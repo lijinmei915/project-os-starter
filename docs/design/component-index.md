@@ -1,20 +1,30 @@
 # 组件目录说明
 
-> 这是 `docs/design/` 的入口文件，记录组件分层和文档索引。
+> 这是未来组件文档的入口。
+> 当前阶段没有真实组件库和业务组件，只保留分层规则。
 
-## 分层
+## 当前状态
+
+- 尚未接入 Radix / shadcn / ai-components
+- 尚未建立 `src/components`
+- 尚未沉淀真实组件文档
+
+## 组件分层
 
 | 层级 | 说明 |
 |------|------|
-| Primitive | 基础 UI 原语 |
-| Pattern | 业务组合与交互规则 |
+| Primitive | 基础 UI 原语，如 Button、Input、Dialog |
+| Pattern | 业务组合与交互规则，如 SearchBar、DataTable、FormSection |
+| Page | 页面级编排，不提前抽复用 |
 
-## 组件索引
+## 后续登记规则
 
-| 组件 / Pattern | 分层 | 文档 |
-|----------------|------|------|
-| `{{Button}}` | Primitive | `docs/design/{{buttons}}.md` |
-| `{{FormField}}` | Pattern | `docs/design/{{form-field}}.md` |
+新增共享组件时再登记：
+
+| 组件 / Pattern | 分层 | 文档 | 代码位置 |
+|----------------|------|------|----------|
+| 暂无 | 暂无 | 暂无 | 暂无 |
 
 备注：
-- 没有对应文档的共享组件，不算真正沉淀完成。
+- 没有真实代码和真实用法前，不预填组件清单。
+- 组件层选型完成后，再补组件索引。

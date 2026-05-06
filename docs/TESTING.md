@@ -45,10 +45,10 @@ bash scripts/check-runtime.sh .
 目标：确认当前任务仍服务于项目阶段目标。
 
 检查项：
-- `docs/HANDOFF.md` 的“下一步”是否能对应 `docs/PRODUCT_PLAN.md` 的近期优先级
-- `docs/PROJECT.md` 的“当前范围”是否能覆盖近期规划里的任务
+- `HANDOFF.md` 的“下一步”是否能对应 `docs/PRODUCT_PLAN.md` 的近期优先级
+- `PROJECT.md` 的“当前范围”是否能覆盖近期规划里的任务
 - `docs/PRODUCT_PLAN.md` 的“本阶段不做”是否没有被放进当前下一步
-- 如果临时改变优先级，是否在 `docs/HANDOFF.md` 或 `docs/DECISIONS.md` 说明原因
+- 如果临时改变优先级，是否在 `HANDOFF.md` 或 `docs/DECISIONS.md` 说明原因
 - 如果跨层改动较大，是否更新 `docs/CHANGELOG.md`
 
 ### 4. 设计一致性检查
@@ -83,5 +83,5 @@ bash scripts/check-runtime.sh .
 - 本轮改动是否还符合 `docs/PRODUCT_PLAN.md` 的当前阶段目标
 - 如果改了 UI，是否符合 `docs/DESIGN_STANDARDS.md`
 - 如果改了代码，是否运行了对应测试或说明为什么没跑
-- 如果改变了下一步，是否更新 `docs/HANDOFF.md`
+- 如果改变了下一步，是否更新 `HANDOFF.md`
 - 如果形成新规则或踩坑，是否更新 `docs/LESSONS.md`

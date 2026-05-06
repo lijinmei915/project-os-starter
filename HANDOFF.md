@@ -30,6 +30,8 @@
 - 已强化 `design-system` 对“设计 tokens / tokens 规范”的触发
 - 已强化 `frontend` 对“登录页 / 页面 / 组件”的触发
 - 已完成 7 条 CLI 复测：7 条 pass
+- 已清理 `docs/` 旧模板残留，删除 `docs/PROJECT.md` / `docs/HANDOFF.md`
+- 已将 `docs/PRODUCT_PLAN.md`、`docs/DECISIONS.md`、`docs/DESIGN_STANDARDS.md`、`docs/LESSONS.md` 改为当前 Project OS 真实内容
 
 ## 不做事项
 
@@ -41,11 +43,10 @@
 
 ## 风险与待确认
 
-- `docs/` 中仍有旧模板文档，后续需要决定保留为参考还是继续瘦身
 - CLI print 模式不一定显式输出 skill banner，当前以固定第一响应前缀和行为判断路由
+- 组件层尚未接入，后续再决定 Radix / shadcn / ai-components
 
 ## 下一步
 
-1. 决定 `docs/` 中旧模板文档的保留策略
-2. 做首个收口 commit
-3. 后续再进入组件层选型：`ai-components` / Radix / shadcn
+1. 提交 docs 清理结果
+2. 后续再进入组件层选型：`ai-components` / Radix / shadcn

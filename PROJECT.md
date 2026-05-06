@@ -32,20 +32,19 @@
 - 设计系统：`design-system` 已能承接 Design Tokens 请求
 - 前端实现：`frontend` 已能承接具体页面请求
 - 根入口分层：`AGENTS.md` / `CLAUDE.md` 已同步 v1 路由契约
+- docs 清理：已删除 `docs/PROJECT.md` / `docs/HANDOFF.md`，根目录文件作为 SSOT
 
 ## 已知问题
 
-- 仍有历史模板文档残留在 `docs/` 中
 - 组件运行层 `ai-components` 尚未建立
 - CLI print 模式通过固定第一响应前缀判断路由
 - 自动校验目前仍以人工/CLI 复测记录为主
 
 ## 下一步重点
 
-1. 决定 `docs/` 中历史模板文档的保留策略
-2. 做首个收口 commit
-3. 提高自动校验稳定性
-4. 后续再评估 `ai-components` / Radix / shadcn，不在当前阶段接入
+1. 提交 docs 清理结果
+2. 提高自动校验稳定性
+3. 后续再评估 `ai-components` / Radix / shadcn，不在当前阶段接入
 
 ## 重要说明
 

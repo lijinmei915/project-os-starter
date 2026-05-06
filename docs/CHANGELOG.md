@@ -14,6 +14,41 @@
 
 ## 2026-05-06
 
+### Project OS / docs 收口
+
+#### 清理旧模板文档并统一 SSOT
+
+改动：
+- 删除 `docs/PROJECT.md` 和 `docs/HANDOFF.md`
+- 将当前状态和交接上下文统一到根目录 `PROJECT.md` / `HANDOFF.md`
+- 将 `docs/PRODUCT_PLAN.md` 改成 Project OS 当前路线图
+- 将 `docs/DECISIONS.md` 改成真实架构决策记录
+- 将 `docs/DESIGN_STANDARDS.md` 改成当前阶段的设计规则边界
+- 将 `docs/LESSONS.md` 改成真实错误模式记录
+- 将 `docs/design/component-index.md` 改成当前无组件状态说明
+- 将 `tests/cases.md` 改成 v1 测试索引，详细记录仍在 `.claude/skills/tests/cases.md`
+
+影响：
+- `docs/` 不再保留和根目录冲突的项目状态 / 交接文档
+- 后续查当前状态只看 `PROJECT.md`
+- 后续查当前交接只看 `HANDOFF.md`
+- `docs/` 只承接长期规范、决策、测试和设计参考
+
+相关文件：
+- `PROJECT.md`
+- `HANDOFF.md`
+- `docs/PRODUCT_PLAN.md`
+- `docs/DECISIONS.md`
+- `docs/DESIGN_STANDARDS.md`
+- `docs/LESSONS.md`
+- `docs/TESTING.md`
+- `docs/design/component-index.md`
+- `tests/cases.md`
+
+---
+
+## 2026-05-06
+
 ### Project OS / 路由收口
 
 #### 修复 v1 路由契约与 CLI print 模式入口偏移
@@ -44,26 +79,5 @@
 - `.claude/skills/design-system/SKILL.md`
 - `.claude/skills/frontend/SKILL.md`
 - `.claude/skills/tests/cases.md`
-
----
-
-## {{YYYY-MM-DD}}
-
-### {{主题分区，例如"登录 / 认证 / 数据隔离"}}
-
-#### {{一句话改动标题}}
-
-改动：
-- {{具体做了什么}}
-- {{}}
-
-影响：
-- {{对后续开发、用户体验、架构的实际影响}}
-
-相关文件：
-- `{{路径 1}}`
-- `{{路径 2}}`
-
----
 
 <!-- 更早的日期往下追加，新的在上 -->

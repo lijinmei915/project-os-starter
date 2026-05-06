@@ -175,30 +175,24 @@
 - 新目录能长期存在，不是为一次性需求临时加的
 - 新目录命名能表达职责，而不是只表达技术名词
 
-## 本项目示例（可选）
-
-> 这一节不是必须的。
-> 只有当当前项目已经有相对稳定的代码结构，并且这些示例能帮助后续协作时，才补。
-
-### 主应用示例
+## 当前 Project OS 结构
 
 | 文件 | 职责 |
 |------|------|
-| `{{根组件路径}}` | 根组件、全局状态、路由 |
-| `{{数据层路径}}` | 所有 {{数据源}} 操作 |
-| `{{侧边栏/导航路径}}` | 布局、导航 |
-| `{{核心列表 pattern 路径}}` | 主列表/网格展示 |
-| `{{核心表单 pattern 路径}}` | 新增/编辑弹窗 |
-
-### 样式与配置示例
-
-| 文件 | 职责 |
-|------|------|
-| `{{样式入口}}` | 入口：外部依赖 + @import 子文件 |
-| `{{token 文件}}` | CSS 变量 / 设计 token |
-| `index.html` | HTML 入口 |
-| `{{构建配置}}` | 构建配置 |
+| `README.md` | 给人看的入口说明 |
+| `AGENTS.md` | AI 运行规则和 v1 路由契约 |
+| `CLAUDE.md` | Claude 专属配置和 CLI 第一响应约束 |
+| `PROJECT.md` | 当前项目状态 SSOT |
+| `HANDOFF.md` | 当前交接上下文 SSOT |
+| `.claude/skills/REGISTRY.md` | 内部 skill 注册表 |
+| `.claude/skills/project-setup/SKILL.md` | 项目级请求入口 |
+| `.claude/skills/project-setup/references/` | INIT / AUDIT / HYBRID / CLARIFICATION 流程材料 |
+| `.claude/skills/design-system/SKILL.md` | 设计规则和 Design Tokens 能力边界 |
+| `.claude/skills/frontend/SKILL.md` | 页面和组件实现能力边界 |
+| `.claude/skills/tests/cases.md` | v1 路由测试记录 |
+| `scripts/check-runtime.sh` | Runtime 文件结构校验 |
+| `docs/` | 长期规范、决策、变更和测试说明 |
 
 备注：
-- 如果老项目已有更好的结构说明，就不用硬套这份示例。
-- 命名不清时，优先让目录表达“职责”，不是“技术名词”。
+- 当前还不是前端工程，没有 `src/`、`package.json` 或构建产物。
+- 后续接组件层时，再按本文件前面的职责分类补真实代码目录。
