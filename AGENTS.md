@@ -1,0 +1,271 @@
+# AGENTS
+
+`AGENTS.md` 是 AI 运行规则，不是项目介绍。
+
+本项目定位为 AI Runtime / Project OS。所有助手在本仓库内工作时，优先遵守本文，再按任务需要加载其他文档。
+
+## 系统结构
+
+本项目分为三层：
+
+- `project-setup`：入口与路由
+- `design-system`：设计规则
+- `frontend`：代码实现
+
+当前阶段是收口期：只稳定内核，不扩功能。
+
+## 规则优先级
+
+1. 当前对话里用户刚刚明确说的话
+2. 本文件 `AGENTS.md`
+3. `PROJECT.md`、`HANDOFF.md`、仓库内相关文档
+4. 助手专属配置文件，如 `CLAUDE.md`
+5. 全局用户偏好
+6. 助手自身默认行为
+
+冲突处理：越靠近当前任务、越具体的规则优先。
+
+## 入口控制
+
+- 所有项目相关请求优先进入 `project-setup`
+- 其他 skill 不能直接抢入口
+- 如果请求涉及新项目、接管项目、结构整理、协作规则、文档收口，必须先按 `project-setup` 判断
+- 模糊产品请求先走 `project-setup / CLARIFICATION`
+- 不确定当前项目状态时，默认按 `HYBRID` 处理
+
+## 路由规则
+
+`project-setup` 负责三种模式：
+
+- `CLARIFICATION`：模糊产品 / 想法 / 东西请求
+- `INIT`：启动新软件产品、系统、应用、网站、看板、仓库
+- `AUDIT`：分析项目现状，包括职责承接和缺口
+- `HYBRID`：接管项目，默认模式
+
+内部流程 reference 放在：
+
+- `.claude/skills/project-setup/references/init.md`
+- `.claude/skills/project-setup/references/audit.md`
+- `.claude/skills/project-setup/references/hybrid.md`
+- `.claude/skills/project-setup/references/clarification.md`
+
+这些文件是内部流程材料，不是独立 skill。
+
+## v1 路由契约
+
+以下输入必须稳定分流：
+
+| 用户输入 | 目标 |
+|----------|------|
+| 我想做一个产品 | `project-setup / CLARIFICATION` |
+| 我想做一个后台管理系统 | `project-setup / INIT` |
+| 我想快速做一个后台管理系统原型 | `project-setup / INIT / Prototype-first` |
+| 帮我看看这个项目架构怎么样 | `project-setup / AUDIT` |
+| 这个项目有点乱，帮我整理一下继续做 | `project-setup / HYBRID` |
+| 帮我设计 tokens 规范 | `design-system` |
+| 帮我写一个登录页 | `frontend` |
+
+v1 测试输出必须先打路由前缀，再进入正文。
+
+```txt
+帮我写一个登录页
+-> 第一行：Skill: frontend
+```
+
+### CLARIFICATION 第一响应
+
+用户只说“我想做一个产品 / 我有个想法 / 想做个东西”时，不要泛问“什么产品”。
+
+必须先走内部澄清，且只问下面这一组问题，不要扩展成目标用户、平台、技术栈、已有代码：
+
+```txt
+这是一个 CLARIFICATION 请求。我先确认一下：
+
+1. 你是想做软件系统，还是产品方案？
+2. 如果是软件系统，是想快速出原型，还是先建项目基础？
+```
+
+### INIT 第一响应
+
+用户想做新的软件、系统、应用、网站、看板时，如果没有明确启动方式，先问启动模式。
+
+不要先问技术栈、功能范围、数据库、部署、权限、模块、用户角色或组件库。
+
+```txt
+这是一个 INIT 请求。你希望我按哪种方式开始？
+
+1. 快速原型：先生成一个能看的页面
+2. 项目治理：先建立项目结构、文档、规范
+3. 完整项目：先建基础，再生成页面
+```
+
+如果用户明确说“快速 / 原型 / prototype”，直接判定：
+
+```txt
+Start mode: Prototype-first
+本次目标：先生成一个可见原型。
+```
+
+之后最多问一个范围问题，不要先问技术栈、数据库、组件库。
+
+### v1 验收输入的固定处理
+
+这几条是 v1 收口测试用例，必须稳定输出：
+
+```txt
+输入：我想做一个产品
+输出：这是一个 CLARIFICATION 请求。我先确认一下：
+1. 你是想做软件系统，还是产品方案？
+2. 如果是软件系统，是想快速出原型，还是先建项目基础？
+```
+
+```txt
+输入：我想做一个后台管理系统
+输出：这是一个 INIT 请求。你希望我按哪种方式开始？
+1. 快速原型：先生成一个能看的页面
+2. 项目治理：先建立项目结构、文档、规范
+3. 完整项目：先建基础，再生成页面
+```
+
+```txt
+输入：我想快速做一个后台管理系统原型
+输出：Start mode: Prototype-first
+本次目标：先生成一个可见原型。
+```
+
+```txt
+输入：帮我写一个登录页
+输出：Skill: frontend
+```
+
+### HYBRID 第一响应
+
+用户说“这个项目 / 当前项目 / 继续做 / 整理一下”时，在项目目录里默认指当前 workspace。
+
+不要先问这是本地项目、Supabase、Vercel、GitHub 还是其他平台。
+
+如果没有文件读取工具：
+
+```txt
+这是一个 HYBRID 请求，但当前没有可用的文件读取工具。
+请提供文件访问权限，或先贴 README.md / PROJECT.md / AGENTS.md 的内容。
+```
+
+### 领域 skill 第一响应
+
+- “设计 tokens / tokens 规范 / UI 规范”默认是 `design-system`，不要先解释 Auth Token 或 LLM Token。
+- “登录页 / 页面 / 组件 / 表单 / 表格”默认是 `frontend`，不要当成新项目初始化。
+- 具体页面 / 组件请求的第一行应输出 `Skill: frontend`，方便测试和交接判断。
+
+## 设计约束
+
+涉及 UI 时必须经过 `design-system`。
+
+UI 必须：
+
+- 使用 tokens，不写死样式
+- 使用布局原语，如 Page、Stack、Grid
+- 使用标准组件
+- 遵守已有设计规范
+
+禁止：
+
+- 随意设计 UI
+- 跳过 tokens
+- 自由发挥组件风格
+
+## 前端约束
+
+`frontend` 只负责实现，不负责重新设计。
+
+实现前必须确认：
+
+- 设计规则来自 `design-system`
+- 组件边界清楚
+- 交互状态完整
+- 可点击元素有 hover 和 focus-visible 状态
+
+## 语言规则
+
+- 自动识别用户语言
+- 用用户语言回答
+- Scheduling / hard rules: English first, with Chinese explanation when needed
+- 日常说明 / 项目文档：中文为主
+- 用户交互文案：跟随用户语言
+- 内部调度名、目录名、模式名使用稳定英文
+
+原则：
+
+```txt
+English for scheduling, Chinese for cognition.
+```
+
+中文解释：调度名、模式名、硬规则用英文优先，降低歧义；项目说明和认知文档用中文为主；面向用户的产品文案跟随用户语言。
+
+语言分层：
+
+| 文件 / 区域 | 语言策略 |
+|-------------|----------|
+| `SKILL.md` | English hard rules + 中文解释 |
+| `AGENTS.md` | 中英混合 |
+| `README.md` | 中文 |
+| `PROJECT.md` | 中文 |
+| `HANDOFF.md` | 中文 |
+| `references/` | 中文为主，关键约束可用英文 |
+
+总规则：
+
+```txt
+The closer to scheduling and execution, the more English.
+The closer to understanding and handoff, the more Chinese.
+```
+
+## 协作规则
+
+- 默认短答：先结论，再方案，最后补风险
+- 任何代码或文件改动前，先说方案，等用户确认后再执行
+- 只做用户明确要求的事，不擅自扩展任务范围
+- 发现缺失文件时，先报告缺什么和处理选项，不顺手创建
+- 能基于现有文档和上下文判断的，不重复追问
+- 做 review 时，先列具体问题，再说影响和建议
+- 改完按“改了什么 / 为什么这样改 / 还有什么风险或待确认”汇报
+- commit 后主动问“要推上去吗？”，未确认前不 push
+
+## 文档分层
+
+- `README.md`：给人看的入口说明
+- `AGENTS.md`：给 AI 用的运行规则
+- `PROJECT.md`：当前项目状态
+- `HANDOFF.md`：当前交接上下文
+
+README 不写运行规则。
+
+AGENTS 不写产品介绍。
+
+PROJECT 不写交接细节。
+
+HANDOFF 不写长期路线。
+
+## 冲突处理
+
+如果被其他泛化澄清流程带偏，但用户请求仍属于本项目相关工作，必须切回 `project-setup`。
+
+如果文档之间冲突，按 SSOT 判断：
+
+- 入口说明看 `README.md`
+- AI 行为看 `AGENTS.md`
+- 当前状态看 `PROJECT.md`
+- 当前交接看 `HANDOFF.md`
+
+## 禁止行为
+
+- 不要把 reference 当成 skill
+- 不要把流程片段暴露成入口能力
+- 不要在收口期增加功能
+- 不要优化 UI
+- 不要新增自动化
+- 不要为了填满文档而编造信息
+
+## 犯错后必须记录
+
+任何一次触发 bug、误删、误配、误改的操作，都必须把复盘和新增约束写进 `docs/LESSONS.md`。
