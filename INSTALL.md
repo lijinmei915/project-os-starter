@@ -76,6 +76,8 @@ examples/
 tests/
 scripts/check-runtime.sh
 scripts/install-project-os.sh
+scripts/install-adapter.sh
+adapters/
 ```
 
 可选内容：
@@ -86,6 +88,38 @@ CLAUDE.md
 
 中文说明：
 `CLAUDE.md` 是 Claude 专属增强文件。如果源仓库里没有这个文件，安装脚本会安全跳过，不影响 Project OS 运行。
+
+---
+
+## 安装模型 / 工具适配
+
+Project OS 的通用规则源头是：
+
+```txt
+AGENTS.md
+```
+
+不同工具的专属入口由 adapter 生成：
+
+```txt
+adapters/CLAUDE.md -> CLAUDE.md
+adapters/CODEX.md  -> CODEX.md
+adapters/CURSOR.md -> .cursor/rules/project-os.md
+adapters/GEMINI.md -> GEMINI.md
+```
+
+安装方式：
+
+```bash
+bash scripts/install-adapter.sh claude .
+bash scripts/install-adapter.sh codex .
+bash scripts/install-adapter.sh cursor .
+bash scripts/install-adapter.sh gemini .
+```
+
+中文说明：
+adapter 不是新的规则源头，只是把 `AGENTS.md` 的职责翻译成对应工具更容易自动读取的文件。
+需要哪个工具，就安装哪个 adapter。
 
 ---
 
@@ -136,6 +170,8 @@ examples/
 tests/
 scripts/check-runtime.sh
 scripts/install-project-os.sh
+scripts/install-adapter.sh
+adapters/
 ```
 
 然后执行：

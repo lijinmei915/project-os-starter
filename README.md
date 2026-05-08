@@ -123,6 +123,17 @@ bash scripts/check-runtime.sh .
 
 完整安装说明见 `INSTALL.md`。
 
+如需写入具体工具的自动读取规则，可以安装 adapter：
+
+```bash
+bash scripts/install-adapter.sh claude .
+bash scripts/install-adapter.sh codex .
+bash scripts/install-adapter.sh cursor .
+bash scripts/install-adapter.sh gemini .
+```
+
+adapter 会把 `adapters/` 里的模板写入对应工具自己的入口文件，但规则源头仍然是 `AGENTS.md`。
+
 ## 常用 slash commands
 
 在 Claude Code 中可以使用项目级 `/` 命令：

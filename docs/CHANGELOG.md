@@ -21,6 +21,8 @@
 改动：
 - 新增 `INSTALL.md`，提供给人和 AI 的安装说明
 - 新增 `scripts/install-project-os.sh`，支持把 Project OS 安装到目标目录
+- 新增 `adapters/`，提供 Claude / Codex / Cursor / Gemini 适配模板
+- 新增 `scripts/install-adapter.sh`，支持按工具写入对应模型/工具入口文件
 - 在 `README.md` 增加“给别人使用”的自然语言安装提示
 - 在 `check-runtime.sh` 中检查安装说明和安装脚本
 - 使用临时空目录完成试装，并通过目标目录内的 `check-runtime.sh` 校验
@@ -28,12 +30,15 @@
 影响：
 - 使用者拿到 GitHub 地址后，可以直接让 AI clone 源仓库并运行安装脚本
 - 安装脚本会复制 Project OS 核心文件，并把冲突文件备份到 `.project-os/backups/`
+- adapter 让 Claude / Codex / Cursor / Gemini 读取各自入口文件，但规则源头仍然是 `AGENTS.md`
 - Project OS 从“可 clone 的 starter”升级为“可安装到已有项目的 runtime”
 
 相关文件：
 - `INSTALL.md`
 - `README.md`
 - `scripts/install-project-os.sh`
+- `scripts/install-adapter.sh`
+- `adapters/`
 - `scripts/check-runtime.sh`
 - `PROJECT.md`
 - `HANDOFF.md`

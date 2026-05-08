@@ -44,6 +44,8 @@
 - 已新增 `INSTALL.md`，提供给人和 AI 的安装说明
 - 已新增 `scripts/install-project-os.sh`，支持把 Project OS 自动安装到目标目录
 - 已用临时空目录试装并通过 `check-runtime.sh` 校验：0 warning
+- 已新增 `adapters/CLAUDE.md`、`CODEX.md`、`CURSOR.md`、`GEMINI.md`
+- 已新增 `scripts/install-adapter.sh`，可按工具写入 `CLAUDE.md` / `CODEX.md` / `.cursor/rules/project-os.md` / `GEMINI.md`
 
 ## 不做事项
 
@@ -60,5 +62,5 @@
 
 ## 下一步
 
-1. 提交 Project OS 安装自动化改动
+1. 提交 Project OS 安装与 adapter 自动化改动
 2. 后续再进入组件层选型：`ai-components` / Radix / shadcn

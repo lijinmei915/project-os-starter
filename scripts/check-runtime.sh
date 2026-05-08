@@ -62,9 +62,15 @@ for file in README.md AGENTS.md PROJECT.md HANDOFF.md; do
   fi
 done
 
-for file in INSTALL.md scripts/install-project-os.sh; do
+for file in INSTALL.md scripts/install-project-os.sh scripts/install-adapter.sh; do
   if ! has_file "$file"; then
     warn "missing Project OS installation helper: $file"
+  fi
+done
+
+for file in adapters/CLAUDE.md adapters/CODEX.md adapters/CURSOR.md adapters/GEMINI.md; do
+  if ! has_file "$file"; then
+    warn "missing Project OS adapter template: $file"
   fi
 done
 

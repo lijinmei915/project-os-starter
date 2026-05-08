@@ -115,10 +115,12 @@ copy_file "INSTALL.md"
 copy_dir "docs"
 copy_dir "examples"
 copy_dir "tests"
+copy_dir "adapters"
 
 mkdir -p "$target_abs/scripts"
 copy_file "scripts/check-runtime.sh"
 copy_file "scripts/install-project-os.sh"
+copy_file "scripts/install-adapter.sh"
 
 if [ -f "$target_abs/.gitignore" ]; then
   if ! grep -q '^\.DS_Store$' "$target_abs/.gitignore"; then
