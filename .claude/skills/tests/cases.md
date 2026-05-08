@@ -211,3 +211,103 @@ Result 2026-05-06 after frontend-prefix fix:
 - status: pass
 - actual: First line was `Skill: frontend`, then asked for technology stack, styling, and login method.
 - reason: Explicitly identified the frontend route before implementation questions.
+
+---
+
+## Project OS Installation Entry Tests
+
+目标：验证 Project OS 安装 / 接入 / 检查入口同时支持自然语言和 `/os`。
+
+### Install Case 1
+
+Input: 帮我初始化这个项目
+
+Expected:
+- INSTALL FLOW
+- directory detection
+- INIT if empty / near-empty
+- CHECK-UPGRADE if Project OS is already installed
+
+Result 2026-05-06:
+- status: pass
+- command: `claude -p "帮我初始化这个项目" --no-session-persistence --tools ""`
+- actual: Detected current directory as an installed Project OS project and routed to `INSTALL / CHECK-UPGRADE`.
+- reason: Correctly avoided treating an already-installed Project OS directory as normal HYBRID takeover.
+
+### Install Case 2
+
+Input: 这个老项目有点乱，帮我接管一下
+
+Expected:
+- INSTALL FLOW
+- directory detection
+- HYBRID if existing codebase
+
+Result 2026-05-06:
+- status: pass
+- command: `claude -p "这个老项目有点乱，帮我接管一下" --no-session-persistence --tools ""`
+- actual: Routed to `INSTALL / HYBRID` and proposed takeover steps.
+- reason: Correctly treated takeover / organize / continue intent as HYBRID.
+
+### Install Case 3
+
+Input: /os
+
+Expected:
+- INSTALL FLOW
+- directory detection
+- EMPTY -> INSTALL / INIT
+- EXISTING -> INSTALL / HYBRID
+- INSTALLED -> INSTALL / CHECK-UPGRADE
+
+Result 2026-05-06:
+- status: pass-with-note
+- command: interactive `claude`, then `/os`
+- actual: Claude Code discovered the project slash command and displayed `/os` with description: "Enter Project OS install/adopt/check flow for the current directory."
+- reason: Command registration is valid. Automated `-p` print mode does not expand slash commands, so execution must be hand-tested in interactive Claude Code.
+
+### Install Case 4
+
+Input: 帮我检查一下 Project OS 有没有缺文件
+
+Expected:
+- INSTALL FLOW
+- existing Project OS check
+- repair proposal if files are missing
+
+Result 2026-05-06:
+- status: pass-with-issue
+- command: `claude -p "帮我检查一下 Project OS 有没有缺文件" --no-session-persistence --tools ""`
+- actual: Detected installed Project OS and entered CHECK-UPGRADE mode, then reported file visibility limitations.
+- reason: Route is correct. Issue: first line did not exactly print `INSTALL / CHECK-UPGRADE`, but the body classified the mode correctly.
+- patch: Keep first-response prefix rule in `CLAUDE.md` / `AGENTS.md`; retest in normal interactive mode with read tools enabled if strict output format is required.
+
+### Install Case 5
+
+Input: 只帮我看看，不要改
+
+Expected:
+- AUDIT
+- no file modification
+
+Result 2026-05-06:
+- status: pass
+- command: `claude -p "只帮我看看，不要改" --no-session-persistence --tools ""`
+- actual: Produced an `AUDIT` result and did not modify files.
+- reason: Correctly respected inspect-only intent.
+
+### Install Case 6
+
+Input: 我想做一个项目
+
+Expected:
+- INIT
+- ask start mode if unclear
+
+### Install Case 7
+
+Input: 接管这个老项目
+
+Expected:
+- HYBRID
+- inspect existing project first

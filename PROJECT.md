@@ -33,6 +33,9 @@
 - 前端实现：`frontend` 已能承接具体页面请求
 - 根入口分层：`AGENTS.md` / `CLAUDE.md` 已同步 v1 路由契约
 - docs 清理：已删除 `docs/PROJECT.md` / `docs/HANDOFF.md`，根目录文件作为 SSOT
+- slash commands：已新增 `/os-check`、`/os-test`、`/os-handoff`
+- install flow：已新增自然语言 + `/os` 双入口，用于 Project OS 安装 / 接入 / 检查
+- install flow 复测：自然语言初始化已能进入 `INSTALL / CHECK-UPGRADE`，自然语言接管已能进入 `INSTALL / HYBRID`
 
 ## 已知问题
 
@@ -42,9 +45,9 @@
 
 ## 下一步重点
 
-1. 提交 docs 清理结果
-2. 提高自动校验稳定性
-3. 后续再评估 `ai-components` / Radix / shadcn，不在当前阶段接入
+1. 提交 INSTALL FLOW 和 slash commands 改动
+2. 后续再评估 `ai-components` / Radix / shadcn，不在当前阶段接入
+3. 提高自动校验稳定性
 
 ## 重要说明
 

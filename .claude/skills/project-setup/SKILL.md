@@ -7,6 +7,9 @@ description: >
   system, app, website, dashboard, repo, or codebase.
   Also use this skill for vague product requests such as "我想做一个产品" and
   route them to CLARIFICATION before execution.
+  When the user invokes /os or naturally asks to initialize, install, adopt,
+  repair, check, or upgrade Project OS in the current directory, route to
+  INSTALL before INIT, HYBRID, AUDIT, or CLARIFICATION.
   This skill classifies the request into INIT, AUDIT, or HYBRID before any code,
   UI, or file generation.
   For unclear INIT requests, ask the INIT start mode question before asking
@@ -19,10 +22,10 @@ description: >
 
 Primary entry skill for project-related requests.
 
-This skill controls project setup, project audit, and project takeover workflows.
+This skill controls Project OS install/adoption, project setup, project audit, and project takeover workflows.
 
 中文说明：
-这是项目相关请求的主入口，负责判断用户是在初始化项目、审计项目，还是接管已有项目。
+这是项目相关请求的主入口，负责判断用户是在安装 Project OS、初始化项目、审计项目，还是接管已有项目。
 
 ---
 
@@ -45,6 +48,7 @@ Project-level requests MUST be classified before execution.
 
 Classification:
 
+- INSTALL: install / adopt / check / upgrade Project OS in current directory
 - CLARIFICATION: vague product / idea / thing request
 - INIT: new software product / system / app / website / dashboard / repo
 - AUDIT: analyze only
@@ -57,9 +61,85 @@ Classification:
 
 ---
 
+## Project OS Installation Entry
+
+Project OS can enter the installation flow through either natural language intent detection or the explicit `/os` command.
+
+The assistant MUST NOT require the user to use `/os`.
+
+### Entry Methods
+
+#### 1. Natural language intent detection
+
+When the user expresses intent to initialize, install, adopt, repair, check, or upgrade Project OS in the current directory, automatically route to `references/install.md`.
+
+Typical expressions include:
+
+- 帮我初始化这个项目
+- 帮我把 Project OS 装进这个项目
+- 帮我接管这个老项目
+- 这个项目有点乱，帮我规范一下
+- 帮我检查 Project OS 有没有缺文件
+- 帮我升级一下 Project OS
+- 这是空目录，帮我开始
+- 这是已有项目，帮我接入规范
+
+#### 2. Explicit command entry
+
+When the user invokes:
+
+```txt
+/os
+```
+
+route directly to `references/install.md`.
+
+The `/os` command is an explicit shortcut and fallback entry, not the only supported entry.
+
+中文说明：
+Project OS 支持两种入口：
+普通用户直接说自然语言，高级用户可以输入 `/os`。
+`/os` 是显式入口和兜底入口，不是唯一入口。
+
+### Install routing
+
+MUST route to INSTALL before INIT / HYBRID / AUDIT / CLARIFICATION.
+
+INSTALL means Project OS distribution into a workspace.
+It must inspect the directory and combine directory state with user intent:
+
+```txt
+Install / initialize / check / upgrade intent:
+- EMPTY / NEAR-EMPTY -> INSTALL / INIT
+- INSTALLED          -> INSTALL / CHECK-UPGRADE
+- EXISTING           -> INSTALL / HYBRID
+- UNKNOWN            -> INSTALL / NEEDS ACCESS
+
+Take over / continue / organize intent:
+- EXISTING or INSTALLED -> INSTALL / HYBRID
+
+Inspect-only intent:
+- AUDIT
+```
+
+中文说明：
+INSTALL 不是普通项目需求，而是 Project OS 自己的安装 / 接入 / 检查入口。
+它先判断用户是在安装检查 Project OS，还是接管继续做项目，再结合当前目录状态决定下一步。
+
+---
+
 ## Modes
 
 This skill has three modes:
+
+### INSTALL
+
+Use INSTALL when the user invokes `/os` or asks to install, adopt, check, or upgrade Project OS in the current directory.
+
+INSTALL means Project OS distribution and adoption.
+
+中文说明：
+INSTALL 是 Project OS 的分发和接入流程，不是普通产品初始化。
 
 ### INIT
 
@@ -95,15 +175,16 @@ HYBRID 是“接管项目”，先盘点、整理、稳定，再继续推进。
 ## Hard Rules
 
 - DO NOT let frontend act as the first responder for project-level requests.
+- DO NOT route `/os` to normal INIT before INSTALL classification.
 - DO NOT skip project state detection.
-- MUST decide INIT / AUDIT / HYBRID before taking action.
+- MUST decide INSTALL / INIT / AUDIT / HYBRID before taking action.
 - MUST decide INIT start mode before UI, code, or file generation.
 - MUST ask at most 2-3 questions when clarification is needed.
 - MUST prefer HYBRID when unsure.
 
 中文说明：
 项目级请求不能跳过分类直接写页面或代码。
-必须先判断项目状态，再决定走 `INIT` / `AUDIT` / `HYBRID`。
+必须先判断项目状态，再决定走 `INSTALL` / `INIT` / `AUDIT` / `HYBRID`。
 如果是 INIT，还要先明确启动方式。
 不确定时默认 `HYBRID`。
 
@@ -143,6 +224,7 @@ INIT 阶段必须先确认启动方式。不能一上来直接问技术栈、功
 
 After mode detection:
 
+- INSTALL -> read `references/install.md`
 - INIT -> read `references/init.md`
 - AUDIT -> read `references/audit.md`
 - HYBRID -> read `references/hybrid.md`

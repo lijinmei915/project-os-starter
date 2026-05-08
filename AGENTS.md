@@ -29,14 +29,65 @@
 
 - 所有项目相关请求优先进入 `project-setup`
 - 其他 skill 不能直接抢入口
+- Project OS 安装 / 接入 / 检查请求进入 `INSTALL FLOW`
 - 如果请求涉及新项目、接管项目、结构整理、协作规则、文档收口，必须先按 `project-setup` 判断
 - 模糊产品请求先走 `project-setup / CLARIFICATION`
 - 不确定当前项目状态时，默认按 `HYBRID` 处理
+
+## Project OS Installation Entry
+
+Project OS 支持两种安装 / 接入入口：
+
+```txt
+自然语言识别意图 = 默认入口
+/os = 显式入口 / 高级入口 / 兜底入口
+```
+
+当用户表达以下意图时，自动进入 `INSTALL FLOW`，不要要求用户必须输入 `/os`：
+
+- 帮我初始化这个项目
+- 帮我把 Project OS 装进这个项目
+- 帮我接管这个老项目
+- 这个项目有点乱，帮我规范一下
+- 帮我检查 Project OS 有没有缺文件
+- 帮我升级一下 Project OS
+- 这是空目录，帮我开始
+- 这是已有项目，帮我接入规范
+
+当用户输入：
+
+```txt
+/os
+```
+
+也直接进入 `INSTALL FLOW`。
+
+`INSTALL FLOW` 只负责判断 Project OS 如何进入当前目录，不做业务 UI，不接组件库。
+
+INSTALL 路由必须同时看用户意图和目录状态：
+
+```txt
+安装 / 初始化 / 检查 / 升级 Project OS：
+- 空目录 / 近似空目录 -> INSTALL / INIT
+- 已安装 Project OS -> INSTALL / CHECK-UPGRADE
+- 已有代码但未安装 Project OS -> INSTALL / HYBRID
+
+接管 / 继续 / 整理项目：
+- 已有项目或已安装 Project OS -> INSTALL / HYBRID
+
+只看不改：
+- AUDIT
+```
+
+中文说明：
+“帮我初始化这个项目”在已安装 Project OS 的目录里，不要误判成 HYBRID；应该先检查当前 Project OS 结构和缺口。
+“帮我接管这个老项目 / 整理继续做”才进入 HYBRID。
 
 ## 路由规则
 
 `project-setup` 负责三种模式：
 
+- `INSTALL`：Project OS 安装 / 接入 / 检查 / 升级
 - `CLARIFICATION`：模糊产品 / 想法 / 东西请求
 - `INIT`：启动新软件产品、系统、应用、网站、看板、仓库
 - `AUDIT`：分析项目现状，包括职责承接和缺口
@@ -44,6 +95,7 @@
 
 内部流程 reference 放在：
 
+- `.claude/skills/project-setup/references/install.md`
 - `.claude/skills/project-setup/references/init.md`
 - `.claude/skills/project-setup/references/audit.md`
 - `.claude/skills/project-setup/references/hybrid.md`
@@ -70,6 +122,18 @@ v1 测试输出必须先打路由前缀，再进入正文。
 ```txt
 帮我写一个登录页
 -> 第一行：Skill: frontend
+```
+
+INSTALL / AUDIT 测试同样必须先打路由前缀：
+
+```txt
+帮我检查一下 Project OS 有没有缺文件
+-> INSTALL / CHECK-UPGRADE
+```
+
+```txt
+只帮我看看，不要改
+-> AUDIT
 ```
 
 ### CLARIFICATION 第一响应

@@ -32,6 +32,15 @@
 - 已完成 7 条 CLI 复测：7 条 pass
 - 已清理 `docs/` 旧模板残留，删除 `docs/PROJECT.md` / `docs/HANDOFF.md`
 - 已将 `docs/PRODUCT_PLAN.md`、`docs/DECISIONS.md`、`docs/DESIGN_STANDARDS.md`、`docs/LESSONS.md` 改为当前 Project OS 真实内容
+- 已新增项目级 slash commands：`/os-check`、`/os-test`、`/os-handoff`
+- 已新增 `INSTALL FLOW`，支持自然语言识别和 `/os` 显式入口
+- 已新增 `/os` 命令作为 Project OS 安装 / 接入 / 检查的统一入口
+- 已复测自然语言 INSTALL FLOW：
+  - “帮我初始化这个项目” -> `INSTALL / CHECK-UPGRADE`
+  - “这个老项目有点乱，帮我接管一下” -> `INSTALL / HYBRID`
+  - “帮我检查一下 Project OS 有没有缺文件” -> CHECK-UPGRADE 语义正确
+  - “只帮我看看，不要改” -> `AUDIT`
+- 已在 Claude Code 交互模式确认 `/os` 命令可被发现；`-p` print 模式不会展开 slash command
 
 ## 不做事项
 
@@ -45,8 +54,9 @@
 
 - CLI print 模式不一定显式输出 skill banner，当前以固定第一响应前缀和行为判断路由
 - 组件层尚未接入，后续再决定 Radix / shadcn / ai-components
+- `/os` 已可被交互式 Claude Code 发现，但自动 TTY 中不方便确认菜单执行，后续可人工手点验证一次
 
 ## 下一步
 
-1. 提交 docs 清理结果
+1. 提交 INSTALL FLOW 和 slash commands 改动
 2. 后续再进入组件层选型：`ai-components` / Radix / shadcn

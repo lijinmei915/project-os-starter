@@ -62,9 +62,15 @@ for file in README.md AGENTS.md PROJECT.md HANDOFF.md; do
   fi
 done
 
-for file in .claude/skills/REGISTRY.md .claude/skills/project-setup/SKILL.md .claude/skills/project-setup/references/init.md .claude/skills/project-setup/references/audit.md .claude/skills/project-setup/references/hybrid.md .claude/skills/project-setup/references/clarification.md .claude/skills/design-system/SKILL.md .claude/skills/frontend/SKILL.md .claude/skills/tests/cases.md .claude/skills/changelog/README.md; do
+for file in .claude/skills/REGISTRY.md .claude/skills/project-setup/SKILL.md .claude/skills/project-setup/references/install.md .claude/skills/project-setup/references/init.md .claude/skills/project-setup/references/audit.md .claude/skills/project-setup/references/hybrid.md .claude/skills/project-setup/references/clarification.md .claude/skills/design-system/SKILL.md .claude/skills/frontend/SKILL.md .claude/skills/tests/cases.md .claude/skills/changelog/README.md; do
   if ! has_file "$file"; then
     error "missing Project OS skill file: $file"
+  fi
+done
+
+for file in .claude/commands/os.md .claude/commands/os-check.md .claude/commands/os-test.md .claude/commands/os-handoff.md; do
+  if ! has_file "$file"; then
+    warn "missing optional Project OS slash command: $file"
   fi
 done
 

@@ -26,6 +26,26 @@
 2026-05-06: 7/7 pass
 ```
 
+## Installation entry case
+
+| Case | Input | Expected |
+|------|-------|----------|
+| I1 | 帮我初始化这个项目 | `INSTALL FLOW -> directory detection -> INIT if empty / CHECK-UPGRADE if installed` |
+| I2 | 这个老项目有点乱，帮我接管一下 | `INSTALL FLOW -> directory detection -> HYBRID if existing` |
+| I3 | /os | `INSTALL FLOW` |
+| I4 | 帮我检查一下 Project OS 有没有缺文件 | `INSTALL FLOW -> CHECK / repair proposal` |
+| I5 | 只帮我看看，不要改 | `AUDIT` |
+| I6 | 我想做一个项目 | `INIT` |
+| I7 | 接管这个老项目 | `HYBRID` |
+
+2026-05-06 quick result:
+
+- I1: pass, current installed Project OS directory routed to `INSTALL / CHECK-UPGRADE`
+- I2: pass, takeover intent routed to `INSTALL / HYBRID`
+- I3: pass-with-note, `/os` command is registered and discoverable in interactive Claude Code; `-p` print mode does not expand slash commands
+- I4: pass-with-issue, detected CHECK-UPGRADE but did not print the exact prefix first
+- I5: pass, inspect-only routed to AUDIT
+
 ## 最小复测命令
 
 ```bash

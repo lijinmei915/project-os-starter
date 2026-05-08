@@ -14,6 +14,67 @@
 
 ## 2026-05-06
 
+### Project OS / install flow
+
+#### 增加自然语言 + `/os` 双入口安装流程
+
+改动：
+- 新增 `references/install.md`
+- 在 `project-setup/SKILL.md` 中加入 Project OS Installation Entry
+- 支持自然语言触发 INSTALL FLOW
+- 支持显式 `/os` 兜底入口
+- 新增 `.claude/commands/os.md`
+- 在测试用例中补充 INSTALL FLOW 相关 case
+
+影响：
+- 普通用户不用记命令，可以直接说“帮我初始化这个项目”
+- 高级用户可以用 `/os` 明确触发安装 / 接入 / 检查
+- INSTALL FLOW 会先判断目录状态，再决定 INIT / HYBRID / CHECK-UPGRADE / AUDIT
+- 已复测自然语言入口：初始化已安装目录进入 `INSTALL / CHECK-UPGRADE`，接管老项目进入 `INSTALL / HYBRID`
+- 已确认 `/os` 在 Claude Code 交互模式中可被发现；`-p` print 模式不展开 slash commands
+
+相关文件：
+- `.claude/skills/project-setup/SKILL.md`
+- `.claude/skills/project-setup/references/install.md`
+- `.claude/commands/os.md`
+- `.claude/skills/tests/cases.md`
+- `tests/cases.md`
+- `README.md`
+- `scripts/check-runtime.sh`
+
+---
+
+## 2026-05-06
+
+### Project OS / slash commands
+
+#### 增加显式 `/` 操作入口
+
+改动：
+- 新增 `/os-check`：运行 Project OS 体检并汇总工作区状态
+- 新增 `/os-test`：运行或引导 v1 路由测试
+- 新增 `/os-handoff`：汇总当前状态、提交情况和下一步
+- 在 `README.md` 增加常用 slash commands 说明
+- 在 `check-runtime.sh` 中检查这些 slash command 文件是否存在
+
+影响：
+- 使用者不需要记住所有 shell / CLI 命令
+- `/` 命令作为显式操作按钮，不做强制自动门禁
+- 自动化仍保持轻量，避免 CLI 登录态或模型输出不稳定导致误伤
+
+相关文件：
+- `.claude/commands/os-check.md`
+- `.claude/commands/os-test.md`
+- `.claude/commands/os-handoff.md`
+- `README.md`
+- `PROJECT.md`
+- `HANDOFF.md`
+- `scripts/check-runtime.sh`
+
+---
+
+## 2026-05-06
+
 ### Project OS / docs 收口
 
 #### 清理旧模板文档并统一 SSOT
