@@ -1,0 +1,133 @@
+# Project OS 安装说明
+
+这个仓库可以作为 Project OS 源仓库，被安装到空目录或已有项目里。
+
+目标是让使用者只需要拿到 GitHub 地址，然后用自然语言让 AI 安装。
+
+源仓库：
+
+```txt
+https://github.com/lijinmei915/project-os-starter.git
+```
+
+---
+
+## 给 AI 的一句话
+
+把下面这段发给 Claude Code / Codex / 其他 coding agent：
+
+```txt
+请把 Project OS 安装到当前项目。
+
+源仓库：
+https://github.com/lijinmei915/project-os-starter.git
+
+请按以下方式执行：
+1. clone 源仓库到临时目录
+2. 运行源仓库里的 scripts/install-project-os.sh，把 Project OS 安装到当前目录
+3. 安装后运行 scripts/check-runtime.sh .
+4. 不要接组件库，不要生成业务 UI，不要扩展新功能
+5. 如果当前目录已有同名文件，先备份再覆盖
+```
+
+---
+
+## AI 可执行命令
+
+在目标项目目录里执行：
+
+```bash
+tmp_dir="$(mktemp -d)"
+git clone https://github.com/lijinmei915/project-os-starter.git "$tmp_dir/project-os-starter"
+bash "$tmp_dir/project-os-starter/scripts/install-project-os.sh" .
+bash scripts/check-runtime.sh .
+```
+
+中文说明：
+这会把 Project OS 复制到当前目录，并做一次结构校验。
+
+---
+
+## 安装到已有项目
+
+如果当前目录已经有项目文件，安装脚本会先备份冲突文件到：
+
+```txt
+.project-os/backups/
+```
+
+然后再写入 Project OS 文件。
+
+会安装的核心内容：
+
+```txt
+.claude/skills/
+.claude/commands/
+.claude/hooks/
+.claude/project.json
+.claude/settings.local.json
+AGENTS.md
+CLAUDE.md
+README.md
+PROJECT.md
+HANDOFF.md
+docs/
+examples/
+tests/
+scripts/check-runtime.sh
+```
+
+---
+
+## 安装后怎么用
+
+普通用户直接说：
+
+```txt
+帮我初始化这个项目
+```
+
+或：
+
+```txt
+这个老项目有点乱，帮我接管一下
+```
+
+高级用户可以输入：
+
+```txt
+/os
+```
+
+Project OS 会先进入 `INSTALL FLOW`，判断当前目录状态，再决定走：
+
+```txt
+INSTALL / INIT
+INSTALL / HYBRID
+INSTALL / CHECK-UPGRADE
+AUDIT
+```
+
+---
+
+## 手动安装
+
+如果不想运行脚本，也可以手动复制这些内容到目标项目：
+
+```txt
+.claude/
+AGENTS.md
+CLAUDE.md
+PROJECT.md
+HANDOFF.md
+docs/
+examples/
+tests/
+scripts/check-runtime.sh
+```
+
+然后执行：
+
+```bash
+bash scripts/check-runtime.sh .
+```

@@ -36,6 +36,7 @@
 - slash commands：已新增 `/os-check`、`/os-test`、`/os-handoff`
 - install flow：已新增自然语言 + `/os` 双入口，用于 Project OS 安装 / 接入 / 检查
 - install flow 复测：自然语言初始化已能进入 `INSTALL / CHECK-UPGRADE`，自然语言接管已能进入 `INSTALL / HYBRID`
+- 分发安装：已新增 `INSTALL.md` 和 `scripts/install-project-os.sh`，支持拿到 GitHub 地址后由 AI 自动安装到目标项目
 
 ## 已知问题
 
@@ -46,8 +47,8 @@
 ## 下一步重点
 
 1. 提交 INSTALL FLOW 和 slash commands 改动
-2. 后续再评估 `ai-components` / Radix / shadcn，不在当前阶段接入
-3. 提高自动校验稳定性
+2. 提交 Project OS 安装自动化改动
+3. 后续再评估 `ai-components` / Radix / shadcn，不在当前阶段接入
 
 ## 重要说明
 

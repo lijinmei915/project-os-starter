@@ -41,13 +41,15 @@
   - “帮我检查一下 Project OS 有没有缺文件” -> CHECK-UPGRADE 语义正确
   - “只帮我看看，不要改” -> `AUDIT`
 - 已在 Claude Code 交互模式确认 `/os` 命令可被发现；`-p` print 模式不会展开 slash command
+- 已新增 `INSTALL.md`，提供给人和 AI 的安装说明
+- 已新增 `scripts/install-project-os.sh`，支持把 Project OS 自动安装到目标目录
+- 已用临时空目录试装并通过 `check-runtime.sh` 校验：0 warning
 
 ## 不做事项
 
 - 不新增 skill
 - 不扩功能
 - 不优化 UI
-- 不新增自动化
 - 不接外部 skill，Project OS 先保持纯内置闭环
 
 ## 风险与待确认
@@ -58,5 +60,5 @@
 
 ## 下一步
 
-1. 提交 INSTALL FLOW 和 slash commands 改动
+1. 提交 Project OS 安装自动化改动
 2. 后续再进入组件层选型：`ai-components` / Radix / shadcn

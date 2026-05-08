@@ -62,6 +62,12 @@ for file in README.md AGENTS.md PROJECT.md HANDOFF.md; do
   fi
 done
 
+for file in INSTALL.md scripts/install-project-os.sh; do
+  if ! has_file "$file"; then
+    warn "missing Project OS installation helper: $file"
+  fi
+done
+
 for file in .claude/skills/REGISTRY.md .claude/skills/project-setup/SKILL.md .claude/skills/project-setup/references/install.md .claude/skills/project-setup/references/init.md .claude/skills/project-setup/references/audit.md .claude/skills/project-setup/references/hybrid.md .claude/skills/project-setup/references/clarification.md .claude/skills/design-system/SKILL.md .claude/skills/frontend/SKILL.md .claude/skills/tests/cases.md .claude/skills/changelog/README.md; do
   if ! has_file "$file"; then
     error "missing Project OS skill file: $file"

@@ -95,6 +95,34 @@ Project OS 支持两种入口：
 
 `/os` 是显式快捷入口，不是唯一入口。
 
+## 给别人使用
+
+最简单的方式：把这个 GitHub 地址发给对方，让对方在自己的项目里对 AI 说“安装这个 Project OS”。
+
+```txt
+https://github.com/lijinmei915/project-os-starter.git
+```
+
+可以直接复制这段给 AI：
+
+```txt
+请把 Project OS 安装到当前项目。
+源仓库：https://github.com/lijinmei915/project-os-starter.git
+请 clone 到临时目录，运行 scripts/install-project-os.sh 安装到当前目录，安装后运行 scripts/check-runtime.sh .。
+不要接组件库，不要生成业务 UI，不要扩展新功能。
+```
+
+也可以手动执行：
+
+```bash
+tmp_dir="$(mktemp -d)"
+git clone https://github.com/lijinmei915/project-os-starter.git "$tmp_dir/project-os-starter"
+bash "$tmp_dir/project-os-starter/scripts/install-project-os.sh" .
+bash scripts/check-runtime.sh .
+```
+
+完整安装说明见 `INSTALL.md`。
+
 ## 常用 slash commands
 
 在 Claude Code 中可以使用项目级 `/` 命令：
