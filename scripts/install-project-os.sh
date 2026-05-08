@@ -66,6 +66,18 @@ copy_file() {
   log "installed file: $relative_path"
 }
 
+copy_optional_file() {
+  relative_path="$1"
+  src="$source_abs/$relative_path"
+
+  if [ ! -f "$src" ]; then
+    log "skip optional source file: $relative_path"
+    return
+  fi
+
+  copy_file "$relative_path"
+}
+
 copy_dir() {
   relative_path="$1"
   src="$source_abs/$relative_path"
@@ -94,7 +106,7 @@ copy_file ".claude/project.json"
 copy_file ".claude/settings.local.json"
 
 copy_file "AGENTS.md"
-copy_file "CLAUDE.md"
+copy_optional_file "CLAUDE.md"
 copy_file "README.md"
 copy_file "PROJECT.md"
 copy_file "HANDOFF.md"

@@ -67,15 +67,25 @@ bash scripts/check-runtime.sh .
 .claude/project.json
 .claude/settings.local.json
 AGENTS.md
-CLAUDE.md
 README.md
 PROJECT.md
 HANDOFF.md
+INSTALL.md
 docs/
 examples/
 tests/
 scripts/check-runtime.sh
+scripts/install-project-os.sh
 ```
+
+可选内容：
+
+```txt
+CLAUDE.md
+```
+
+中文说明：
+`CLAUDE.md` 是 Claude 专属增强文件。如果源仓库里没有这个文件，安装脚本会安全跳过，不影响 Project OS 运行。
 
 ---
 
@@ -117,13 +127,15 @@ AUDIT
 ```txt
 .claude/
 AGENTS.md
-CLAUDE.md
+README.md
 PROJECT.md
 HANDOFF.md
+INSTALL.md
 docs/
 examples/
 tests/
 scripts/check-runtime.sh
+scripts/install-project-os.sh
 ```
 
 然后执行：
