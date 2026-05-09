@@ -54,6 +54,7 @@
 
 改动：
 - 新增 `docs/DOCUMENTATION.md`，定义 README / AGENTS / PROJECT / HANDOFF / CHANGELOG 等文件职责
+- 在 `docs/DOCUMENTATION.md` 增加文档结构契约：Required / Recommended / Reference Implementation
 - 在 `AGENTS.md` 增加文档更新规则和 SSOT 指向
 - 在 `README.md`、`PROJECT.md`、`HANDOFF.md` 同步文档治理入口和当前状态
 - 在 `check-runtime.sh` 中检查文档治理文件

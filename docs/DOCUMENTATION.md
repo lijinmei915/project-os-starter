@@ -32,6 +32,92 @@
 
 ---
 
+## 文档结构契约
+
+Project OS 不在文档里维护完整目录树。
+
+原因：
+
+```txt
+完整目录树容易漂移。
+结构契约更稳定。
+```
+
+文档结构分为四层：
+
+1. Root core docs
+
+根目录核心文档，负责入口、规则、状态、交接。
+
+2. docs/
+
+长期文档，负责规范、决策、测试策略、复盘和设计参考。
+
+3. tests/
+
+测试材料，负责可复测 case、验收矩阵和测试记录。
+
+4. adapters/
+
+工具适配层，负责把通用规则翻译成 Claude / Codex / Cursor / Gemini 等工具可读取的入口文件。
+
+### Required
+
+Project OS 最小可用结构必须包含：
+
+```txt
+README.md
+AGENTS.md
+PROJECT.md
+HANDOFF.md
+INSTALL.md
+docs/DOCUMENTATION.md
+scripts/check-runtime.sh
+```
+
+缺少这些文件时，Project OS 仍可能被人读懂一部分，但不能视为完整安装。
+
+### Recommended
+
+推荐结构：
+
+```txt
+docs/CHANGELOG.md
+docs/DECISIONS.md
+docs/LESSONS.md
+docs/TESTING.md
+tests/
+adapters/
+scripts/install-project-os.sh
+scripts/install-adapter.sh
+```
+
+这些文件让 Project OS 具备可分发、可验证、可回溯、可跨工具适配的能力。
+
+### Reference Implementation
+
+当前参考实现：
+
+```txt
+.claude/
+```
+
+`.claude/` 提供 Claude Code 的 skills、commands、hooks 和项目配置。
+
+它是 Project OS 的一个实现版本，不是 Project OS 的唯一形态。
+
+### Structure Rule
+
+判断文档结构时，优先看契约，不看临时目录树。
+
+```txt
+Required 缺失 = 安装不完整
+Recommended 缺失 = 能跑但能力不完整
+Reference implementation 缺失 = 对应工具能力不可用，不代表 Project OS 核心失效
+```
+
+---
+
 ## 核心文件边界
 
 ### README.md

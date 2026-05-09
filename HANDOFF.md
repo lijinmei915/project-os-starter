@@ -51,6 +51,7 @@
 - 已新增 `scripts/create-test-fixtures.sh`，生成 empty / existing / installed 三类测试目录
 - 已新增 `docs/DOCUMENTATION.md`，把 README / AGENTS / PROJECT / HANDOFF / CHANGELOG 等文档边界和更新规则收口成 SSOT
 - 已在 `AGENTS.md` 增加文档更新规则，避免每次改动默认同步所有核心文档
+- 已在 `docs/DOCUMENTATION.md` 增加文档结构契约：Required / Recommended / Reference Implementation
 
 ## 不做事项
 

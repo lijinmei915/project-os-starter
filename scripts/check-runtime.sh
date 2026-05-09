@@ -169,6 +169,11 @@ if has_file "docs/DOCUMENTATION.md"; then
       warn "docs/DOCUMENTATION.md should define boundary for $pattern"
     fi
   done
+  for pattern in "Required" "Recommended" "Reference Implementation" "Structure Rule"; do
+    if ! contains "docs/DOCUMENTATION.md" "$pattern"; then
+      warn "docs/DOCUMENTATION.md should define documentation structure contract: $pattern"
+    fi
+  done
 fi
 
 if has_file "docs/PRODUCT_PLAN.md"; then
