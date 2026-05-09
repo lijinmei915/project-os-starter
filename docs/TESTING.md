@@ -40,6 +40,15 @@ bash scripts/check-runtime.sh .
 参考场景：
 - `examples/prompt-simulation.md`
 
+跨工具验收：
+- `tests/cross-tool-matrix.md`
+
+推荐准备测试目录：
+
+```bash
+bash scripts/create-test-fixtures.sh /tmp/project-os-fixtures
+```
+
 ### 3. 产品规划偏离检查
 
 目标：确认当前任务仍服务于项目阶段目标。

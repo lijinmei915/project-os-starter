@@ -38,6 +38,7 @@
 - install flow 复测：自然语言初始化已能进入 `INSTALL / CHECK-UPGRADE`，自然语言接管已能进入 `INSTALL / HYBRID`
 - 分发安装：已新增 `INSTALL.md` 和 `scripts/install-project-os.sh`，支持拿到 GitHub 地址后由 AI 自动安装到目标项目
 - 工具适配：已新增 `adapters/` 和 `scripts/install-adapter.sh`，支持按需写入 Claude / Codex / Cursor / Gemini 适配文件
+- 跨工具验收：已新增 `tests/cross-tool-matrix.md` 和 `scripts/create-test-fixtures.sh`，用于验证 CLI 与可代码桌面端都能进入同一套 INSTALL FLOW
 
 ## 已知问题
 
@@ -48,8 +49,8 @@
 ## 下一步重点
 
 1. 继续把 Project OS 文案从“Claude 实现”收紧为“通用内核 + 适配层”
-2. 后续再评估 `ai-components` / Radix / shadcn，不在当前阶段接入
-3. 提高跨工具验证稳定性
+2. 跑 Codex / Claude Code / 可代码桌面端的跨工具验收表
+3. 后续再评估 `ai-components` / Radix / shadcn，不在当前阶段接入
 
 ## 重要说明
 

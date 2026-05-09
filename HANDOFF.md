@@ -47,6 +47,8 @@
 - 已新增 `adapters/CLAUDE.md`、`CODEX.md`、`CURSOR.md`、`GEMINI.md`
 - 已新增 `scripts/install-adapter.sh`，可按工具写入 `CLAUDE.md` / `CODEX.md` / `.cursor/rules/project-os.md` / `GEMINI.md`
 - 已将文案进一步收紧为“AGENTS.md 是通用规则源头，.claude/* 是参考实现，adapters/* 是工具适配层”
+- 已新增 `tests/cross-tool-matrix.md`，记录 Codex / Claude Code / 可代码桌面端的验收表
+- 已新增 `scripts/create-test-fixtures.sh`，生成 empty / existing / installed 三类测试目录
 
 ## 不做事项
 
@@ -63,5 +65,6 @@
 
 ## 下一步
 
-1. 提交平台无关文案收口改动
-2. 后续再进入组件层选型：`ai-components` / Radix / shadcn
+1. 提交跨工具测试矩阵与 fixture 脚本
+2. 跑 Codex / Claude Code / 可代码桌面端验收
+3. 后续再进入组件层选型：`ai-components` / Radix / shadcn

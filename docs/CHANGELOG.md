@@ -72,6 +72,31 @@
 
 ---
 
+### Project OS / cross-tool testing
+
+#### 增加 CLI 与可代码桌面端共用的验收矩阵
+
+改动：
+- 新增 `tests/cross-tool-matrix.md`
+- 新增 `scripts/create-test-fixtures.sh`
+- 在 `README.md`、`docs/TESTING.md`、`tests/cases.md` 中加入跨工具测试入口
+- 在 `check-runtime.sh` 中检查跨工具测试材料
+
+影响：
+- 可以生成空目录、已有代码项目、已安装 Project OS 三类测试目录
+- Codex、Claude Code、可代码桌面端可以按同一张表验证 INSTALL FLOW
+- 测试重点从“所有工具原生支持同一命令”转为“所有工具理解同一意图并进入同一套路由”
+
+相关文件：
+- `tests/cross-tool-matrix.md`
+- `scripts/create-test-fixtures.sh`
+- `README.md`
+- `docs/TESTING.md`
+- `tests/cases.md`
+- `scripts/check-runtime.sh`
+
+---
+
 ## 2026-05-06
 
 ### Project OS / install flow

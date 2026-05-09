@@ -8,6 +8,12 @@
 .claude/skills/tests/cases.md
 ```
 
+跨工具测试矩阵见：
+
+```txt
+tests/cross-tool-matrix.md
+```
+
 ## v1.0.0 核心 case
 
 | Case | Input | Expected |
@@ -56,4 +62,12 @@ printf '%s' '帮我写一个登录页' | claude -p --no-session-persistence --to
 
 ```txt
 Skill: frontend
+```
+
+## 跨工具测试目录
+
+生成空项目、已有项目、已安装 Project OS 三类测试目录：
+
+```bash
+bash scripts/create-test-fixtures.sh /tmp/project-os-fixtures
 ```

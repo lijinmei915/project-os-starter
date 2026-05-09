@@ -146,6 +146,22 @@ Project OS 核心依赖的是 AGENTS.md + docs + scripts
 Claude 只是当前第一个参考实现
 ```
 
+## 跨工具测试
+
+Project OS 的目标是同时覆盖终端 CLI 和可代码桌面端。
+
+测试矩阵见：
+
+```txt
+tests/cross-tool-matrix.md
+```
+
+生成测试目录：
+
+```bash
+bash scripts/create-test-fixtures.sh /tmp/project-os-fixtures
+```
+
 ## 常用 slash commands
 
 在 Claude Code 中可以使用项目级 `/` 命令：

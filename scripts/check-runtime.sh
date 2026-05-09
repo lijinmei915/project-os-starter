@@ -68,6 +68,12 @@ for file in INSTALL.md scripts/install-project-os.sh scripts/install-adapter.sh;
   fi
 done
 
+for file in tests/cross-tool-matrix.md scripts/create-test-fixtures.sh; do
+  if ! has_file "$file"; then
+    warn "missing Project OS cross-tool testing helper: $file"
+  fi
+done
+
 for file in adapters/CLAUDE.md adapters/CODEX.md adapters/CURSOR.md adapters/GEMINI.md; do
   if ! has_file "$file"; then
     warn "missing Project OS adapter template: $file"
