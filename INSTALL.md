@@ -14,7 +14,7 @@ https://github.com/lijinmei915/project-os-starter.git
 
 ## 给 AI 的一句话
 
-把下面这段发给 Claude Code / Codex / 其他 coding agent：
+把下面这段发给任意 coding agent：
 
 ```txt
 请把 Project OS 安装到当前项目。
@@ -87,6 +87,8 @@ CLAUDE.md
 ```
 
 中文说明：
+核心规则源头是 `AGENTS.md`。
+`.claude/*` 是当前仓库自带的参考实现，`adapters/*` 是面向不同工具的适配层。
 `CLAUDE.md` 是 Claude 专属增强文件。如果源仓库里没有这个文件，安装脚本会安全跳过，不影响 Project OS 运行。
 
 ---

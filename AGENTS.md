@@ -19,7 +19,7 @@
 1. 当前对话里用户刚刚明确说的话
 2. 本文件 `AGENTS.md`
 3. `PROJECT.md`、`HANDOFF.md`、仓库内相关文档
-4. 助手专属配置文件，如 `CLAUDE.md`
+4. 工具适配文件，如 `CLAUDE.md`、`CODEX.md`、`.cursor/rules/project-os.md`
 5. 全局用户偏好
 6. 助手自身默认行为
 
@@ -28,11 +28,15 @@
 ## 入口控制
 
 - 所有项目相关请求优先进入 `project-setup`
-- 其他 skill 不能直接抢入口
+- 其他领域能力不能直接抢入口
 - Project OS 安装 / 接入 / 检查请求进入 `INSTALL FLOW`
 - 如果请求涉及新项目、接管项目、结构整理、协作规则、文档收口，必须先按 `project-setup` 判断
 - 模糊产品请求先走 `project-setup / CLARIFICATION`
 - 不确定当前项目状态时，默认按 `HYBRID` 处理
+
+中文说明：
+`project-setup`、`design-system`、`frontend` 是 Project OS 的逻辑分层。
+当前仓库把它们实现为 `.claude/skills/*`，但这是参考实现，不等于只能给 Claude 用。
 
 ## Project OS Installation Entry
 
@@ -64,6 +68,10 @@ Project OS 支持两种安装 / 接入入口：
 
 `INSTALL FLOW` 只负责判断 Project OS 如何进入当前目录，不做业务 UI，不接组件库。
 
+中文说明：
+`/os` 是当前参考实现里的显式命令入口。
+如果某个工具不支持 slash commands，仍然应通过自然语言意图进入同一条 INSTALL 路由。
+
 INSTALL 路由必须同时看用户意图和目录状态：
 
 ```txt
@@ -85,7 +93,7 @@ INSTALL 路由必须同时看用户意图和目录状态：
 
 ## 路由规则
 
-`project-setup` 负责三种模式：
+`project-setup` 负责这些模式：
 
 - `INSTALL`：Project OS 安装 / 接入 / 检查 / 升级
 - `CLARIFICATION`：模糊产品 / 想法 / 东西请求
@@ -93,7 +101,7 @@ INSTALL 路由必须同时看用户意图和目录状态：
 - `AUDIT`：分析项目现状，包括职责承接和缺口
 - `HYBRID`：接管项目，默认模式
 
-内部流程 reference 放在：
+当前参考实现的内部流程材料放在：
 
 - `.claude/skills/project-setup/references/install.md`
 - `.claude/skills/project-setup/references/init.md`
@@ -101,7 +109,8 @@ INSTALL 路由必须同时看用户意图和目录状态：
 - `.claude/skills/project-setup/references/hybrid.md`
 - `.claude/skills/project-setup/references/clarification.md`
 
-这些文件是内部流程材料，不是独立 skill。
+这些文件是内部流程材料，不是独立产品功能，也不是新的规则源头。
+对非 Claude 工具，等价行为应通过 `AGENTS.md` 和 `adapters/` 适配得到。
 
 ## v1 路由契约
 

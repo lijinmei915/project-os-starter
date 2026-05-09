@@ -31,7 +31,7 @@
 - 入口控制：`project-setup` 已覆盖 CLARIFICATION / INIT / AUDIT / HYBRID
 - 设计系统：`design-system` 已能承接 Design Tokens 请求
 - 前端实现：`frontend` 已能承接具体页面请求
-- 根入口分层：`AGENTS.md` / `CLAUDE.md` 已同步 v1 路由契约
+- 根入口分层：`AGENTS.md` 已作为通用规则源头，适配层由 `adapters/` 承接
 - docs 清理：已删除 `docs/PROJECT.md` / `docs/HANDOFF.md`，根目录文件作为 SSOT
 - slash commands：已新增 `/os-check`、`/os-test`、`/os-handoff`
 - install flow：已新增自然语言 + `/os` 双入口，用于 Project OS 安装 / 接入 / 检查
@@ -47,9 +47,9 @@
 
 ## 下一步重点
 
-1. 提交 INSTALL FLOW 和 slash commands 改动
-2. 提交 Project OS 安装与 adapter 自动化改动
-3. 后续再评估 `ai-components` / Radix / shadcn，不在当前阶段接入
+1. 继续把 Project OS 文案从“Claude 实现”收紧为“通用内核 + 适配层”
+2. 后续再评估 `ai-components` / Radix / shadcn，不在当前阶段接入
+3. 提高跨工具验证稳定性
 
 ## 重要说明
 

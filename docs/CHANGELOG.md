@@ -46,6 +46,32 @@
 
 ---
 
+## 2026-05-09
+
+### Project OS / platform-neutral wording
+
+#### 将系统定位收紧为“通用内核 + 工具适配层”
+
+改动：
+- 在 `AGENTS.md` 明确 `AGENTS.md` 是规则源头
+- 把 `.claude/*` 标注为当前参考实现，而不是唯一宿主
+- 在 `README.md` 和 `INSTALL.md` 中强调 `adapters/*` 负责各工具入口文件
+- 在 `PROJECT.md` / `HANDOFF.md` 同步当前定位
+
+影响：
+- 使用者更容易理解 Project OS 本体不依赖 Claude
+- Claude、Codex、Cursor、Gemini 现在都被表述为同一套核心规则的不同适配入口
+- 后续继续扩展别的工具时，不需要重写系统本体
+
+相关文件：
+- `AGENTS.md`
+- `README.md`
+- `INSTALL.md`
+- `PROJECT.md`
+- `HANDOFF.md`
+
+---
+
 ## 2026-05-06
 
 ### Project OS / install flow

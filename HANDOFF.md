@@ -46,6 +46,7 @@
 - 已用临时空目录试装并通过 `check-runtime.sh` 校验：0 warning
 - 已新增 `adapters/CLAUDE.md`、`CODEX.md`、`CURSOR.md`、`GEMINI.md`
 - 已新增 `scripts/install-adapter.sh`，可按工具写入 `CLAUDE.md` / `CODEX.md` / `.cursor/rules/project-os.md` / `GEMINI.md`
+- 已将文案进一步收紧为“AGENTS.md 是通用规则源头，.claude/* 是参考实现，adapters/* 是工具适配层”
 
 ## 不做事项
 
@@ -62,5 +63,5 @@
 
 ## 下一步
 
-1. 提交 Project OS 安装与 adapter 自动化改动
+1. 提交平台无关文案收口改动
 2. 后续再进入组件层选型：`ai-components` / Radix / shadcn

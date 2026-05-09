@@ -30,11 +30,16 @@ find . -maxdepth 3 -type f | sort
 | `AGENTS.md` | 给 AI 用的运行规则 |
 | `PROJECT.md` | 当前项目状态 |
 | `HANDOFF.md` | 当前交接上下文 |
-| `.claude/` | Claude 运行配置、hooks、内部能力材料 |
-| `.claude/skills/project-setup/references/` | 初始化、审计等内部流程 reference |
+| `adapters/` | 各工具适配模板，如 Claude / Codex / Cursor / Gemini |
+| `.claude/` | 当前参考实现的配置、hooks、内部能力材料 |
+| `.claude/skills/project-setup/references/` | 当前参考实现的初始化、审计等内部流程 reference |
 | `docs/` | 历史文档、规范草案、可插拔参考材料 |
 | `examples/` | 示例材料 |
 | `scripts/` | 检查脚本 |
+
+中文说明：
+Project OS 的核心规则源头是 `AGENTS.md`。
+`.claude/` 是当前仓库自带的参考实现，`adapters/` 则负责把同一套规则写入不同工具自己的入口文件。
 
 ## 如何使用
 
@@ -103,7 +108,7 @@ Project OS 支持两种入口：
 https://github.com/lijinmei915/project-os-starter.git
 ```
 
-可以直接复制这段给 AI：
+可以直接复制这段给任意 coding agent：
 
 ```txt
 请把 Project OS 安装到当前项目。
@@ -133,6 +138,13 @@ bash scripts/install-adapter.sh gemini .
 ```
 
 adapter 会把 `adapters/` 里的模板写入对应工具自己的入口文件，但规则源头仍然是 `AGENTS.md`。
+
+如果你不用 Claude，也没关系：
+
+```txt
+Project OS 核心依赖的是 AGENTS.md + docs + scripts
+Claude 只是当前第一个参考实现
+```
 
 ## 常用 slash commands
 
