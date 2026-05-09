@@ -49,6 +49,8 @@
 - 已将文案进一步收紧为“AGENTS.md 是通用规则源头，.claude/* 是参考实现，adapters/* 是工具适配层”
 - 已新增 `tests/cross-tool-matrix.md`，记录 Codex / Claude Code / 可代码桌面端的验收表
 - 已新增 `scripts/create-test-fixtures.sh`，生成 empty / existing / installed 三类测试目录
+- 已新增 `docs/DOCUMENTATION.md`，把 README / AGENTS / PROJECT / HANDOFF / CHANGELOG 等文档边界和更新规则收口成 SSOT
+- 已在 `AGENTS.md` 增加文档更新规则，避免每次改动默认同步所有核心文档
 
 ## 不做事项
 
@@ -65,6 +67,6 @@
 
 ## 下一步
 
-1. 提交跨工具测试矩阵与 fixture 脚本
-2. 跑 Codex / Claude Code / 可代码桌面端验收
+1. 跑 Codex / Claude Code / 可代码桌面端验收
+2. 继续验证安装脚本和 adapter 在空目录 / 老项目 / 已安装项目里的表现
 3. 后续再进入组件层选型：`ai-components` / Radix / shadcn

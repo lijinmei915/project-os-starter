@@ -48,6 +48,31 @@
 
 ## 2026-05-09
 
+### Project OS / documentation governance
+
+#### 增加文档编写规范和更新边界
+
+改动：
+- 新增 `docs/DOCUMENTATION.md`，定义 README / AGENTS / PROJECT / HANDOFF / CHANGELOG 等文件职责
+- 在 `AGENTS.md` 增加文档更新规则和 SSOT 指向
+- 在 `README.md`、`PROJECT.md`、`HANDOFF.md` 同步文档治理入口和当前状态
+- 在 `check-runtime.sh` 中检查文档治理文件
+
+影响：
+- 后续不用默认同时更新所有核心文档
+- 当前状态、交接上下文、历史变更、架构决策和错误复盘有了明确边界
+- 文档维护从“口头约定”变成可校验的 Project OS 规则
+
+相关文件：
+- `docs/DOCUMENTATION.md`
+- `AGENTS.md`
+- `README.md`
+- `PROJECT.md`
+- `HANDOFF.md`
+- `scripts/check-runtime.sh`
+
+---
+
 ### Project OS / platform-neutral wording
 
 #### 将系统定位收紧为“通用内核 + 工具适配层”

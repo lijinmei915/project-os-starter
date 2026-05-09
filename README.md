@@ -31,6 +31,7 @@ find . -maxdepth 3 -type f | sort
 | `PROJECT.md` | 当前项目状态 |
 | `HANDOFF.md` | 当前交接上下文 |
 | `adapters/` | 各工具适配模板，如 Claude / Codex / Cursor / Gemini |
+| `docs/DOCUMENTATION.md` | 文档编写规范和更新边界 |
 | `.claude/` | 当前参考实现的配置、hooks、内部能力材料 |
 | `.claude/skills/project-setup/references/` | 当前参考实现的初始化、审计等内部流程 reference |
 | `docs/` | 历史文档、规范草案、可插拔参考材料 |
@@ -197,3 +198,5 @@ bash scripts/create-test-fixtures.sh /tmp/project-os-fixtures
 AI 行为规则见 `AGENTS.md`。
 
 交接上下文见 `HANDOFF.md`。
+
+文档怎么写、什么时候更新哪个文件，见 `docs/DOCUMENTATION.md`。

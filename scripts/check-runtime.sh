@@ -68,6 +68,10 @@ for file in INSTALL.md scripts/install-project-os.sh scripts/install-adapter.sh;
   fi
 done
 
+if ! has_file "docs/DOCUMENTATION.md"; then
+  warn "missing documentation governance file: docs/DOCUMENTATION.md"
+fi
+
 for file in tests/cross-tool-matrix.md scripts/create-test-fixtures.sh; do
   if ! has_file "$file"; then
     warn "missing Project OS cross-tool testing helper: $file"
@@ -157,6 +161,14 @@ if has_file "HANDOFF.md"; then
   if ! has_any "HANDOFF.md" "下一步" "Next"; then
     warn "HANDOFF.md should include a next-step section"
   fi
+fi
+
+if has_file "docs/DOCUMENTATION.md"; then
+  for pattern in "README.md" "AGENTS.md" "PROJECT.md" "HANDOFF.md" "CHANGELOG.md" "SSOT"; do
+    if ! contains "docs/DOCUMENTATION.md" "$pattern"; then
+      warn "docs/DOCUMENTATION.md should define boundary for $pattern"
+    fi
+  done
 fi
 
 if has_file "docs/PRODUCT_PLAN.md"; then

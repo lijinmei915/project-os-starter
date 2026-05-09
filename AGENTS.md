@@ -310,6 +310,10 @@ The closer to understanding and handoff, the more Chinese.
 - `AGENTS.md`：给 AI 用的运行规则
 - `PROJECT.md`：当前项目状态
 - `HANDOFF.md`：当前交接上下文
+- `docs/DOCUMENTATION.md`：文档编写规范和更新边界
+- `docs/CHANGELOG.md`：结构性变更记录
+- `docs/DECISIONS.md`：架构决策原因
+- `docs/LESSONS.md`：错误模式和新增约束
 
 README 不写运行规则。
 
@@ -318,6 +322,21 @@ AGENTS 不写产品介绍。
 PROJECT 不写交接细节。
 
 HANDOFF 不写长期路线。
+
+CHANGELOG 不写当前状态。
+
+adapters 不写新的规则源头。
+
+详细文档边界和更新决策表见 `docs/DOCUMENTATION.md`。
+
+### 文档更新规则
+
+- 小型任务或普通交接：只更新 `HANDOFF.md`
+- 当前阶段、进度、已知问题改变：更新 `PROJECT.md` + `HANDOFF.md`
+- AI 行为或路由规则改变：更新 `AGENTS.md` + tests + `HANDOFF.md`
+- 安装、分发、适配层、SSOT 结构改变：更新 `docs/CHANGELOG.md`，必要时同步 `README.md` / `INSTALL.md`
+- 犯错、误改、误判后新增约束：更新 `docs/LESSONS.md`
+- 不要默认四个核心文档一起改
 
 ## 冲突处理
 
@@ -329,6 +348,7 @@ HANDOFF 不写长期路线。
 - AI 行为看 `AGENTS.md`
 - 当前状态看 `PROJECT.md`
 - 当前交接看 `HANDOFF.md`
+- 文档边界看 `docs/DOCUMENTATION.md`
 
 ## 禁止行为
 
