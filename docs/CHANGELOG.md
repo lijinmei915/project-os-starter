@@ -48,6 +48,55 @@
 
 ## 2026-05-09
 
+### Project OS / document governance tightening
+
+#### 将文档边界、模板分层和轻量校验闭环接起来
+
+改动：
+- 新增 `templates/global/`，把全局用户偏好、用户画像和 memory 规则从根目录 / `docs/` 收回模板层
+- 在 `docs/DOCUMENTATION.md` 增加 “PROJECT / HANDOFF / PRODUCT_PLAN 怎么判断该写哪” 的决策规则
+- 将 `docs/PRODUCT_PLAN.md` 改成正式的 `v1 / v1.5 / v2 / v3` 产品化路线
+- 将根目录 `PROJECT.md`、`HANDOFF.md` 压瘦成“当前状态”和“当前交接”两类短文档
+- 在 `AGENTS.md` 和 `scripts/check-runtime.sh` 中加入文档更新前置规则与轻量自动校验
+
+影响：
+- 后续新建或更新文档时，不必靠记忆判断写哪一份
+- 项目模板、全局模板、源仓库历史的边界更清楚
+- `check-runtime.sh` 能更早发现文档串边界和缺关键标题的问题
+
+相关文件：
+- `templates/global/`
+- `docs/DOCUMENTATION.md`
+- `docs/PRODUCT_PLAN.md`
+- `PROJECT.md`
+- `HANDOFF.md`
+- `AGENTS.md`
+- `scripts/check-runtime.sh`
+
+---
+
+### Project OS / global template grouping
+
+#### 将全局用户模板与 memory 规则收回模板层
+
+改动：
+- 新增 `templates/global/`，统一存放全局用户偏好、全局用户画像和 memory 规则模板
+- 移除根目录 `GLOBAL_USER_*` 和 `docs/MEMORY_RULES.md` 的悬空位置
+- 在 `README.md`、`docs/DOCUMENTATION.md`、`scripts/check-runtime.sh` 中同步新的结构边界和校验
+
+影响：
+- 根目录入口更轻，不再混入全局协作模板
+- 项目模板和全局模板边界更清楚，安装到目标项目时不容易误会
+- 后续如果接入全局 memory 或用户画像能力，有明确模板落点
+
+相关文件：
+- `templates/global/`
+- `README.md`
+- `docs/DOCUMENTATION.md`
+- `scripts/check-runtime.sh`
+
+---
+
 ### Project OS / install templates
 
 #### 将安装包文档拆成“源仓库文档”和“目标项目模板”
@@ -69,6 +118,24 @@
 - `INSTALL.md`
 - `README.md`
 - `docs/DOCUMENTATION.md`
+
+---
+
+### Project OS / documentation model
+
+#### 明确 AI 工程项目的四层分层模型
+
+改动：
+- 在 `docs/DOCUMENTATION.md` 增加“AI 工程项目四层模型”
+- 在 `README.md` 增加简版结构图和根目录 5 个关键入口说明
+
+影响：
+- 后续讨论 `PROJECT.md`、`HANDOFF.md`、`README.md` 是否过重时，有统一判断框架
+- 更容易识别文档是不是越层，比如把历史写进 `PROJECT.md`、把规则写进 `README.md`
+
+相关文件：
+- `docs/DOCUMENTATION.md`
+- `README.md`
 
 ---
 

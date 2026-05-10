@@ -79,6 +79,7 @@ If INIT was reached from `INSTALL / INIT`, ask this question in the same turn af
 
 中文说明：
 如果 INIT 是从 `INSTALL / INIT` 进来的，安装完成后同一轮就要接着问这个问题，不要停住。
+只要启动方式还没明确，这一轮就不能结束。
 
 ---
 

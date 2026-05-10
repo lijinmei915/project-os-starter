@@ -47,6 +47,7 @@ specific page/component implementation -> frontend
 - `/os` is an explicit shortcut into INSTALL FLOW.
 - CLI print mode may not show the skill banner, but the first response must still reveal the route.
 - If the route is `INSTALL / INIT`, print that route first and continue into the INIT start mode question after installation/check completes.
+- The turn is only complete after the INIT start mode is clear.
 - Claude-specific behavior belongs here; shared rules belong in `AGENTS.md`.
 
 中文说明：

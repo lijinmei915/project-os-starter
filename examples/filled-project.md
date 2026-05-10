@@ -29,11 +29,14 @@
 ```txt
 pocket-notes/
   AGENTS.md
+  PROJECT.md
   README.md
+  HANDOFF.md
   docs/
-    PROJECT.md
     PRODUCT_PLAN.md
-    USER_CONTEXT.md
+    CHANGELOG.md
+    DECISIONS.md
+    LESSONS.md
   src/
     App.tsx
     components/
@@ -44,7 +47,7 @@ pocket-notes/
 
 ---
 
-## docs/PROJECT.md 片段
+## PROJECT.md 片段
 
 ```md
 # Pocket Notes — 项目定义
@@ -98,28 +101,13 @@ Pocket Notes 是一个给独立创作者使用的灵感收集和轻量整理工�
 
 ---
 
-## docs/USER_CONTEXT.md 片段
-
-```md
-# 用户上下文
-
-> 本文件只放“这个用户在当前项目里的覆盖信息”。
-> 如果全局用户映射里已经有稳定信息，项目内没有特殊要求时，不要重复抄一遍。
-
-## 项目覆盖项
-
-- 当前项目称呼：暂无项目特殊覆盖，沿用全局偏好
-- 当前项目角色预期：这个项目里优先把我当产品和工程协作者
-- 当前项目解释深度：涉及架构和数据流时稍微展开；普通样式改动短答即可
-- 当前项目特殊禁区：代码改动前先说方案，确认后再执行
-```
-
----
-
-## docs/HANDOFF.md 片段
+## HANDOFF.md 片段
 
 ```md
 # 当前交接
+
+> 本文件只写“当前这轮做到哪里、接下来怎么继续”。
+> 如果某个协作偏好只在这个项目里特殊生效，也可以在这里写覆盖项。
 
 ## 当前状态
 
@@ -132,11 +120,11 @@ Pocket Notes 是一个给独立创作者使用的灵感收集和轻量整理工�
 ### 项目初始化
 
 - 填写 README / AGENTS / PROJECT / PRODUCT_PLAN 的基础信息
-- 确认 USER_CONTEXT 只记录项目特殊覆盖，不重复抄全局偏好
+- 确认项目内不重复抄全局偏好，只在需要时写项目特殊覆盖
 
 关键文件：
 - `README.md`：更新项目入口和真实结构
-- `docs/PROJECT.md`：补项目定义、当前阶段和核心文件
+- `PROJECT.md`：补项目定义、当前阶段和核心文件
 - `docs/PRODUCT_PLAN.md`：补近期目标和本阶段不做事项
 
 ## 下一步
@@ -151,5 +139,5 @@ Pocket Notes 是一个给独立创作者使用的灵感收集和轻量整理工�
 ## 使用这个示例时注意
 
 - 示例只展示关键片段，不要求所有项目写得一样细。
-- 新项目里 `docs/USER_CONTEXT.md` 默认只写项目覆盖；全局偏好由助手先读取并复述给用户确认。
+- 全局偏好应来自长期模板或 memory；项目内只写确实需要覆盖的特殊要求。
 - 没确定的信息可以保留 `TODO:`，不要为了填满文档而编造。

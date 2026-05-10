@@ -83,6 +83,11 @@ if [ "$is_source_repo" -eq 1 ]; then
       warn "missing Project OS cross-tool testing helper: $file"
     fi
   done
+  for file in templates/global/GLOBAL_USER_PREFERENCES_TEMPLATE.md templates/global/GLOBAL_USER_PROFILE_TEMPLATE.md templates/global/MEMORY_RULES.md; do
+    if ! has_file "$file"; then
+      warn "missing global collaboration template: $file"
+    fi
+  done
 fi
 
 for file in adapters/CLAUDE.md adapters/CODEX.md adapters/CURSOR.md adapters/GEMINI.md; do
@@ -170,6 +175,12 @@ if has_file "HANDOFF.md"; then
   if ! has_any "HANDOFF.md" "下一步" "Next"; then
     warn "HANDOFF.md should include a next-step section"
   fi
+  if ! has_any "HANDOFF.md" "当前状态" "本次已完成" "风险与待确认"; then
+    warn "HANDOFF.md should include current status, completed work, and risks"
+  fi
+  if has_any "HANDOFF.md" "v1.5" "v2" "v3" "长期方向（3-6 个月" "中期规划（1-3 个月" "产品愿景"; then
+    warn "HANDOFF.md looks too roadmap-heavy; move long-term planning to docs/PRODUCT_PLAN.md"
+  fi
 fi
 
 if has_file "docs/DOCUMENTATION.md"; then
@@ -201,17 +212,32 @@ for file in templates/project/README.md templates/project/PROJECT.md templates/p
 done
 
 if has_file "docs/PRODUCT_PLAN.md"; then
+  if ! has_any "docs/PRODUCT_PLAN.md" "v1" "v1.5" "v2" "v3"; then
+    warn "docs/PRODUCT_PLAN.md should define staged product roadmap (v1 / v1.5 / v2 / v3)"
+  fi
   if ! has_any "docs/PRODUCT_PLAN.md" "近期规划" "当前优先级" "本阶段要做"; then
     warn "docs/PRODUCT_PLAN.md should include near-term priorities"
   fi
   if ! has_any "docs/PRODUCT_PLAN.md" "本阶段不做" "暂不"; then
     warn "docs/PRODUCT_PLAN.md should say what this stage will not do"
   fi
+  if has_any "docs/PRODUCT_PLAN.md" "本次已完成" "当前阻塞" "是否可继续"; then
+    warn "docs/PRODUCT_PLAN.md should not include handoff-style execution details"
+  fi
 fi
 
 if has_file "PROJECT.md"; then
   if ! has_any "PROJECT.md" "当前架构" "当前进度" "当前状态"; then
     warn "PROJECT.md should describe current architecture and status"
+  fi
+  if ! has_any "PROJECT.md" "当前阶段" "下一步重点"; then
+    warn "PROJECT.md should include current stage and next priorities"
+  fi
+  if has_any "PROJECT.md" "本次已完成" "当前阻塞" "是否可继续"; then
+    warn "PROJECT.md should not include handoff-only status fields"
+  fi
+  if has_any "PROJECT.md" "v1.5" "v2" "v3" "长期方向（3-6 个月" "中期规划（1-3 个月"; then
+    warn "PROJECT.md looks too roadmap-heavy; keep long-term phases in docs/PRODUCT_PLAN.md"
   fi
 fi
 

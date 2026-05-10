@@ -2,63 +2,33 @@
 
 ## 项目定位
 
-这是一个 AI Runtime / Project OS。
-
-它用于把 AI 驱动开发流程收口成稳定内核，包括：
-
-- 项目自动初始化
-- 项目接管与审计
-- 可控 UI 生成
-- 结构化开发流程
+- 项目名：`Project OS`
+- 一句话定位：把 AI 驱动开发流程收口成可安装、可分流、可交接的 runtime
+- 当前阶段：`v1 可安装 runtime 收口期`
 
 ## 当前架构
 
-入口层：
-
-- `project-setup`：负责路由和阶段判断
-
-规则层：
-
-- `design-system`：负责设计规范
-
-执行层：
-
-- `frontend`：负责代码实现
+- 入口层：`project-setup`
+- 规则层：`design-system`
+- 执行层：`frontend`
+- 规则源头：`AGENTS.md`
+- 参考实现：`.claude/`
+- 工具适配：`adapters/`
 
 ## 当前进度
 
-- 路由系统：v1 收口测试 7/7 通过
-- 入口控制：`project-setup` 已覆盖 CLARIFICATION / INIT / AUDIT / HYBRID
-- 设计系统：`design-system` 已能承接 Design Tokens 请求
-- 前端实现：`frontend` 已能承接具体页面请求
-- 根入口分层：`AGENTS.md` 已作为通用规则源头，适配层由 `adapters/` 承接
-- docs 清理：已删除 `docs/PROJECT.md` / `docs/HANDOFF.md`，根目录文件作为 SSOT
-- slash commands：已新增 `/os-check`、`/os-test`、`/os-handoff`
-- install flow：已新增自然语言 + `/os` 双入口，用于 Project OS 安装 / 接入 / 检查
-- install flow 复测：自然语言初始化已能进入 `INSTALL / CHECK-UPGRADE`，自然语言接管已能进入 `INSTALL / HYBRID`
-- install routing：已补充 `INSTALL / INIT` 继续进入 INIT start mode 的规则，避免停在安装总结
-- 分发安装：已新增 `INSTALL.md` 和 `scripts/install-project-os.sh`，支持拿到 GitHub 地址后由 AI 自动安装到目标项目
-- 安装模板：已拆分 `templates/project/`，目标项目安装时使用干净模板，不再带源仓库历史文档
-- 模板填法：已要求目标项目模板自带“用途 / 什么时候更新 / 不要写什么”说明，降低后续文档跑偏概率
-- 工具适配：已新增 `adapters/` 和 `scripts/install-adapter.sh`，支持按需写入 Claude / Codex / Cursor / Gemini 适配文件
-- 跨工具验收：已新增 `tests/cross-tool-matrix.md` 和 `scripts/create-test-fixtures.sh`，用于验证 CLI 与可代码桌面端都能进入同一套 INSTALL FLOW
-- 文档治理：已新增 `docs/DOCUMENTATION.md`，明确 README / AGENTS / PROJECT / HANDOFF / CHANGELOG 等文档边界和更新规则
+- 已完成：v1 路由契约、INSTALL FLOW、安装脚本、adapter 写入、项目模板 / 全局模板、文档治理、跨工具验收骨架
+- 正在做：远端分发验收、安装文案收紧、根目录状态/交接文档压瘦
+- 尚未开始：组件运行层 `ai-components`、组件库选型、工具原生 package 化
 
 ## 已知问题
 
-- 组件运行层 `ai-components` 尚未建立
-- CLI print 模式通过固定第一响应前缀判断路由
-- 自动校验目前仍以人工/CLI 复测记录为主
+- 纯空目录里，未预装规则时，模型不会天然认识 `Project OS`
+- CLI / 桌面端验收仍以人工复测为主
+- 组件层和原生 package 化还没进入实施
 
 ## 下一步重点
 
-1. 跑 Codex / Claude Code / 可代码桌面端的跨工具验收表
-2. 继续验证安装脚本和 adapter 在不同目录状态下的表现
-3. 后续再评估 `ai-components` / Radix / shadcn，不在当前阶段接入
-
-## 重要说明
-
-- 当前阶段是收口期
-- HYBRID 模式最重要
-- 优先保证稳定，不追求复杂
-- 英文做调度，中文做认知
+1. push GitHub，确保远端安装拿到的是最新版
+2. 用远端地址重做空目录 / 老项目 / 已安装项目验收
+3. 收紧 `README.md` / `INSTALL.md` 的最短安装文案

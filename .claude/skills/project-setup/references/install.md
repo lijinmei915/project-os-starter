@@ -289,6 +289,7 @@ After Project OS files are installed or confirmed, continue into INIT in the sam
 2. state whether installation/check is complete
 3. if start mode is unclear, immediately ask the INIT start mode question
 4. do not stop at installation summary only
+5. treat the turn as incomplete until the INIT start mode is clear
 
 Required follow-up when start mode is unclear:
 
@@ -306,6 +307,7 @@ Do not ask about tech stack, modules, database, deployment, or UI library before
 空目录里“初始化并接入 Project OS”不是只把文件装进去就结束。
 安装完成后，要在同一轮继续进入 INIT 启动方式判断。
 不要停在安装总结，更不要先问技术栈和模块。
+本轮结束条件不是“安装完成”，而是“INIT 启动方式已经明确”。
 不确定时先审计，不直接写文件。
 已有项目优先保护用户现有文件。
 

@@ -35,12 +35,36 @@ find . -maxdepth 3 -type f | sort
 | `.claude/` | 当前参考实现的配置、hooks、内部能力材料 |
 | `.claude/skills/project-setup/references/` | 当前参考实现的初始化、审计等内部流程 reference |
 | `docs/` | 历史文档、规范草案、可插拔参考材料 |
+| `templates/project/` | 安装到目标项目时使用的干净项目模板 |
+| `templates/global/` | 全局用户偏好、画像、memory 规则模板 |
 | `examples/` | 示例材料 |
 | `scripts/` | 检查脚本 |
 
 中文说明：
 Project OS 的核心规则源头是 `AGENTS.md`。
 `.claude/` 是当前仓库自带的参考实现，`adapters/` 则负责把同一套规则写入不同工具自己的入口文件。
+`templates/project/` 发给目标项目，`templates/global/` 发给全局记忆或长期协作层，不直接混进根目录入口。
+
+## 四层模型
+
+这个仓库按 4 层理解最清楚：
+
+```txt
+1. 项目源码层        = 项目真正跑起来的代码
+2. AI 规则层         = 告诉 AI 怎么干活
+3. 项目认知层        = 告诉人和 AI 这是什么项目
+4. 验收 / 变更 / 交接层 = 防止改完以后接不住、查不回、测不出
+```
+
+当前根目录 5 个关键入口：
+
+```txt
+README.md   = 这是啥，怎么开始
+AGENTS.md   = AI 怎么干活
+PROJECT.md  = 这个项目现在怎样
+HANDOFF.md  = 下一位怎么接
+INSTALL.md  = 怎么把 Project OS 装进目标项目
+```
 
 ## 如何使用
 

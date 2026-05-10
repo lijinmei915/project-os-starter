@@ -43,7 +43,7 @@ Project OS 不在文档里维护完整目录树。
 结构契约更稳定。
 ```
 
-文档结构分为四层：
+文档结构分为六个区域：
 
 1. Root core docs
 
@@ -66,6 +66,13 @@ Project OS 不在文档里维护完整目录树。
 安装到目标项目时使用的模板层。
 
 这里放“发给目标项目的干净文档模板”，不放本源仓库自己的运行历史。
+
+6. templates/global/
+
+全局协作模板层。
+
+这里放“跨项目长期成立”的用户偏好、用户画像、memory 维护规则模板。
+不要把它们混进根目录入口，也不要当成当前项目状态文档。
 
 ### Required
 
@@ -147,6 +154,72 @@ docs/DESIGN_STANDARDS.md
 
 这样即使不回看总规则，AI 和人也知道该怎么填。
 
+### Global Templates
+
+全局协作和 memory 相关内容应统一放在：
+
+```txt
+templates/global/
+```
+
+当前包括：
+
+```txt
+templates/global/GLOBAL_USER_PREFERENCES_TEMPLATE.md
+templates/global/GLOBAL_USER_PROFILE_TEMPLATE.md
+templates/global/MEMORY_RULES.md
+```
+
+规则：
+
+```txt
+项目模板归 templates/project/
+全局协作模板归 templates/global/
+不要把全局模板直接放在根目录入口层
+```
+
+### Source vs Install
+
+判断一个文件该留在源仓库、还是该复制到目标项目时，用这三类：
+
+#### Source repo only
+
+只属于 `project-os-starter` 源仓库自己的运行历史和治理记录：
+
+```txt
+根目录 PROJECT.md
+根目录 HANDOFF.md
+docs/CHANGELOG.md
+docs/DECISIONS.md
+docs/LESSONS.md
+```
+
+#### Install to target
+
+安装到目标项目时，应使用模板版本生成：
+
+```txt
+templates/project/README.md
+templates/project/PROJECT.md
+templates/project/HANDOFF.md
+templates/project/docs/*
+```
+
+#### Both
+
+源仓库保留，同时安装到目标项目：
+
+```txt
+AGENTS.md
+INSTALL.md
+docs/DOCUMENTATION.md
+.claude/
+adapters/
+scripts/
+tests/
+docs/design/
+```
+
 ### Structure Rule
 
 判断文档结构时，优先看契约，不看临时目录树。
@@ -156,6 +229,129 @@ Required 缺失 = 安装不完整
 Recommended 缺失 = 能跑但能力不完整
 Reference implementation 缺失 = 对应工具能力不可用，不代表 Project OS 核心失效
 ```
+
+---
+
+## AI 工程项目四层模型
+
+判断一个 AI 工程项目的文件该放哪里，先看它属于哪一层。
+
+### 1. 项目源码层
+
+回答：
+
+- 项目本身怎么运行
+- 真实业务代码放哪里
+- 配置、接口、数据、页面在哪里
+
+典型内容：
+
+```txt
+src/
+app/
+components/
+api/
+db/
+package.json
+```
+
+规则：
+
+- 这里只放真正运行的代码和配置
+- 不把 AI 规则、交接、历史变更塞进源码层
+
+### 2. AI 规则层
+
+回答：
+
+- AI 进入项目后怎么判断请求
+- 哪些行为允许，哪些不允许
+- 不同工具怎么读取同一套规则
+
+典型内容：
+
+```txt
+AGENTS.md
+CLAUDE.md
+CODEX.md
+.cursor/rules/
+.claude/skills/
+adapters/
+```
+
+规则：
+
+- 这里只写 AI 怎么干活
+- 不把产品介绍和当前进度混进来
+
+### 3. 产品 / 设计 / 项目认知层
+
+回答：
+
+- 这是什么项目
+- 现在到哪了
+- 产品目标和设计边界是什么
+
+典型内容：
+
+```txt
+README.md
+PROJECT.md
+docs/PRODUCT_PLAN.md
+docs/CODE_STRUCTURE.md
+docs/DESIGN_STANDARDS.md
+docs/design/
+```
+
+规则：
+
+- 这一层帮助人和 AI 理解项目
+- 不写执行规则，不写交接流水
+
+### 4. 验收 / 变更 / 交接层
+
+回答：
+
+- 上一轮改了什么
+- 为什么这么改
+- 有哪些坑
+- 下一步怎么接
+- 怎么验证没有跑偏
+
+典型内容：
+
+```txt
+HANDOFF.md
+docs/CHANGELOG.md
+docs/DECISIONS.md
+docs/LESSONS.md
+docs/TESTING.md
+tests/
+scripts/check-runtime.sh
+```
+
+规则：
+
+- 这一层负责可接手、可追溯、可验证
+- 不负责项目介绍和源码分层
+
+### 一句话区分
+
+```txt
+源码层 = 项目真正跑起来的代码
+AI 规则层 = 告诉 AI 怎么干活
+项目认知层 = 告诉人和 AI 这是什么项目
+验收交接层 = 防止改完以后接不住、查不回、测不出
+```
+
+### 用这个模型判断越层
+
+常见越层例子：
+
+- `PROJECT.md` 写了太多变更历史：这些应该进 `docs/CHANGELOG.md`
+- `HANDOFF.md` 写了太多项目介绍：这些应该进 `README.md` 或 `PROJECT.md`
+- `README.md` 写了太多 AI 路由：这些应该进 `AGENTS.md`
+- adapter 写了新的通用规则：这些应该回到 `AGENTS.md`
 
 ---
 
@@ -277,6 +473,93 @@ Reference implementation 缺失 = 对应工具能力不可用，不代表 Projec
 - 旧的流水信息可以合并压缩
 - 不要把 `docs/CHANGELOG.md` 复制进来
 
+### docs/PRODUCT_PLAN.md
+
+产品路线图。
+
+回答：
+
+- 这个产品分几个阶段演进
+- 每个阶段的目标、交付物、成功标准是什么
+- 当前阶段暂时不做什么
+
+不要写：
+
+- 当前回合做了什么
+- 上一轮具体改了哪些文件
+- 临时交接和阻塞
+
+什么时候更新：
+
+- 产品阶段定义变了
+- 中长期路线变了
+- 阶段目标或成功标准变了
+- 明确新增或删除一个产品阶段
+
+---
+
+## 快速判断：该写 PROJECT、HANDOFF 还是 PRODUCT_PLAN
+
+看到一条信息时，先问它回答的是哪个问题：
+
+### 写到 PROJECT.md
+
+如果它回答的是：
+
+```txt
+这个项目现在是什么
+现在到哪了
+当前最重要的下一步是什么
+```
+
+典型例子：
+
+- 当前阶段从 v1 收口变成 v1.5 分发优化
+- 已知问题新增或删除
+- 下一步重点从“测路由”变成“推 GitHub 验收”
+
+### 写到 HANDOFF.md
+
+如果它回答的是：
+
+```txt
+这轮刚做了什么
+接下来谁来接、先做什么
+当前有哪些风险或阻塞
+```
+
+典型例子：
+
+- 这次补了哪些规则
+- 哪个测试刚跑过，结论是什么
+- 哪个点还没验完
+- 下一位 AI 先别碰什么
+
+### 写到 docs/PRODUCT_PLAN.md
+
+如果它回答的是：
+
+```txt
+这个产品未来怎么分阶段演进
+v1 之后做什么
+哪些事是下一阶段，不是当前阶段
+```
+
+典型例子：
+
+- v1 做可安装 runtime
+- v1.5 做分发体验优化
+- v2 做工具原生适配包
+- v3 做可发现 skill / package
+
+### 一句话判断
+
+```txt
+PROJECT.md       = 现在是什么
+HANDOFF.md       = 这轮做了什么，接下来怎么接
+docs/PRODUCT_PLAN.md = 以后怎么演进
+```
+
 ---
 
 ## docs/ 目录边界
@@ -392,6 +675,57 @@ Reference implementation 缺失 = 对应工具能力不可用，不代表 Projec
 ```txt
 adapters/* 只能适配 AGENTS.md，不能替代 AGENTS.md。
 ```
+
+---
+
+## 全局协作模板边界
+
+### templates/global/GLOBAL_USER_PREFERENCES_TEMPLATE.md
+
+记录用户的长期协作偏好。
+
+回答：
+
+- 怎么称呼更合适
+- 喜欢什么语气和解释方式
+- 默认工作方式是什么
+
+不要写：
+
+- 当前项目状态
+- 临时任务要求
+- 一次性对话结论
+
+### templates/global/GLOBAL_USER_PROFILE_TEMPLATE.md
+
+记录跨项目稳定成立的用户画像。
+
+回答：
+
+- 这个人是谁
+- 理解深度如何
+- 是否接受专业术语
+
+不要写：
+
+- 当前项目业务
+- 仅在单个项目里生效的特殊限制
+
+### templates/global/MEMORY_RULES.md
+
+定义 memory 应该记什么、什么时候更新、怎么写简洁。
+
+回答：
+
+- 什么值得进长期记忆
+- 什么不该写进去
+- 全局和项目边界怎么分
+
+不要写：
+
+- 本轮笔记
+- 执行流水
+- 已经在项目 SSOT 文档里可直接读取的细节
 
 ---
 

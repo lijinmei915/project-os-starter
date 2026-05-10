@@ -44,6 +44,7 @@ specific page/component implementation -> frontend
 If the route is `INSTALL / INIT`, print that route first.
 If installation completes in the same turn, continue directly into the INIT start mode question.
 Do not stop at installation summary only.
+The turn is only complete after the INIT start mode is clear.
 
 ---
 

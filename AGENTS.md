@@ -163,6 +163,14 @@ INSTALL / AUDIT 测试同样必须先打路由前缀：
 3. 完整项目：先建基础，再生成页面
 ```
 
+本轮结束条件：
+
+```txt
+INIT 启动方式已经明确
+```
+
+如果 `Prototype-first / Foundation-first / Full setup` 还没明确，本轮不能结束在安装总结。
+
 ### CLARIFICATION 第一响应
 
 用户只说“我想做一个产品 / 我有个想法 / 想做个东西”时，不要泛问“什么产品”。
@@ -353,10 +361,18 @@ adapters 不写新的规则源头。
 
 详细文档边界和更新决策表见 `docs/DOCUMENTATION.md`。
 
+在新建或更新任何项目文档前：
+
+1. 先看 `docs/DOCUMENTATION.md`
+2. 判断这是“当前状态 / 当前交接 / 中长期路线 / 结构变更 / 决策原因 / 错误复盘”里的哪一类
+3. 如果有对应模板，优先沿用模板结构，不自己发明新格式
+4. 改完后运行 `bash scripts/check-runtime.sh .`
+
 ### 文档更新规则
 
 - 小型任务或普通交接：只更新 `HANDOFF.md`
 - 当前阶段、进度、已知问题改变：更新 `PROJECT.md` + `HANDOFF.md`
+- 中长期阶段路线改变：更新 `docs/PRODUCT_PLAN.md`，必要时只在 `PROJECT.md` 留短摘要
 - AI 行为或路由规则改变：更新 `AGENTS.md` + tests + `HANDOFF.md`
 - 安装、分发、适配层、SSOT 结构改变：更新 `docs/CHANGELOG.md`，必要时同步 `README.md` / `INSTALL.md`
 - 犯错、误改、误判后新增约束：更新 `docs/LESSONS.md`
