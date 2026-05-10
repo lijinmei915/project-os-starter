@@ -38,6 +38,17 @@ contains() {
   [ -f "$file" ] && grep -q "$pattern" "$file"
 }
 
+check_guidance_header() {
+  file="$1"
+  [ -f "$file" ] || return 0
+  header_preview="$(head -n 12 "$file" 2>/dev/null || true)"
+  for pattern in "用途：" "什么时候更新：" "不要写什么："; do
+    if ! printf '%s\n' "$header_preview" | grep -q "$pattern"; then
+      warn "document should include guidance header ($pattern): $file"
+    fi
+  done
+}
+
 has_any() {
   file="$1"
   shift
@@ -65,6 +76,10 @@ for file in README.md AGENTS.md PROJECT.md HANDOFF.md; do
   if ! has_file "$file"; then
     error "missing core file: $file"
   fi
+done
+
+for file in README.md AGENTS.md PROJECT.md HANDOFF.md INSTALL.md CLAUDE.md docs/CHANGELOG.md docs/CODE_STRUCTURE.md docs/DECISIONS.md docs/DESIGN_STANDARDS.md docs/DOCUMENTATION.md docs/LESSONS.md docs/PRODUCT_PLAN.md docs/TESTING.md tests/cases.md tests/cross-tool-matrix.md examples/filled-project.md examples/prompt-simulation.md; do
+  check_guidance_header "$file"
 done
 
 for file in INSTALL.md scripts/install-project-os.sh scripts/install-adapter.sh; do
@@ -201,14 +216,8 @@ if has_file "docs/DOCUMENTATION.md"; then
   done
 fi
 
-for file in templates/project/README.md templates/project/PROJECT.md templates/project/HANDOFF.md templates/project/docs/CHANGELOG.md templates/project/docs/DECISIONS.md templates/project/docs/LESSONS.md templates/project/docs/TESTING.md templates/project/docs/PRODUCT_PLAN.md templates/project/docs/CODE_STRUCTURE.md templates/project/docs/DESIGN_STANDARDS.md; do
-  if [ -f "$file" ]; then
-    for pattern in "用途：" "什么时候更新：" "不要写什么："; do
-      if ! contains "$file" "$pattern"; then
-        warn "template file should include guidance header ($pattern): $file"
-      fi
-    done
-  fi
+for file in templates/project/README.md templates/project/PROJECT.md templates/project/HANDOFF.md templates/project/docs/CHANGELOG.md templates/project/docs/DECISIONS.md templates/project/docs/LESSONS.md templates/project/docs/TESTING.md templates/project/docs/PRODUCT_PLAN.md templates/project/docs/CODE_STRUCTURE.md templates/project/docs/DESIGN_STANDARDS.md templates/global/GLOBAL_USER_PREFERENCES_TEMPLATE.md templates/global/GLOBAL_USER_PROFILE_TEMPLATE.md templates/global/MEMORY_RULES.md; do
+  check_guidance_header "$file"
 done
 
 if has_file "docs/PRODUCT_PLAN.md"; then

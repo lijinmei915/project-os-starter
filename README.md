@@ -1,5 +1,9 @@
 # AI Runtime / Project OS
 
+> 用途：回答“这个仓库是什么、怎么开始、关键入口在哪、怎么安装给别人用”。
+> 什么时候更新：入口说明、安装方式、关键目录职责、对外使用方式变化时。
+> 不要写什么：AI 详细运行规则、当前交接流水、详细变更历史、内部 reference 细节。
+
 这是一个用于构建 AI 驱动开发流程的项目操作系统。
 
 它不是普通模板，也不是一次性脚手架，而是一套可控的 AI 开发 Runtime：负责识别项目阶段、统一入口调度、沉淀协作规则，并把项目从初始化、接管、设计约束到前端实现串成稳定流程。
@@ -34,7 +38,7 @@ find . -maxdepth 3 -type f | sort
 | `docs/DOCUMENTATION.md` | 文档编写规范和更新边界 |
 | `.claude/` | 当前参考实现的配置、hooks、内部能力材料 |
 | `.claude/skills/project-setup/references/` | 当前参考实现的初始化、审计等内部流程 reference |
-| `docs/` | 历史文档、规范草案、可插拔参考材料 |
+| `docs/` | 长期治理、产品规划、设计规范、测试策略与变更记录 |
 | `templates/project/` | 安装到目标项目时使用的干净项目模板 |
 | `templates/global/` | 全局用户偏好、画像、memory 规则模板 |
 | `examples/` | 示例材料 |

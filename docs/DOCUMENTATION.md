@@ -1,5 +1,9 @@
 # 文档编写规范
 
+> 用途：定义 Project OS 的文档边界、编写规范、更新规则和校验约束。
+> 什么时候更新：文档分层、模板规范、SSOT 判断、文档校验规则变化时。
+> 不要写什么：当前交接流水、一次性任务细节、与文档治理无关的实现过程。
+
 本文定义 Project OS 的文档边界和更新规则。
 
 核心原则：
@@ -7,6 +11,13 @@
 ```txt
 只写在最该负责的地方。
 不要为了同步而同步。
+```
+
+补充原则：
+
+```txt
+写给 AI 读的 Markdown，要先让它快速判断：
+这份文档是干嘛的、什么时候该改、什么不该写进来。
 ```
 
 ---
@@ -153,6 +164,209 @@ docs/DESIGN_STANDARDS.md
 ```
 
 这样即使不回看总规则，AI 和人也知道该怎么填。
+
+### AI 友好 Markdown 规范
+
+为了让 AI 更稳定地读取、更新和引用文档，受本规范约束的文档应尽量满足以下结构：
+
+#### 1. 顶部先给用途说明
+
+推荐格式：
+
+```md
+# 文档标题
+
+> 用途：这份文档回答什么问题
+> 什么时候更新：什么情况下改它
+> 不要写什么：哪些内容不该写进来
+```
+
+作用：
+
+- 让 AI 先判断“该不该往这里写”
+- 让人快速理解这份文档的边界
+- 降低 `PROJECT.md` / `HANDOFF.md` / `PRODUCT_PLAN.md` 串层概率
+
+#### 2. 标题尽量稳定
+
+优先使用固定、可复用的标题，不要频繁改名。
+
+例如：
+
+```txt
+当前阶段
+当前进度
+已知问题
+下一步重点
+风险与待确认
+```
+
+#### 3. 多用列表，少用散文
+
+AI 更适合读取：
+
+- 一条一个事实
+- 列表式状态
+- 稳定字段
+
+而不是混合很多层意思的长段描述。
+
+#### 4. 一文一责
+
+一份文档只回答一类问题。
+
+不要在同一份文档里同时写：
+
+- 项目介绍
+- AI 运行规则
+- 当前交接
+- 长期路线图
+
+#### 5. 显式写“不该写什么”
+
+约束不仅要写“该写什么”，也要写：
+
+```txt
+不要写什么
+```
+
+这样 AI 更容易避免把错误内容写进去。
+
+### 受本规范约束的文档
+
+以下文档默认必须带头部说明：
+
+```txt
+README.md
+AGENTS.md
+PROJECT.md
+HANDOFF.md
+INSTALL.md
+CLAUDE.md
+docs/*.md
+tests/*.md
+examples/*.md
+templates/project/*.md
+templates/project/docs/*.md
+templates/global/*.md
+```
+
+说明：
+
+- `templates/*` 是强约束，必须有完整头部说明
+- 根目录核心文档和 `docs/*.md` 也应有完整头部说明
+- `tests/*.md` 和 `examples/*.md` 也建议用同一格式，方便 AI 理解它们是“测试材料”还是“示例材料”
+- `adapters/*`、`.claude/skills/*`、`.claude/commands/*` 属于工具适配或内部实现层，可以使用更轻的说明，不强制要求完整三行头部
+
+### 文档语言分层规则
+
+Project OS 的文档语言不追求“全部中文”或“全部英文”，而是按职责分层。
+
+总原则：
+
+```txt
+The closer to scheduling and execution, the more English.
+The closer to understanding and handoff, the more Chinese.
+```
+
+中文解释：
+
+```txt
+越靠近调度和执行，越偏英文。
+越靠近认知、说明和交接，越偏中文。
+```
+
+#### 1. 英文优先 + 中文解释
+
+适用范围：
+
+```txt
+SKILL.md
+模式名
+路由名
+硬规则
+安装流转名
+slash command 名
+adapter 中的工具执行规则
+```
+
+示例：
+
+```txt
+INSTALL / INIT / HYBRID / AUDIT / CLARIFICATION
+Prototype-first / Foundation-first / Full setup
+CHECK-UPGRADE
+```
+
+规则：
+
+- 稳定调度词优先保留英文
+- 关键硬规则可先写英文，再补中文解释
+- 不要在不同文档里把同一个模式名来回翻译
+
+#### 2. 中文为主
+
+适用范围：
+
+```txt
+README.md
+PROJECT.md
+HANDOFF.md
+docs/*.md
+tests/*.md
+examples/*.md
+templates/project/*
+templates/global/*
+```
+
+规则：
+
+- 项目说明、交接、测试说明、产品规划和模板填写说明以中文为主
+- 遇到稳定术语时，直接保留英文名，不强行翻译
+
+例如：
+
+```txt
+AGENTS.md
+project-setup
+design-system
+frontend
+INSTALL / INIT / HYBRID
+```
+
+#### 3. 中英混合
+
+适用范围：
+
+```txt
+AGENTS.md
+CLAUDE.md
+adapters/*
+```
+
+规则：
+
+- 执行规则、模式名、工具行为约束：英文优先
+- 解释、维护说明、备注：中文为主
+
+#### 4. 稳定术语保持英文
+
+以下术语在所有文档里应尽量保持英文，不要按上下文反复改名：
+
+```txt
+INSTALL
+INIT
+HYBRID
+AUDIT
+CLARIFICATION
+CHECK-UPGRADE
+project-setup
+design-system
+frontend
+Prototype-first
+Foundation-first
+Full setup
+```
 
 ### Global Templates
 

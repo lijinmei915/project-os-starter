@@ -1,5 +1,9 @@
 # Project OS Test Cases
 
+> 用途：记录 Project OS 路由测试用例和当前测试结论。
+> 什么时候更新：路由契约、安装入口、测试结论或最小复测命令变化时。
+> 不要写什么：长期产品规划、当前项目交接、与测试无关的实现细节。
+
 目标：验证 Project OS 的核心路由是否稳定。
 
 主测试记录见：
@@ -29,7 +33,10 @@ tests/cross-tool-matrix.md
 ## 当前结论
 
 ```txt
-2026-05-06: 7/7 pass
+2026-05-06: v1 路由 7/7 pass
+2026-05-10: 安装入口补充复测完成
+- 已安装目录：会先走 INSTALL / CHECK-UPGRADE，再继续进入 INIT start mode 选择
+- 纯空目录：如果没有任何预装入口文件，模型不会天然认识 Project OS；当前产品策略仍是“可安装 runtime”，不是模型原生已知 skill
 ```
 
 ## Installation entry case
@@ -44,13 +51,13 @@ tests/cross-tool-matrix.md
 | I6 | 我想做一个项目 | `INIT` |
 | I7 | 接管这个老项目 | `HYBRID` |
 
-2026-05-06 quick result:
+2026-05-10 current result:
 
-- I1: pass, current installed Project OS directory routed to `INSTALL / CHECK-UPGRADE`
-- I1-empty-dir expected detail: print `INSTALL / INIT` first, then continue into INIT start mode selection instead of stopping at installation summary
+- I1-installed-dir: pass, current installed Project OS directory routed to `INSTALL / CHECK-UPGRADE` and continues into INIT start mode selection
+- I1-empty-dir: fail by design for now, pure blank directory without any preinstalled entry files will not let generic models naturally recognize `Project OS`
 - I2: pass, takeover intent routed to `INSTALL / HYBRID`
-- I3: pass-with-note, `/os` command is registered and discoverable in interactive Claude Code; `-p` print mode does not expand slash commands
-- I4: pass-with-issue, detected CHECK-UPGRADE but did not print the exact prefix first
+- I3: pass-with-note, `/os` command is registered and discoverable in interactive Claude Code; print / exec mode behavior still depends on tool support
+- I4: pass, detect installed Project OS and enter CHECK-UPGRADE path
 - I5: pass, inspect-only routed to AUDIT
 
 ## 最小复测命令
