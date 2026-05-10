@@ -7,6 +7,18 @@
 
 ## Project OS / 路由
 
+### 2026-05-10 INSTALL / INIT 停在安装总结，没有继续进入启动方式选择
+
+**犯的错**：空目录里用户说“帮我初始化这个项目，接入 Project OS”时，系统完成安装后停在安装总结，没有继续进入 `INIT` 的启动方式选择。
+
+**根本原因**：INSTALL 规则只约束了“先安装和分类”，但没有写死“当结果是 `INSTALL / INIT` 时，安装完成后必须继续进入 INIT”。
+
+**加了什么规则**：
+- `AGENTS.md` 增加 `INSTALL / INIT` 的固定第一响应和继续进入 INIT 的要求。
+- `project-setup/SKILL.md` 增加 continuation hard rule。
+- `references/install.md` 明确安装完成后同一轮继续进入 INIT start mode。
+- 各工具 adapter 同步这条行为。
+
 ### 2026-05-06 CLI print 模式没有稳定展示 skill banner
 
 **犯的错**：只看语义时，Case 7 “帮我写一个登录页”虽然行为进入 frontend，但输出没有显式 `frontend` 标签，导致测试结果只能记为 `pass-with-issue`。

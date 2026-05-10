@@ -140,6 +140,10 @@ bash scripts/install-adapter.sh gemini .
 
 adapter 会把 `adapters/` 里的模板写入对应工具自己的入口文件，但规则源头仍然是 `AGENTS.md`。
 
+安装到目标项目时，`README.md`、`PROJECT.md`、`HANDOFF.md`、`docs/CHANGELOG.md` 等会使用干净模板，不会直接复制本源仓库的运行历史。
+
+目标项目也会拿到 `scripts/create-test-fixtures.sh`，方便后续在自己的仓库里继续做空目录 / 老项目 / 已安装三类路由复测。
+
 如果你不用 Claude，也没关系：
 
 ```txt

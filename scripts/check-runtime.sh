@@ -12,6 +12,11 @@ cd "$target" || exit 2
 
 warnings=0
 errors=0
+is_source_repo=0
+
+if [ -d "templates/project" ]; then
+  is_source_repo=1
+fi
 
 warn() {
   warnings=$((warnings + 1))
@@ -72,11 +77,13 @@ if ! has_file "docs/DOCUMENTATION.md"; then
   warn "missing documentation governance file: docs/DOCUMENTATION.md"
 fi
 
-for file in tests/cross-tool-matrix.md scripts/create-test-fixtures.sh; do
-  if ! has_file "$file"; then
-    warn "missing Project OS cross-tool testing helper: $file"
-  fi
-done
+if [ "$is_source_repo" -eq 1 ]; then
+  for file in tests/cross-tool-matrix.md scripts/create-test-fixtures.sh; do
+    if ! has_file "$file"; then
+      warn "missing Project OS cross-tool testing helper: $file"
+    fi
+  done
+fi
 
 for file in adapters/CLAUDE.md adapters/CODEX.md adapters/CURSOR.md adapters/GEMINI.md; do
   if ! has_file "$file"; then
@@ -133,11 +140,13 @@ if has_file "tests/cases.md"; then
   fi
 fi
 
-for file in examples/filled-project.md examples/prompt-simulation.md; do
-  if ! has_file "$file"; then
-    warn "missing example file: $file"
-  fi
-done
+if [ "$is_source_repo" -eq 1 ]; then
+  for file in examples/filled-project.md examples/prompt-simulation.md; do
+    if ! has_file "$file"; then
+      warn "missing example file: $file"
+    fi
+  done
+fi
 
 placeholder_count="$(count_matches '\{\{[^}]+\}\}')"
 todo_count="$(count_matches 'TODO')"
@@ -146,7 +155,7 @@ if [ "$placeholder_count" -gt 0 ]; then
   warn "found $placeholder_count template placeholder line(s): {{...}}"
 fi
 
-if [ "$todo_count" -gt 0 ]; then
+if [ "$is_source_repo" -eq 1 ] && [ "$todo_count" -gt 0 ]; then
   warn "found $todo_count TODO line(s)"
 fi
 
@@ -174,7 +183,22 @@ if has_file "docs/DOCUMENTATION.md"; then
       warn "docs/DOCUMENTATION.md should define documentation structure contract: $pattern"
     fi
   done
+  for pattern in "用途" "什么时候更新" "不要写什么"; do
+    if ! contains "docs/DOCUMENTATION.md" "$pattern"; then
+      warn "docs/DOCUMENTATION.md should define template guidance fields: $pattern"
+    fi
+  done
 fi
+
+for file in templates/project/README.md templates/project/PROJECT.md templates/project/HANDOFF.md templates/project/docs/CHANGELOG.md templates/project/docs/DECISIONS.md templates/project/docs/LESSONS.md templates/project/docs/TESTING.md templates/project/docs/PRODUCT_PLAN.md templates/project/docs/CODE_STRUCTURE.md templates/project/docs/DESIGN_STANDARDS.md; do
+  if [ -f "$file" ]; then
+    for pattern in "用途：" "什么时候更新：" "不要写什么："; do
+      if ! contains "$file" "$pattern"; then
+        warn "template file should include guidance header ($pattern): $file"
+      fi
+    done
+  fi
+done
 
 if has_file "docs/PRODUCT_PLAN.md"; then
   if ! has_any "docs/PRODUCT_PLAN.md" "近期规划" "当前优先级" "本阶段要做"; then
@@ -205,7 +229,7 @@ if has_file "package.json"; then
   fi
 fi
 
-if has_file "docs/TESTING.md"; then
+if [ "$is_source_repo" -eq 1 ] && has_file "docs/TESTING.md"; then
   if ! has_any "docs/TESTING.md" "Prompt 行为测试" "产品规划偏离" "设计一致性" "代码测试"; then
     warn "docs/TESTING.md should cover prompt, product, design, and code checks"
   fi

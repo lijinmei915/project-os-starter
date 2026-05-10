@@ -49,21 +49,27 @@ backup_existing() {
   fi
 }
 
-copy_file() {
-  relative_path="$1"
-  src="$source_abs/$relative_path"
+copy_file_from() {
+  source_path="$1"
+  relative_path="$2"
   dest="$target_abs/$relative_path"
 
-  if [ ! -f "$src" ]; then
-    log "skip missing source file: $relative_path"
+  if [ ! -f "$source_path" ]; then
+    log "skip missing source file: $source_path"
     return
   fi
 
   backup_existing "$relative_path"
   mkdir -p "$(dirname "$dest")"
-  cp "$src" "$dest"
+  cp "$source_path" "$dest"
   installed=$((installed + 1))
   log "installed file: $relative_path"
+}
+
+copy_file() {
+  relative_path="$1"
+  src="$source_abs/$relative_path"
+  copy_file_from "$src" "$relative_path"
 }
 
 copy_optional_file() {
@@ -107,20 +113,31 @@ copy_file ".claude/settings.local.json"
 
 copy_file "AGENTS.md"
 copy_optional_file "CLAUDE.md"
-copy_file "README.md"
-copy_file "PROJECT.md"
-copy_file "HANDOFF.md"
 copy_file "INSTALL.md"
 
-copy_dir "docs"
-copy_dir "examples"
 copy_dir "tests"
 copy_dir "adapters"
+copy_dir "docs/design"
+
+template_root="$source_abs/templates/project"
+
+copy_file_from "$template_root/README.md" "README.md"
+copy_file_from "$template_root/PROJECT.md" "PROJECT.md"
+copy_file_from "$template_root/HANDOFF.md" "HANDOFF.md"
+copy_file_from "$source_abs/docs/DOCUMENTATION.md" "docs/DOCUMENTATION.md"
+copy_file_from "$template_root/docs/CHANGELOG.md" "docs/CHANGELOG.md"
+copy_file_from "$template_root/docs/DECISIONS.md" "docs/DECISIONS.md"
+copy_file_from "$template_root/docs/LESSONS.md" "docs/LESSONS.md"
+copy_file_from "$template_root/docs/TESTING.md" "docs/TESTING.md"
+copy_file_from "$template_root/docs/PRODUCT_PLAN.md" "docs/PRODUCT_PLAN.md"
+copy_file_from "$template_root/docs/CODE_STRUCTURE.md" "docs/CODE_STRUCTURE.md"
+copy_file_from "$template_root/docs/DESIGN_STANDARDS.md" "docs/DESIGN_STANDARDS.md"
 
 mkdir -p "$target_abs/scripts"
 copy_file "scripts/check-runtime.sh"
 copy_file "scripts/install-project-os.sh"
 copy_file "scripts/install-adapter.sh"
+copy_file "scripts/create-test-fixtures.sh"
 
 if [ -f "$target_abs/.gitignore" ]; then
   if ! grep -q '^\.DS_Store$' "$target_abs/.gitignore"; then

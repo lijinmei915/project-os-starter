@@ -38,3 +38,4 @@ specific page/component implementation -> frontend
 
 中文说明：
 不要跳过 Project OS 路由直接生成业务代码。
+如果是 `INSTALL / INIT`，先明确打印这个路由；安装结束后同一轮继续进入 INIT 启动方式选择。

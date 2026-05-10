@@ -36,7 +36,10 @@
 - slash commands：已新增 `/os-check`、`/os-test`、`/os-handoff`
 - install flow：已新增自然语言 + `/os` 双入口，用于 Project OS 安装 / 接入 / 检查
 - install flow 复测：自然语言初始化已能进入 `INSTALL / CHECK-UPGRADE`，自然语言接管已能进入 `INSTALL / HYBRID`
+- install routing：已补充 `INSTALL / INIT` 继续进入 INIT start mode 的规则，避免停在安装总结
 - 分发安装：已新增 `INSTALL.md` 和 `scripts/install-project-os.sh`，支持拿到 GitHub 地址后由 AI 自动安装到目标项目
+- 安装模板：已拆分 `templates/project/`，目标项目安装时使用干净模板，不再带源仓库历史文档
+- 模板填法：已要求目标项目模板自带“用途 / 什么时候更新 / 不要写什么”说明，降低后续文档跑偏概率
 - 工具适配：已新增 `adapters/` 和 `scripts/install-adapter.sh`，支持按需写入 Claude / Codex / Cursor / Gemini 适配文件
 - 跨工具验收：已新增 `tests/cross-tool-matrix.md` 和 `scripts/create-test-fixtures.sh`，用于验证 CLI 与可代码桌面端都能进入同一套 INSTALL FLOW
 - 文档治理：已新增 `docs/DOCUMENTATION.md`，明确 README / AGENTS / PROJECT / HANDOFF / CHANGELOG 等文档边界和更新规则

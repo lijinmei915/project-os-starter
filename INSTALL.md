@@ -71,12 +71,20 @@ README.md
 PROJECT.md
 HANDOFF.md
 INSTALL.md
-docs/
-examples/
+docs/DOCUMENTATION.md
+docs/CHANGELOG.md
+docs/DECISIONS.md
+docs/LESSONS.md
+docs/TESTING.md
+docs/PRODUCT_PLAN.md
+docs/CODE_STRUCTURE.md
+docs/DESIGN_STANDARDS.md
+docs/design/
 tests/
 scripts/check-runtime.sh
 scripts/install-project-os.sh
 scripts/install-adapter.sh
+scripts/create-test-fixtures.sh
 adapters/
 ```
 
@@ -90,6 +98,7 @@ CLAUDE.md
 核心规则源头是 `AGENTS.md`。
 `.claude/*` 是当前仓库自带的参考实现，`adapters/*` 是面向不同工具的适配层。
 `CLAUDE.md` 是 Claude 专属增强文件。如果源仓库里没有这个文件，安装脚本会安全跳过，不影响 Project OS 运行。
+`README.md` / `PROJECT.md` / `HANDOFF.md` / `docs/CHANGELOG.md` 等会使用干净模板，不会把源仓库自己的状态历史直接带进目标项目。
 
 ---
 
@@ -167,12 +176,20 @@ README.md
 PROJECT.md
 HANDOFF.md
 INSTALL.md
-docs/
-examples/
+docs/DOCUMENTATION.md
+docs/CHANGELOG.md
+docs/DECISIONS.md
+docs/LESSONS.md
+docs/TESTING.md
+docs/PRODUCT_PLAN.md
+docs/CODE_STRUCTURE.md
+docs/DESIGN_STANDARDS.md
+docs/design/
 tests/
 scripts/check-runtime.sh
 scripts/install-project-os.sh
 scripts/install-adapter.sh
+scripts/create-test-fixtures.sh
 adapters/
 ```
 

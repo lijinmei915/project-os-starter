@@ -52,6 +52,9 @@
 - 已新增 `docs/DOCUMENTATION.md`，把 README / AGENTS / PROJECT / HANDOFF / CHANGELOG 等文档边界和更新规则收口成 SSOT
 - 已在 `AGENTS.md` 增加文档更新规则，避免每次改动默认同步所有核心文档
 - 已在 `docs/DOCUMENTATION.md` 增加文档结构契约：Required / Recommended / Reference Implementation
+- 已修复 `INSTALL / INIT` 规则：空目录安装后不能停在安装总结，必须继续进入 INIT 启动方式选择
+- 已拆分安装文档模板：目标项目安装时使用 `templates/project/`，不再复制本源仓库自己的 PROJECT / HANDOFF / CHANGELOG 历史
+- 已为目标项目模板补齐顶部填写说明：用途 / 什么时候更新 / 不要写什么
 
 ## 不做事项
 

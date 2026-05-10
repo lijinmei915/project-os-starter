@@ -48,6 +48,30 @@
 
 ## 2026-05-09
 
+### Project OS / install templates
+
+#### 将安装包文档拆成“源仓库文档”和“目标项目模板”
+
+改动：
+- 新增 `templates/project/`，存放目标项目用的 README / PROJECT / HANDOFF / CHANGELOG 等模板
+- 调整 `scripts/install-project-os.sh`，安装时不再直接复制源仓库自己的状态文档
+- 在 `INSTALL.md`、`README.md`、`docs/DOCUMENTATION.md` 中说明安装模板边界
+
+影响：
+- 别人安装 Project OS 时，不会拿到本源仓库自己的交接、变更历史和项目状态
+- 安装结果更像“干净起步模板”，而不是“连源仓库历史一起搬过去”
+- 源仓库文档继续只服务 `project-os-starter` 自己
+- 每个目标项目模板顶部都带填写说明，后续新建文档更不容易跑偏
+
+相关文件：
+- `templates/project/`
+- `scripts/install-project-os.sh`
+- `INSTALL.md`
+- `README.md`
+- `docs/DOCUMENTATION.md`
+
+---
+
 ### Project OS / documentation governance
 
 #### 增加文档编写规范和更新边界
@@ -71,6 +95,33 @@
 - `PROJECT.md`
 - `HANDOFF.md`
 - `scripts/check-runtime.sh`
+
+---
+
+### Project OS / install-init continuation
+
+#### 修复空目录初始化停在安装总结的问题
+
+改动：
+- 在 `AGENTS.md` 明确 `INSTALL / INIT` 第一响应和继续进入 INIT start mode 的要求
+- 在 `project-setup/SKILL.md`、`references/install.md`、`references/init.md` 增加强制 continuation 规则
+- 在 `adapters/` 同步各工具的安装后续行为
+- 在 `tests/` 和 `docs/LESSONS.md` 补充对应测试和复盘
+
+影响：
+- 空目录里“初始化并接入 Project OS”不再只停在安装成功
+- 安装完成后会在同一轮继续进入 INIT，并要求明确启动方式
+- 更贴近真实用户意图，也更容易做 CLI / 桌面端人工验收
+
+相关文件：
+- `AGENTS.md`
+- `.claude/skills/project-setup/SKILL.md`
+- `.claude/skills/project-setup/references/install.md`
+- `.claude/skills/project-setup/references/init.md`
+- `adapters/`
+- `tests/cases.md`
+- `tests/cross-tool-matrix.md`
+- `docs/LESSONS.md`
 
 ---
 

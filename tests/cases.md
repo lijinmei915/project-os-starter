@@ -47,6 +47,7 @@ tests/cross-tool-matrix.md
 2026-05-06 quick result:
 
 - I1: pass, current installed Project OS directory routed to `INSTALL / CHECK-UPGRADE`
+- I1-empty-dir expected detail: print `INSTALL / INIT` first, then continue into INIT start mode selection instead of stopping at installation summary
 - I2: pass, takeover intent routed to `INSTALL / HYBRID`
 - I3: pass-with-note, `/os` command is registered and discoverable in interactive Claude Code; `-p` print mode does not expand slash commands
 - I4: pass-with-issue, detected CHECK-UPGRADE but did not print the exact prefix first

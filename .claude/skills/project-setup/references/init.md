@@ -75,6 +75,11 @@ Do not ask about tech stack, features, database, deployment, or UI library befor
 中文说明：
 启动方式不明确时，第一优先级是问“快速原型 / 项目治理 / 完整项目”，不是先问技术栈、功能模块、数据库或组件库。
 
+If INIT was reached from `INSTALL / INIT`, ask this question in the same turn after installation/check is complete.
+
+中文说明：
+如果 INIT 是从 `INSTALL / INIT` 进来的，安装完成后同一轮就要接着问这个问题，不要停住。
+
 ---
 
 ## Prototype-first

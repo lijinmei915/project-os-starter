@@ -61,6 +61,12 @@ Project OS 不在文档里维护完整目录树。
 
 工具适配层，负责把通用规则翻译成 Claude / Codex / Cursor / Gemini 等工具可读取的入口文件。
 
+5. templates/project/
+
+安装到目标项目时使用的模板层。
+
+这里放“发给目标项目的干净文档模板”，不放本源仓库自己的运行历史。
+
 ### Required
 
 Project OS 最小可用结构必须包含：
@@ -105,6 +111,41 @@ scripts/install-adapter.sh
 `.claude/` 提供 Claude Code 的 skills、commands、hooks 和项目配置。
 
 它是 Project OS 的一个实现版本，不是 Project OS 的唯一形态。
+
+### Install Templates
+
+安装到目标项目时，以下内容不应直接复制源仓库当前状态，而应使用模板：
+
+```txt
+README.md
+PROJECT.md
+HANDOFF.md
+docs/CHANGELOG.md
+docs/DECISIONS.md
+docs/LESSONS.md
+docs/TESTING.md
+docs/PRODUCT_PLAN.md
+docs/CODE_STRUCTURE.md
+docs/DESIGN_STANDARDS.md
+```
+
+规则：
+
+```txt
+源仓库自己的运行记录归源仓库。
+目标项目拿到的是空白或半结构化模板。
+```
+
+模板规则：
+
+```txt
+每个模板顶部都应包含：
+- 用途
+- 什么时候更新
+- 不要写什么
+```
+
+这样即使不回看总规则，AI 和人也知道该怎么填。
 
 ### Structure Rule
 

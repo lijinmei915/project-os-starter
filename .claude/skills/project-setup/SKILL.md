@@ -126,6 +126,15 @@ Inspect-only intent:
 INSTALL 不是普通项目需求，而是 Project OS 自己的安装 / 接入 / 检查入口。
 它先判断用户是在安装检查 Project OS，还是接管继续做项目，再结合当前目录状态决定下一步。
 
+If the route is `INSTALL / INIT`, the FIRST response must reveal that route.
+If installation is performed in the same turn, do not stop after installation summary.
+Continue directly into INIT and ask or decide the start mode before any UI/code generation.
+
+中文说明：
+如果判断结果是 `INSTALL / INIT`，第一响应必须显式写出这个路由。
+如果这一轮已经完成安装，不要停在“安装好了”。
+要继续进入 INIT，并在启动方式不明确时立刻问启动模式。
+
 ---
 
 ## Modes
@@ -179,6 +188,7 @@ HYBRID 是“接管项目”，先盘点、整理、稳定，再继续推进。
 - DO NOT skip project state detection.
 - MUST decide INSTALL / INIT / AUDIT / HYBRID before taking action.
 - MUST decide INIT start mode before UI, code, or file generation.
+- MUST continue from INSTALL / INIT into INIT start mode selection when the user is asking to initialize/start the project.
 - MUST ask at most 2-3 questions when clarification is needed.
 - MUST prefer HYBRID when unsure.
 
@@ -186,6 +196,7 @@ HYBRID 是“接管项目”，先盘点、整理、稳定，再继续推进。
 项目级请求不能跳过分类直接写页面或代码。
 必须先判断项目状态，再决定走 `INSTALL` / `INIT` / `AUDIT` / `HYBRID`。
 如果是 INIT，还要先明确启动方式。
+如果是 `INSTALL / INIT`，安装不是终点，还要继续进入 INIT。
 不确定时默认 `HYBRID`。
 
 ---

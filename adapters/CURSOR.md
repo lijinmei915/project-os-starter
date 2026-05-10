@@ -30,6 +30,7 @@ specific page/component implementation -> frontend
 ```
 
 Do not generate unrelated UI or code before route classification.
+If the route is `INSTALL / INIT`, print that route first and continue into INIT start mode selection after installation/check completes.
 
 中文说明：
 Cursor 里也要先分流，再写代码。

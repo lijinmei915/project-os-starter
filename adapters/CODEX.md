@@ -41,6 +41,10 @@ specific page/component implementation -> frontend
 中文说明：
 不要把“做系统 / 接管项目 / 检查结构”直接当成普通代码实现。
 
+If the route is `INSTALL / INIT`, print that route first.
+If installation completes in the same turn, continue directly into the INIT start mode question.
+Do not stop at installation summary only.
+
 ---
 
 ## Codex Notes

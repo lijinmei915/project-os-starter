@@ -82,7 +82,7 @@ Expected:
 INSTALL FLOW
 Directory state: Empty / near-empty
 Route: INSTALL / INIT
-Ask INIT start mode before execution
+After install/check, continue into INIT start mode question in the same turn
 No business UI/code generation
 No file changes before mode is clear
 ```

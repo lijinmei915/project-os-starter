@@ -258,6 +258,54 @@ AUDIT first, then propose next action
 ```
 
 中文说明：
+---
+
+## Output Contract
+
+The first response must show the route prefix before any long explanation.
+
+Examples:
+
+```txt
+INSTALL / INIT
+INSTALL / HYBRID
+INSTALL / CHECK-UPGRADE
+AUDIT
+INSTALL / NEEDS ACCESS
+```
+
+中文说明：
+INSTALL 相关请求第一行先打路由前缀，方便人和测试工具判断当前分流。
+
+---
+
+## Continuation Rule
+
+If the route is `INSTALL / INIT`, installation is not the final stop.
+
+After Project OS files are installed or confirmed, continue into INIT in the same turn:
+
+1. restate that the route is `INSTALL / INIT`
+2. state whether installation/check is complete
+3. if start mode is unclear, immediately ask the INIT start mode question
+4. do not stop at installation summary only
+
+Required follow-up when start mode is unclear:
+
+```txt
+这是一个 INIT 请求。你希望我按哪种方式开始？
+
+1. 快速原型：先生成一个能看的页面
+2. 项目治理：先建立项目结构、文档、规范
+3. 完整项目：先建基础，再生成页面
+```
+
+Do not ask about tech stack, modules, database, deployment, or UI library before this step.
+
+中文说明：
+空目录里“初始化并接入 Project OS”不是只把文件装进去就结束。
+安装完成后，要在同一轮继续进入 INIT 启动方式判断。
+不要停在安装总结，更不要先问技术栈和模块。
 不确定时先审计，不直接写文件。
 已有项目优先保护用户现有文件。
 
