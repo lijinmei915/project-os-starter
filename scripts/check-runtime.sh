@@ -221,14 +221,23 @@ for file in templates/project/README.md templates/project/PROJECT.md templates/p
 done
 
 if has_file "docs/PRODUCT_PLAN.md"; then
-  if ! has_any "docs/PRODUCT_PLAN.md" "v1" "v1.5" "v2" "v3"; then
-    warn "docs/PRODUCT_PLAN.md should define staged product roadmap (v1 / v1.5 / v2 / v3)"
-  fi
-  if ! has_any "docs/PRODUCT_PLAN.md" "近期规划" "当前优先级" "本阶段要做"; then
-    warn "docs/PRODUCT_PLAN.md should include near-term priorities"
-  fi
-  if ! has_any "docs/PRODUCT_PLAN.md" "本阶段不做" "暂不"; then
-    warn "docs/PRODUCT_PLAN.md should say what this stage will not do"
+  if [ "$is_source_repo" -eq 1 ]; then
+    if ! has_any "docs/PRODUCT_PLAN.md" "v1" "v1.5" "v2" "v3"; then
+      warn "docs/PRODUCT_PLAN.md should define staged product roadmap (v1 / v1.5 / v2 / v3)"
+    fi
+    if ! has_any "docs/PRODUCT_PLAN.md" "近期规划" "当前优先级" "本阶段要做"; then
+      warn "docs/PRODUCT_PLAN.md should include near-term priorities"
+    fi
+    if ! has_any "docs/PRODUCT_PLAN.md" "本阶段不做" "暂不"; then
+      warn "docs/PRODUCT_PLAN.md should say what this stage will not do"
+    fi
+  else
+    if ! has_any "docs/PRODUCT_PLAN.md" "当前阶段目标" "本阶段要做"; then
+      warn "target project docs/PRODUCT_PLAN.md should define current stage goal and planned work"
+    fi
+    if ! has_any "docs/PRODUCT_PLAN.md" "本阶段不做"; then
+      warn "target project docs/PRODUCT_PLAN.md should say what this stage will not do"
+    fi
   fi
   if has_any "docs/PRODUCT_PLAN.md" "本次已完成" "当前阻塞" "是否可继续"; then
     warn "docs/PRODUCT_PLAN.md should not include handoff-style execution details"

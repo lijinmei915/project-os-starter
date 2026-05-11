@@ -1,5 +1,9 @@
 # Claude Code Adapter
 
+> 用途：把 `AGENTS.md` 的通用规则翻译成 Claude Code 更容易读取的入口行为。
+> 什么时候更新：Claude Code 专属入口、读取顺序、路由要求或命令行为变化时。
+> 不要写什么：新的规则源头、当前项目交接、长期产品规划。
+
 This file is a Claude Code adapter for Project OS.
 
 `AGENTS.md` is the single source of truth. This file only translates the shared Project OS rules into Claude Code behavior.
