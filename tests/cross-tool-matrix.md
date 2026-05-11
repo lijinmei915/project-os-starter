@@ -55,12 +55,12 @@ bash scripts/create-test-fixtures.sh /tmp/project-os-fixtures
 | 测试项 | Codex | Claude Code | 可代码桌面端 |
 |--------|-------|-------------|--------------|
 | 自然语言触发 INIT | 待测 | 待测 | 待测 |
-| 自然语言触发 HYBRID | 待测 | 待测 | 待测 |
+| 自然语言触发 HYBRID | 通过 | 待测 | 待测 |
 | `/os` 触发 INSTALL FLOW | 待测 | 待测 | 待测 |
 | 已安装项目检查升级 | 待测 | 待测 | 待测 |
 | 只看不改进入 AUDIT | 待测 | 待测 | 待测 |
-| 不直接生成业务代码 | 待测 | 待测 | 待测 |
-| 不覆盖已有文件 | 待测 | 待测 | 待测 |
+| 不直接生成业务代码 | 通过 | 待测 | 待测 |
+| 不覆盖已有文件 | 通过 | 待测 | 待测 |
 
 ---
 
@@ -113,6 +113,16 @@ Directory state: Existing codebase without Project OS
 Route: INSTALL / HYBRID
 Inspect existing structure first
 Do not overwrite source files
+```
+
+Latest result:
+
+```txt
+Codex: pass
+- Route prefix: INSTALL / HYBRID
+- Existing source files preserved: package.json, src/App.tsx, src/main.tsx
+- Existing README backed up to .project-os/backups/
+- Project OS runtime installed as clean template set
 ```
 
 ### Case 3: Explicit `/os`
