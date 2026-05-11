@@ -1,1 +1,22 @@
+# macOS
 .DS_Store
+
+# Local environment
+.env
+.env.*
+!.env.example
+
+# Dependencies / build output
+node_modules/
+dist/
+build/
+.cache/
+*.log
+
+# Local Project OS / personal files
+CLAUDE.md
+.claude/settings.local.json
+GLOBAL_USER_PROFILE.md
+GLOBAL_USER_PREFERENCES.md
+LOCAL_NOTES.md
+PRIVATE_HANDOFF.md

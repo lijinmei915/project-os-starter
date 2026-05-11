@@ -15,6 +15,34 @@
 
 ---
 
+## 2026-05-11
+
+### Project OS / distribution boundary
+
+#### 收紧源仓库、本地增强和目标项目模板边界
+
+改动：
+- 在 `docs/DOCUMENTATION.md` 明确三条维护线：源仓库线、用户模板线、本地增强线
+- 新增 `templates/project/AGENTS.md`，让目标项目拿到轻量 AI 规则入口
+- 调整 `scripts/install-project-os.sh`，目标项目使用模板版 `AGENTS.md`
+- 主安装脚本不再分发 `.claude/settings.local.json` 和本地 `CLAUDE.md`
+- 补强 `.gitignore`，排除环境文件、构建产物、真实用户画像和本地增强文件
+
+影响：
+- 目标项目不会继承源仓库自己的收口规则、测试历史或个人本地 Claude 配置
+- `AGENTS.md` 仍是目标项目 AI 规则入口，但安装后版本更轻
+- Claude 专属入口改由 `scripts/install-adapter.sh claude .` 显式安装
+
+相关文件：
+- `.gitignore`
+- `INSTALL.md`
+- `templates/project/AGENTS.md`
+- `scripts/install-project-os.sh`
+- `scripts/check-runtime.sh`
+- `docs/DOCUMENTATION.md`
+
+---
+
 ## 2026-05-08
 
 ### Project OS / distribution

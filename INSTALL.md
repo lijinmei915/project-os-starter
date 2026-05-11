@@ -69,7 +69,6 @@ bash scripts/check-runtime.sh .
 .claude/commands/
 .claude/hooks/
 .claude/project.json
-.claude/settings.local.json
 AGENTS.md
 README.md
 PROJECT.md
@@ -92,16 +91,11 @@ scripts/create-test-fixtures.sh
 adapters/
 ```
 
-可选内容：
-
-```txt
-CLAUDE.md
-```
-
 中文说明：
 核心规则源头是 `AGENTS.md`。
 `.claude/*` 是当前仓库自带的参考实现，`adapters/*` 是面向不同工具的适配层。
-`CLAUDE.md` 是 Claude 专属增强文件。如果源仓库里没有这个文件，安装脚本会安全跳过，不影响 Project OS 运行。
+`.claude/settings.local.json` 是本地增强配置，不作为公开运行时文件安装到目标项目。
+`CLAUDE.md` 不由主安装脚本默认写入；如需 Claude 专属入口，请运行 `scripts/install-adapter.sh claude .`。
 `README.md` / `PROJECT.md` / `HANDOFF.md` / `docs/CHANGELOG.md` 等会使用干净模板，不会把源仓库自己的状态历史直接带进目标项目。
 
 ---

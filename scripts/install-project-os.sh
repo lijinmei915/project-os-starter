@@ -109,10 +109,7 @@ copy_dir ".claude/commands"
 copy_dir ".claude/hooks"
 
 copy_file ".claude/project.json"
-copy_file ".claude/settings.local.json"
 
-copy_file "AGENTS.md"
-copy_optional_file "CLAUDE.md"
 copy_file "INSTALL.md"
 
 copy_dir "tests"
@@ -121,6 +118,7 @@ copy_dir "docs/design"
 
 template_root="$source_abs/templates/project"
 
+copy_file_from "$template_root/AGENTS.md" "AGENTS.md"
 copy_file_from "$template_root/README.md" "README.md"
 copy_file_from "$template_root/PROJECT.md" "PROJECT.md"
 copy_file_from "$template_root/HANDOFF.md" "HANDOFF.md"

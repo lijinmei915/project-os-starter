@@ -216,7 +216,7 @@ if has_file "docs/DOCUMENTATION.md"; then
   done
 fi
 
-for file in templates/project/README.md templates/project/PROJECT.md templates/project/HANDOFF.md templates/project/docs/CHANGELOG.md templates/project/docs/DECISIONS.md templates/project/docs/LESSONS.md templates/project/docs/TESTING.md templates/project/docs/PRODUCT_PLAN.md templates/project/docs/CODE_STRUCTURE.md templates/project/docs/DESIGN_STANDARDS.md templates/global/GLOBAL_USER_PREFERENCES_TEMPLATE.md templates/global/GLOBAL_USER_PROFILE_TEMPLATE.md templates/global/MEMORY_RULES.md; do
+for file in templates/project/README.md templates/project/AGENTS.md templates/project/PROJECT.md templates/project/HANDOFF.md templates/project/docs/CHANGELOG.md templates/project/docs/DECISIONS.md templates/project/docs/LESSONS.md templates/project/docs/TESTING.md templates/project/docs/PRODUCT_PLAN.md templates/project/docs/CODE_STRUCTURE.md templates/project/docs/DESIGN_STANDARDS.md templates/global/GLOBAL_USER_PREFERENCES_TEMPLATE.md templates/global/GLOBAL_USER_PROFILE_TEMPLATE.md templates/global/MEMORY_RULES.md; do
   check_guidance_header "$file"
 done
 

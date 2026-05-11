@@ -85,6 +85,32 @@ Project OS 不在文档里维护完整目录树。
 这里放“跨项目长期成立”的用户偏好、用户画像、memory 维护规则模板。
 不要把它们混进根目录入口，也不要当成当前项目状态文档。
 
+### 三条维护线
+
+Project OS 维护时必须区分三条线：
+
+```txt
+1. 源仓库线：project-os-starter 自己怎么维护、测试、发布
+2. 用户模板线：别人安装后拿到什么干净模板和运行入口
+3. 本地增强线：维护者自己在 Claude / Codex / Cursor 里的个人增强
+```
+
+判断规则：
+
+| 线 | 典型内容 | 是否默认分发给目标项目 |
+|----|----------|------------------------|
+| 源仓库线 | 根目录状态文档、`docs/`、`tests/`、`examples/` | 只分发通用规则和必要运行时，不分发源仓库历史 |
+| 用户模板线 | `templates/project/`、安装后的目标项目文档 | 是，目标项目拿到的是干净模板 |
+| 本地增强线 | 本地 `CLAUDE.md`、`.claude/settings.local.json`、真实用户画像 | 否，默认不进公开 Git，也不安装到目标项目 |
+
+原则：
+
+```txt
+源仓库可以记录自己的演进。
+目标项目不能继承源仓库的历史。
+本地增强不能伪装成通用规则。
+```
+
 ### Required
 
 Project OS 最小可用结构必须包含：
@@ -136,6 +162,7 @@ scripts/install-adapter.sh
 
 ```txt
 README.md
+AGENTS.md
 PROJECT.md
 HANDOFF.md
 docs/CHANGELOG.md
