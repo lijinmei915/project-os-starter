@@ -1,8 +1,168 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-target="${1:-.}"
+target="."
 source_root="${PROJECT_OS_SOURCE:-}"
+profile=""
+include_design=0
+include_skills=0
+include_adapters=0
+target_set=0
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  bash scripts/install-project-os.sh [target] [--profile core|product|full]
+
+Profiles:
+  core     AGENTS.md, PROJECT.md, HANDOFF.md, scripts/check-runtime.sh
+  product  core + README/INSTALL + lightweight governance docs
+  full     product + design docs + Claude runtime + adapters
+
+Options:
+  --with-design    Add docs/DESIGN_STANDARDS.md and docs/design/
+  --with-skills    Add .claude skills, commands, and project config
+  --with-adapters  Add adapters/ and scripts/install-adapter.sh
+  -h, --help       Show this help
+
+Examples:
+  bash scripts/install-project-os.sh . --profile core
+  bash scripts/install-project-os.sh . --profile product --with-design
+  bash scripts/install-project-os.sh . --profile full
+USAGE
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --profile)
+      if [ "$#" -lt 2 ]; then
+        echo "ERROR: --profile requires a value"
+        exit 2
+      fi
+      profile="$2"
+      shift 2
+      ;;
+    --profile=*)
+      profile="${1#--profile=}"
+      shift
+      ;;
+    --with-design)
+      include_design=1
+      shift
+      ;;
+    --with-skills)
+      include_skills=1
+      shift
+      ;;
+    --with-adapters)
+      include_adapters=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*)
+      echo "ERROR: unknown option: $1"
+      usage
+      exit 2
+      ;;
+    *)
+      if [ "$target_set" -eq 1 ]; then
+        echo "ERROR: unexpected argument: $1"
+        usage
+        exit 2
+      fi
+      target="$1"
+      target_set=1
+      shift
+      ;;
+  esac
+done
+
+if [ "$#" -gt 0 ]; then
+  if [ "$target_set" -eq 1 ]; then
+    echo "ERROR: unexpected argument: $1"
+    usage
+    exit 2
+  fi
+  target="$1"
+fi
+
+log() {
+  echo "Project OS installer: $*"
+}
+
+ask_yes_no() {
+  prompt="$1"
+  default="$2"
+  answer=""
+
+  read -r -p "$prompt " answer || answer=""
+  if [ -z "$answer" ]; then
+    answer="$default"
+  fi
+
+  case "$answer" in
+    y|Y|yes|YES|Yes)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+choose_interactive_profile() {
+  choice=""
+
+  echo "Project OS installer: choose install profile"
+  echo "1. 纯工具库 / 轻量项目 -> core"
+  echo "2. 产品项目 -> product"
+  echo "3. 不确定 -> core"
+  read -r -p "这个项目是？ [1/2/3] " choice || choice=""
+
+  case "$choice" in
+    2)
+      profile="product"
+      ;;
+    *)
+      profile="core"
+      ;;
+  esac
+
+  if ask_yes_no "需要设计规范？ [y/N]" "N"; then
+    include_design=1
+  fi
+  if ask_yes_no "需要复杂 AI flows / skills？ [y/N]" "N"; then
+    include_skills=1
+  fi
+  if ask_yes_no "需要跨 AI 工具 adapters？ [y/N]" "N"; then
+    include_adapters=1
+  fi
+}
+
+if [ -z "$profile" ]; then
+  if [ -t 0 ] && [ -t 1 ]; then
+    choose_interactive_profile
+  else
+    profile="core"
+  fi
+fi
+
+case "$profile" in
+  core|product|full)
+    ;;
+  *)
+    echo "ERROR: unknown profile: $profile"
+    usage
+    exit 2
+    ;;
+esac
 
 if [ -z "$source_root" ]; then
   script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -23,13 +183,11 @@ target_abs="$(cd "$target" && pwd)"
 source_abs="$(cd "$source_root" && pwd)"
 timestamp="$(date +%Y%m%d-%H%M%S)"
 backup_root="$target_abs/.project-os/backups/$timestamp"
+template_root="$source_abs/templates/project"
 
 installed=0
 backed_up=0
-
-log() {
-  echo "Project OS installer: $*"
-}
+documentation_installed=0
 
 if [ "$source_abs" = "$target_abs" ]; then
   log "source and target are the same directory"
@@ -66,76 +224,114 @@ copy_file_from() {
   log "installed file: $relative_path"
 }
 
-copy_file() {
-  relative_path="$1"
-  src="$source_abs/$relative_path"
-  copy_file_from "$src" "$relative_path"
-}
-
-copy_optional_file() {
-  relative_path="$1"
-  src="$source_abs/$relative_path"
-
-  if [ ! -f "$src" ]; then
-    log "skip optional source file: $relative_path"
-    return
-  fi
-
-  copy_file "$relative_path"
-}
-
-copy_dir() {
-  relative_path="$1"
-  src="$source_abs/$relative_path"
+copy_dir_from() {
+  source_path="$1"
+  relative_path="$2"
   dest="$target_abs/$relative_path"
 
-  if [ ! -d "$src" ]; then
-    log "skip missing source directory: $relative_path"
+  if [ ! -d "$source_path" ]; then
+    log "skip missing source directory: $source_path"
     return
   fi
 
   backup_existing "$relative_path"
   mkdir -p "$dest"
-  cp -R "$src/." "$dest/"
+  cp -R "$source_path/." "$dest/"
   installed=$((installed + 1))
   log "installed directory: $relative_path"
 }
 
+install_file() {
+  relative_path="$1"
+  copy_file_from "$template_root/$relative_path" "$relative_path"
+}
+
+install_dir() {
+  relative_path="$1"
+  copy_dir_from "$template_root/$relative_path" "$relative_path"
+}
+
+install_core() {
+  install_file "AGENTS.md"
+  install_file "PROJECT.md"
+  install_file "HANDOFF.md"
+  install_file "scripts/check-runtime.sh"
+}
+
+install_documentation_doc() {
+  if [ "$documentation_installed" -eq 0 ]; then
+    install_file "docs/DOCUMENTATION.md"
+    documentation_installed=1
+  fi
+}
+
+install_product_docs() {
+  install_file "README.md"
+  install_file "INSTALL.md"
+  install_documentation_doc
+  install_file "docs/CHANGELOG.md"
+  install_file "docs/DECISIONS.md"
+  install_file "docs/LESSONS.md"
+}
+
+install_design_docs() {
+  install_documentation_doc
+  install_file "docs/DESIGN_STANDARDS.md"
+  install_dir "docs/design"
+}
+
+install_full_docs() {
+  install_file "docs/TESTING.md"
+  install_file "docs/PRODUCT_PLAN.md"
+  install_file "docs/CODE_STRUCTURE.md"
+}
+
+install_claude_runtime() {
+  install_file ".claude/project.json"
+  install_dir ".claude/skills"
+  install_dir ".claude/commands"
+}
+
+install_claude_hooks() {
+  install_dir ".claude/hooks"
+}
+
+install_adapter_runtime() {
+  install_dir "adapters"
+  install_file "scripts/install-adapter.sh"
+}
+
 log "source: $source_abs"
 log "target: $target_abs"
+log "profile: $profile"
 
-copy_dir ".claude/skills"
-copy_dir ".claude/commands"
-copy_dir ".claude/hooks"
+install_core
 
-copy_file ".claude/project.json"
+case "$profile" in
+  product)
+    install_product_docs
+    ;;
+  full)
+    include_design=1
+    include_skills=1
+    include_adapters=1
+    install_product_docs
+    install_full_docs
+    install_claude_hooks
+    ;;
+esac
 
-copy_file "INSTALL.md"
+if [ "$include_design" -eq 1 ]; then
+  install_design_docs
+fi
 
-copy_dir "tests"
-copy_dir "adapters"
-copy_dir "docs/design"
+if [ "$include_skills" -eq 1 ]; then
+  install_claude_runtime
+fi
 
-template_root="$source_abs/templates/project"
-
-copy_file_from "$template_root/AGENTS.md" "AGENTS.md"
-copy_file_from "$template_root/README.md" "README.md"
-copy_file_from "$template_root/PROJECT.md" "PROJECT.md"
-copy_file_from "$template_root/HANDOFF.md" "HANDOFF.md"
-copy_file_from "$source_abs/docs/DOCUMENTATION.md" "docs/DOCUMENTATION.md"
-copy_file_from "$template_root/docs/CHANGELOG.md" "docs/CHANGELOG.md"
-copy_file_from "$template_root/docs/DECISIONS.md" "docs/DECISIONS.md"
-copy_file_from "$template_root/docs/LESSONS.md" "docs/LESSONS.md"
-copy_file_from "$template_root/docs/TESTING.md" "docs/TESTING.md"
-copy_file_from "$template_root/docs/PRODUCT_PLAN.md" "docs/PRODUCT_PLAN.md"
-copy_file_from "$template_root/docs/CODE_STRUCTURE.md" "docs/CODE_STRUCTURE.md"
-copy_file_from "$template_root/docs/DESIGN_STANDARDS.md" "docs/DESIGN_STANDARDS.md"
-
-mkdir -p "$target_abs/scripts"
-copy_file "scripts/check-runtime.sh"
-copy_file "scripts/install-project-os.sh"
-copy_file "scripts/install-adapter.sh"
-copy_file "scripts/create-test-fixtures.sh"
+if [ "$include_adapters" -eq 1 ]; then
+  install_adapter_runtime
+fi
 
 if [ -f "$target_abs/.gitignore" ]; then
   if ! grep -q '^\.DS_Store$' "$target_abs/.gitignore"; then

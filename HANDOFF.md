@@ -6,7 +6,7 @@
 
 ## 当前状态
 
-- 当前做到：Project OS 已完成 v1 收口，远端 GitHub 分发和老项目接入验收已打通
+- 当前做到：Project OS 已完成 v1 收口，并把安装产物改为 `core` / `product` / `full` profile 分发
 - 当前阻塞：无
 - 是否可继续：可直接继续
 
@@ -21,6 +21,10 @@
 - 已记录三条维护线：源仓库线、用户模板线、本地增强线
 - 已补目标项目轻量 `AGENTS.md` 模板，并调整安装脚本改用模板版 `AGENTS.md`
 - 已停止主安装脚本分发 `.claude/settings.local.json` 和本地 `CLAUDE.md`
+- 已补模板同步检查：源仓库运行时改动后，可用 `scripts/sync-templates.sh` 同步到 `templates/project`
+- 已明确安装器和测试夹具只属于源仓库，不默认安装到用户项目
+- 已实现 profile-based 安装：默认非交互为 `core`，终端无 profile 时进入交互选择
+- 已调整 `check-runtime.sh`：轻量安装不再被要求带 `.claude/skills`、adapters 和完整 docs
 
 ## 不做事项
 
@@ -32,10 +36,10 @@
 ## 风险与待确认
 
 - 纯空目录里，如果没有任何预装入口文件，模型不会天然认识 `Project OS`
-- 当前分发边界改动已本地验证；远端验收需要等 commit + push 后再跑
+- profile-based 安装改动尚未 commit / push
 
 ## 下一步
 
-1. commit 本轮分发边界收口
-2. push 后用远端地址重跑安装验收
-3. 继续收紧 `README.md` / `INSTALL.md` 的最短安装文案
+1. commit 本轮 profile-based install 收口
+2. push 后用远端地址重跑 `core` / `product` / `full` 安装验收
+3. 继续观察目标项目是否还觉得安装产物偏重

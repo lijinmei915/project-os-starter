@@ -140,7 +140,7 @@ https://github.com/lijinmei915/project-os-starter.git
 可以直接复制这段给任意 coding agent：
 
 ```txt
-请把 Project OS 安装到当前项目。
+请把 Project OS 以 core profile 安装到当前项目。
 源仓库：https://github.com/lijinmei915/project-os-starter.git
 请 clone 到临时目录，运行 scripts/install-project-os.sh 安装到当前目录，安装后运行 scripts/check-runtime.sh .。
 不要接组件库，不要生成业务 UI，不要扩展新功能。
@@ -151,15 +151,28 @@ https://github.com/lijinmei915/project-os-starter.git
 ```bash
 tmp_dir="$(mktemp -d)"
 git clone https://github.com/lijinmei915/project-os-starter.git "$tmp_dir/project-os-starter"
-bash "$tmp_dir/project-os-starter/scripts/install-project-os.sh" .
+bash "$tmp_dir/project-os-starter/scripts/install-project-os.sh" . --profile core
 bash scripts/check-runtime.sh .
 ```
 
 完整安装说明见 `INSTALL.md`。
 
+安装 profile：
+
+| profile | 适合场景 | 安装内容 |
+|---------|----------|----------|
+| `core` | 默认推荐，小项目和老项目轻量接入 | `AGENTS.md` / `PROJECT.md` / `HANDOFF.md` / `scripts/check-runtime.sh` |
+| `product` | 需要基础项目治理文档 | `core` + README / INSTALL / CHANGELOG / DECISIONS / LESSONS |
+| `full` | 需要完整 Project OS runtime | `product` + 设计文档 + `.claude/skills` + commands / hooks + adapters |
+
+中文说明：
+源仓库保留完整能力，但默认不会把整套 skills、adapters、tests、hooks 都塞进目标项目。
+需要时显式选择 `product`、`full` 或附加 `--with-design` / `--with-skills` / `--with-adapters`。
+
 如需写入具体工具的自动读取规则，可以安装 adapter：
 
 ```bash
+bash scripts/install-project-os.sh . --profile core --with-adapters
 bash scripts/install-adapter.sh claude .
 bash scripts/install-adapter.sh codex .
 bash scripts/install-adapter.sh cursor .
@@ -170,7 +183,7 @@ adapter 会把 `adapters/` 里的模板写入对应工具自己的入口文件�
 
 安装到目标项目时，`README.md`、`PROJECT.md`、`HANDOFF.md`、`docs/CHANGELOG.md` 等会使用干净模板，不会直接复制本源仓库的运行历史。
 
-目标项目也会拿到 `scripts/create-test-fixtures.sh`，方便后续在自己的仓库里继续做空目录 / 老项目 / 已安装三类路由复测。
+源仓库里的 `scripts/create-test-fixtures.sh` 只用于维护 Project OS Starter 自己的验收夹具，不会默认安装到目标项目。
 
 如果你不用 Claude，也没关系：
 

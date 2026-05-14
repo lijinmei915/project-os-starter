@@ -15,7 +15,8 @@
 目标：确认 AI Runtime 的核心入口、状态和 reference 没有跑偏。
 
 检查项：
-- `README.md` / `AGENTS.md` / `PROJECT.md` / `HANDOFF.md` 是否存在
+- `AGENTS.md` / `PROJECT.md` / `HANDOFF.md` 是否存在
+- `README.md` / `INSTALL.md` / `docs/*` 是否符合当前安装 profile 的边界
 - `PROJECT.md` 是否写清项目定位、当前架构和当前进度
 - `HANDOFF.md` 是否写清当前状态、风险和下一步
 - `project-setup` references 是否存在：`init.md` / `audit.md`

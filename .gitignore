@@ -15,6 +15,7 @@ build/
 
 # Local Project OS / personal files
 CLAUDE.md
+!templates/project/adapters/CLAUDE.md
 .claude/settings.local.json
 GLOBAL_USER_PROFILE.md
 GLOBAL_USER_PREFERENCES.md

@@ -15,6 +15,34 @@
 
 ---
 
+## 2026-05-14
+
+### Project OS / install profile
+
+#### 将安装产物改为 profile-based 轻量分发
+
+改动：
+- `scripts/install-project-os.sh` 支持 `--profile core|product|full`
+- 默认非交互安装使用 `core`，只安装 `AGENTS.md` / `PROJECT.md` / `HANDOFF.md` / `scripts/check-runtime.sh`
+- 终端手动执行且未传 profile 时，会询问项目类型、是否需要设计规范、skills 和 adapters
+- `scripts/check-runtime.sh` 改为识别轻量安装，不再要求每个目标项目都带 `.claude/skills`、adapters 和完整 docs
+- `README.md` / `INSTALL.md` / `docs/DOCUMENTATION.md` 同步 profile 分发边界
+
+影响：
+- 源仓库继续保留完整 runtime，目标项目默认拿到更干净的最小协作入口
+- 老项目接入时不再默认覆盖 `README.md` 或塞入整套 hooks / tests / adapters
+- 需要完整 Project OS 能力时，仍可用 `--profile full` 或按需启用 `--with-design` / `--with-skills` / `--with-adapters`
+
+相关文件：
+- `scripts/install-project-os.sh`
+- `scripts/check-runtime.sh`
+- `README.md`
+- `INSTALL.md`
+- `docs/DOCUMENTATION.md`
+- `templates/project/`
+
+---
+
 ## 2026-05-11
 
 ### Project OS / distribution boundary

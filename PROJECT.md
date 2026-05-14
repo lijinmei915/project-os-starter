@@ -21,8 +21,8 @@
 
 ## 当前进度
 
-- 已完成：v1 路由契约、INSTALL FLOW、安装脚本、adapter 写入、项目模板 / 全局模板、文档治理
-- 正在做：远端分发验收、安装文案收紧
+- 已完成：v1 路由契约、INSTALL FLOW、profile-based 安装脚本、adapter 写入、项目模板 / 全局模板、文档治理
+- 正在做：profile 安装验收、提交前收口
 - 暂不做：组件运行层 `ai-components`、组件库选型、工具原生 package 化
 
 ## 已知问题
@@ -32,6 +32,6 @@
 
 ## 下一步重点
 
-1. push GitHub，确保远端安装拿到的是最新版
-2. 用远端地址重做空目录 / 老项目 / 已安装项目验收
-3. 收紧 `README.md` / `INSTALL.md` 的最短安装文案
+1. commit 并 push profile-based install 改动
+2. 用远端地址重做 `core` / `product` / `full` 安装验收
+3. 继续收紧对外最短安装文案
