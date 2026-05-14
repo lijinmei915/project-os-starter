@@ -87,6 +87,13 @@ count_matches() {
 
 echo "Checking AI Runtime docs in: $(pwd)"
 
+if [ -f ".project-os/version" ]; then
+  version_val="$(grep '^version=' .project-os/version | cut -d= -f2)"
+  profile_val="$(grep '^profile=' .project-os/version | cut -d= -f2)"
+  installed_val="$(grep '^installed=' .project-os/version | cut -d= -f2)"
+  echo "Project OS: $version_val (profile: $profile_val, installed: $installed_val)"
+fi
+
 for file in AGENTS.md PROJECT.md HANDOFF.md; do
   if ! has_file "$file"; then
     error "missing core file: $file"
