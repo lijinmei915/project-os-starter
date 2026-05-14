@@ -401,7 +401,7 @@ else
   log "created .gitignore"
 fi
 
-# Fix 1: write version record
+# Write version record
 version_val="$(cat "$source_abs/VERSION" 2>/dev/null || echo "unknown")"
 version_file="$target_abs/.project-os/version"
 mkdir -p "$(dirname "$version_file")"
@@ -409,6 +409,26 @@ printf 'version=%s\ninstalled=%s\nprofile=%s\n' \
   "$version_val" \
   "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   "$profile" > "$version_file"
+
+# Write machine-readable state (only on fresh install, not upgrade)
+state_file="$target_abs/.project-os/state.json"
+if [ "$upgrade" -eq 0 ] && [ ! -f "$state_file" ]; then
+  cat > "$state_file" <<'STATE'
+{
+  "name": "",
+  "description": "",
+  "phase": "init",
+  "stage": "",
+  "status": {
+    "done": [],
+    "doing": [],
+    "blocked": [],
+    "next": []
+  }
+}
+STATE
+  log "created .project-os/state.json — fill in name, phase, stage, status"
+fi
 
 log "installed items: $installed"
 

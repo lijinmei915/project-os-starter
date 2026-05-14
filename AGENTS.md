@@ -18,6 +18,16 @@
 
 当前阶段是收口期：只稳定内核，不扩功能。
 
+## 机器可读项目状态
+
+当 `.project-os/state.json` 存在时：
+
+- 以 `state.json` 为权威数据源，读取项目名称、阶段（`phase`）、当前进度（`status`）
+- `PROJECT.md` 是 `state.json` 的人类可读展示层，两者冲突时以 `state.json` 为准
+- 更新项目状态时，同步更新 `state.json` 和 `PROJECT.md`，不要只改其中一个
+
+`phase` 合法值：`init` / `stabilizing` / `shipping` / `maintenance` / `archived`
+
 ## 规则优先级
 
 1. 当前对话里用户刚刚明确说的话

@@ -1,0 +1,29 @@
+{
+  "name": "project-os-starter",
+  "description": "AI 开发 Runtime：识别项目阶段、统一入口调度、沉淀协作规则",
+  "phase": "stabilizing",
+  "stage": "v1 可安装 runtime 收口期",
+  "status": {
+    "done": [
+      "v1 路由契约",
+      "INSTALL FLOW",
+      "profile-based 安装（core / product / full）",
+      "版本记录 + upgrade 路径",
+      "远端三 profile 验收",
+      "README 瘦身 + INSTALL 补 upgrade 说明"
+    ],
+    "doing": [
+      "v1.5 减幻觉 schema 设计"
+    ],
+    "blocked": [],
+    "next": [
+      "project-state.json schema 落地到 check-runtime + AGENTS",
+      "project.json JSON Schema 补全"
+    ]
+  },
+  "architecture": {
+    "entry": "project-setup",
+    "rules": "design-system",
+    "execution": "frontend"
+  }
+}

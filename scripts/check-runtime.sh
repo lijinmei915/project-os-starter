@@ -94,6 +94,16 @@ if [ -f ".project-os/version" ]; then
   echo "Project OS: $version_val (profile: $profile_val, installed: $installed_val)"
 fi
 
+if [ -f ".project-os/state.json" ]; then
+  valid_phases="init|stabilizing|shipping|maintenance|archived"
+  if ! grep -qE '"phase"\s*:\s*"(init|stabilizing|shipping|maintenance|archived)"' ".project-os/state.json"; then
+    warn ".project-os/state.json: phase must be one of: init, stabilizing, shipping, maintenance, archived"
+  fi
+  if grep -q '"name"\s*:\s*""' ".project-os/state.json" 2>/dev/null; then
+    warn ".project-os/state.json: name is empty — fill in project name"
+  fi
+fi
+
 for file in AGENTS.md PROJECT.md HANDOFF.md; do
   if ! has_file "$file"; then
     error "missing core file: $file"

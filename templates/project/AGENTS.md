@@ -59,6 +59,16 @@ If the route is `INSTALL / INIT`, print the route first. If installation happens
 
 If the route is `INSTALL / HYBRID`, inspect the existing structure first and propose the smallest safe adoption plan.
 
+## Machine-readable project state
+
+When `.project-os/state.json` exists:
+
+- Use it as the authoritative data source for project name, `phase`, and `status`.
+- `PROJECT.md` is the human-readable presentation layer. When they conflict, trust `state.json`.
+- When updating project state, keep `state.json` and `PROJECT.md` in sync — do not update only one.
+
+Valid `phase` values: `init` / `stabilizing` / `shipping` / `maintenance` / `archived`
+
 ## Safety
 
 - Do not modify files until the mode is clear.
