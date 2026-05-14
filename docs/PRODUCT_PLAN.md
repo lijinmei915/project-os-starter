@@ -63,11 +63,12 @@ v1 可安装 runtime 收口期
 - 不做自动自进化
 - 不追求空目录一句话让所有模型天然认识 `Project OS`
 
-### v1.5：分发体验优化
+### v1.5：分发体验优化 + 减少 AI 幻觉
 
 目标：
 
 - 让别人更容易安装、理解和复测 Project OS
+- 给 AI 提供机器可读的结构化锚点，减少读 markdown 时的幻觉
 
 核心交付物：
 
@@ -75,18 +76,23 @@ v1 可安装 runtime 收口期
 - 发给 AI 的最短安装提示
 - GitHub 远端版本验收
 - 更轻的 `PROJECT.md` / `HANDOFF.md`
+- 给 `project.json`（已有）补 JSON Schema，定义字段契约
+- 核心状态文档（`PROJECT.md` / `HANDOFF.md`）有对应 typed schema：markdown 是给人看的展示层，schema 是给 AI 读的数据层
 
 成功标准：
 
 - 拿到 GitHub 地址后，别人能按最短提示完成安装
 - 远端安装结果与本地安装结果一致
 - 人工验收步骤足够短，不需要反复解释
+- AI 填写状态文档时有字段范围约束，不自由发挥
+- `check-runtime.sh` 能从 grep 升级为 schema 验证关键字段
 
 本阶段不做：
 
 - 不改核心路由模型
 - 不引入组件库
 - 不扩更多 skill
+- 不替换 markdown（schema 与 markdown 并存，不是替代关系）
 
 ### v2：工具原生适配包
 
