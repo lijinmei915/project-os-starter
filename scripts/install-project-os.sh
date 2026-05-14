@@ -84,15 +84,6 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-if [ "$#" -gt 0 ]; then
-  if [ "$target_set" -eq 1 ]; then
-    echo "ERROR: unexpected argument: $1"
-    usage
-    exit 2
-  fi
-  target="$1"
-fi
-
 log() {
   echo "Project OS installer: $*"
 }
@@ -123,12 +114,16 @@ choose_interactive_profile() {
   echo "Project OS installer: choose install profile"
   echo "1. 纯工具库 / 轻量项目 -> core"
   echo "2. 产品项目 -> product"
-  echo "3. 不确定 -> core"
-  read -r -p "这个项目是？ [1/2/3] " choice || choice=""
+  echo "3. 完整 runtime（含 skills / hooks / adapters）-> full"
+  echo "4. 不确定 -> core"
+  read -r -p "这个项目是？ [1/2/3/4] " choice || choice=""
 
   case "$choice" in
     2)
       profile="product"
+      ;;
+    3)
+      profile="full"
       ;;
     *)
       profile="core"

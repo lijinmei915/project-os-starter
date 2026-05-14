@@ -36,10 +36,8 @@
 ## 风险与待确认
 
 - 纯空目录里，如果没有任何预装入口文件，模型不会天然认识 `Project OS`
-- profile-based 安装改动尚未 commit / push
 
 ## 下一步
 
-1. commit 本轮 profile-based install 收口
-2. push 后用远端地址重跑 `core` / `product` / `full` 安装验收
-3. 继续观察目标项目是否还觉得安装产物偏重
+1. 用远端地址重跑 `core` / `product` / `full` 安装验收
+2. 继续观察目标项目是否还觉得安装产物偏重

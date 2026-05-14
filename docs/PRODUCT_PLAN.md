@@ -141,10 +141,9 @@ v1 可安装 runtime 收口期
 
 ## 当前优先级
 
-1. push GitHub，确保远端版本和本地版本一致
-2. 用远端地址重做空目录 / 老项目 / 已安装项目验收
-3. 收紧 `README.md` / `INSTALL.md` 的最短安装文案
-4. 压瘦根目录 `PROJECT.md` / `HANDOFF.md`
+1. 用远端地址重做空目录 / 老项目 / 已安装项目验收
+2. 收紧 `README.md` / `INSTALL.md` 的最短安装文案
+3. 压瘦根目录 `PROJECT.md` / `HANDOFF.md`
 
 ---
 
