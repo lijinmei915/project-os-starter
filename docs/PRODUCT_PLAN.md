@@ -111,22 +111,33 @@ v1 可安装 runtime 收口期
 - 不做 marketplace 级分发
 - 不追求所有平台一次打通
 
-### v3：可发现 skill / package
+### v3：可发现 skill / package + 外部系统集成
 
 目标：
 
-- 让 Project OS 逐步从“仓库 + 安装脚本”升级为“更容易被模型和工具发现的能力包”
+- 让 Project OS 逐步从”仓库 + 安装脚本”升级为”更容易被模型和工具发现的能力包”
+- 把 `adapters/` 扩展成两类：AI 工具 adapter（现有）+ 外部系统 adapter（新增）
+- 支持一条命令从读需求到部署的全流程：AI 读 Jira/Confluence US → 拆 task → 建分支 → 开发 → 自动化测试 → Sonar 安全扫描 → 合并部署
 
 核心交付物：
 
 - package / metadata 设计
 - 更正式的安装入口协议
 - 可发现的命令 / skill 注册机制
+- 外部系统 adapter 框架：Jira / Confluence（需求源）、GitHub Actions / Jenkins（执行层）、SonarQube（质量门禁）
+- INIT flow 支持接收 US 作为输入，自动拆解为 task 并进入开发流程
 
 成功标准：
 
 - 纯空目录里也更容易通过短提示进入正确流程
 - 平台能先认识 Project OS，再执行安装或接管
+- `--with-ci` 安装选项可写入 GitHub Actions workflow 模板
+- AI 能根据 US 自主完成从建分支到提 PR 的完整开发闭环
+
+本阶段不做（留到 v4+）：
+
+- 不追求全平台一次打通
+- 不做完全无人值守的自动部署（需保留人工审批节点）
 
 ---
 
