@@ -39,5 +39,5 @@
 
 ## 下一步
 
-1. 收紧 `README.md` / `INSTALL.md` 的最短安装文案（v1.5）
-2. 开始 `project.json` JSON Schema 设计（v1.5 减幻觉方向）
+1. 收紧 `README.md` / `INSTALL.md` 的最短安装文案
+2. 开始 `project.json` JSON Schema 设计（减幻觉方向）

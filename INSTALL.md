@@ -18,37 +18,12 @@ https://github.com/lijinmei915/project-os-starter.git
 
 ## 给 AI 的一句话
 
-把下面这段发给任意 coding agent：
-
 ```txt
-请把 Project OS 安装到当前项目。
-
-源仓库：
-https://github.com/lijinmei915/project-os-starter.git
-
-请按以下方式执行：
-1. clone 源仓库到临时目录
-2. 运行源仓库里的 scripts/install-project-os.sh，以 core profile 安装到当前目录
-3. 安装后运行 scripts/check-runtime.sh .
-4. 不要接组件库，不要生成业务 UI，不要扩展新功能
-5. 如果当前目录已有同名文件，先备份再覆盖
+请把 Project OS 以 core profile 安装到当前项目：
+git clone https://github.com/lijinmei915/project-os-starter.git /tmp/pos && bash /tmp/pos/scripts/install-project-os.sh . --profile core && bash scripts/check-runtime.sh .
 ```
 
 ---
-
-## AI 可执行命令
-
-在目标项目目录里执行：
-
-```bash
-tmp_dir="$(mktemp -d)"
-git clone https://github.com/lijinmei915/project-os-starter.git "$tmp_dir/project-os-starter"
-bash "$tmp_dir/project-os-starter/scripts/install-project-os.sh" . --profile core
-bash scripts/check-runtime.sh .
-```
-
-中文说明：
-这会把最小 Project OS 入口安装到当前目录，并做一次结构校验。
 
 ---
 
@@ -106,6 +81,24 @@ scripts/check-runtime.sh
 `CLAUDE.md` 不由主安装脚本默认写入；如需 Claude 专属入口，请运行 `scripts/install-adapter.sh claude .`。
 `README.md` / `PROJECT.md` / `HANDOFF.md` / `docs/CHANGELOG.md` 等会使用干净模板，不会把源仓库自己的状态历史直接带进目标项目。
 `scripts/install-project-os.sh` 和 `scripts/create-test-fixtures.sh` 是源仓库维护工具，不会默认安装到目标项目。
+
+---
+
+## 升级已有安装
+
+如果目标项目已经安装过 Project OS，想拉取最新版本：
+
+```bash
+git clone https://github.com/lijinmei915/project-os-starter.git /tmp/pos
+bash /tmp/pos/scripts/install-project-os.sh . --profile core --upgrade
+```
+
+`--upgrade` 模式的行为：
+
+- 目标文件**被用户修改过**（MD5 与安装时不同）→ 跳过，打印 `skip (modified)`
+- 目标文件**未修改**或**不存在** → 正常更新
+
+如果想强制覆盖某个文件，先删掉它再跑一次不带 `--upgrade` 的安装。
 
 ---
 
