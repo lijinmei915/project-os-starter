@@ -39,5 +39,5 @@
 
 ## 下一步
 
-1. 用远端地址重跑 `core` / `product` / `full` 安装验收
-2. 继续观察目标项目是否还觉得安装产物偏重
+1. 收紧 `README.md` / `INSTALL.md` 的最短安装文案（v1.5）
+2. 开始 `project.json` JSON Schema 设计（v1.5 减幻觉方向）
