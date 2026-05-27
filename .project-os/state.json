@@ -1,8 +1,8 @@
 {
   "name": "project-os-starter",
-  "description": "AI 开发 Runtime：识别项目阶段、统一入口调度、沉淀协作规则",
+  "description": "AI Engineering Kit：检查并补齐通用 AI 工程文件，让项目能被 AI 和下一位开发者稳定接住",
   "phase": "stabilizing",
-  "stage": "v1 可安装 runtime 收口期",
+  "stage": "AI Engineering Kit 自身工程化收口期",
   "status": {
     "done": [
       "v1 路由契约",
@@ -10,15 +10,34 @@
       "profile-based 安装（core / product / full）",
       "版本记录 + upgrade 路径",
       "远端三 profile 验收",
-      "README 瘦身 + INSTALL 补 upgrade 说明"
+      "README 瘦身 + INSTALL 补 upgrade 说明",
+      "AI 工程完整度报告原型",
+      "报告页新项目 / 老项目双入口",
+      "AI 项目工程助手组件契约",
+      "上下文完整度 + 工程成熟度双分数模型",
+      "check-template-sync strict 模式",
+      "可执行回归测试入口 tests/run-tests.sh",
+      "评分模型 schema 和 v0.2 数据源",
+      "GitHub Actions CI",
+      "报告页截图回归入口",
+      "报告页视觉 diff 入口",
+      "报告页桌面 / 移动端视觉 baseline",
+      "报告页 HTML 模板层",
+      "报告模块结构化数据源",
+      "报告页 CSS token 对齐",
+      "跨工具 adapter 验收矩阵",
+      "老项目空模板文档识别"
     ],
     "doing": [
-      "v1.5 减幻觉 schema 设计"
+      "AI Engineering Kit 自身工程化补齐",
+      "工程成熟度 v0.2 校准",
+      "真实老项目质量识别校准"
     ],
     "blocked": [],
     "next": [
-      "project-state.json schema 落地到 check-runtime + AGENTS",
-      "project.json JSON Schema 补全"
+      "真实老项目样本文档质量校准",
+      "报告数据层和评分模型对应关系校准",
+      "真实工具会话抽样复查"
     ]
   },
   "architecture": {

@@ -357,6 +357,11 @@ The closer to understanding and handoff, the more Chinese.
 - `PROJECT.md`：当前项目状态
 - `HANDOFF.md`：当前交接上下文
 - `docs/DOCUMENTATION.md`：文档编写规范和更新边界
+- `docs/NAMING.md`：文档命名规范
+- `docs/ARCHITECTURE.md`：系统结构和模块职责
+- `docs/ENVIRONMENT.md`：环境变量、依赖和启动方式
+- `docs/TESTING.md`：测试和验收方式
+- `docs/RUNBOOK.md`：常见操作、发布和故障处理
 - `docs/CHANGELOG.md`：结构性变更记录
 - `docs/DECISIONS.md`：架构决策原因
 - `docs/LESSONS.md`：错误模式和新增约束
@@ -378,9 +383,11 @@ adapters 不写新的规则源头。
 在新建或更新任何项目文档前：
 
 1. 先看 `docs/DOCUMENTATION.md`
-2. 判断这是“当前状态 / 当前交接 / 中长期路线 / 结构变更 / 决策原因 / 错误复盘”里的哪一类
-3. 如果有对应模板，优先沿用模板结构，不自己发明新格式
-4. 改完后运行 `bash scripts/check-runtime.sh .`
+2. 需要命名或新增文件时看 `docs/NAMING.md`
+3. 判断这是“当前状态 / 当前交接 / 环境说明 / 架构说明 / 测试验收 / 运行手册 / 中长期路线 / 结构变更 / 决策原因 / 错误复盘”里的哪一类
+4. 如果有对应模板，优先沿用模板结构，不自己发明新格式
+5. 改完后运行 `bash scripts/check-runtime.sh .`
+6. 如涉及 AI 工程完整度，运行 `bash scripts/check-ai-project.sh . --write-report`
 
 ### 文档更新规则
 

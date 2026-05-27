@@ -86,10 +86,14 @@ README.md              -> 给人看的入口说明
 PROJECT.md             -> 当前项目状态
 HANDOFF.md             -> 当前交接上下文
 docs/DOCUMENTATION.md  -> 文档编写规范和边界
+docs/NAMING.md         -> 文档命名规范
+docs/ARCHITECTURE.md   -> 架构和模块职责
+docs/ENVIRONMENT.md    -> 环境变量、依赖、启动方式
+docs/TESTING.md        -> 测试和验收策略
+docs/RUNBOOK.md        -> 常见操作、发布和故障处理
 docs/CHANGELOG.md      -> 结构性变更记录
 docs/DECISIONS.md      -> 关键决策原因
 docs/LESSONS.md        -> 错误复盘和新增约束
-docs/TESTING.md        -> 测试和验收策略
 ```
 
 Before creating or updating project documents, check `docs/DOCUMENTATION.md`.

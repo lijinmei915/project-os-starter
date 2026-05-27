@@ -1,17 +1,17 @@
-# AI Runtime / Project OS
+# AI Engineering Kit
 
 > 用途：回答"这个仓库是什么、怎么开始、关键入口在哪、怎么安装给别人用"。
 > 什么时候更新：入口说明、安装方式、关键目录职责、对外使用方式变化时。
 > 不要写什么：AI 详细运行规则、当前交接流水、详细变更历史、内部 reference 细节。
 
-一套可安装的 AI 开发 Runtime：识别项目阶段、统一入口调度、沉淀协作规则，把项目从初始化到交接串成稳定流程。
+一套通用的 AI 工程文件工具包：检查一个项目能不能被 AI 看懂、能不能被下一位开发者接住，并按需补齐工程文档结构。
 
 ## 能做什么
 
-- 自动识别项目阶段（新项目 / 接管 / 混合），统一路由
-- 固化 AI 协作规则，避免每次对话从头约定
-- 记录项目状态，保持上下文连续（`PROJECT.md` / `HANDOFF.md`）
-- 支持 Claude / Codex / Cursor / Gemini 多工具适配
+- 检查 AI 工程完整度，输出 100 分体检报告
+- 补齐通用工程文档：规则、状态、交接、环境、测试、架构、运行手册
+- 默认不覆盖已有文档，优先给出缺口和建议
+- 支持 Claude / Codex / Cursor / Gemini 等工具适配
 
 ## 安装给别人用
 
@@ -24,7 +24,7 @@ https://github.com/lijinmei915/project-os-starter.git
 **最短 AI 提示：**
 
 ```txt
-请把 Project OS 以 core profile 安装到当前项目：
+请把 AI Engineering Kit 以 core profile 安装到当前项目：
 git clone https://github.com/lijinmei915/project-os-starter.git /tmp/pos && bash /tmp/pos/scripts/install-project-os.sh . --profile core && bash scripts/check-runtime.sh .
 ```
 
@@ -38,7 +38,40 @@ bash scripts/check-runtime.sh .
 
 完整安装说明（profiles / adapters / upgrade）见 `INSTALL.md`。
 
-## 安装后怎么用
+## 检查项目完整度
+
+安装后运行：
+
+```bash
+bash scripts/ai-project.sh report .
+```
+
+它会检查：
+
+```txt
+系统规则：AGENTS.md
+开发者规则：docs/ENVIRONMENT.md
+用户意图：PROJECT.md / README.md
+项目文件：docs/ARCHITECTURE.md
+工具反馈：docs/TESTING.md / scripts
+交接摘要：HANDOFF.md
+```
+
+报告会写入：
+
+```txt
+.project-os/reports/ai-project-report.md
+.project-os/reports/ai-project-report.html
+.project-os/reports/ai-project-report.json
+```
+
+如果后续想补齐更多工程文档模板：
+
+```bash
+bash scripts/add-project-docs.sh . --profile product
+```
+
+## AI 交互
 
 直接对 AI 说你要做什么，例如"帮我初始化这个项目"或"这个老项目有点乱，帮我接管一下"。系统自动判断状态并进入对应流程。高级用户可输入 `/os` 显式触发。
 
@@ -62,6 +95,11 @@ bash scripts/check-runtime.sh .
 | `AGENTS.md` | AI 运行规则（路由、约束、文档边界） |
 | `PROJECT.md` | 当前项目状态 |
 | `HANDOFF.md` | 当前交接上下文 |
+| `docs/NAMING.md` | 文档命名规范 |
+| `docs/ARCHITECTURE.md` | 架构和模块职责 |
+| `docs/ENVIRONMENT.md` | 环境变量、依赖、启动方式 |
+| `docs/TESTING.md` | 测试和验收方式 |
+| `docs/RUNBOOK.md` | 常见操作和故障处理 |
 | `INSTALL.md` | 安装说明 |
 | `docs/` | 长期治理、产品规划、设计规范 |
 | `templates/` | 安装到目标项目的干净模板 |

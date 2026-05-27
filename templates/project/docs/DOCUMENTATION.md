@@ -39,7 +39,13 @@
 | 为什么做过某个架构决定 | `docs/DECISIONS.md` |
 | 这次结构性改动影响了哪里 | `docs/CHANGELOG.md` |
 | 犯过什么错，新增了什么约束 | `docs/LESSONS.md` |
+| 文档应该怎么命名 | `docs/NAMING.md` |
+| 架构和模块职责是什么 | `docs/ARCHITECTURE.md` |
+| 环境变量和启动方式是什么 | `docs/ENVIRONMENT.md` |
 | 怎么测试和验收 | `docs/TESTING.md`、`tests/` |
+| 常见操作和故障怎么处理 | `docs/RUNBOOK.md` |
+| 机器可读评分模型是什么 | `schemas/ai-project-score.v0.2.json` |
+| 报告模块怎么分组和说明 | `schemas/ai-project-report.v0.1.json` |
 
 ---
 
@@ -54,7 +60,7 @@ Project OS 不在文档里维护完整目录树。
 结构契约更稳定。
 ```
 
-文档结构分为六个区域：
+文档结构分为七个区域：
 
 1. Root core docs
 
@@ -68,17 +74,21 @@ Project OS 不在文档里维护完整目录树。
 
 测试材料，负责可复测 case、验收矩阵和测试记录。
 
-4. adapters/
+4. schemas/
+
+机器可读契约，负责状态、评分模型、配置模型等结构化数据定义。
+
+5. adapters/
 
 工具适配层，负责把通用规则翻译成 Claude / Codex / Cursor / Gemini 等工具可读取的入口文件。
 
-5. templates/project/
+6. templates/project/
 
 安装到目标项目时使用的模板层。
 
 这里放“发给目标项目的干净文档模板”，不放本源仓库自己的运行历史。
 
-6. templates/global/
+7. templates/global/
 
 全局协作模板层。
 
@@ -120,6 +130,16 @@ AGENTS.md
 PROJECT.md
 HANDOFF.md
 scripts/check-runtime.sh
+scripts/check-secrets.sh
+scripts/check-ai-project.sh
+scripts/ai-project.sh
+scripts/add-project-docs.sh
+schemas/ai-project-score.schema.json
+schemas/ai-project-score.v0.2.json
+schemas/ai-project-report.schema.json
+schemas/ai-project-report.v0.1.json
+templates/report/ai-project-report.html
+templates/project-docs/
 ```
 
 缺少这些文件时，Project OS 仍可能被人读懂一部分，但不能视为完整安装。
@@ -136,10 +156,24 @@ scripts/check-runtime.sh
 README.md
 INSTALL.md
 docs/DOCUMENTATION.md
+docs/NAMING.md
+docs/ARCHITECTURE.md
+docs/ENVIRONMENT.md
+docs/TESTING.md
+docs/RUNBOOK.md
 docs/CHANGELOG.md
 docs/DECISIONS.md
 docs/LESSONS.md
 scripts/check-runtime.sh
+scripts/check-secrets.sh
+scripts/check-ai-project.sh
+scripts/ai-project.sh
+scripts/add-project-docs.sh
+schemas/ai-project-score.schema.json
+schemas/ai-project-score.v0.2.json
+schemas/ai-project-report.schema.json
+schemas/ai-project-report.v0.1.json
+templates/project-docs/
 ```
 
 增强结构：
@@ -160,8 +194,8 @@ scripts/install-adapter.sh
 
 | profile | 目标 | 内容 |
 |---------|------|------|
-| `core` | 最小 AI 协作规则 | `AGENTS.md` / `PROJECT.md` / `HANDOFF.md` / `scripts/check-runtime.sh` |
-| `product` | 基础项目治理 | `core` + README / INSTALL / DOCUMENTATION / CHANGELOG / DECISIONS / LESSONS |
+| `core` | 最小 AI 协作规则和体检入口 | `AGENTS.md` / `PROJECT.md` / `HANDOFF.md` / `scripts/check-runtime.sh` / `scripts/check-secrets.sh` / `scripts/check-ai-project.sh` / `scripts/ai-project.sh` / `scripts/add-project-docs.sh` / `schemas/ai-project-score.*.json` / `schemas/ai-project-report.*.json` / `templates/report/ai-project-report.html` / `templates/project-docs/` |
+| `product` | 基础 AI 工程治理 | `core` + README / INSTALL / DOCUMENTATION / NAMING / ARCHITECTURE / ENVIRONMENT / TESTING / RUNBOOK / CHANGELOG / DECISIONS / LESSONS |
 | `full` | 完整 Project OS runtime | `product` + 设计文档 + `.claude` runtime + adapters |
 
 ### Reference Implementation
@@ -188,10 +222,19 @@ HANDOFF.md
 docs/CHANGELOG.md
 docs/DECISIONS.md
 docs/LESSONS.md
+docs/NAMING.md
+docs/ARCHITECTURE.md
+docs/ENVIRONMENT.md
 docs/TESTING.md
 docs/PRODUCT_PLAN.md
 docs/CODE_STRUCTURE.md
+docs/RUNBOOK.md
 docs/DESIGN_STANDARDS.md
+schemas/ai-project-score.schema.json
+schemas/ai-project-score.v0.2.json
+schemas/ai-project-report.schema.json
+schemas/ai-project-report.v0.1.json
+templates/project-docs/
 ```
 
 规则：
@@ -200,6 +243,7 @@ docs/DESIGN_STANDARDS.md
 源仓库自己的运行记录归源仓库。
 目标项目拿到的是空白或半结构化模板。
 是否安装某个模板，由 install profile 决定。
+轻量安装后如果要追加工程文档模板，由 `scripts/add-project-docs.sh` 从 `templates/project-docs/` 复制，默认跳过已有文件。
 ```
 
 模板规则：

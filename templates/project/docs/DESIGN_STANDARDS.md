@@ -15,7 +15,9 @@
 ## 基本规则
 
 - 涉及 UI 时先经过 `design-system`
-- 颜色、字号、间距优先走 token
+- 颜色、字号、间距、圆角、阴影优先走 token
+- token 表见 `docs/design/tokens.md`
+- 布局规则见 `docs/design/layout.md`
 - 页面需要说明默认态、空态、错态、加载态
 
 ## 参考文档

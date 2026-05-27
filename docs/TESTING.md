@@ -27,8 +27,29 @@
 推荐命令：
 
 ```bash
+bash tests/run-tests.sh
 bash scripts/check-runtime.sh .
+bash scripts/ai-project.sh report .
 ```
+
+区别：
+- `check-runtime.sh` 检查 Project OS / AI Engineering Kit 自身文件结构是否完整。
+- `check-ai-project.sh` 检查一个项目是否具备 AI 工程上下文完整度，并输出工程成熟度。
+
+`check-ai-project.sh` 当前输出两条分数：
+
+| 分数 | 含义 | 不能替代什么 |
+|------|------|--------------|
+| AI 工程上下文完整度 | AI 接手项目所需的规则、状态、架构、测试说明和交接资料是否齐，且不是明显空模板 | 不能证明测试、发布和报告工程已经闭环 |
+| AI 工程成熟度 | 测试入口、fixtures、CI、评分模型、报告 UI 工程化、发布检查和跨工具验收是否到位 | 不能替代人工架构 review |
+
+当前 v0.2 成熟度检查故意比上下文完整度更严格。
+如果一个项目上下文完整度是 100，但工程成熟度偏低，说明“能读懂”，不代表“能稳定交付”。
+
+文档质量识别：
+- 空文件、只有标题、只有表格头、只有 `TODO` / `TBD` / `未记录` / `暂无记录` / `{{placeholder}}` 的文档，不视为可用文档。
+- `README.md`、`AGENTS.md`、`PROJECT.md`、`HANDOFF.md` 和关键 `docs/*` 都会先过有效内容检查，再进入关键词检查。
+- 这是轻量启发式，不替代人工 review；目标是先避免“文件名齐了但内容全空”的假阳性。
 
 ### 2. Prompt 行为测试
 
@@ -86,6 +107,108 @@ bash scripts/create-test-fixtures.sh /tmp/project-os-fixtures
 - 关键用户流程可用 Playwright 或浏览器手测清单
 - Supabase / API 请求至少验证成功、失败、loading 三种状态
 - UI 改动至少记录手测结果；高风险 UI 流程建议补截图或端到端测试
+
+### 6. AI 工程成熟度检查
+
+目标：让 AI Engineering Kit 不只检查“有没有文件”，还检查“能不能验证、发布、交接和复查”。
+
+当前 v0.2 维度：
+
+- 评分与状态源：`PROJECT.md` 与 `.project-os/state.json` 是否一致，评分模型是否有 schema 和 v0.2 数据源
+- 测试与质量门禁：是否有可执行测试入口、fixtures、CI、严格模板同步
+- 报告与组件工程：HTML 报告是否可生成，报告 UI 是否脱离 shell 内联，组件契约和截图验收是否存在
+- 分发与发布：是否有版本号、发布前检查、安装 profile 自动回归
+- 老项目与跨工具：adapter 和跨工具验收矩阵是否完成
+- 交接治理：`HANDOFF.md`、`CHANGELOG.md`、`DECISIONS.md` 是否记录当前工程化路线
+
+推荐命令：
+
+```bash
+bash scripts/ai-project.sh report .
+```
+
+预期：
+
+```txt
+AI 工程上下文完整度：.../100
+AI 工程成熟度：.../100
+```
+
+评分模型来源：
+
+- `schemas/ai-project-score.schema.json`：定义评分模型结构
+- `schemas/ai-project-score.v0.2.json`：记录当前上下文完整度和工程成熟度的维度、分值和检测方式
+- `schemas/ai-project-report.schema.json`：定义报告模块数据结构
+- `schemas/ai-project-report.v0.1.json`：记录报告模块标题、评分 section 分组和说明文案
+
+### 7. 可执行回归测试
+
+目标：把源仓库维护者原本手动做的检查收进一个可重复入口。
+
+推荐命令：
+
+```bash
+bash tests/run-tests.sh
+```
+
+当前覆盖：
+
+- `scripts/check-runtime.sh`
+- `scripts/check-secrets.sh`
+- `scripts/check-template-sync.sh --strict`
+- `schemas/ai-project-score.schema.json`
+- `schemas/ai-project-score.v0.2.json`
+- `schemas/ai-project-report.schema.json`
+- `schemas/ai-project-report.v0.1.json`
+- `tests/check-report-model.mjs`
+- `scripts/check-ai-project.sh --write-report --html`
+- `scripts/add-project-docs.sh`
+- `tests/screenshot-regression.sh`
+- `tests/visual-diff.mjs --self-test`
+- `templates/report/ai-project-report.html`
+- `.project-os/reports/ai-project-report.json`
+- `tests/cross-tool-matrix.md`
+- 老项目占位文档夹具，验证 `TODO` / `未记录` 不会被误判为可用文档
+- `core` / `product` / `full` 三种安装 profile
+- `core` 安装后的追加工程文档命令
+- 安装结果里的关键文件存在性和不该出现的文件
+- `claude` / `codex` / `cursor` / `gemini` adapter 安装和 `AGENTS.md` 引用检查
+
+说明：
+- 这不是完整单元测试框架，但已经能阻断最常见的分发和模板同步问题。
+- 截图回归脚本会先检查 HTML 报告关键标记；如果运行环境提供可用浏览器，会额外生成桌面和移动端截图。
+- 如果存在 `tests/screenshots/baseline/ai-project-report-desktop.png` 或 `tests/screenshots/baseline/ai-project-report-mobile.png`，脚本会用 `tests/visual-diff.mjs` 做真实像素 diff。
+- 默认阈值为 `VISUAL_DIFF_THRESHOLD=0.01`，即 1% 像素变化；可用 `VISUAL_DIFF_PIXEL_DELTA` 调整单像素差异敏感度。
+- 没有浏览器或没有 baseline 时，默认跳过图片 diff；设置 `VISUAL_DIFF_STRICT=1` 后会把缺浏览器、缺 baseline 或差异超阈值都视为失败。
+- HTML 报告模板位于 `templates/report/ai-project-report.html`，测试会通过报告生成和截图回归间接验证模板可用。
+- 跨工具矩阵当前先验证 adapter 分发与规则源头一致性，真实模型会话表现仍应在发布前抽样复查。
+- 后续如果继续拆出评分执行层或报告渲染层，应继续把对应检查接入这个入口。
+- `tests/check-report-model.mjs` 会校验评分维度总分、报告模块引用的 section，以及上下文评分维度是否都被报告模块覆盖，避免页面分组和评分模型漂移。
+
+### 8. CI 自动化检查
+
+目标：把本地回归测试接入 GitHub，让 push 和 pull request 后自动复查。
+
+CI 文件：
+
+```txt
+.github/workflows/ci.yml
+```
+
+当前覆盖：
+
+- shell 脚本语法检查
+- JSON schema / 模型解析检查
+- `bash tests/run-tests.sh`
+- `tests/screenshot-regression.sh`
+- AI 项目报告生成
+- 报告关键标记检查
+- tracked files 是否被测试过程意外改动
+- 上传 markdown / HTML 报告 artifact，若生成了截图也一并上传
+
+说明：
+- CI 是自动执行器，不替代 `tests/run-tests.sh`。
+- `tests/run-tests.sh` 是具体检查脚本，CI 只是负责在 GitHub 上自动调用它。
 
 ---
 

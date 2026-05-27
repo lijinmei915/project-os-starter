@@ -118,15 +118,19 @@ if [ "$is_source_repo" -eq 1 ]; then
   done
 fi
 
-for file in README.md AGENTS.md PROJECT.md HANDOFF.md INSTALL.md CLAUDE.md docs/CHANGELOG.md docs/CODE_STRUCTURE.md docs/DECISIONS.md docs/DESIGN_STANDARDS.md docs/DOCUMENTATION.md docs/LESSONS.md docs/PRODUCT_PLAN.md docs/TESTING.md tests/cases.md tests/cross-tool-matrix.md examples/filled-project.md examples/prompt-simulation.md; do
+for file in README.md AGENTS.md PROJECT.md HANDOFF.md INSTALL.md CLAUDE.md docs/ARCHITECTURE.md docs/CHANGELOG.md docs/CODE_STRUCTURE.md docs/DECISIONS.md docs/DESIGN_STANDARDS.md docs/DOCUMENTATION.md docs/ENVIRONMENT.md docs/LESSONS.md docs/NAMING.md docs/PRODUCT_PLAN.md docs/RUNBOOK.md docs/TESTING.md tests/cases.md tests/cross-tool-matrix.md examples/filled-project.md examples/prompt-simulation.md; do
   check_guidance_header "$file"
 done
 
-for file in scripts/check-runtime.sh; do
+for file in scripts/check-runtime.sh scripts/check-secrets.sh scripts/check-ai-project.sh scripts/ai-project.sh scripts/add-project-docs.sh; do
   if ! has_file "$file"; then
     warn "missing Project OS runtime helper: $file"
   fi
 done
+
+if has_file "scripts/add-project-docs.sh" && [ ! -d "templates/project-docs" ]; then
+  warn "missing add-project-docs template directory: templates/project-docs"
+fi
 
 if [ "$is_source_repo" -eq 1 ] || [ "$has_adapters" -eq 1 ]; then
   if ! has_file "scripts/install-adapter.sh"; then
@@ -138,8 +142,12 @@ if [ "$is_source_repo" -eq 1 ] && ! has_file "scripts/install-project-os.sh"; th
   warn "missing source installer: scripts/install-project-os.sh"
 fi
 
-if [ "$has_docs" -eq 1 ] && ! has_file "docs/DOCUMENTATION.md"; then
-  warn "missing documentation governance file: docs/DOCUMENTATION.md"
+if [ "$has_docs" -eq 1 ]; then
+  for file in docs/DOCUMENTATION.md docs/NAMING.md; do
+    if ! has_file "$file"; then
+      warn "missing documentation governance file: $file"
+    fi
+  done
 fi
 
 if [ "$is_source_repo" -eq 1 ]; then
@@ -211,7 +219,7 @@ if has_file ".claude/skills/REGISTRY.md"; then
 fi
 
 if [ "$is_source_repo" -eq 1 ]; then
-  for file in docs/PRODUCT_PLAN.md docs/CODE_STRUCTURE.md docs/TESTING.md; do
+  for file in docs/ARCHITECTURE.md docs/ENVIRONMENT.md docs/NAMING.md docs/PRODUCT_PLAN.md docs/RUNBOOK.md docs/TESTING.md; do
     if ! has_file "$file"; then
       warn "missing optional but recommended file: $file"
     fi
@@ -269,7 +277,7 @@ if has_file "HANDOFF.md"; then
 fi
 
 if has_file "docs/DOCUMENTATION.md"; then
-  for pattern in "README.md" "AGENTS.md" "PROJECT.md" "HANDOFF.md" "CHANGELOG.md" "SSOT"; do
+  for pattern in "README.md" "AGENTS.md" "PROJECT.md" "HANDOFF.md" "CHANGELOG.md" "SSOT" "NAMING.md" "ENVIRONMENT.md" "RUNBOOK.md"; do
     if ! contains "docs/DOCUMENTATION.md" "$pattern"; then
       warn "docs/DOCUMENTATION.md should define boundary for $pattern"
     fi
@@ -286,7 +294,7 @@ if has_file "docs/DOCUMENTATION.md"; then
   done
 fi
 
-for file in templates/project/README.md templates/project/AGENTS.md templates/project/PROJECT.md templates/project/HANDOFF.md templates/project/docs/CHANGELOG.md templates/project/docs/DECISIONS.md templates/project/docs/LESSONS.md templates/project/docs/TESTING.md templates/project/docs/PRODUCT_PLAN.md templates/project/docs/CODE_STRUCTURE.md templates/project/docs/DESIGN_STANDARDS.md templates/global/GLOBAL_USER_PREFERENCES_TEMPLATE.md templates/global/GLOBAL_USER_PROFILE_TEMPLATE.md templates/global/MEMORY_RULES.md; do
+for file in templates/project/README.md templates/project/AGENTS.md templates/project/PROJECT.md templates/project/HANDOFF.md templates/project/docs/ARCHITECTURE.md templates/project/docs/CHANGELOG.md templates/project/docs/DECISIONS.md templates/project/docs/ENVIRONMENT.md templates/project/docs/LESSONS.md templates/project/docs/NAMING.md templates/project/docs/RUNBOOK.md templates/project/docs/TESTING.md templates/project/docs/PRODUCT_PLAN.md templates/project/docs/CODE_STRUCTURE.md templates/project/docs/DESIGN_STANDARDS.md templates/global/GLOBAL_USER_PREFERENCES_TEMPLATE.md templates/global/GLOBAL_USER_PROFILE_TEMPLATE.md templates/global/MEMORY_RULES.md; do
   check_guidance_header "$file"
 done
 

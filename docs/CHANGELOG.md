@@ -15,6 +15,347 @@
 
 ---
 
+## 2026-05-20
+
+### AI Engineering Kit / self engineering
+
+#### 增加本地密钥占位和安全检查
+
+改动：
+- 新增 `.env.example`，只提供 `DEEPSEEK_API_KEY` 空占位，不写入真实 key
+- 新增 `scripts/check-secrets.sh`，检查 `.env.local` 是否被 git 忽略，并扫描 tracked files 中是否出现明显 provider key
+- `core` profile 分发 `check-secrets.sh`，并纳入模板同步、CI 和回归测试
+- 环境文档说明真实 key 只能放在本机环境变量或 `.env.local`
+
+影响：
+- 静态报告页仍不直接读取 API key 或执行本机命令
+- 真实 provider key 不进入仓库、模板、报告和测试夹具
+- 目标项目安装后也能用同一条命令检查密钥放置是否安全
+
+相关文件：
+- `.env.example`
+- `scripts/check-secrets.sh`
+- `docs/ENVIRONMENT.md`
+- `docs/DOCUMENTATION.md`
+- `tests/run-tests.sh`
+- `.github/workflows/ci.yml`
+
+---
+
+#### 补齐追加工程文档工具和 JSON 报告
+
+改动：
+- 新增 `scripts/add-project-docs.sh`，从 `templates/project-docs/` 向项目追加工程文档模板，默认跳过已有文件
+- `core` profile 分发 `scripts/add-project-docs.sh` 和 `templates/project-docs/`，让轻量安装后的项目也能后续补齐 `docs/*` 模板
+- `scripts/check-ai-project.sh --write-report` 同步生成 `.project-os/reports/ai-project-report.json`
+- 报告页“添加更多文档”从 `待接入` 占位改为复制补齐文档命令
+- 回归测试覆盖 core 安装后的追加文档命令和 JSON 报告存在性
+
+影响：
+- 不引入 API 或本地服务，仍采用“命令真实执行，网页展示结果”的运行方式
+- 用户可先轻量接入，再按需补充 DOCUMENTATION / NAMING / ARCHITECTURE / ENVIRONMENT / TESTING / RUNBOOK / CHANGELOG / DECISIONS / LESSONS 等工程文档
+- JSON 报告成为面向页面、CLI 和其他 AI 工具的机器可读返回值
+
+相关文件：
+- `scripts/add-project-docs.sh`
+- `scripts/check-ai-project.sh`
+- `templates/project-docs/`
+- `templates/report/ai-project-report.html`
+- `tests/run-tests.sh`
+- `docs/DOCUMENTATION.md`
+- `docs/NAMING.md`
+
+---
+
+#### 报告模块迁到结构化数据
+
+改动：
+- 新增 `schemas/ai-project-report.schema.json` 和 `schemas/ai-project-report.v0.1.json`，记录报告模块标题、评分 section 分组和说明文案
+- `scripts/check-ai-project.sh` 生成 HTML 报告时改为读取报告模块数据源，不再在 shell 循环里硬编码六个模块和 `case` 文案
+- `scripts/install-project-os.sh`、`tests/run-tests.sh` 和 CI 将报告 schema / v0.1 数据源纳入 `core` 分发和回归检查
+- `docs/NAMING.md`、`docs/DOCUMENTATION.md`、`docs/PRODUCT_PLAN.md`、`docs/DECISIONS.md` 同步说明报告数据层边界
+
+影响：
+- 后续调整报告模块结构时，可以先改数据源，再由脚本和模板消费
+- `core` profile 的报告生成依赖从“脚本 + 模板”变为“脚本 + 模板 + 报告数据源”
+- 仍保持静态 HTML 和 Bash 运行方式，不新增前端构建或 `jq` 依赖
+
+相关文件：
+- `schemas/ai-project-report.schema.json`
+- `schemas/ai-project-report.v0.1.json`
+- `scripts/check-ai-project.sh`
+- `scripts/install-project-os.sh`
+- `tests/run-tests.sh`
+- `.github/workflows/ci.yml`
+
+---
+
+#### 增加老项目空模板文档识别
+
+改动：
+- `scripts/check-ai-project.sh` 增加有效内容判断，先排除空白、标题、引用说明、表格头、`TODO`、`TBD`、`未记录`、`暂无记录`、占位符等低信息量内容
+- 上下文完整度检查不再只按文件存在给分，`AGENTS.md`、`PROJECT.md`、`HANDOFF.md` 和关键 `docs/*` 都需要达到最小有效行数
+- `tests/run-tests.sh` 增加老项目占位文档夹具，验证“已有但全是占位”的文档不会拿到 `100/100`
+- `schemas/ai-project-score.schema.json` 和 `schemas/ai-project-score.v0.2.json` 增加 `substantive_file` / `substantive_content_any` 等检测语义
+- `docs/TESTING.md`、`docs/RUNBOOK.md`、`docs/DECISIONS.md` 同步说明文档质量识别边界
+
+影响：
+- 老项目报告能区分“完全缺失”和“已有但不合格”
+- 非技术用户不会因为文件名齐全就误以为项目已可稳定交接
+- 当前识别仍是轻量启发式，后续需要真实老项目样本继续校准阈值
+
+相关文件：
+- `scripts/check-ai-project.sh`
+- `tests/run-tests.sh`
+- `schemas/ai-project-score.schema.json`
+- `schemas/ai-project-score.v0.2.json`
+- `docs/TESTING.md`
+- `docs/RUNBOOK.md`
+- `docs/DECISIONS.md`
+
+---
+
+#### 升级报告页截图回归为视觉 diff
+
+改动：
+- 新增 `tests/visual-diff.mjs`，不依赖第三方包即可读取 PNG、计算像素差异并输出 diff 图
+- `tests/screenshot-regression.sh` 从单张可选截图升级为桌面 / 移动端双视口截图
+- 当 `tests/screenshots/baseline/` 存在基准图时，截图回归会自动做真实视觉 diff
+- 新增第一版桌面 / 移动端 baseline，用于固定当前报告页视觉状态
+- `tests/run-tests.sh` 增加 `tests/visual-diff.mjs --self-test`
+- `docs/TESTING.md`、`docs/RUNBOOK.md` 和 `docs/ENVIRONMENT.md` 同步说明 baseline、阈值和严格模式
+
+影响：
+- 报告页不再只检查 HTML 标记和“能不能截图”，也能在有 baseline 时发现视觉退化
+- 默认模式仍不强依赖本机浏览器，避免普通回归在无 Chrome 环境里失败
+- baseline 是否提交由维护者在视觉稳定后确认
+
+相关文件：
+- `tests/screenshot-regression.sh`
+- `tests/visual-diff.mjs`
+- `tests/run-tests.sh`
+- `tests/screenshots/baseline/.gitkeep`
+- `tests/screenshots/baseline/ai-project-report-desktop.png`
+- `tests/screenshots/baseline/ai-project-report-mobile.png`
+- `docs/TESTING.md`
+- `docs/RUNBOOK.md`
+- `docs/ENVIRONMENT.md`
+
+---
+
+#### 收口跨工具 adapter 验收矩阵
+
+改动：
+- 重写 `tests/cross-tool-matrix.md`，明确 adapter 分发验收、路由契约验收和最新回归结果
+- `tests/run-tests.sh` 增加 cross-tool matrix 检查，禁止验收矩阵继续保留 pending 标记
+- `tests/run-tests.sh` 在临时 `full` 安装目录里运行 `scripts/install-adapter.sh`，验证 `claude` / `codex` / `cursor` / `gemini` 四个入口文件均能生成
+- 四个 adapter 入口文件都会检查是否引用 `AGENTS.md`，确保 adapter 不成为新的规则源头
+
+影响：
+- 工程成熟度 v0.2 中“跨工具验收矩阵已完成”缺口被补上
+- 本仓库成熟度从 `95/100` 提升到 `100/100`
+- 当前 100 分代表 v0.2 模型覆盖的工程闭环已通过，不代表真实业务项目无需人工 review
+
+相关文件：
+- `tests/cross-tool-matrix.md`
+- `tests/run-tests.sh`
+- `docs/DECISIONS.md`
+- `schemas/ai-project-score.schema.json`
+- `schemas/ai-project-score.v0.2.json`
+
+---
+
+#### 抽出报告页 HTML 模板层
+
+改动：
+- 新增 `templates/report/ai-project-report.html`
+- `scripts/check-ai-project.sh` 不再内联整页 HTML / CSS / JS，而是生成缺口列表和模块卡片后注入模板
+- `templates/project/` 同步分发报告模板，`core` profile 安装时会带上报告模板
+- `check-template-sync.sh` 和 `sync-templates.sh` 纳入 `templates/report`
+
+影响：
+- 报告 UI 从 shell 主逻辑里拆出，后续改视觉和交互不必在检查脚本里翻大段 HTML
+- 工程成熟度 v0.2 中“报告 UI 已从 shell 主逻辑中拆出”缺口被补上
+- 本仓库成熟度从 `89/100` 提升到 `95/100`
+
+相关文件：
+- `templates/report/ai-project-report.html`
+- `scripts/check-ai-project.sh`
+- `scripts/install-project-os.sh`
+- `scripts/check-template-sync.sh`
+- `scripts/sync-templates.sh`
+- `docs/DECISIONS.md`
+- `templates/project/templates/report/ai-project-report.html`
+
+---
+
+#### 增加报告页截图回归入口
+
+改动：
+- 新增 `tests/screenshot-regression.sh`
+- 新增 `tests/screenshots/` 截图输出目录，并忽略生成的 PNG
+- `tests/run-tests.sh` 接入报告页回归，先检查 HTML 关键标记，浏览器可用时再生成截图
+- CI artifact 增加截图路径，便于失败后回看报告页状态
+
+影响：
+- 报告页视觉改动不再完全依赖人工肉眼检查
+- 工程成熟度 v0.2 中“报告页截图或视觉回归验收”缺口被补上
+- 本仓库成熟度从 `85/100` 提升到 `89/100`
+
+相关文件：
+- `tests/screenshot-regression.sh`
+- `tests/screenshots/.gitkeep`
+- `tests/run-tests.sh`
+- `.github/workflows/ci.yml`
+- `.gitignore`
+
+---
+
+#### 增加 GitHub Actions CI
+
+改动：
+- 新增 `.github/workflows/ci.yml`
+- CI 在 push、pull request 和手动触发时运行
+- CI 覆盖 shell 语法检查、JSON 解析、`tests/run-tests.sh`、报告生成、报告关键标记检查和 tracked files 变更检查
+- CI 会上传 markdown / HTML 报告 artifact，方便失败时查看
+- `docs/TESTING.md` 和 `docs/RUNBOOK.md` 同步说明 CI 与本地测试脚本的关系
+
+影响：
+- `tests/run-tests.sh` 不再只靠维护者手动记得运行
+- 工程成熟度 v0.2 中 CI 缺口被补上
+- 本仓库成熟度从 `79/100` 提升到 `85/100`
+
+相关文件：
+- `.github/workflows/ci.yml`
+- `docs/TESTING.md`
+- `docs/RUNBOOK.md`
+
+---
+
+#### 增加评分模型 schema 和 v0.2 数据源
+
+改动：
+- 新增 `schemas/ai-project-score.schema.json`，定义评分模型结构
+- 新增 `schemas/ai-project-score.v0.2.json`，记录上下文完整度和工程成熟度的维度、分值和检测方式
+- `scripts/check-ai-project.sh` 改为识别评分模型 schema 和 v0.2 数据源
+- `tests/run-tests.sh` 增加评分模型存在性检查
+- `docs/NAMING.md` 和 `docs/DOCUMENTATION.md` 增加 `schemas/` 命名与文档边界
+
+影响：
+- 评分规则不再只藏在 shell 脚本里
+- 工程成熟度 v0.2 中“评分模型 schema”缺口被补上
+- 后续拆报告 UI 或增加测试时，可以围绕同一份评分模型数据继续收口
+
+相关文件：
+- `schemas/ai-project-score.schema.json`
+- `schemas/ai-project-score.v0.2.json`
+- `scripts/check-ai-project.sh`
+- `tests/run-tests.sh`
+- `docs/NAMING.md`
+- `docs/DOCUMENTATION.md`
+
+---
+
+#### 增加 strict 模板同步和可执行回归测试入口
+
+改动：
+- `scripts/check-template-sync.sh` 增加 `--strict`，发现模板不同步时可退出失败，用作质量门禁
+- 新增 `tests/run-tests.sh`，串起 runtime 检查、模板 strict 检查、报告生成和 `core` / `product` / `full` 安装 profile 回归
+- `docs/TESTING.md` 和 `docs/RUNBOOK.md` 更新正式测试入口
+
+影响：
+- 源仓库维护不再只靠手动复制运行手册命令
+- 安装 profile 的关键文件边界可以被一条命令复测
+- 工程成熟度 v0.2 中“可执行测试入口”和“安装 profile 自动化回归”缺口被补上
+
+相关文件：
+- `scripts/check-template-sync.sh`
+- `tests/run-tests.sh`
+- `docs/TESTING.md`
+- `docs/RUNBOOK.md`
+
+---
+
+#### 将完整度检查升级为双分数模型
+
+改动：
+- `scripts/check-ai-project.sh` 新增 `AI 工程成熟度`，与原有上下文完整度分开计算
+- 成熟度 v0.2 检查评分模型、状态同步、可执行测试、fixtures、CI、严格模板同步、报告 UI 工程化、发布闭环和跨工具验收
+- HTML 报告主结论改为展示工程成熟度，避免“文件齐全”误判为“工程闭环完整”
+- `scripts/ai-project.sh report` 改为默认生成 markdown 和 HTML 报告
+- `docs/TESTING.md`、`docs/RUNBOOK.md`、`docs/DECISIONS.md` 同步解释双分数口径
+
+影响：
+- 本仓库当前上下文完整度为 100/100，但工程成熟度会暴露真实缺口
+- 后续补齐顺序更清楚：优先测试入口、fixtures、严格模板同步、评分 schema、CI 和报告组件化
+- 非技术用户看到报告时，不会再把“文档骨架完整”理解成“项目已经完全工程化”
+
+相关文件：
+- `scripts/check-ai-project.sh`
+- `scripts/ai-project.sh`
+- `docs/TESTING.md`
+- `docs/RUNBOOK.md`
+- `docs/DECISIONS.md`
+
+---
+
+#### 增加自身工程化路线图和状态同步
+
+改动：
+- 在 `docs/PRODUCT_PLAN.md` 增加 AI Engineering Kit 自身工程化补齐主线，按 P0 / P1 / P2 / P3 拆分真实评分、可执行测试、报告 UI 工程化、老项目接入和发布闭环
+- 将当前阶段同步为“AI Engineering Kit 自身工程化收口期”
+- 同步更新 `PROJECT.md` 和 `.project-os/state.json`，避免当前状态与机器可读状态漂移
+- 在 `docs/DECISIONS.md` 记录“不新增 TODO 文档，路线图归入 PRODUCT_PLAN”的决策
+- 修正 `docs/DESIGN_STANDARDS.md` 对报告页组件契约的描述，避免继续声称完全没有真实 UI
+
+影响：
+- 当前完整度 100/100 被明确为“文件骨架完整”，不再等同于真实工程成熟
+- 下一步补齐顺序从零散讨论收敛为 P0 到 P3 的路线图
+- 后续新增测试、报告组件、评分模型或 CI 时，有明确文档归位
+
+相关文件：
+- `docs/PRODUCT_PLAN.md`
+- `PROJECT.md`
+- `.project-os/state.json`
+- `HANDOFF.md`
+- `docs/DECISIONS.md`
+- `docs/DESIGN_STANDARDS.md`
+
+---
+
+## 2026-05-18
+
+### AI Engineering Kit / completeness check
+
+#### 增加 AI 工程完整度体检和主流文档命名规范
+
+改动：
+- 新增 `docs/NAMING.md`，明确根目录、`docs/`、工具 adapter 和生成报告的命名规则
+- 新增 `docs/ARCHITECTURE.md`、`docs/ENVIRONMENT.md`、`docs/RUNBOOK.md`，补齐架构、环境和运行手册入口
+- 新增 `scripts/check-ai-project.sh`，按系统规则、开发者规则、用户意图、项目文件、工具反馈、交接摘要等维度输出 100 分完整度报告
+- 新增 `scripts/ai-project.sh`，提供 `check` / `report` / `install` 三个更直白的入口
+- 更新安装 profile，`core` 带检查脚本，`product` 带 AI 工程治理文档
+- 更新目标项目模板，补齐命名、架构、环境和运行手册模板
+
+影响：
+- 工具定位从单纯 Project OS 安装器，扩展为通用 AI 工程文件检查和补齐工具包
+- 已有项目可以先跑体检报告，再决定是否补文档，不必默认覆盖已有文档
+- 文档命名更接近主流约定：平台约定文件保留原名，工程治理文档集中在 `docs/`
+
+相关文件：
+- `README.md`
+- `INSTALL.md`
+- `AGENTS.md`
+- `docs/NAMING.md`
+- `docs/ARCHITECTURE.md`
+- `docs/ENVIRONMENT.md`
+- `docs/RUNBOOK.md`
+- `scripts/check-ai-project.sh`
+- `scripts/ai-project.sh`
+- `templates/project/`
+
+---
+
 ## 2026-05-14
 
 ### Project OS / install profile

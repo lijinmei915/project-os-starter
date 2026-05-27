@@ -16,8 +16,8 @@ Usage:
   bash scripts/install-project-os.sh [target] [--profile core|product|full]
 
 Profiles:
-  core     AGENTS.md, PROJECT.md, HANDOFF.md, scripts/check-runtime.sh
-  product  core + README/INSTALL + lightweight governance docs
+  core     AGENTS.md, PROJECT.md, HANDOFF.md, check scripts
+  product  core + README/INSTALL + AI engineering governance docs
   full     product + design docs + Claude runtime + adapters
 
 Options:
@@ -295,10 +295,21 @@ install_dir() {
 }
 
 install_core() {
+  install_file ".env.example"
   install_file "AGENTS.md"
   install_file "PROJECT.md"
   install_file "HANDOFF.md"
   install_file "scripts/check-runtime.sh"
+  install_file "scripts/check-secrets.sh"
+  install_file "scripts/check-ai-project.sh"
+  install_file "scripts/ai-project.sh"
+  install_file "scripts/add-project-docs.sh"
+  install_file "schemas/ai-project-score.schema.json"
+  install_file "schemas/ai-project-score.v0.2.json"
+  install_file "schemas/ai-project-report.schema.json"
+  install_file "schemas/ai-project-report.v0.1.json"
+  install_file "templates/report/ai-project-report.html"
+  install_dir "templates/project-docs"
 }
 
 install_documentation_doc() {
@@ -312,6 +323,11 @@ install_product_docs() {
   install_file "README.md"
   install_file "INSTALL.md"
   install_documentation_doc
+  install_file "docs/NAMING.md"
+  install_file "docs/ARCHITECTURE.md"
+  install_file "docs/ENVIRONMENT.md"
+  install_file "docs/TESTING.md"
+  install_file "docs/RUNBOOK.md"
   install_file "docs/CHANGELOG.md"
   install_file "docs/DECISIONS.md"
   install_file "docs/LESSONS.md"
@@ -324,7 +340,6 @@ install_design_docs() {
 }
 
 install_full_docs() {
-  install_file "docs/TESTING.md"
   install_file "docs/PRODUCT_PLAN.md"
   install_file "docs/CODE_STRUCTURE.md"
 }
@@ -396,8 +411,12 @@ if [ -f "$target_abs/.gitignore" ]; then
     printf '.project-os/backups/\n' >> "$target_abs/.gitignore"
     log "updated .gitignore: added .project-os/backups/"
   fi
+  if ! grep -q '\.project-os/reports/' "$target_abs/.gitignore"; then
+    printf '.project-os/reports/\n' >> "$target_abs/.gitignore"
+    log "updated .gitignore: added .project-os/reports/"
+  fi
 else
-  printf '.DS_Store\n.project-os/backups/\n' > "$target_abs/.gitignore"
+  printf '.DS_Store\n.project-os/backups/\n.project-os/reports/\n' > "$target_abs/.gitignore"
   log "created .gitignore"
 fi
 

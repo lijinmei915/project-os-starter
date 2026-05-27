@@ -37,7 +37,16 @@
 
 ## 前端 / 交互
 
-暂无记录。
+### 2026-05-20 工作台复合 class 覆盖了分栏内边距
+
+**犯的错**：旧项目左栏同时使用 `kit-left kit-card`，后声明的 `.kit-card { padding: 0 }` 覆盖了 `kit-left` 的工作台内边距，导致左栏没有真正使用 `WorkbenchLayout` padding token。
+
+**根本原因**：布局容器 class 和内容卡片 class 混用，且两个选择器权重相同，后声明样式覆盖了前面的布局语义。
+
+**加了什么规则**：
+- `kit-left` / `kit-right` 这类布局分栏不再叠加 `kit-card`。
+- 工作台内边距必须挂在 `WorkbenchLayout` / panel column 层，不能由内部卡片 class 参与决定。
+- 调整工作台间距后，要用浏览器量真实渲染距离，而不是只看 CSS token。
 
 ---
 
@@ -49,10 +58,29 @@
 
 ## 数据 / Schema / 引用一致性
 
-暂无记录。
+### 2026-05-20 并行生成同一个报告文件导致 HTML 临时交叉写入
+
+**犯的错**：验证 `check-ai-project.sh` 和 `ai-project.sh report` 时并行运行了两个都会写 `.project-os/reports/ai-project-report.html` 的命令，导致同一个 HTML 报告文件出现重复片段和交叉写入。
+
+**根本原因**：并行工具调用适合读文件和互不影响的检查，但不适合同时写同一个生成物。两个报告命令目标文件相同，没有文件锁或临时文件原子替换保护。
+
+**加了什么规则**：
+- 不并行运行会写同一个报告、快照、构建产物或模板目录的命令。
+- 生成报告时单独顺序执行 `bash scripts/check-ai-project.sh . --write-report --html`。
+- 如果后续要允许并行报告生成，脚本需要先写入唯一临时文件，再原子替换目标文件。
 
 ---
 
 ## 联调 / 部署 / 环境
 
-暂无记录。
+### 2026-05-20 Chrome 截图回归缺少超时保护导致任务挂住
+
+**犯的错**：生成视觉 baseline 时，`tests/screenshot-regression.sh` 调用本机 Chrome 后一直等待，没有及时退出，导致当前任务被卡住。
+
+**根本原因**：脚本直接执行浏览器命令，没有给 headless 截图过程设置超时；一旦 Chrome 启动或截图阶段卡住，回归脚本无法自行恢复。
+
+**加了什么规则**：
+- `tests/screenshot-regression.sh` 增加 `run_with_timeout`，默认 `BROWSER_SCREENSHOT_TIMEOUT=30` 秒后终止卡住的浏览器截图命令。
+- Chrome 截图命令不再强制传入临时 `--user-data-dir`，优先使用更接近直接 headless 的稳定参数。
+- `docs/ENVIRONMENT.md` 记录 `BROWSER_SCREENSHOT_TIMEOUT` 环境变量。
+- `docs/RUNBOOK.md` 增加 Chrome 截图卡住时的复跑方式。

@@ -25,6 +25,11 @@
 - AI 运行规则：`AGENTS.md`
 - 当前项目状态：`PROJECT.md`
 - 当前交接上下文：`HANDOFF.md`
+- 文档命名规范：`docs/NAMING.md`
+- 架构说明：`docs/ARCHITECTURE.md`
+- 环境说明：`docs/ENVIRONMENT.md`
+- 测试与验收：`docs/TESTING.md`
+- 运行手册：`docs/RUNBOOK.md`
 - 结构性变更记录：`docs/CHANGELOG.md`
 
 ## 开始方式
@@ -39,4 +44,10 @@
 
 ```txt
 这个项目有点乱，帮我接管一下
+```
+
+检查 AI 工程完整度：
+
+```bash
+bash scripts/ai-project.sh report .
 ```

@@ -17,6 +17,10 @@ build/
 CLAUDE.md
 !templates/project/adapters/CLAUDE.md
 .claude/settings.local.json
+.project-os/reports/
+tests/screenshots/*.png
+tests/screenshots/current/
+tests/screenshots/diff/
 GLOBAL_USER_PROFILE.md
 GLOBAL_USER_PREFERENCES.md
 LOCAL_NOTES.md

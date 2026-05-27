@@ -3,20 +3,29 @@
 > 用途：定义当前设计边界、token 方向、布局规则和组件库策略。
 > 什么时候更新：设计系统范围、token 分类、组件库接入策略或 UI 约束变化时。
 > 不要写什么：前端实现流水、当前交接、与设计无关的工程决策。
-> 当前阶段只定义设计规则边界，不接组件库，不生成真实 UI。
+> 当前阶段不接组件库；已存在静态 HTML 报告页和轻量组件契约，但尚未建立应用级前端组件工程。
 > 具体 token、布局和组件索引见 `docs/design/*.md`。
 
 ---
 
 ## 当前状态
 
-Project OS 现在没有真实前端代码、没有 `src/`、没有组件库。
+Project OS 现在没有应用级 `src/`、没有组件库，也没有 React / Vue 等前端运行层。
+
+但 AI 项目工程助手报告页已经形成静态 HTML 原型和轻量组件契约：
+
+- 报告页由 `scripts/check-ai-project.sh` 生成
+- 报告页当前沉淀为 9 个核心组件和 2 个页面组合模式
+- 组件契约登记在 `docs/design/ai-project-assistant/components.md`
+- TS 数据源和类型契约登记在 `docs/design/ai-project-assistant/components.ts`、`docs/design/ai-project-assistant/data.ts`
+- 组件索引登记在 `docs/design/component-index.md`
 
 设计规范的作用是：
 
 - 约束未来 UI 生成时必须先经过 `design-system`
-- 明确 Design Tokens 的基础分类
+- 明确 Design Tokens 的基础分类和当前 v0.1 数值表
 - 防止 AI 在没有规则时自由发挥 UI 风格
+- 防止静态报告页和未来组件工程之间出现两套不一致的视觉规则
 
 ---
 
@@ -25,8 +34,8 @@ Project OS 现在没有真实前端代码、没有 `src/`、没有组件库。
 | 文档 | 职责 |
 |------|------|
 | `docs/DESIGN_STANDARDS.md` | 设计规范总入口 |
-| `docs/design/tokens.md` | token 分类和使用原则 |
-| `docs/design/layout.md` | 页面布局和信息层级原则 |
+| `docs/design/tokens.md` | token 命名、数值表和使用原则 |
+| `docs/design/layout.md` | 页面壳、工作台、表单、列表和响应式布局规则 |
 | `docs/design/component-index.md` | 组件分层和索引 |
 
 ---
@@ -43,7 +52,7 @@ Project OS 现在没有真实前端代码、没有 `src/`、没有组件库。
 
 - 颜色、圆角、阴影、字号、间距优先走 token
 - 不在组件里散落硬编码视觉值
-- 项目早期可以先定义分类，不急着填满具体值
+- 当前 token 表见 `docs/design/tokens.md`
 
 ### 3. 结构先于装饰
 
