@@ -1,0 +1,532 @@
+{
+  "$schema": "ai-project-score.schema.json",
+  "modelId": "ai-project-engineering-score",
+  "version": "0.2",
+  "status": "active",
+  "description": "Scores whether an AI project is readable by agents and whether its engineering loop can be tested, shipped, and handed off.",
+  "totalScores": {
+    "context": 100,
+    "maturity": 100
+  },
+  "statusBands": [
+    {
+      "scoreType": "context",
+      "min": 85,
+      "label": "状态良好"
+    },
+    {
+      "scoreType": "context",
+      "min": 70,
+      "label": "可用，有缺口"
+    },
+    {
+      "scoreType": "context",
+      "min": 0,
+      "label": "需要补工程文档"
+    },
+    {
+      "scoreType": "maturity",
+      "min": 85,
+      "label": "工程闭环较完整"
+    },
+    {
+      "scoreType": "maturity",
+      "min": 65,
+      "label": "上下文可用，工程化有缺口"
+    },
+    {
+      "scoreType": "maturity",
+      "min": 0,
+      "label": "文件骨架可用，工程闭环不足"
+    }
+  ],
+  "dimensions": [
+    {
+      "id": "context-system-rules",
+      "title": "系统规则",
+      "scoreType": "context",
+      "maxPoints": 15,
+      "checks": [
+        {
+          "id": "agents-entry",
+          "label": "存在可用 AGENTS.md，作为 AI 规则入口",
+          "points": 8,
+          "gapLabel": "AGENTS.md 缺失或仍像空模板",
+          "detection": {
+            "kind": "substantive_file",
+            "path": "AGENTS.md",
+            "minMeaningfulLines": 8
+          }
+        },
+        {
+          "id": "agents-rules-content",
+          "label": "AGENTS.md 说明了 AI 行为、安全边界或文档规则",
+          "points": 7,
+          "gapLabel": "AGENTS.md 应说明 AI 行为、安全边界或文档规则",
+          "detection": {
+            "kind": "substantive_content_any",
+            "path": "AGENTS.md",
+            "minMeaningfulLines": 8,
+            "patterns": ["Safety", "Documentation", "Routing", "规则", "文档"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "context-developer-rules",
+      "title": "开发者规则",
+      "scoreType": "context",
+      "maxPoints": 15,
+      "checks": [
+        {
+          "id": "environment-doc",
+          "label": "存在可用 docs/ENVIRONMENT.md，说明环境、依赖、变量或外部服务",
+          "points": 8,
+          "gapLabel": "docs/ENVIRONMENT.md 缺失或仍像空模板",
+          "detection": {
+            "kind": "substantive_file",
+            "path": "docs/ENVIRONMENT.md",
+            "minMeaningfulLines": 5
+          }
+        },
+        {
+          "id": "runtime-entry",
+          "label": "README 或 package 信息提供了安装、启动或运行入口",
+          "points": 7,
+          "gapLabel": "README 或 package 信息应提供安装、启动或运行入口",
+          "detection": {
+            "kind": "substantive_content_any",
+            "path": "README.md",
+            "minMeaningfulLines": 4,
+            "patterns": ["install", "start", "run", "启动", "安装", "环境"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "context-user-intent",
+      "title": "用户意图",
+      "scoreType": "context",
+      "maxPoints": 15,
+      "checks": [
+        {
+          "id": "project-status-doc",
+          "label": "存在可用 PROJECT.md，记录当前项目状态",
+          "points": 8,
+          "gapLabel": "PROJECT.md 缺失或仍像空模板",
+          "detection": {
+            "kind": "substantive_file",
+            "path": "PROJECT.md",
+            "minMeaningfulLines": 4
+          }
+        },
+        {
+          "id": "project-status-content",
+          "label": "PROJECT.md 包含项目定位、当前阶段、状态或下一步重点",
+          "points": 7,
+          "gapLabel": "PROJECT.md 应包含项目定位、当前阶段、状态或下一步重点",
+          "detection": {
+            "kind": "substantive_content_any",
+            "path": "PROJECT.md",
+            "minMeaningfulLines": 4,
+            "patterns": ["当前阶段", "当前状态", "下一步", "定位", "phase", "status"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "context-project-files",
+      "title": "项目文件",
+      "scoreType": "context",
+      "maxPoints": 10,
+      "checks": [
+        {
+          "id": "architecture-doc",
+          "label": "存在架构说明或代码结构说明",
+          "points": 7,
+          "gapLabel": "建议补可用的 docs/ARCHITECTURE.md 或 docs/CODE_STRUCTURE.md，不能只是空模板",
+          "detection": {
+            "kind": "substantive_file_any",
+            "paths": ["docs/ARCHITECTURE.md", "docs/CODE_STRUCTURE.md"]
+          }
+        },
+        {
+          "id": "architecture-boundaries",
+          "label": "架构文档说明了模块职责或边界",
+          "points": 3,
+          "gapLabel": "架构文档应说明模块职责或边界",
+          "detection": {
+            "kind": "substantive_content_any",
+            "paths": ["docs/ARCHITECTURE.md", "docs/CODE_STRUCTURE.md"],
+            "minMeaningfulLines": 4,
+            "patterns": ["模块", "职责", "数据流", "边界", "module", "boundary", "目录", "结构"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "context-tool-feedback",
+      "title": "工具反馈",
+      "scoreType": "context",
+      "maxPoints": 15,
+      "checks": [
+        {
+          "id": "testing-doc",
+          "label": "存在可用 docs/TESTING.md",
+          "points": 7,
+          "gapLabel": "docs/TESTING.md 缺失或仍像空模板",
+          "detection": {
+            "kind": "substantive_file",
+            "path": "docs/TESTING.md",
+            "minMeaningfulLines": 4
+          }
+        },
+        {
+          "id": "check-command",
+          "label": "项目提供了测试或检查命令",
+          "points": 8,
+          "gapLabel": "建议补一个明确的测试或检查命令",
+          "detection": {
+            "kind": "file_exists",
+            "paths": ["scripts/check-runtime.sh", "scripts/check-ai-project.sh", "tests/run-tests.sh"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "context-handoff",
+      "title": "交接摘要",
+      "scoreType": "context",
+      "maxPoints": 15,
+      "checks": [
+        {
+          "id": "handoff-doc",
+          "label": "存在可用 HANDOFF.md",
+          "points": 9,
+          "gapLabel": "HANDOFF.md 缺失或仍像空模板",
+          "detection": {
+            "kind": "substantive_file",
+            "path": "HANDOFF.md",
+            "minMeaningfulLines": 4
+          }
+        },
+        {
+          "id": "handoff-content",
+          "label": "HANDOFF.md 包含当前状态、风险或下一步",
+          "points": 6,
+          "gapLabel": "HANDOFF.md 应包含当前状态、风险或下一步",
+          "detection": {
+            "kind": "substantive_content_any",
+            "path": "HANDOFF.md",
+            "minMeaningfulLines": 4,
+            "patterns": ["当前状态", "风险", "下一步", "blocked", "next"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "context-decisions-runtime",
+      "title": "决策和运行",
+      "scoreType": "context",
+      "maxPoints": 10,
+      "checks": [
+        {
+          "id": "decisions-doc",
+          "label": "存在可用 docs/DECISIONS.md，用于记录关键决策",
+          "points": 5,
+          "gapLabel": "docs/DECISIONS.md 缺失或仍像空模板",
+          "detection": {
+            "kind": "substantive_file",
+            "path": "docs/DECISIONS.md",
+            "minMeaningfulLines": 3
+          }
+        },
+        {
+          "id": "runbook-or-changelog",
+          "label": "存在运行手册或变更记录",
+          "points": 5,
+          "gapLabel": "建议补可用的 docs/RUNBOOK.md 或 docs/CHANGELOG.md",
+          "detection": {
+            "kind": "substantive_file_any",
+            "paths": ["docs/RUNBOOK.md", "docs/CHANGELOG.md"],
+            "minMeaningfulLines": 3
+          }
+        }
+      ]
+    },
+    {
+      "id": "context-documentation-governance",
+      "title": "命名和文档治理",
+      "scoreType": "context",
+      "maxPoints": 5,
+      "checks": [
+        {
+          "id": "naming-doc",
+          "label": "存在可用 docs/NAMING.md，说明文档命名规范",
+          "points": 3,
+          "gapLabel": "docs/NAMING.md 缺失或仍像空模板",
+          "detection": {
+            "kind": "substantive_file",
+            "path": "docs/NAMING.md",
+            "minMeaningfulLines": 4
+          }
+        },
+        {
+          "id": "documentation-doc",
+          "label": "存在可用 docs/DOCUMENTATION.md，说明文档边界",
+          "points": 2,
+          "gapLabel": "docs/DOCUMENTATION.md 缺失或仍像空模板",
+          "detection": {
+            "kind": "substantive_file",
+            "path": "docs/DOCUMENTATION.md",
+            "minMeaningfulLines": 4
+          }
+        }
+      ]
+    },
+    {
+      "id": "maturity-score-source",
+      "title": "评分与状态源",
+      "scoreType": "maturity",
+      "maxPoints": 20,
+      "checks": [
+        {
+          "id": "state-project-sync",
+          "label": "PROJECT.md 与 .project-os/state.json 的当前阶段一致",
+          "points": 8,
+          "gapLabel": "PROJECT.md 与 .project-os/state.json 应保持当前阶段一致",
+          "detection": {
+            "kind": "state_stage_matches_project"
+          }
+        },
+        {
+          "id": "score-model-source",
+          "label": "存在评分模型 schema 和 v0.2 数据源",
+          "points": 7,
+          "gapLabel": "建议补评分模型 schema 和 v0.2 数据源，避免评分规则只藏在脚本里",
+          "detection": {
+            "kind": "file_exists",
+            "paths": ["schemas/ai-project-score.schema.json", "schemas/ai-project-score.v0.2.json"]
+          }
+        },
+        {
+          "id": "maturity-explained",
+          "label": "路线图已说明文件完整度不等于真实工程成熟度",
+          "points": 5,
+          "gapLabel": "路线图应说明文件完整度和工程成熟度的差异",
+          "detection": {
+            "kind": "content_any",
+            "path": "docs/PRODUCT_PLAN.md",
+            "patterns": ["100/100", "真实工程成熟", "工程闭环"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "maturity-quality-gates",
+      "title": "测试与质量门禁",
+      "scoreType": "maturity",
+      "maxPoints": 25,
+      "checks": [
+        {
+          "id": "executable-tests",
+          "label": "存在可执行测试入口",
+          "points": 8,
+          "gapLabel": "缺少可执行测试入口，目前更像人工验收清单",
+          "detection": {
+            "kind": "file_exists",
+            "paths": ["scripts/test.sh", "tests/run.sh", "tests/run-tests.sh"]
+          }
+        },
+        {
+          "id": "fixtures",
+          "label": "存在测试夹具或夹具生成脚本",
+          "points": 5,
+          "gapLabel": "建议补 fixtures，覆盖空项目、老项目、缺文档项目和完整项目",
+          "detection": {
+            "kind": "file_exists",
+            "paths": ["scripts/create-test-fixtures.sh", "fixtures"]
+          }
+        },
+        {
+          "id": "ci-workflow",
+          "label": "存在 CI workflow",
+          "points": 6,
+          "gapLabel": "缺少 CI workflow，核心检查还不能在提交后自动复现",
+          "detection": {
+            "kind": "dir_exists",
+            "path": ".github/workflows"
+          }
+        },
+        {
+          "id": "strict-template-sync",
+          "label": "模板同步检查支持严格模式",
+          "points": 6,
+          "gapLabel": "check-template-sync.sh 应支持 --strict，作为 CI gate 使用",
+          "detection": {
+            "kind": "script_supports_option",
+            "path": "scripts/check-template-sync.sh",
+            "option": "--strict"
+          }
+        }
+      ]
+    },
+    {
+      "id": "maturity-report-ui",
+      "title": "报告与组件工程",
+      "scoreType": "maturity",
+      "maxPoints": 20,
+      "checks": [
+        {
+          "id": "html-report",
+          "label": "完整度报告支持 HTML 输出",
+          "points": 5,
+          "gapLabel": "建议支持 HTML 报告，方便非技术用户检查",
+          "detection": {
+            "kind": "script_supports_option",
+            "path": "scripts/check-ai-project.sh",
+            "option": "--html"
+          }
+        },
+        {
+          "id": "report-ui-extracted",
+          "label": "报告 UI 已从 shell 主逻辑中拆出",
+          "points": 6,
+          "gapLabel": "报告 UI 仍内联在 shell 脚本里，后续应拆成数据层和模板层",
+          "detection": {
+            "kind": "report_ui_inline_shell",
+            "path": "scripts/check-ai-project.sh",
+            "templatePath": "templates/report/ai-project-report.html"
+          }
+        },
+        {
+          "id": "component-contract",
+          "label": "存在报告页组件契约和 TS 数据源",
+          "points": 5,
+          "gapLabel": "建议补报告页组件契约和数据源",
+          "detection": {
+            "kind": "file_exists",
+            "paths": [
+              "docs/design/ai-project-assistant/components.ts",
+              "docs/design/ai-project-assistant/data.ts"
+            ]
+          }
+        },
+        {
+          "id": "visual-regression",
+          "label": "存在报告页截图或视觉 diff 验收",
+          "points": 4,
+          "gapLabel": "缺少报告页截图 / 视觉 diff 回归，视觉变化仍主要靠人工看",
+          "detection": {
+            "kind": "file_exists",
+            "paths": [
+              "tests/visual-regression.md",
+              "tests/screenshot-regression.sh",
+              "tests/visual-diff.mjs",
+              "tests/screenshots"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "maturity-delivery",
+      "title": "分发与发布",
+      "scoreType": "maturity",
+      "maxPoints": 15,
+      "checks": [
+        {
+          "id": "version-file",
+          "label": "存在版本号文件",
+          "points": 4,
+          "gapLabel": "建议补 VERSION 或等价版本来源",
+          "detection": {
+            "kind": "file_exists",
+            "path": "VERSION"
+          }
+        },
+        {
+          "id": "release-checklist",
+          "label": "运行手册包含发布前检查",
+          "points": 5,
+          "gapLabel": "运行手册应说明发布前检查",
+          "detection": {
+            "kind": "content_any",
+            "path": "docs/RUNBOOK.md",
+            "patterns": ["发布前检查", "release", "VERSION"]
+          }
+        },
+        {
+          "id": "install-profile-regression",
+          "label": "安装 profile 有自动化回归入口",
+          "points": 6,
+          "gapLabel": "core/product/full 安装 profile 仍缺少自动化回归入口",
+          "detection": {
+            "kind": "file_exists",
+            "paths": ["tests/run-tests.sh", "scripts/test-install-profiles.sh"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "maturity-cross-tool",
+      "title": "老项目与跨工具",
+      "scoreType": "maturity",
+      "maxPoints": 10,
+      "checks": [
+        {
+          "id": "adapters",
+          "label": "存在跨工具 adapter",
+          "points": 5,
+          "gapLabel": "建议补 Claude / Codex / Cursor / Gemini 等 adapter",
+          "detection": {
+            "kind": "dir_exists",
+            "path": "adapters"
+          }
+        },
+        {
+          "id": "cross-tool-matrix-complete",
+          "label": "跨工具验收矩阵已完成",
+          "points": 5,
+          "gapLabel": "跨工具验收矩阵仍有待测项",
+          "detection": {
+            "kind": "content_any",
+            "path": "tests/cross-tool-matrix.md",
+            "patterns": ["Claude", "Codex", "Cursor", "Gemini"],
+            "forbiddenPatterns": ["待测", "TODO"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "maturity-handoff-governance",
+      "title": "交接治理",
+      "scoreType": "maturity",
+      "maxPoints": 10,
+      "checks": [
+        {
+          "id": "handoff-risk-next",
+          "label": "HANDOFF.md 包含当前状态、风险和下一步",
+          "points": 5,
+          "gapLabel": "HANDOFF.md 应包含当前状态、风险和下一步",
+          "detection": {
+            "kind": "content_any",
+            "path": "HANDOFF.md",
+            "patterns": ["当前状态", "风险", "下一步"]
+          }
+        },
+        {
+          "id": "engineering-route-recorded",
+          "label": "自身工程化路线已进入 CHANGELOG 和 DECISIONS",
+          "points": 5,
+          "gapLabel": "结构性工程化路线应进入 CHANGELOG 和 DECISIONS",
+          "detection": {
+            "kind": "content_any",
+            "paths": ["docs/CHANGELOG.md", "docs/DECISIONS.md"],
+            "patterns": ["self engineering", "自身工程化", "工程成熟度"]
+          }
+        }
+      ]
+    }
+  ]
+}

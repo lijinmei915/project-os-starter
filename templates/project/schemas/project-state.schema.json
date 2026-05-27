@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "project-state.schema.json",
+  "title": "Project OS State",
+  "description": "Machine-readable project state. Authoritative source for AI. Human-readable presentation layer is PROJECT.md.",
+  "type": "object",
+  "required": ["phase"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Project name"
+    },
+    "description": {
+      "type": "string",
+      "description": "One-line project description"
+    },
+    "phase": {
+      "type": "string",
+      "enum": ["init", "stabilizing", "shipping", "maintenance", "archived"],
+      "description": "Current lifecycle phase. AI uses this to adjust behavior and routing hints."
+    },
+    "stage": {
+      "type": "string",
+      "description": "Human-readable stage label within the current phase, e.g. 'v1 可安装 runtime 收口期'"
+    },
+    "status": {
+      "type": "object",
+      "description": "Current work status. AI uses this to understand what is done, in progress, and next.",
+      "properties": {
+        "done": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Completed items in the current stage"
+        },
+        "doing": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Currently in-progress items"
+        },
+        "blocked": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Blocked items with reason"
+        },
+        "next": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Prioritized next steps"
+        }
+      },
+      "additionalProperties": false
+    },
+    "architecture": {
+      "type": "object",
+      "description": "Key architectural layers of this project",
+      "properties": {
+        "entry":     { "type": "string" },
+        "rules":     { "type": "string" },
+        "execution": { "type": "string" }
+      }
+    }
+  },
+  "additionalProperties": true
+}

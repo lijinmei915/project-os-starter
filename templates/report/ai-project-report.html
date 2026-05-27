@@ -1,0 +1,2431 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI 项目工程完整度报告</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --gray-50: #fafafa;
+      --gray-100: #f4f4f5;
+      --gray-200: #e4e4e7;
+      --gray-300: #d4d4d8;
+      --gray-400: #a1a1aa;
+      --gray-500: #71717a;
+      --gray-600: #52525b;
+      --gray-700: #3f3f46;
+      --gray-800: #27272a;
+      --gray-900: #18181b;
+      --slate-50: #f8fafc;
+      --slate-100: #edf0f5;
+      --slate-200: #d9dee7;
+      --slate-500: #667085;
+      --slate-900: #1d2430;
+      --teal-50: #dff7f3;
+      --teal-600: #087b73;
+      --teal-500: #13b7a6;
+      --emerald-50: #e8f7ef;
+      --emerald-100: #ecfdf5;
+      --emerald-200: #b7e7ca;
+      --emerald-300: #86efac;
+      --emerald-400: #34d399;
+      --emerald-500: #10b981;
+      --emerald-600: #059669;
+      --emerald-700: #087443;
+      --emerald-800: #047857;
+      --blue-50: #eef4ff;
+      --blue-600: #2563eb;
+      --blue-700: #175cd3;
+      --orange-50: #fff4e5;
+      --orange-700: #b54708;
+
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --font-mono: "SFMono-Regular", Consolas, monospace;
+      --text-10: 10px;
+      --text-11: 11px;
+      --text-12: 12px;
+      --text-13: 13px;
+      --text-14: 14px;
+      --text-16: 16px;
+      --text-18: 18px;
+      --text-20: 20px;
+      --text-22: 22px;
+      --text-24: 24px;
+      --text-26: 26px;
+      --text-30: 30px;
+      --text-32: 32px;
+      --text-34: 34px;
+      --text-40: 40px;
+      --text-44: 44px;
+      --font-regular: 400;
+      --font-medium: 650;
+      --font-bold: 700;
+      --font-strong: 750;
+      --font-heavy: 800;
+
+      --space-2: 2px;
+      --space-3: 3px;
+      --space-4: 4px;
+      --space-5: 5px;
+      --space-6: 6px;
+      --space-8: 8px;
+      --space-9: 9px;
+      --space-10: 10px;
+      --space-12: 12px;
+      --space-13: 13px;
+      --space-14: 14px;
+      --space-16: 16px;
+      --space-18: 18px;
+      --space-20: 20px;
+      --space-24: 24px;
+      --space-28: 28px;
+      --space-32: 32px;
+      --space-48: 48px;
+      --space-72: 72px;
+
+      --radius-xs: 4px;
+      --radius-sm: 8px;
+      --radius-md: 10px;
+      --radius-card: 12px;
+      --radius-lg: 14px;
+      --radius-xl: 18px;
+      --radius-full: 999px;
+
+      --color-surface-page: var(--gray-50);
+      --color-surface-panel: #ffffff;
+      --color-surface-muted: var(--slate-50);
+      --color-surface-control: var(--gray-100);
+      --color-surface-inverse: var(--gray-900);
+      --color-surface-inverse-hover: var(--gray-800);
+      --color-text-primary: var(--gray-900);
+      --color-text-secondary: var(--gray-500);
+      --color-text-muted: var(--gray-400);
+      --color-text-soft: var(--gray-600, #52525b);
+      --color-text-inverse: #ffffff;
+      --color-border-default: rgba(228, 228, 231, .9);
+      --color-border-subtle: rgba(228, 228, 231, .6);
+      --color-border-strong: var(--slate-200);
+      --color-brand: var(--teal-500);
+      --color-brand-text: var(--teal-600);
+      --color-action-primary: #164c7a;
+      --color-action-primary-hover: #0f3a5e;
+      --color-success-text: var(--emerald-700);
+      --color-success-bg: var(--emerald-50);
+      --color-success-strong: var(--emerald-500);
+      --color-success-icon: var(--emerald-400);
+      --color-warning-text: var(--orange-700);
+      --color-warning-bg: var(--orange-50);
+      --color-info-bg: var(--blue-50);
+      --color-info-text: var(--blue-700);
+      --color-focus: var(--blue-600);
+      --color-metric-panel: #101d2b;
+
+      --shadow-sm: 0 1px 2px rgba(24, 24, 27, .04);
+      --shadow-control: 0 1px 2px rgba(24, 24, 27, .06);
+      --shadow-strong: 0 8px 22px rgba(24, 24, 27, .16);
+      --shadow-focus: 0 0 0 3px rgba(37, 99, 235, .28);
+      --shadow-focus-muted: 0 0 0 3px rgba(37, 99, 235, .16);
+      --shadow-success-ring: 0 0 0 3px rgba(52, 211, 153, .22);
+      --shadow-brand-ring: 0 0 0 3px rgba(19, 183, 166, .16);
+
+      --layout-report-max: 1280px;
+      --layout-workbench-max: 960px;
+      --layout-page-gutter: 32px;
+      --layout-workbench-gutter: 28px;
+      --layout-breakpoint: 780px;
+
+      --component-icon-xs: 8px;
+      --component-icon-sm: 12px;
+      --component-icon-md: 16px;
+      --component-icon-lg: 18px;
+      --component-step-size: 20px;
+      --component-check-size: 18px;
+      --component-add-size: 32px;
+      --component-check-icon-size: 34px;
+      --component-check-glyph-size: 16px;
+      --component-checklist-column-gap: var(--space-14);
+      --component-checklist-padding: var(--space-12);
+      --component-empty-action-min-height: 88px;
+      --component-empty-action-padding-block: var(--space-16);
+      --component-empty-action-padding-inline: var(--space-16);
+      --component-empty-action-border: 1px dashed var(--gray-300);
+      --component-empty-action-radius: var(--radius-lg);
+      --component-empty-action-bg: rgba(250, 250, 250, .72);
+      --component-empty-action-gap: var(--space-6);
+      --component-button-min-height: 44px;
+      --component-button-padding-block: var(--space-10);
+      --component-button-padding-inline: var(--space-18);
+      --component-field-action-size: 32px;
+      --component-field-padding-block: var(--space-10);
+      --component-field-padding-inline: var(--space-13);
+      --component-workbench-panel-padding-block: var(--space-32);
+      --component-workbench-panel-padding-inline: var(--space-32);
+      --component-workbench-section-gap: var(--space-32);
+      --component-workbench-list-gap: var(--space-12);
+      --component-workbench-control-gap: var(--space-16);
+      --component-section-title-gap: var(--space-4);
+      --component-section-content-gap: var(--space-16);
+      --transition-fast: .18s ease;
+      --transition-switch: .24s ease;
+
+      --bg: var(--color-surface-page);
+      --panel: var(--color-surface-panel);
+      --text: var(--slate-900);
+      --muted: var(--slate-500);
+      --line: var(--color-border-strong);
+      --pass: var(--color-success-text);
+      --pass-bg: var(--color-success-bg);
+      --gap: var(--color-warning-text);
+      --gap-bg: var(--color-warning-bg);
+      --ink: var(--color-action-primary);
+      --accent: var(--color-brand);
+      --blue: var(--color-focus);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    main {
+      width: min(var(--layout-report-max), calc(100% - var(--layout-page-gutter)));
+      margin: var(--space-32) auto;
+    }
+    header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(420px, 520px);
+      gap: var(--space-24);
+      align-items: stretch;
+      margin-bottom: var(--space-18);
+    }
+    h1 {
+      margin: 0 0 var(--space-8);
+      font-size: var(--text-44);
+      letter-spacing: 0;
+    }
+    .hero {
+      display: grid;
+      align-content: center;
+      min-height: 164px;
+    }
+    .eyebrow {
+      display: inline-flex;
+      width: fit-content;
+      margin-bottom: var(--space-12);
+      padding: var(--space-4) var(--space-10);
+      border-radius: var(--radius-full);
+      background: var(--teal-50);
+      color: var(--color-brand-text);
+      font-size: var(--text-13);
+      font-weight: 700;
+    }
+    .meta {
+      color: var(--muted);
+      font-size: var(--text-14);
+      overflow-wrap: anywhere;
+    }
+    .top-metrics {
+      border: 1px solid var(--line);
+      background: var(--color-metric-panel);
+      color: var(--color-text-inverse);
+      border-radius: var(--radius-sm);
+      padding: var(--space-20);
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: var(--space-18);
+      align-items: center;
+    }
+    .metric {
+      min-width: 0;
+    }
+    .metric + .metric {
+      border-left: 1px solid rgba(255, 255, 255, .18);
+      padding-left: var(--space-18);
+    }
+    .metric-label {
+      color: rgba(255,255,255,.72);
+      font-size: var(--text-14);
+      font-weight: 700;
+      margin-bottom: var(--space-8);
+    }
+    .metric-value {
+      font-size: var(--text-40);
+      font-weight: 750;
+      line-height: 1;
+    }
+    .metric-sub {
+      color: rgba(255,255,255,.68);
+      font-size: var(--text-13);
+      margin-top: var(--space-8);
+    }
+    .score-ring {
+      width: 120px;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      margin: 0 auto 10px;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at center, var(--color-metric-panel) 56%, transparent 57%),
+        conic-gradient(var(--accent) ${completion_percent}%, rgba(255,255,255,.18) 0);
+    }
+    .score-ring strong {
+      font-size: var(--text-32);
+      line-height: 1;
+    }
+    .status {
+      display: inline-flex;
+      margin-top: var(--space-12);
+      padding: var(--space-4) var(--space-10);
+      border-radius: var(--radius-full);
+      font-size: var(--text-13);
+      font-weight: 650;
+    }
+    .status.strong { background: var(--pass-bg); color: var(--pass); }
+    .status.usable { background: var(--color-info-bg); color: var(--color-info-text); }
+    .status.weak { background: var(--gap-bg); color: var(--gap); }
+    .module-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+    section {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 18px;
+    }
+    h2 {
+      margin: 0 0 12px;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+    .module-title {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .number {
+      display: inline-grid;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      border-radius: 8px;
+      color: #fff;
+      background: linear-gradient(135deg, var(--blue), #23b7a8);
+      font-weight: 800;
+      flex: 0 0 auto;
+    }
+    .bar {
+      height: 10px;
+      overflow: hidden;
+      background: #edf0f5;
+      border-radius: 999px;
+      margin: 8px 0 14px;
+    }
+    .bar > span {
+      display: block;
+      height: 100%;
+      background: var(--ink);
+      border-radius: inherit;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 8px;
+    }
+    li {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 8px;
+      align-items: start;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .tag {
+      width: 52px;
+      text-align: center;
+      border-radius: 999px;
+      padding: 2px 6px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .tag.pass { color: var(--pass); background: var(--pass-bg); }
+    .tag.gap { color: var(--gap); background: var(--gap-bg); }
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      margin: 18px 0;
+    }
+    .summary div {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .summary strong {
+      display: block;
+      font-size: 22px;
+    }
+    button, textarea, input {
+      font: inherit;
+    }
+    button {
+      appearance: none;
+      -webkit-appearance: none;
+      margin: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    button:active {
+      transform: none;
+    }
+    body[data-mode="new"] .top-metrics {
+      display: none;
+    }
+    .mode-choice {
+      margin: 18px 0;
+    }
+    .mode-choice h2 {
+      font-size: 24px;
+    }
+    .mode-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .mode-card {
+      text-align: left;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 18px;
+      cursor: pointer;
+      color: var(--text);
+      user-select: none;
+      transition: border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
+    }
+    .mode-card strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 20px;
+    }
+    .mode-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .mode-card.is-active {
+      border-color: #13b7a6;
+      box-shadow: 0 0 0 3px rgba(19, 183, 166, .16);
+    }
+    .mode-card:focus-visible {
+      outline: none;
+      box-shadow: var(--shadow-focus-muted);
+    }
+    .mode-panel.is-hidden {
+      display: none;
+    }
+    .wizard {
+      display: grid;
+      gap: 16px;
+    }
+    .wizard-lead {
+      display: grid;
+      grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
+      gap: 16px;
+    }
+    .start-options {
+      display: grid;
+      gap: 10px;
+    }
+    .start-card {
+      text-align: left;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fafc;
+      padding: 14px;
+      cursor: pointer;
+      color: var(--text);
+      user-select: none;
+      transition: border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
+    }
+    .start-card strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+    .start-card span {
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .start-card.is-active {
+      background: #e8f7ef;
+      border-color: #8fd8b0;
+    }
+    .start-card:focus-visible {
+      outline: none;
+      box-shadow: var(--shadow-focus-muted);
+    }
+    .doc-picks {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .doc-config-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(320px, .8fr);
+      gap: 16px;
+      align-items: start;
+    }
+    .doc-pick {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 8px;
+      align-items: start;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fafc;
+      padding: 10px;
+      color: var(--text);
+      font-size: 14px;
+      cursor: pointer;
+      user-select: none;
+      transition: border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
+    }
+    .doc-pick:hover {
+      border-color: #9fb6d1;
+    }
+    .doc-pick:focus-within,
+    .doc-pick:focus-visible,
+    .doc-pick.is-selected {
+      outline: none;
+      box-shadow: var(--shadow-focus-muted);
+      border-color: #2563eb;
+    }
+    .doc-pick.required {
+      background: var(--pass-bg);
+      border-color: #b7e7ca;
+    }
+    .doc-pick small {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .doc-preview {
+      display: grid;
+      gap: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fafc;
+      padding: 14px;
+      position: sticky;
+      top: 16px;
+    }
+    .doc-preview strong {
+      font-size: 18px;
+    }
+    .doc-preview .file-path {
+      width: fit-content;
+      border-radius: 999px;
+      background: #eef4ff;
+      color: #175cd3;
+      padding: 5px 9px;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 12px;
+      font-weight: 750;
+    }
+    .doc-preview ul {
+      margin-top: 2px;
+      gap: 6px;
+    }
+    .doc-preview li {
+      display: list-item;
+      list-style: disc;
+      margin-left: 18px;
+      color: var(--text);
+    }
+    .doc-preview-note {
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .wizard-output {
+      display: grid;
+      gap: 10px;
+    }
+    .plain-card {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 18px;
+    }
+    .plain-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr);
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+    .verdict {
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+    .verdict-badge {
+      display: inline-flex;
+      width: fit-content;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: #dff7f3;
+      color: #087b73;
+      font-size: 13px;
+      font-weight: 750;
+    }
+    .verdict h2 {
+      margin: 0;
+      font-size: 30px;
+    }
+    .verdict p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 16px;
+    }
+    .plain-score {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 14px;
+      align-items: center;
+      padding: 14px;
+      border-radius: 8px;
+      background: #f8fafc;
+      border: 1px solid var(--line);
+    }
+    .plain-score strong {
+      font-size: 26px;
+    }
+    .plain-score span {
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .todo-card {
+      display: grid;
+      gap: 12px;
+    }
+    .todo-card h2 {
+      margin-bottom: 0;
+    }
+    .missing-list {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .missing-list li {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 10px;
+      align-items: start;
+      color: var(--text);
+      background: #f8fafc;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+    }
+    .missing-list .ok {
+      background: var(--pass-bg);
+      border-color: #b7e7ca;
+    }
+    .dot {
+      display: inline-grid;
+      place-items: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      color: #fff;
+      background: var(--gap);
+      font-size: 13px;
+      font-weight: 800;
+    }
+    .ok .dot {
+      background: var(--pass);
+    }
+    .action-board {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .action-card {
+      display: grid;
+      gap: 10px;
+      align-content: start;
+    }
+    .action-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .copy-area {
+      width: 100%;
+      min-height: 96px;
+      resize: vertical;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fafc;
+      padding: 10px;
+      color: var(--text);
+      font: var(--text-14)/1.5 var(--font-sans);
+    }
+    .copy-button {
+      width: fit-content;
+      border: 0;
+      border-radius: 8px;
+      background: #164c7a;
+      color: #fff;
+      padding: 9px 12px;
+      font-size: 14px;
+      font-weight: 750;
+      cursor: pointer;
+      user-select: none;
+      transition: background var(--transition-fast), box-shadow var(--transition-fast);
+    }
+    .copy-button:hover {
+      background: #0f3a5e;
+    }
+    .copy-button:focus-visible {
+      outline: none;
+      box-shadow: var(--shadow-focus-muted);
+    }
+    .section-heading {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: end;
+      margin: 24px 0 12px;
+    }
+    .section-heading h2 {
+      margin: 0;
+      font-size: 22px;
+    }
+    .section-heading p {
+      max-width: 620px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .guide {
+      margin-bottom: 18px;
+      display: grid;
+      grid-template-columns: minmax(0, .9fr) minmax(0, 1.4fr);
+      gap: 18px;
+      align-items: start;
+    }
+    .guide p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 15px;
+    }
+    .guide-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .guide-step {
+      min-height: 92px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fafc;
+      padding: 12px;
+    }
+    .guide-step strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+    .guide-step span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .flow {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .steps {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .step {
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fafc;
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 650;
+    }
+    .module-help {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 14px;
+      min-height: 42px;
+    }
+    .command-panel {
+      margin-top: 18px;
+    }
+    details.command-panel {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 0;
+    }
+    details.command-panel > summary {
+      cursor: pointer;
+      padding: 16px 18px;
+      font-weight: 800;
+    }
+    details.command-panel > div {
+      padding: 0 18px 18px;
+    }
+    .command-list {
+      display: grid;
+      gap: 10px;
+    }
+    .command-row {
+      display: grid;
+      grid-template-columns: 160px minmax(0, 1fr);
+      gap: 12px;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fafc;
+      padding: 10px 12px;
+    }
+    .command-row span {
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 650;
+    }
+    code {
+      display: block;
+      min-width: 0;
+      overflow-x: auto;
+      color: #102033;
+      font-family: var(--font-mono);
+      font-size: var(--text-13);
+      white-space: nowrap;
+    }
+    body {
+      background: var(--color-surface-page);
+      color: var(--color-text-primary);
+    }
+    main {
+      width: 100%;
+      margin: 0;
+    }
+    main > header,
+    main > .mode-choice,
+    main > #newProjectPanel,
+    main > #oldProjectPanel {
+      display: none !important;
+    }
+    .kit-shell {
+      max-width: var(--layout-workbench-max);
+      margin: 0 auto;
+      padding: var(--space-48) var(--layout-workbench-gutter) var(--space-72);
+      color: var(--color-text-primary);
+    }
+    .kit-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: var(--space-24);
+      margin-bottom: var(--space-32);
+    }
+    .kit-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-6);
+      margin-bottom: var(--space-12);
+      padding: var(--space-4) var(--space-10);
+      border-radius: var(--radius-xs);
+      background: var(--color-surface-inverse);
+      color: var(--color-text-inverse);
+      font-size: var(--text-11);
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .kit-icon {
+      width: var(--component-icon-lg);
+      height: var(--component-icon-lg);
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+      flex: 0 0 auto;
+    }
+    .kit-brand .kit-icon {
+      width: var(--text-13);
+      height: var(--text-13);
+      color: var(--color-success-icon);
+    }
+    .kit-brand-mark {
+      width: var(--space-8);
+      height: var(--space-8);
+      border-radius: var(--radius-full);
+      background: var(--color-success-icon);
+      box-shadow: var(--shadow-success-ring);
+    }
+    .kit-header h1 {
+      margin: 0 0 var(--space-4);
+      color: var(--color-text-primary);
+      font-size: var(--text-32);
+      font-weight: 720;
+      line-height: 1.1;
+      letter-spacing: -0.01em;
+    }
+    .kit-header p {
+      margin: 0;
+      color: var(--color-text-secondary);
+      font-size: var(--text-14);
+    }
+    .kit-meta {
+      min-width: 320px;
+      border: 1px solid var(--color-border-default);
+      border-radius: var(--radius-lg);
+      background: var(--color-surface-panel);
+      box-shadow: var(--shadow-sm);
+      padding: var(--space-12);
+      color: var(--color-text-secondary);
+      display: grid;
+      gap: var(--space-10);
+    }
+    .kit-meta-top {
+      display: flex;
+      align-items: center;
+      gap: var(--space-10);
+      min-width: 0;
+    }
+    .kit-meta-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-md);
+      background: var(--color-surface-control);
+      color: var(--color-success-strong);
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+    }
+    .kit-meta-icon .kit-icon {
+      width: var(--component-icon-md);
+      height: var(--component-icon-md);
+    }
+    .kit-meta-title {
+      display: grid;
+      gap: var(--space-2);
+      min-width: 0;
+    }
+    .kit-meta-title strong {
+      color: var(--color-text-primary);
+      font-size: var(--text-14);
+      font-weight: var(--font-strong);
+      line-height: 1.2;
+    }
+    .kit-meta-title span {
+      color: var(--color-text-secondary);
+      font-size: var(--text-11);
+      line-height: 1.35;
+    }
+    .kit-score-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--space-8);
+    }
+    .kit-score-pill {
+      padding: var(--space-8);
+      border: 1px solid var(--color-border-subtle);
+      border-radius: var(--radius-md);
+      background: var(--color-surface-page);
+      display: grid;
+      gap: var(--space-2);
+    }
+    .kit-score-pill span {
+      color: var(--color-text-muted);
+      font-size: var(--text-11);
+      line-height: 1.2;
+    }
+    .kit-score-pill strong {
+      color: var(--color-text-primary);
+      font-family: var(--font-mono);
+      font-size: var(--text-14);
+      line-height: 1.2;
+    }
+    .kit-meta-row {
+      display: flex;
+      justify-content: space-between;
+      gap: var(--space-14);
+      align-items: center;
+    }
+    .kit-meta-row + .kit-meta-row {
+      margin-top: var(--space-5);
+    }
+    .kit-meta-label {
+      color: var(--color-text-muted);
+    }
+    .kit-meta-value {
+      max-width: 190px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .kit-switch {
+      position: relative;
+      display: inline-flex;
+      width: min(100%, 390px);
+      margin-bottom: var(--space-24);
+      padding: var(--space-6);
+      border: 1px solid var(--color-border-default);
+      border-radius: var(--radius-lg);
+      background: var(--color-surface-panel);
+      box-shadow: var(--shadow-sm);
+    }
+    .kit-switch-slider {
+      position: absolute;
+      top: var(--space-6);
+      bottom: var(--space-6);
+      left: var(--space-6);
+      width: calc(50% - var(--space-6));
+      border-radius: var(--radius-md);
+      background: var(--color-surface-inverse);
+      transition: transform var(--transition-switch);
+    }
+    .kit-switch[data-project="old"] .kit-switch-slider {
+      transform: translateX(calc(100% + 0px));
+    }
+    .kit-switch button {
+      position: relative;
+      z-index: 1;
+      flex: 1;
+      min-height: 42px;
+      border: 0;
+      background: transparent;
+      color: var(--color-text-secondary);
+      font-size: var(--text-14);
+      font-weight: 650;
+      cursor: pointer;
+      border-radius: var(--radius-md);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-8);
+      transition: color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
+      user-select: none;
+    }
+    .kit-switch button:hover {
+      color: var(--color-text-primary);
+    }
+    .kit-switch button:active {
+      transform: none;
+      background: transparent;
+    }
+    .kit-switch button:focus-visible {
+      outline: none;
+      box-shadow: var(--shadow-focus-muted);
+    }
+    .kit-switch button .kit-icon {
+      width: var(--component-icon-md);
+      height: var(--component-icon-md);
+    }
+    .kit-switch button.is-active .kit-icon {
+      color: var(--color-success-icon);
+    }
+    .kit-switch button.is-active {
+      color: var(--color-text-inverse);
+    }
+    .kit-panel {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 0;
+      border: 1px solid var(--color-border-default);
+      border-radius: var(--radius-xl);
+      background: var(--color-surface-panel);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+    .kit-panel.is-hidden {
+      display: none;
+    }
+    .kit-stack {
+      display: flex;
+      flex-direction: column;
+      gap: var(--component-workbench-section-gap);
+    }
+    .kit-left {
+      grid-column: span 5;
+      padding: var(--component-workbench-panel-padding-block) var(--component-workbench-panel-padding-inline);
+      border-right: 1px solid var(--color-surface-control);
+      background: var(--color-surface-panel);
+      position: relative;
+      z-index: 1;
+    }
+    .kit-right {
+      grid-column: span 7;
+      padding: var(--component-workbench-panel-padding-block) var(--component-workbench-panel-padding-inline);
+      background: rgba(250, 250, 250, .5);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: var(--component-workbench-section-gap);
+    }
+    .kit-card {
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+      padding: 0;
+    }
+    .kit-card.fill {
+      min-height: 184px;
+      display: flex;
+      flex-direction: column;
+    }
+    .kit-card-head {
+      display: flex;
+      justify-content: space-between;
+      gap: var(--space-12);
+      align-items: center;
+      margin-bottom: var(--space-12);
+    }
+    .kit-card h2 {
+      margin: 0 0 var(--space-4);
+      color: var(--color-text-primary);
+      font-size: var(--text-14);
+      font-weight: var(--font-strong);
+      letter-spacing: 0;
+      display: flex;
+      align-items: center;
+      gap: var(--space-8);
+    }
+    .kit-card p {
+      margin: 0;
+      color: var(--color-text-secondary);
+      font-size: var(--text-12);
+      line-height: 1.55;
+    }
+    .kit-section-heading {
+      margin-bottom: var(--component-section-content-gap);
+    }
+    .kit-section-heading[data-component="SectionHeading"] {
+      display: grid;
+      gap: var(--component-section-title-gap);
+      --section-heading-indent: calc(var(--component-step-size) + var(--space-8));
+    }
+    .kit-section-heading[data-variant="plain"] {
+      margin-left: var(--section-heading-indent);
+    }
+    .kit-section-title {
+      margin: 0;
+      color: var(--color-text-primary);
+      font-size: var(--text-14);
+      font-weight: var(--font-strong);
+      letter-spacing: 0;
+      line-height: 1.35;
+      display: grid;
+      align-items: center;
+      gap: var(--space-8);
+    }
+    .kit-section-heading[data-variant="numbered"] .kit-section-title,
+    .kit-section-heading[data-variant="numbered-with-description"] .kit-section-title {
+      grid-template-columns: var(--component-step-size) minmax(0, 1fr);
+    }
+    .kit-section-heading[data-variant="plain"] .kit-section-title {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .kit-section-label {
+      display: block;
+      min-width: 0;
+    }
+    .kit-section-subtitle {
+      margin: 0;
+      color: var(--color-text-secondary);
+      font-size: var(--text-12);
+      line-height: 1.55;
+    }
+    .kit-section-heading[data-variant="numbered-with-description"] .kit-section-subtitle {
+      margin-left: var(--section-heading-indent);
+    }
+    .kit-icon-note {
+      width: var(--component-icon-lg);
+      height: var(--component-icon-lg);
+      border-radius: var(--radius-full);
+      border: 1px solid var(--gray-300);
+      color: var(--color-text-muted);
+      display: grid;
+      place-items: center;
+      font-size: var(--text-12);
+      font-weight: var(--font-heavy);
+    }
+    .kit-choice-list,
+    .kit-strategy-list,
+    .kit-source-list,
+    .kit-material-list,
+    .kit-check-list {
+      display: grid;
+      gap: var(--component-workbench-list-gap);
+    }
+    .kit-choice-list,
+    .kit-strategy-list,
+    .kit-source-list,
+    .kit-material-list,
+    .kit-add-wrap,
+    .kit-source-config-wrap,
+    .kit-check-list {
+      padding-left: 0;
+    }
+    .kit-source-list + .kit-source-config-wrap {
+      margin-top: var(--component-workbench-section-gap);
+    }
+    .kit-add-wrap {
+      display: grid;
+      gap: var(--component-workbench-control-gap);
+    }
+    .kit-choice,
+    .kit-strategy,
+    .kit-source {
+      width: 100%;
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-lg);
+      background: var(--color-surface-panel);
+      padding: var(--space-16);
+      text-align: left;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: var(--space-14);
+      align-items: start;
+      cursor: pointer;
+      transition: border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
+      user-select: none;
+    }
+    .kit-choice:hover,
+    .kit-strategy:hover,
+    .kit-source:hover {
+      background: var(--color-surface-page);
+    }
+    .kit-choice:active,
+    .kit-strategy:active,
+    .kit-source:active {
+      transform: none;
+    }
+    .kit-choice:focus-visible,
+    .kit-strategy:focus-visible,
+    .kit-source:focus-visible {
+      outline: none;
+      box-shadow: var(--shadow-focus-muted);
+    }
+    .kit-choice.is-active,
+    .kit-strategy.is-active,
+    .kit-source.is-active {
+      border-color: var(--color-surface-inverse);
+      background: var(--color-surface-panel);
+      color: var(--color-text-primary);
+      box-shadow: 0 0 0 1px var(--color-surface-inverse);
+    }
+    .kit-choice > .kit-icon,
+    .kit-strategy > .kit-icon,
+    .kit-source > .kit-icon {
+      width: 19px;
+      height: 19px;
+      margin-top: var(--space-2);
+      color: var(--color-text-muted);
+    }
+    .kit-choice.is-active > .kit-icon,
+    .kit-strategy.is-active > .kit-icon,
+    .kit-source.is-active > .kit-icon {
+      color: var(--color-success-icon);
+    }
+    .kit-choice strong,
+    .kit-strategy strong,
+    .kit-source strong {
+      display: block;
+      margin-bottom: var(--space-4);
+      font-size: var(--text-14);
+      font-weight: var(--font-strong);
+      color: var(--color-text-primary);
+    }
+    .kit-choice span,
+    .kit-strategy span,
+    .kit-source span {
+      display: block;
+      color: var(--color-text-secondary);
+      font-size: var(--text-12);
+      line-height: 1.55;
+    }
+    .kit-choice.is-active span,
+    .kit-strategy.is-active span,
+    .kit-source.is-active span {
+      color: var(--color-text-secondary);
+    }
+    .kit-choice.is-active strong,
+    .kit-strategy.is-active strong,
+    .kit-source.is-active strong {
+      color: var(--color-text-primary);
+    }
+    .kit-active-check {
+      display: none;
+      color: var(--color-success-icon);
+      font-size: var(--text-16);
+      font-weight: 900;
+    }
+    .is-active .kit-active-check {
+      display: block;
+    }
+    .kit-material {
+      border: 1px solid var(--color-border-subtle);
+      border-radius: var(--radius-card);
+      background: var(--color-surface-panel);
+      padding: var(--space-14);
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: var(--space-12);
+      align-items: start;
+      cursor: pointer;
+      box-shadow: var(--shadow-sm);
+      transition: background var(--transition-fast);
+    }
+    .kit-material:hover {
+      background: rgba(250, 250, 250, .8);
+    }
+    .kit-material[aria-disabled="true"] {
+      background: var(--color-surface-panel);
+      border-color: var(--color-border-subtle);
+      cursor: pointer;
+      box-shadow: var(--shadow-sm);
+    }
+    .kit-check-control {
+      width: var(--component-check-size);
+      height: var(--component-check-size);
+      margin-top: var(--space-3);
+      border-radius: var(--radius-xs);
+      border: 0;
+      background: var(--color-surface-inverse);
+      display: inline-grid;
+      place-items: center;
+      color: var(--color-success-icon);
+      flex: 0 0 auto;
+      box-shadow: 0 1px 2px rgba(24, 24, 27, .12);
+    }
+    .kit-check-control .kit-icon {
+      width: var(--component-icon-sm);
+      height: var(--component-icon-sm);
+      stroke-width: 4;
+    }
+    .kit-material-copy {
+      display: block;
+      min-width: 0;
+    }
+    .kit-material-copy strong,
+    .kit-check-copy strong {
+      display: block;
+      color: var(--color-text-primary);
+      font-size: var(--text-14);
+      font-weight: var(--font-medium);
+      margin-bottom: var(--space-2);
+    }
+    .kit-material-copy span,
+    .kit-check-copy span {
+      display: block;
+      color: var(--color-text-secondary);
+      font-size: var(--text-12);
+      line-height: 1.5;
+    }
+    .kit-empty-action {
+      flex: 1;
+      width: 100%;
+      min-height: var(--component-empty-action-min-height);
+      padding: var(--component-empty-action-padding-block) var(--component-empty-action-padding-inline);
+      border: var(--component-empty-action-border);
+      border-radius: var(--component-empty-action-radius);
+      background: var(--component-empty-action-bg);
+      display: grid;
+      place-items: center;
+      text-align: center;
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+      user-select: none;
+    }
+    .kit-empty-action > span,
+    .kit-empty-action > div {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: var(--component-empty-action-gap);
+    }
+    .kit-empty-action strong {
+      color: var(--color-text-secondary);
+      font-size: var(--text-13);
+      font-weight: var(--font-medium);
+      line-height: 1.4;
+    }
+    .kit-empty-action p {
+      margin: 0;
+      color: var(--color-text-secondary);
+      font-size: var(--text-12);
+      line-height: 1.5;
+    }
+    .kit-empty-action:hover {
+      background: var(--color-surface-control);
+      border-color: var(--color-text-muted);
+      color: var(--gray-700);
+    }
+    .kit-empty-action:active {
+      transform: none;
+    }
+    .kit-empty-action:focus-visible {
+      outline: none;
+      box-shadow: var(--shadow-focus-muted);
+    }
+    .kit-add {
+      min-height: var(--component-empty-action-min-height);
+    }
+    .kit-add-doc-control {
+      width: var(--component-add-size);
+      height: var(--component-add-size);
+      margin: 0;
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-full);
+      background: var(--color-surface-panel);
+      display: inline-grid;
+      place-items: center;
+      color: var(--color-text-muted);
+      box-shadow: var(--shadow-control);
+      transition: border-color var(--transition-fast), color var(--transition-fast);
+    }
+    .kit-add:hover .kit-add-doc-control {
+      border-color: var(--emerald-300);
+      color: var(--color-success-strong);
+    }
+    .kit-add-doc-control .kit-icon {
+      width: var(--component-icon-md);
+      height: var(--component-icon-md);
+    }
+    .kit-path-field {
+      min-height: var(--component-button-min-height);
+      padding: var(--component-field-padding-block) var(--space-10) var(--component-field-padding-block) var(--component-field-padding-inline);
+      border: 1px solid rgba(228, 228, 231, .74);
+      border-radius: var(--radius-md);
+      background: var(--color-surface-page);
+      color: var(--color-text-soft);
+      font-family: var(--font-mono);
+      font-size: var(--text-12);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) var(--component-field-action-size);
+      gap: var(--space-8);
+      align-items: center;
+    }
+    .kit-path-value {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .kit-directory-action {
+      width: var(--component-field-action-size);
+      height: var(--component-field-action-size);
+      border: 0;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--color-text-muted);
+      display: inline-grid;
+      place-items: center;
+      cursor: pointer;
+      transition: background var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
+    }
+    .kit-directory-action:hover {
+      background: var(--color-surface-control);
+      color: var(--color-text-primary);
+    }
+    .kit-directory-action:focus-visible {
+      outline: none;
+      box-shadow: var(--shadow-focus-muted);
+    }
+    .kit-directory-action .kit-icon {
+      width: var(--component-icon-md);
+      height: var(--component-icon-md);
+    }
+    .kit-directory-input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .kit-primary {
+      width: fit-content;
+      border: 0;
+      border-radius: var(--radius-md);
+      background: var(--color-surface-inverse);
+      color: var(--color-text-inverse);
+      min-height: var(--component-button-min-height);
+      padding: var(--component-button-padding-block) var(--component-button-padding-inline);
+      font-size: var(--text-14);
+      font-weight: var(--font-medium);
+      line-height: 1;
+      cursor: pointer;
+      display: inline-flex;
+      gap: var(--space-8);
+      align-items: center;
+      transition: background var(--transition-fast);
+      user-select: none;
+    }
+    .kit-primary .kit-icon {
+      width: var(--component-icon-md);
+      height: var(--component-icon-md);
+      color: var(--color-success-icon);
+    }
+    .kit-primary:hover {
+      background: var(--color-surface-inverse-hover);
+    }
+    .kit-primary:active {
+      background: var(--color-surface-inverse);
+      transform: none;
+    }
+    .kit-primary:focus-visible {
+      outline: none;
+      box-shadow: var(--shadow-focus-muted);
+    }
+    .kit-primary:disabled,
+    .kit-primary[aria-disabled="true"] {
+      cursor: not-allowed;
+      opacity: .52;
+    }
+    .kit-status-chip {
+      display: inline-flex;
+      width: fit-content;
+      align-items: center;
+      gap: var(--space-4);
+      padding: var(--space-3) var(--space-8);
+      border-radius: var(--radius-full);
+      background: var(--color-surface-control);
+      color: var(--color-text-secondary);
+      font-size: var(--text-11);
+      font-weight: var(--font-medium);
+      line-height: 1.2;
+    }
+    .kit-status-chip.is-live {
+      background: var(--color-success-bg);
+      color: var(--color-success-text);
+    }
+    .kit-status-chip.is-copy {
+      background: var(--color-success-bg);
+      color: var(--color-success-text);
+    }
+    .kit-status-chip.is-planned {
+      background: var(--color-surface-control);
+      color: var(--color-text-muted);
+    }
+    .kit-feature-note {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-8);
+      padding: var(--space-10);
+      border: 1px solid var(--color-border-subtle);
+      border-radius: var(--radius-md);
+      background: var(--color-surface-page);
+      color: var(--color-text-secondary);
+      font-size: var(--text-11);
+      line-height: 1.45;
+    }
+    .kit-feature-note span:last-child {
+      min-width: 0;
+    }
+    .kit-source-config {
+      display: none;
+      gap: var(--component-workbench-control-gap);
+    }
+    .kit-source-config.is-active {
+      display: grid;
+    }
+    .kit-source-config > .kit-section-heading {
+      margin-bottom: 0;
+    }
+    .kit-input {
+      width: 100%;
+      border: 1px solid var(--gray-300);
+      border-radius: var(--radius-md);
+      background: var(--color-surface-panel);
+      color: var(--color-text-primary);
+      padding: var(--space-12);
+      font-size: var(--text-14);
+      outline: 0;
+    }
+    .kit-input:focus {
+      border-color: var(--color-success-strong);
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, .16);
+    }
+    .kit-hint-row {
+      display: flex;
+      gap: var(--component-workbench-list-gap);
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .kit-hint {
+      color: var(--color-text-muted);
+      font-size: var(--text-11);
+    }
+    .kit-upload {
+      min-height: var(--component-empty-action-min-height);
+    }
+    .kit-upload-icon {
+      width: var(--component-add-size);
+      height: var(--component-add-size);
+      margin: 0;
+      color: var(--color-success-strong);
+    }
+    .kit-check-item {
+      display: grid;
+      grid-template-columns: var(--component-check-icon-size) minmax(0, 1fr) var(--component-check-size);
+      column-gap: var(--component-checklist-column-gap);
+      align-items: center;
+      padding: var(--component-checklist-padding);
+      border-radius: var(--radius-lg);
+      background: var(--color-surface-panel);
+      border: 1px solid var(--color-border-subtle);
+      box-shadow: var(--shadow-sm);
+      transition: background var(--transition-fast);
+    }
+    .kit-check-item:hover {
+      background: var(--color-surface-page);
+    }
+    .kit-check-icon {
+      width: var(--component-check-icon-size);
+      height: var(--component-check-icon-size);
+      border-radius: var(--radius-md);
+      background: var(--color-surface-control);
+      color: var(--color-text-soft);
+      display: grid;
+      place-items: center;
+      justify-self: center;
+      align-self: center;
+      line-height: 0;
+    }
+    .kit-check-icon .kit-icon {
+      width: var(--component-check-glyph-size);
+      height: var(--component-check-glyph-size);
+      display: block;
+    }
+    .kit-check-copy {
+      display: block;
+      min-width: 0;
+    }
+    .kit-soft-check {
+      width: var(--component-check-size);
+      height: var(--component-check-size);
+      color: var(--color-success-icon);
+      font-weight: 900;
+      justify-self: center;
+      align-self: center;
+    }
+    .kit-step-num {
+      width: var(--component-step-size);
+      height: var(--component-step-size);
+      border-radius: var(--radius-full);
+      background: var(--color-surface-control);
+      color: var(--color-text-soft);
+      display: inline-grid;
+      place-items: center;
+      font-size: var(--text-10);
+      font-weight: var(--font-heavy);
+      flex: 0 0 auto;
+    }
+    .kit-right::before,
+    .kit-right::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: calc(var(--space-12) * -1);
+      width: var(--space-24);
+      height: var(--space-24);
+      background: var(--color-surface-panel);
+      border: 1px solid var(--gray-200);
+      transform: translateY(-50%) rotate(45deg);
+      display: block;
+    }
+    .kit-right::after {
+      left: calc(var(--space-16) * -1);
+      width: var(--space-32);
+      height: var(--space-32);
+      border: 0;
+    }
+    @media (max-width: 780px) {
+      header, .module-grid, .summary, .flow, .top-metrics, .guide, .guide-grid, .command-row, .plain-layout, .action-board, .plain-score, .mode-grid, .wizard-lead, .doc-picks, .doc-config-grid {
+        grid-template-columns: 1fr;
+      }
+      .kit-header,
+      .kit-panel {
+        display: grid;
+        grid-template-columns: 1fr;
+      }
+      .kit-panel {
+        --component-workbench-panel-padding-block: var(--space-24);
+        --component-workbench-panel-padding-inline: var(--space-20);
+        --component-workbench-section-gap: var(--space-24);
+      }
+      .kit-left,
+      .kit-right {
+        grid-column: auto;
+        border-right: 0;
+      }
+      .kit-right::before,
+      .kit-right::after {
+        display: none;
+      }
+      .kit-meta {
+        min-width: 0;
+      }
+      h1 {
+        font-size: 34px;
+      }
+      .verdict h2 {
+        font-size: 26px;
+      }
+      .section-heading {
+        display: grid;
+      }
+      .metric + .metric {
+        border-left: 0;
+        border-top: 1px solid rgba(255,255,255,.18);
+        padding-left: 0;
+        padding-top: 18px;
+      }
+    }
+  </style>
+</head>
+<body data-mode="new">
+<main>
+  <svg width="0" height="0" style="position:absolute;overflow:hidden" aria-hidden="true" focusable="false">
+    <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z"></path><path d="M5 15l.8 2.2L8 18l-2.2.8L5 21l-.8-2.2L2 18l2.2-.8L5 15z"></path><path d="M19 15l.6 1.7L21 17l-1.4.3L19 19l-.6-1.7L17 17l1.4-.3L19 15z"></path></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14"></path><path d="M5 12h14"></path></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 1-15.1 6.6L4 17"></path><path d="M3 12A9 9 0 0 1 18.1 5.4L20 7"></path><path d="M4 21v-4h4"></path><path d="M20 3v4h-4"></path></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><path d="M20 21a8 8 0 0 0-16 0"></path><circle cx="12" cy="8" r="4"></circle></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21a6 6 0 0 0-12 0"></path><circle cx="10" cy="8" r="4"></circle><path d="M22 21a5 5 0 0 0-4-4.9"></path><path d="M17 4.2a4 4 0 0 1 0 7.6"></path></symbol>
+    <symbol id="i-rocket" viewBox="0 0 24 24"><path d="M4.5 16.5c-1.2 1-1.7 2.9-1.5 4.5 1.6.2 3.5-.3 4.5-1.5"></path><path d="M9 15l-3-3a14 14 0 0 1 9-8l5-1-1 5a14 14 0 0 1-8 9l-3-3z"></path><circle cx="15" cy="9" r="2"></circle></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5 9-5z"></path><path d="M3 13l9 5 9-5"></path><path d="M3 18l9 5 9-5"></path></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="M9 12l2 2 4-5"></path></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"></path></symbol>
+    <symbol id="i-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M8 12l2.5 2.5L16 9"></path></symbol>
+    <symbol id="i-folder-git" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"></path><circle cx="9" cy="13" r="1.5"></circle><circle cx="15" cy="13" r="1.5"></circle><path d="M10.5 13h3"></path></symbol>
+    <symbol id="i-folder-open" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v2"></path><path d="M3 7v11a2 2 0 0 0 2 2h13.2a2 2 0 0 0 1.9-1.4l1.8-5.4A1.5 1.5 0 0 0 20.5 11H8a2 2 0 0 0-1.9 1.4L3 20"></path></symbol>
+    <symbol id="i-github" viewBox="0 0 24 24"><path d="M15 22v-4a4 4 0 0 0-1-3c3 0 6-1.5 6-6a5 5 0 0 0-1.4-3.6c.1-.4.6-1.8-.2-3.4 0 0-1.2-.4-3.8 1.4a13 13 0 0 0-6.8 0C5.2 1.6 4 2 4 2c-.8 1.6-.3 3-.2 3.4A5 5 0 0 0 2.4 9c0 4.5 3 6 6 6a4 4 0 0 0-1 3v4"></path><path d="M9 18c-4.5 2-5-2-7-2"></path></symbol>
+    <symbol id="i-upload-cloud" viewBox="0 0 24 24"><path d="M16 16l-4-4-4 4"></path><path d="M12 12v9"></path><path d="M20.4 17.4A5 5 0 0 0 18 8h-1.3A7 7 0 1 0 5 15.7"></path></symbol>
+    <symbol id="i-activity" viewBox="0 0 24 24"><path d="M22 12h-4l-3 8-6-16-3 8H2"></path></symbol>
+    <symbol id="i-folder-search" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v4"></path><path d="M3 7v11a2 2 0 0 0 2 2h8"></path><circle cx="17" cy="17" r="3"></circle><path d="M20 20l2 2"></path></symbol>
+    <symbol id="i-file-json" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M10 13l-2 2 2 2"></path><path d="M14 13l2 2-2 2"></path></symbol>
+    <symbol id="i-check-square" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"></rect><path d="M8 12l3 3 5-6"></path></symbol>
+    <symbol id="i-file-text" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M8 13h8"></path><path d="M8 17h6"></path></symbol>
+  </svg>
+  <section class="kit-shell" aria-label="AI 项目工程助手">
+    <header class="kit-header">
+      <div>
+        <div class="kit-brand"><svg class="kit-icon"><use href="#i-sparkles"></use></svg>AI Engineering Kit</div>
+        <h1>AI 项目工程助手</h1>
+        <p>选择新项目走初始化向导，老项目看体检报告。</p>
+      </div>
+      <div class="kit-meta" data-component="MetaPanel" data-variant="status-card" data-state="default" data-source="docs/design/ai-project-assistant/data.ts">
+        <div class="kit-meta-top">
+          <span class="kit-meta-icon" aria-hidden="true"><svg class="kit-icon"><use href="#i-activity"></use></svg></span>
+          <span class="kit-meta-title"><strong>当前报告</strong><span>生成于 {{GENERATED_AT}}</span></span>
+        </div>
+        <div class="kit-score-grid">
+          <span class="kit-score-pill"><span>上下文完整度</span><strong>{{CONTEXT_SCORE}}/{{CONTEXT_MAX_SCORE}}</strong></span>
+          <span class="kit-score-pill"><span>工程成熟度</span><strong>{{MATURITY_SCORE}}/{{MATURITY_MAX_SCORE}}</strong></span>
+        </div>
+      </div>
+    </header>
+
+    <div class="kit-switch" data-component="SegmentedSwitch" data-variant="two-options" data-project="new" id="kitProjectSwitch">
+      <div class="kit-switch-slider"></div>
+      <button class="is-active" type="button" data-kit-project="new" data-state="selected"><svg class="kit-icon"><use href="#i-plus"></use></svg>创建新项目</button>
+      <button type="button" data-kit-project="old" data-state="default"><svg class="kit-icon"><use href="#i-refresh"></use></svg>接手老项目</button>
+    </div>
+
+    <section class="kit-panel" id="kitNewPanel">
+      <div class="kit-left kit-stack">
+        <div class="kit-card">
+          <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered" data-source="docs/design/ai-project-assistant/data.ts">
+            <span class="kit-section-title" data-slot="title"><span class="kit-step-num" data-slot="step">1</span><span class="kit-section-label" data-slot="label">协作模式</span></span>
+          </div>
+          <div class="kit-choice-list">
+            <button class="kit-choice is-active" type="button" data-kit-collab="solo" data-component="OptionCard" data-variant="choice" data-state="selected" data-source="docs/design/ai-project-assistant/data.ts">
+              <svg class="kit-icon"><use href="#i-user"></use></svg>
+              <span><strong>个人开发</strong><span>AI 提供敏捷上下文，重视开发速度与灵活性。</span></span>
+              <svg class="kit-icon kit-active-check"><use href="#i-check-circle"></use></svg>
+            </button>
+            <button class="kit-choice" type="button" data-kit-collab="team" data-component="OptionCard" data-variant="choice" data-state="default" data-source="docs/design/ai-project-assistant/data.ts">
+              <svg class="kit-icon"><use href="#i-users"></use></svg>
+              <span><strong>团队协作</strong><span>补齐协作规则、决策记录和交接资料，避免项目越做越散。</span></span>
+              <svg class="kit-icon kit-active-check"><use href="#i-check-circle"></use></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="kit-card">
+          <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered" data-source="docs/design/ai-project-assistant/data.ts">
+            <span class="kit-section-title" data-slot="title"><span class="kit-step-num" data-slot="step">2</span><span class="kit-section-label" data-slot="label">启动策略</span></span>
+          </div>
+          <div class="kit-strategy-list">
+            <button class="kit-strategy is-active" type="button" data-kit-start="prototype" data-component="OptionCard" data-variant="strategy" data-state="selected" data-source="docs/design/ai-project-assistant/data.ts">
+              <svg class="kit-icon"><use href="#i-rocket"></use></svg>
+              <span><strong>快速做个原型</strong><span>先让 AI 做出能看的页面或功能，再慢慢补规范。</span></span>
+              <svg class="kit-icon kit-active-check"><use href="#i-check-circle"></use></svg>
+            </button>
+            <button class="kit-strategy" type="button" data-kit-start="serious" data-component="OptionCard" data-variant="strategy" data-state="default" data-source="docs/design/ai-project-assistant/data.ts">
+              <svg class="kit-icon"><use href="#i-layers"></use></svg>
+              <span><strong>认真建一个项目</strong><span>适合产品、工具、长期维护项目，先把项目基础搭稳。</span></span>
+              <svg class="kit-icon kit-active-check"><use href="#i-check-circle"></use></svg>
+            </button>
+            <button class="kit-strategy" type="button" data-kit-start="handover" data-component="OptionCard" data-variant="strategy" data-state="default" data-source="docs/design/ai-project-assistant/data.ts">
+              <svg class="kit-icon"><use href="#i-shield"></use></svg>
+              <span><strong>只想让 AI 更好接手</strong><span>适合先整理规则、状态和交接，不急着写业务代码。</span></span>
+              <svg class="kit-icon kit-active-check"><use href="#i-check-circle"></use></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="kit-right kit-stack">
+        <div class="kit-card">
+          <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered-with-description" data-source="docs/design/ai-project-assistant/data.ts">
+            <span class="kit-section-title" data-slot="title"><span class="kit-step-num" data-slot="step">3</span><span class="kit-section-label" data-slot="label">基础上下文资料</span></span>
+            <p class="kit-section-subtitle" data-slot="description">已自动勾选 AI 接手所需的最小数据集</p>
+          </div>
+          <div class="kit-material-list" id="kitRequiredMaterials"></div>
+        </div>
+
+        <div class="kit-card fill">
+          <div class="kit-section-heading" data-component="SectionHeading" data-variant="plain" data-source="docs/design/ai-project-assistant/data.ts">
+            <span class="kit-section-title" data-slot="title"><span class="kit-section-label" data-slot="label">自定义增强</span></span>
+            <p class="kit-section-subtitle" data-slot="description">按需补充其他项目文档</p>
+          </div>
+          <div class="kit-add-wrap">
+            <button class="kit-add kit-empty-action" type="button" data-component="AddItemCard" data-variant="document" data-state="copy" data-source="docs/design/ai-project-assistant/data.ts" data-kit-copy-doc-command aria-label="复制补齐工程文档命令">
+              <span><span class="kit-add-doc-control" aria-hidden="true"><svg class="kit-icon"><use href="#i-plus"></use></svg></span><strong data-button-label>复制补齐文档命令</strong><p><span class="kit-status-chip is-copy">可复制</span></p></span>
+            </button>
+            <div class="kit-feature-note"><span class="kit-status-chip is-copy">模板工具</span><span>会补齐 DOCUMENTATION / NAMING / ARCHITECTURE / ENVIRONMENT / TESTING / RUNBOOK / CHANGELOG / DECISIONS / LESSONS 等工程文档模板；默认不覆盖已有文件。</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="kit-panel is-hidden" id="kitOldPanel">
+      <div class="kit-left">
+        <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered-with-description" data-source="docs/design/ai-project-assistant/data.ts">
+          <span class="kit-section-title" data-slot="title"><span class="kit-step-num" data-slot="step">1</span><span class="kit-section-label" data-slot="label">代码来源</span></span>
+          <p class="kit-section-subtitle" data-slot="description">输入老项目代码，生成 AI 可读的接手报告。</p>
+        </div>
+        <div class="kit-source-list">
+          <button class="kit-source is-active" type="button" data-kit-source="local" data-component="OptionCard" data-variant="source" data-state="selected" data-source="docs/design/ai-project-assistant/data.ts">
+            <svg class="kit-icon"><use href="#i-folder-git"></use></svg>
+            <span><strong>读取本机目录</strong><span>直接分析当前运行所在的路径，速度最快。</span></span>
+            <svg class="kit-icon kit-active-check"><use href="#i-check-circle"></use></svg>
+          </button>
+          <button class="kit-source" type="button" data-kit-source="git" data-component="OptionCard" data-variant="source" data-state="default" data-source="docs/design/ai-project-assistant/data.ts">
+            <svg class="kit-icon"><use href="#i-github"></use></svg>
+            <span><strong>Git 仓库地址</strong><span>输入一段公开的或有权限的仓库链接。</span></span>
+            <svg class="kit-icon kit-active-check"><use href="#i-check-circle"></use></svg>
+          </button>
+          <button class="kit-source" type="button" data-kit-source="upload" data-component="OptionCard" data-variant="source" data-state="default" data-source="docs/design/ai-project-assistant/data.ts">
+            <svg class="kit-icon"><use href="#i-upload-cloud"></use></svg>
+            <span><strong>上传压缩包</strong><span>把源码打包传上来，不上传云端仅本地解析。</span></span>
+            <svg class="kit-icon kit-active-check"><use href="#i-check-circle"></use></svg>
+          </button>
+        </div>
+        <div class="kit-source-config-wrap">
+          <div class="kit-source-config is-active" data-kit-source-panel="local">
+            <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered-with-description" data-source="docs/design/ai-project-assistant/data.ts">
+              <span class="kit-section-title" data-slot="title"><span class="kit-step-num" data-slot="step">2</span><span class="kit-section-label" data-slot="label">当前工作目录</span></span>
+              <p class="kit-section-subtitle" data-slot="description">将在下方路径执行代码体检</p>
+            </div>
+            <div class="kit-path-field" data-component="TextField" data-variant="path" data-state="readonly" data-source="docs/design/ai-project-assistant/data.ts">
+              <span class="kit-path-value" id="kitPathValue" data-slot="value" title="{{TARGET_HTML}}">{{TARGET_HTML}}</span>
+              <button class="kit-directory-action" type="button" data-slot="trailingAction" data-kit-directory-browse aria-label="选择本地目录" title="选择本地目录">
+                <svg class="kit-icon"><use href="#i-folder-open"></use></svg>
+              </button>
+              <input class="kit-directory-input" id="kitDirectoryInput" type="file" webkitdirectory directory multiple aria-hidden="true" tabindex="-1">
+            </div>
+            <button class="kit-primary" type="button" data-component="Button" data-variant="primary" data-state="copy" data-kit-copy-local-command><svg class="kit-icon"><use href="#i-activity"></use></svg><span data-button-label>复制体检命令</span></button>
+            <div class="kit-feature-note"><span class="kit-status-chip is-live">命令可用</span><span>网页不会直接执行本机 shell；复制命令后在项目终端运行即可重新生成报告。</span></div>
+          </div>
+          <div class="kit-source-config" data-kit-source-panel="git">
+            <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered-with-description" data-source="docs/design/ai-project-assistant/data.ts">
+              <span class="kit-section-title" data-slot="title"><span class="kit-step-num" data-slot="step">2</span><span class="kit-section-label" data-slot="label">Git 仓库地址</span></span>
+              <p class="kit-section-subtitle" data-slot="description">支持公开仓库或携带凭证的私有仓库</p>
+            </div>
+            <input class="kit-input" id="kitGitInput" type="text" placeholder="https://github.com/...">
+            <div class="kit-hint-row">
+              <button class="kit-primary" type="button" data-component="Button" data-variant="primary" data-state="copy" data-kit-copy-git-command><svg class="kit-icon"><use href="#i-github"></use></svg><span data-button-label>复制分析命令</span></button>
+              <span class="kit-hint">不在网页内直接 clone</span>
+            </div>
+            <div class="kit-feature-note"><span class="kit-status-chip is-live">命令可用</span><span>填写仓库地址后复制命令，在终端中 clone 到临时目录并生成体检报告。</span></div>
+          </div>
+          <div class="kit-source-config" data-kit-source-panel="upload">
+            <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered-with-description" data-source="docs/design/ai-project-assistant/data.ts">
+              <span class="kit-section-title" data-slot="title"><span class="kit-step-num" data-slot="step">2</span><span class="kit-section-label" data-slot="label">上传压缩包</span></span>
+              <p class="kit-section-subtitle" data-slot="description">支持 .zip 格式的代码包</p>
+            </div>
+            <div class="kit-upload kit-empty-action" data-component="AddItemCard" data-variant="upload" data-state="planned" data-source="docs/design/ai-project-assistant/data.ts">
+              <div><svg class="kit-icon kit-upload-icon"><use href="#i-upload-cloud"></use></svg><strong>上传压缩包</strong><p><span class="kit-status-chip is-planned">待接入</span></p></div>
+            </div>
+            <div class="kit-feature-note"><span class="kit-status-chip is-planned">待接入</span><span>当前静态报告页不会解析 zip；后续需要本地应用或服务端能力承接。</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="kit-right kit-stack">
+        <div class="kit-card">
+          <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered-with-description" data-source="docs/design/ai-project-assistant/data.ts">
+            <span class="kit-section-title" data-slot="title"><span class="kit-step-num" data-slot="step">3</span><span class="kit-section-label" data-slot="label">体检将包含以下内容</span></span>
+            <p class="kit-section-subtitle" data-slot="description">完成后自动生成《AI 接手指南》</p>
+          </div>
+          <div class="kit-check-list">
+            <div class="kit-check-item" data-component="ChecklistItem" data-type="audit" data-state="pass" data-source="docs/design/ai-project-assistant/data.ts"><span class="kit-check-icon" data-slot="leadingIcon"><svg class="kit-icon"><use href="#i-folder-search"></use></svg></span><span class="kit-check-copy" data-slot="content"><strong>工程结构梳理</strong><span>发现隐式约定，找出缺失的架构图和文档</span></span><svg class="kit-icon kit-soft-check" data-slot="trailingIcon"><use href="#i-check-circle"></use></svg></div>
+            <div class="kit-check-item" data-component="ChecklistItem" data-type="audit" data-state="pass" data-source="docs/design/ai-project-assistant/data.ts"><span class="kit-check-icon" data-slot="leadingIcon"><svg class="kit-icon"><use href="#i-file-json"></use></svg></span><span class="kit-check-copy" data-slot="content"><strong>依赖与配置诊断</strong><span>检查 package.json 及各类 linter 配置</span></span><svg class="kit-icon kit-soft-check" data-slot="trailingIcon"><use href="#i-check-circle"></use></svg></div>
+            <div class="kit-check-item" data-component="ChecklistItem" data-type="audit" data-state="pass" data-source="docs/design/ai-project-assistant/data.ts"><span class="kit-check-icon" data-slot="leadingIcon"><svg class="kit-icon"><use href="#i-check-square"></use></svg></span><span class="kit-check-copy" data-slot="content"><strong>AI 规范度检测</strong><span>检查组件复用度等代码坏味道</span></span><svg class="kit-icon kit-soft-check" data-slot="trailingIcon"><use href="#i-check-circle"></use></svg></div>
+            <div class="kit-check-item" data-component="ChecklistItem" data-type="audit" data-state="pass" data-source="docs/design/ai-project-assistant/data.ts"><span class="kit-check-icon" data-slot="leadingIcon"><svg class="kit-icon"><use href="#i-file-text"></use></svg></span><span class="kit-check-copy" data-slot="content"><strong>生成接手指南</strong><span>一键将老代码转化为结构化的 AI 上下文</span></span><svg class="kit-icon kit-soft-check" data-slot="trailingIcon"><use href="#i-check-circle"></use></svg></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </section>
+  <header>
+    <div class="hero">
+      <span class="eyebrow">AI Engineering Kit</span>
+      <h1>AI 项目工程助手</h1>
+      <div class="meta">先选择新项目还是老项目。新项目走初始化向导，老项目看体检报告。</div>
+      <div class="meta">项目路径：{{TARGET_HTML}}</div>
+      <div class="meta">生成时间：{{GENERATED_AT}}</div>
+    </div>
+    <div class="top-metrics">
+      <div class="metric">
+        <div class="metric-label">工程成熟度</div>
+        <div class="score-ring"><strong>{{MATURITY_SCORE}}</strong></div>
+        <div class="metric-sub">满分 {{MATURITY_MAX_SCORE}}，<span class="status {{STATUS_CLASS}}">{{STATUS_HTML}}</span></div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">待补工程项</div>
+        <div class="metric-value">{{GAP_COUNT}}</div>
+        <div class="metric-sub">优先处理这些</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">上下文完整度</div>
+        <div class="metric-value">{{CONTEXT_SCORE}}</div>
+        <div class="metric-sub">{{CONTEXT_PASS_COUNT}} 个上下文通过项，{{CONTEXT_GAP_COUNT}} 个缺口</div>
+      </div>
+    </div>
+  </header>
+  <section class="mode-choice" aria-labelledby="mode-title">
+    <h2 id="mode-title">你要处理哪种项目？</h2>
+    <div class="mode-grid">
+      <button class="mode-card is-active" type="button" data-mode-choice="new">
+        <strong>新项目</strong>
+        <span>从 0 开始，先选启动方式和项目文档，生成给 AI 的初始化话术。</span>
+      </button>
+      <button class="mode-card" type="button" data-mode-choice="old">
+        <strong>老项目</strong>
+        <span>已有代码或文档，先体检缺什么，再让 AI 按缺口补齐。</span>
+      </button>
+    </div>
+  </section>
+  <section id="newProjectPanel" class="mode-panel wizard">
+    <div class="wizard-lead">
+      <div class="plain-card">
+        <h2>新项目怎么开始</h2>
+        <p class="meta">不用懂文件名。先选你想怎么开始，再确认要准备哪些文档，系统会生成一段可以直接发给 AI 的话。</p>
+        <div class="start-options" role="group" aria-label="新项目启动方式">
+          <button class="start-card is-active" type="button" data-start-mode="快速做个原型">
+            <strong>快速做个原型</strong>
+            <span>先让 AI 做出能看的页面或功能，再慢慢补规范。</span>
+          </button>
+          <button class="start-card" type="button" data-start-mode="认真建一个项目">
+            <strong>认真建一个项目</strong>
+            <span>适合产品、工具、长期维护项目，先把项目基础搭稳。</span>
+          </button>
+          <button class="start-card" type="button" data-start-mode="只想让 AI 更好接手">
+            <strong>只想让 AI 更好接手</strong>
+            <span>适合先整理规则、状态和交接，不急着写业务代码。</span>
+          </button>
+        </div>
+      </div>
+      <div class="plain-card">
+        <h2>必选资料</h2>
+        <p class="meta">这些已经帮你勾好。它们是 AI 接手项目最小需要的上下文。</p>
+        <div class="doc-picks">
+          <label class="doc-pick required is-selected" tabindex="0" data-doc-detail="项目说明"><input type="checkbox" checked disabled><span>项目说明<small>这个项目是什么，给谁用，目标是什么</small></span></label>
+          <label class="doc-pick required" tabindex="0" data-doc-detail="AI 工作规则"><input type="checkbox" checked disabled><span>AI 工作规则<small>AI 该怎么做，哪些事不要乱改</small></span></label>
+          <label class="doc-pick required" tabindex="0" data-doc-detail="当前状态"><input type="checkbox" checked disabled><span>当前状态<small>现在做到哪一步，还缺什么</small></span></label>
+          <label class="doc-pick required" tabindex="0" data-doc-detail="交接记录"><input type="checkbox" checked disabled><span>交接记录<small>下次打开怎么继续</small></span></label>
+        </div>
+      </div>
+    </div>
+    <section class="plain-card">
+      <h2>可选增强</h2>
+      <p class="meta">你可以自己勾选。点任意文档项，右侧会显示它对应的文件和栏目结构。</p>
+      <div class="doc-config-grid">
+        <div class="doc-picks">
+          <label class="doc-pick" tabindex="0" data-doc-detail="README 入口说明"><input type="checkbox" data-doc-option="README 入口说明"><span>README 入口说明<small>给人看的项目入口</small></span></label>
+          <label class="doc-pick" tabindex="0" data-doc-detail="架构说明"><input type="checkbox" data-doc-option="架构说明"><span>架构说明<small>模块、职责和边界</small></span></label>
+          <label class="doc-pick" tabindex="0" data-doc-detail="环境和启动说明"><input type="checkbox" data-doc-option="环境和启动说明"><span>环境和启动说明<small>依赖、变量、怎么运行</small></span></label>
+          <label class="doc-pick" tabindex="0" data-doc-detail="测试说明"><input type="checkbox" data-doc-option="测试说明"><span>测试说明<small>怎么验证改动没坏</small></span></label>
+          <label class="doc-pick" tabindex="0" data-doc-detail="运行手册"><input type="checkbox" data-doc-option="运行手册"><span>运行手册<small>常见操作和故障处理</small></span></label>
+          <label class="doc-pick" tabindex="0" data-doc-detail="决策记录"><input type="checkbox" data-doc-option="决策记录"><span>决策记录<small>重要取舍为什么这样定</small></span></label>
+          <label class="doc-pick" tabindex="0" data-doc-detail="命名规范"><input type="checkbox" data-doc-option="命名规范"><span>命名规范<small>文档和目录怎么命名</small></span></label>
+          <label class="doc-pick" tabindex="0" data-doc-detail="设计规范"><input type="checkbox" data-doc-option="设计规范"><span>设计规范<small>界面、组件、视觉边界</small></span></label>
+        </div>
+        <aside class="doc-preview" aria-live="polite">
+          <span class="meta">点击左侧任意文档项查看</span>
+          <strong id="docPreviewTitle">项目说明</strong>
+          <span id="docPreviewFile" class="file-path">README.md / PROJECT.md</span>
+          <ul id="docPreviewSections"></ul>
+          <div id="docPreviewNote" class="doc-preview-note"></div>
+        </aside>
+      </div>
+    </section>
+    <section class="plain-card wizard-output">
+      <h2>生成给 AI 的话</h2>
+      <p class="meta">复制下面这段话，发给 Codex、Claude、Cursor 或其他 AI 工具。</p>
+      <textarea id="newProjectGeneratedPrompt" class="copy-area" readonly></textarea>
+      <button class="copy-button" type="button" data-copy-target="newProjectGeneratedPrompt">复制初始化话术</button>
+    </section>
+  </section>
+  <div id="oldProjectPanel" class="mode-panel is-hidden">
+  <div class="plain-layout">
+    <section class="plain-card verdict">
+      <span class="verdict-badge">给不懂代码的人看的结论</span>
+      <h2>{{VERDICT_TITLE_HTML}}</h2>
+      <p>{{VERDICT_DETAIL_HTML}}</p>
+      <div class="plain-score">
+        <div class="score-ring"><strong>{{MATURITY_SCORE}}</strong></div>
+        <div><strong>{{STATUS_HTML}}</strong><br><span>{{NEXT_ACTION_HTML}}</span></div>
+      </div>
+    </section>
+    <section class="plain-card todo-card">
+      <h2>现在要处理什么</h2>
+      <p class="meta">不用先看代码。下面如果没有缺项，就说明这套 AI 工程资料已经比较完整。</p>
+      <ul class="missing-list">
+{{MISSING_ITEMS}}
+      </ul>
+    </section>
+  </div>
+  <div class="action-board">
+    <section class="plain-card action-card">
+      <h2>让 AI 自动补缺口</h2>
+      <p>复制这句话发给 AI，它会按报告补资料。</p>
+      <textarea id="fixPrompt" class="copy-area" readonly>{{FIX_PROMPT_HTML}}</textarea>
+      <button class="copy-button" type="button" data-copy-target="fixPrompt">复制给 AI 的话</button>
+    </section>
+    <section class="plain-card action-card">
+      <h2>检查一个老项目</h2>
+      <p>把这句话发给 AI，让它先体检，不直接改业务。</p>
+      <textarea id="oldProjectPrompt" class="copy-area" readonly>{{OLD_PROJECT_PROMPT_HTML}}</textarea>
+      <button class="copy-button" type="button" data-copy-target="oldProjectPrompt">复制体检话术</button>
+    </section>
+    <section class="plain-card action-card">
+      <h2>接入一个新项目</h2>
+      <p>适合把这套规范用到另一个项目里。</p>
+      <textarea id="newProjectPrompt" class="copy-area" readonly>{{NEW_PROJECT_PROMPT_HTML}}</textarea>
+      <button class="copy-button" type="button" data-copy-target="newProjectPrompt">复制接入话术</button>
+    </section>
+  </div>
+  <div class="section-heading">
+    <h2>上下文完整度详情</h2>
+    <p>下面是 AI 接手资料的细项。工程成熟度缺口以上面的待处理列表为准。</p>
+  </div>
+  <div class="module-grid">
+{{MODULE_GRID}}
+  </div>
+  <details class="command-panel">
+    <summary>高级：给懂代码的人看的命令</summary>
+    <div>
+      <div class="command-list">
+      <div class="command-row"><span>重新生成报告</span><code>bash scripts/check-ai-project.sh . --write-report --html</code></div>
+      <div class="command-row"><span>补齐工程文档</span><code>bash scripts/add-project-docs.sh . --profile product</code></div>
+      <div class="command-row"><span>检查运行状态</span><code>bash scripts/check-runtime.sh .</code></div>
+      <div class="command-row"><span>同步模板检查</span><code>bash scripts/check-template-sync.sh .</code></div>
+      <div class="command-row"><span>报告返回文件</span><code>.project-os/reports/ai-project-report.md / ai-project-report.html / ai-project-report.json</code></div>
+      </div>
+    </div>
+  </details>
+  <div class="flow">
+    <section>
+      <h2>给新项目用</h2>
+      <div class="steps">
+        <span class="step">说明项目类型</span>
+        <span class="step">复制基础资料</span>
+        <span class="step">填写项目状态</span>
+        <span class="step">生成体检单</span>
+        <span class="step">开始协作</span>
+      </div>
+    </section>
+    <section>
+      <h2>检查老项目</h2>
+      <div class="steps">
+        <span class="step">打开项目</span>
+        <span class="step">扫描资料</span>
+        <span class="step">看缺什么</span>
+        <span class="step">让 AI 补齐</span>
+        <span class="step">再体检</span>
+      </div>
+    </section>
+  </div>
+  </div>
+</main>
+<script>
+  const kitRequiredMaterials = {
+    solo: [
+      { id: "project-brief", title: "项目说明", description: "这个项目是什么，给谁用，目标是什么", file: "PROJECT.md", state: "locked" },
+      { id: "agent-rules", title: "AI 工作规则", description: "AI 该怎么做，哪些事不要乱改", file: "AGENTS.md", state: "locked" },
+      { id: "project-status", title: "当前状态", description: "现在做到哪一步，还缺什么", file: "HANDOFF.md", state: "locked" }
+    ],
+    team: [
+      { id: "project-brief", title: "项目说明", description: "这个项目是什么，给谁用，目标是什么", file: "PROJECT.md", state: "locked" },
+      { id: "team-rules", title: "团队工作规则", description: "组件规范、禁止魔数、样式统一", file: "AGENTS.md", state: "locked" },
+      { id: "architecture-rules", title: "架构与约定", description: "目录结构、状态管理和路由规则", file: "docs/ARCHITECTURE.md", state: "locked" },
+      { id: "project-status", title: "当前状态", description: "现在做到哪一步，还缺什么", file: "PROJECT.md", state: "locked" },
+      { id: "handoff-record", title: "交接记录", description: "下一个队友或 AI 接手时需要的信息", file: "HANDOFF.md", state: "locked" }
+    ]
+  };
+  function renderKitRequired(mode) {
+    const target = document.getElementById("kitRequiredMaterials");
+    if (!target) return;
+    target.innerHTML = "";
+    kitRequiredMaterials[mode].forEach((item) => target.appendChild(renderRequiredMaterialItem(item)));
+  }
+  function renderRequiredMaterialItem(item) {
+    const row = document.createElement("label");
+    row.className = "kit-material";
+    row.setAttribute("data-component", "RequiredMaterialItem");
+    row.setAttribute("data-source", "docs/design/ai-project-assistant/data.ts");
+    row.setAttribute("data-state", item.state);
+    row.setAttribute("aria-disabled", item.state === "locked" ? "true" : "false");
+    row.setAttribute("title", item.file + " · 已自动勾选，当前不可取消");
+    row.innerHTML = '<span class="kit-check-control" aria-hidden="true"><svg class="kit-icon"><use href="#i-check"></use></svg></span><span class="kit-material-copy"><strong>' + item.title + '</strong><span>' + item.description + '</span></span>';
+    return row;
+  }
+  document.querySelectorAll("[data-kit-project]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const project = button.dataset.kitProject;
+      const switcher = document.getElementById("kitProjectSwitch");
+      const newPanel = document.getElementById("kitNewPanel");
+      const oldPanel = document.getElementById("kitOldPanel");
+      switcher.dataset.project = project;
+      document.querySelectorAll("[data-kit-project]").forEach((item) => {
+        const isActive = item === button;
+        item.classList.toggle("is-active", isActive);
+        item.dataset.state = isActive ? "selected" : "default";
+      });
+      newPanel.classList.toggle("is-hidden", project !== "new");
+      oldPanel.classList.toggle("is-hidden", project !== "old");
+    });
+  });
+  document.querySelectorAll("[data-kit-collab]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const mode = button.dataset.kitCollab;
+      document.querySelectorAll("[data-kit-collab]").forEach((item) => {
+        const isActive = item === button;
+        item.classList.toggle("is-active", isActive);
+        item.dataset.state = isActive ? "selected" : "default";
+      });
+      renderKitRequired(mode);
+    });
+  });
+  document.querySelectorAll("[data-kit-start]").forEach((button) => {
+    button.addEventListener("click", () => {
+      document.querySelectorAll("[data-kit-start]").forEach((item) => {
+        const isActive = item === button;
+        item.classList.toggle("is-active", isActive);
+        item.dataset.state = isActive ? "selected" : "default";
+      });
+    });
+  });
+  document.querySelectorAll("[data-kit-source]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const source = button.dataset.kitSource;
+      document.querySelectorAll("[data-kit-source]").forEach((item) => {
+        const isActive = item === button;
+        item.classList.toggle("is-active", isActive);
+        item.dataset.state = isActive ? "selected" : "default";
+      });
+      document.querySelectorAll("[data-kit-source-panel]").forEach((panel) => panel.classList.toggle("is-active", panel.dataset.kitSourcePanel === source));
+    });
+  });
+  const directoryBrowseButton = document.querySelector("[data-kit-directory-browse]");
+  const directoryInput = document.getElementById("kitDirectoryInput");
+  const directoryPathValue = document.getElementById("kitPathValue");
+  if (directoryBrowseButton && directoryInput && directoryPathValue) {
+    directoryBrowseButton.addEventListener("click", () => directoryInput.click());
+    directoryInput.addEventListener("change", () => {
+      const firstFile = directoryInput.files && directoryInput.files[0];
+      if (!firstFile) return;
+      const relativePath = firstFile.webkitRelativePath || firstFile.name;
+      const selectedRoot = relativePath.split("/")[0] || "已选择本地目录";
+      directoryPathValue.textContent = selectedRoot;
+      directoryPathValue.title = selectedRoot + "（浏览器不会暴露完整本机路径）";
+      directoryPathValue.closest("[data-component='TextField']").dataset.state = "selected";
+    });
+  }
+  async function writeClipboardText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch (error) {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.left = "-9999px";
+      textarea.style.top = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      const copied = document.execCommand("copy");
+      textarea.remove();
+      if (!copied) throw error;
+    }
+  }
+  async function copyKitCommand(button, command) {
+    const label = button.querySelector("[data-button-label]");
+    const originalText = label ? label.textContent : button.textContent;
+    try {
+      await writeClipboardText(command);
+      if (label) label.textContent = "已复制";
+      else button.textContent = "已复制";
+      window.setTimeout(() => {
+        if (label) label.textContent = originalText;
+        else button.textContent = originalText;
+      }, 1400);
+    } catch (error) {
+      if (label) label.textContent = "复制失败";
+      else button.textContent = "复制失败";
+      window.setTimeout(() => {
+        if (label) label.textContent = originalText;
+        else button.textContent = originalText;
+      }, 1400);
+    }
+  }
+  const localCommandButton = document.querySelector("[data-kit-copy-local-command]");
+  if (localCommandButton) {
+    localCommandButton.addEventListener("click", () => copyKitCommand(localCommandButton, "bash scripts/check-ai-project.sh . --write-report --html"));
+  }
+  const docCommandButton = document.querySelector("[data-kit-copy-doc-command]");
+  if (docCommandButton) {
+    docCommandButton.addEventListener("click", () => copyKitCommand(docCommandButton, "bash scripts/add-project-docs.sh . --profile product && bash scripts/ai-project.sh report ."));
+  }
+  const gitCommandButton = document.querySelector("[data-kit-copy-git-command]");
+  const gitInput = document.getElementById("kitGitInput");
+  if (gitCommandButton && gitInput) {
+    gitCommandButton.addEventListener("click", () => {
+      const repo = gitInput.value.trim();
+      if (!repo) {
+        const label = gitCommandButton.querySelector("[data-button-label]");
+        const originalText = label ? label.textContent : gitCommandButton.textContent;
+        if (label) label.textContent = "先填地址";
+        else gitCommandButton.textContent = "先填地址";
+        window.setTimeout(() => {
+          if (label) label.textContent = originalText;
+          else gitCommandButton.textContent = originalText;
+        }, 1400);
+        gitInput.focus();
+        return;
+      }
+      const safeRepo = repo.replace(/"/g, '\\"');
+      const command = 'tmp_dir="$(mktemp -d)" && git clone "' + safeRepo + '" "$tmp_dir/project" && bash scripts/check-ai-project.sh "$tmp_dir/project" --write-report --html';
+      copyKitCommand(gitCommandButton, command);
+    });
+  }
+  renderKitRequired("solo");
+
+  const modeButtons = Array.from(document.querySelectorAll("[data-mode-choice]"));
+  const newPanel = document.getElementById("newProjectPanel");
+  const oldPanel = document.getElementById("oldProjectPanel");
+  function setMode(mode) {
+    document.body.dataset.mode = mode;
+    modeButtons.forEach((button) => {
+      button.classList.toggle("is-active", button.dataset.modeChoice === mode);
+    });
+    newPanel.classList.toggle("is-hidden", mode !== "new");
+    oldPanel.classList.toggle("is-hidden", mode !== "old");
+  }
+  modeButtons.forEach((button) => {
+    button.addEventListener("click", () => setMode(button.dataset.modeChoice));
+  });
+
+  const startCards = Array.from(document.querySelectorAll("[data-start-mode]"));
+  const docOptions = Array.from(document.querySelectorAll("[data-doc-option]"));
+  const generatedPrompt = document.getElementById("newProjectGeneratedPrompt");
+  let selectedStartMode = "快速做个原型";
+
+  const docDetails = {
+    "项目说明": {
+      file: "README.md / PROJECT.md",
+      sections: ["项目定位", "当前阶段", "协作文档入口", "当前进度", "已知问题", "下一步重点"],
+      note: "用来回答：这个项目是什么、现在在哪里、别人从哪开始读。"
+    },
+    "AI 工作规则": {
+      file: "AGENTS.md",
+      sections: ["AI 入口规则", "任务路由", "安全边界", "文档更新规则", "语言规则"],
+      note: "用来告诉 AI：怎么协作、什么能改、什么不能乱动。"
+    },
+    "当前状态": {
+      file: "PROJECT.md",
+      sections: ["项目定位", "当前架构", "当前进度", "已知问题", "下一步重点"],
+      note: "用来让下一位协作者快速知道项目真实状态。"
+    },
+    "交接记录": {
+      file: "HANDOFF.md",
+      sections: ["当前状态", "本次已完成", "风险与待确认", "下一步"],
+      note: "用来回答：这轮做到哪了，下轮怎么接着干。"
+    },
+    "README 入口说明": {
+      file: "README.md",
+      sections: ["项目定位", "当前阶段", "协作文档", "开始方式"],
+      note: "适合给人看，作为打开项目后的第一份说明。"
+    },
+    "架构说明": {
+      file: "docs/ARCHITECTURE.md",
+      sections: ["系统概览", "模块职责", "数据流 / 调用流", "关键边界", "待补充"],
+      note: "适合稍复杂的项目，避免 AI 不知道模块边界。"
+    },
+    "环境和启动说明": {
+      file: "docs/ENVIRONMENT.md",
+      sections: ["本地运行", "依赖", "环境变量", "外部服务", "常见环境问题"],
+      note: "适合需要安装依赖、配置环境变量或接外部服务的项目。"
+    },
+    "测试说明": {
+      file: "docs/TESTING.md",
+      sections: ["最小检查", "路由测试", "交付前检查"],
+      note: "适合让 AI 改完后知道怎么验证，而不是只说完成了。"
+    },
+    "运行手册": {
+      file: "docs/RUNBOOK.md",
+      sections: ["常用命令", "发布前检查", "回滚 / 恢复", "故障处理"],
+      note: "适合会长期运行、发布或排障的项目。"
+    },
+    "决策记录": {
+      file: "docs/DECISIONS.md",
+      sections: ["决策标题", "背景", "决定", "影响", "后续观察"],
+      note: "适合记录重要取舍，避免以后反复推翻同一个决定。"
+    },
+    "命名规范": {
+      file: "docs/NAMING.md",
+      sections: ["总原则", "根目录文件", "docs/ 文件", "工具适配文件", "生成物"],
+      note: "适合多人或多 AI 协作时统一文件命名。"
+    },
+    "设计规范": {
+      file: "docs/DESIGN_STANDARDS.md / docs/design/",
+      sections: ["当前状态", "基本规则", "设计 token", "布局规则", "组件索引"],
+      note: "适合有 UI 的项目，减少 AI 自由发挥界面风格。"
+    }
+  };
+
+  function renderDocDetail(name) {
+    const detail = docDetails[name];
+    if (!detail) return;
+    document.querySelectorAll("[data-doc-detail]").forEach((item) => {
+      item.classList.toggle("is-selected", item.dataset.docDetail === name);
+    });
+    document.getElementById("docPreviewTitle").textContent = name;
+    document.getElementById("docPreviewFile").textContent = detail.file;
+    const list = document.getElementById("docPreviewSections");
+    list.innerHTML = "";
+    detail.sections.forEach((section) => {
+      const li = document.createElement("li");
+      li.textContent = section;
+      list.appendChild(li);
+    });
+    document.getElementById("docPreviewNote").textContent = detail.note;
+  }
+
+  document.querySelectorAll("[data-doc-detail]").forEach((item) => {
+    item.addEventListener("click", () => renderDocDetail(item.dataset.docDetail));
+    item.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        renderDocDetail(item.dataset.docDetail);
+      }
+    });
+  });
+
+  function selectedOptions() {
+    return docOptions
+      .filter((input) => input.checked)
+      .map((input) => input.dataset.docOption);
+  }
+
+  function buildNewProjectPrompt() {
+    const options = selectedOptions();
+    const selectedText = options.length ? options.map((item) => "- " + item).join("\\n") : "- 暂不选择增强项";
+    const questionRule = "我还没有提供详细资料。请先问我项目名称、项目目标、使用场景和当前想法；每次最多问 3 个问题。";
+    generatedPrompt.value = [
+      "我想开始一个新项目。",
+      "启动方式：" + selectedStartMode,
+      "",
+      "请先帮我整理成适合 AI 接手的项目基础资料。",
+      "",
+      "必需生成或更新：",
+      "- 项目说明：这个项目是什么、给谁用、目标是什么",
+      "- AI 工作规则：AI 该怎么干活、哪些事不能乱改",
+      "- 当前状态：现在做到哪一步、还缺什么",
+      "- 交接记录：下次打开怎么继续",
+      "",
+      "我选择的可选增强：",
+      selectedText,
+      "",
+      "要求：",
+      "- 如果我粘贴的内容里已有相关信息，请复用并整理",
+      "- 没有的信息标记为待确认，不要编造",
+      "- 先整理项目基础，再决定是否写业务代码",
+      "- 如果信息不够，请先问我最关键的问题",
+      "",
+      questionRule
+    ].join("\\n");
+  }
+
+  startCards.forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedStartMode = button.dataset.startMode;
+      startCards.forEach((item) => item.classList.toggle("is-active", item === button));
+      buildNewProjectPrompt();
+    });
+  });
+  docOptions.forEach((input) => input.addEventListener("change", buildNewProjectPrompt));
+  buildNewProjectPrompt();
+  renderDocDetail("项目说明");
+
+  document.querySelectorAll("[data-copy-target]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const target = document.getElementById(button.dataset.copyTarget);
+      if (!target) return;
+      target.select();
+      try {
+        await navigator.clipboard.writeText(target.value);
+        const oldText = button.textContent;
+        button.textContent = "已复制";
+        window.setTimeout(() => {
+          button.textContent = oldText;
+        }, 1400);
+      } catch (error) {
+        document.execCommand("copy");
+      }
+    });
+  });
+</script>
+</body>
+</html>

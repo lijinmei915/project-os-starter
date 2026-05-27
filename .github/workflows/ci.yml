@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - "codex/**"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  project-os:
+    name: Project OS regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show tool versions
+        run: |
+          bash --version
+          node --version
+
+      - name: Shell syntax check
+        run: |
+          bash -n scripts/check-runtime.sh
+          bash -n scripts/check-secrets.sh
+          bash -n scripts/check-template-sync.sh
+          bash -n scripts/check-ai-project.sh
+          bash -n scripts/ai-project.sh
+          bash -n scripts/install-project-os.sh
+          bash -n scripts/install-adapter.sh
+          bash -n scripts/sync-templates.sh
+          bash -n tests/screenshot-regression.sh
+          bash -n tests/run-tests.sh
+          node --check tests/visual-diff.mjs
+
+      - name: Validate JSON schemas and models
+        run: |
+          node -e "const fs=require('fs'); for (const file of ['schemas/project-state.schema.json','schemas/ai-project-score.schema.json','schemas/ai-project-score.v0.2.json','schemas/ai-project-report.schema.json','schemas/ai-project-report.v0.1.json']) { JSON.parse(fs.readFileSync(file, 'utf8')); console.log('json ok:', file); }"
+
+      - name: Run Project OS regression tests
+        run: bash tests/run-tests.sh
+
+      - name: Check secret safety
+        run: bash scripts/check-secrets.sh .
+
+      - name: Generate AI project report
+        run: bash scripts/check-ai-project.sh . --write-report --html
+
+      - name: Check generated report markers
+        run: |
+          grep -q "AI 工程上下文完整度" .project-os/reports/ai-project-report.md
+          grep -q "AI 工程成熟度" .project-os/reports/ai-project-report.md
+          grep -q "Maturity" .project-os/reports/ai-project-report.html
+
+      - name: Ensure tracked files are unchanged
+        run: git diff --exit-code
+
+      - name: Upload AI project report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-project-report
+          path: |
+            .project-os/reports/ai-project-report.md
+            .project-os/reports/ai-project-report.html
+            tests/screenshots/*.png
+            tests/screenshots/current/*.png
+            tests/screenshots/diff/*.png
+          if-no-files-found: ignore

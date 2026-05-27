@@ -1,0 +1,841 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI 项目工程助手低线条视觉方案</title>
+  <style>
+    :root {
+      --ink: #16181d;
+      --muted: #6b7280;
+      --soft: #eef3f7;
+      --line: rgba(18, 24, 38, .08);
+      --teal: #13c9a4;
+      --green: #16a34a;
+      --blue: #3478f6;
+      --amber: #f59e0b;
+      --rose: #f43f5e;
+      --violet: #7c3aed;
+      --card: rgba(255, 255, 255, .82);
+      --shadow: 0 24px 60px rgba(26, 31, 44, .12);
+      --soft-shadow: 0 12px 36px rgba(26, 31, 44, .08);
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 8% 0%, rgba(19, 201, 164, .13), transparent 28%),
+        radial-gradient(circle at 92% 4%, rgba(52, 120, 246, .12), transparent 26%),
+        #edf3f8;
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    .board {
+      width: min(1560px, calc(100vw - 56px));
+      margin: 0 auto;
+      padding: 42px 0 52px;
+    }
+    .hero {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 28px;
+      align-items: end;
+      margin-bottom: 28px;
+    }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 999px;
+      background: rgba(19, 201, 164, .13);
+      color: #047857;
+      padding: 8px 13px;
+      font-size: 14px;
+      font-weight: 760;
+    }
+    h1 {
+      margin: 16px 0 10px;
+      font-size: 48px;
+      line-height: 1.06;
+      letter-spacing: 0;
+    }
+    .hero p {
+      margin: 0;
+      max-width: 760px;
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1.75;
+      font-weight: 520;
+    }
+    .principles {
+      width: 430px;
+      border-radius: 24px;
+      background: rgba(255, 255, 255, .7);
+      box-shadow: var(--soft-shadow);
+      padding: 18px;
+      backdrop-filter: blur(16px);
+    }
+    .principles strong {
+      display: block;
+      margin-bottom: 10px;
+      font-size: 15px;
+    }
+    .principles span {
+      display: inline-flex;
+      margin: 4px 4px 0 0;
+      border-radius: 999px;
+      background: #fff;
+      padding: 7px 10px;
+      color: #525866;
+      font-size: 12px;
+      font-weight: 680;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 24px;
+    }
+    .scheme {
+      position: relative;
+      min-height: 530px;
+      border-radius: 30px;
+      background: var(--card);
+      box-shadow: var(--shadow);
+      padding: 22px;
+      overflow: hidden;
+    }
+    .scheme::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(145deg, rgba(255, 255, 255, .78), transparent 42%);
+    }
+    .scheme-head {
+      position: relative;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 15px;
+      align-items: start;
+      margin-bottom: 16px;
+    }
+    .num {
+      width: 44px;
+      height: 44px;
+      border-radius: 16px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-size: 18px;
+      font-weight: 860;
+      box-shadow: 0 12px 24px rgba(0, 0, 0, .16);
+    }
+    .scheme h2 {
+      margin: 1px 0 4px;
+      font-size: 24px;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+    .scheme-head p {
+      margin: 0;
+      color: #697080;
+      font-size: 14px;
+      line-height: 1.55;
+      font-weight: 520;
+    }
+    .mock {
+      position: relative;
+      height: 410px;
+      border-radius: 24px;
+      padding: 20px;
+      background: #f7fafc;
+      overflow: hidden;
+    }
+    .mini-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 820;
+      color: #19202c;
+    }
+    .mark {
+      width: 28px;
+      height: 28px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 900;
+    }
+    .pill {
+      border-radius: 999px;
+      padding: 8px 12px;
+      background: #fff;
+      color: #667085;
+      font-size: 12px;
+      font-weight: 720;
+      box-shadow: 0 6px 18px rgba(20, 28, 44, .06);
+    }
+    .switch {
+      display: inline-grid;
+      grid-auto-flow: column;
+      gap: 6px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, .7);
+      padding: 5px;
+      box-shadow: inset 0 0 0 1px rgba(20, 28, 44, .05);
+    }
+    .switch span {
+      border-radius: 12px;
+      padding: 8px 13px;
+      color: #6b7280;
+      font-size: 12px;
+      font-weight: 760;
+    }
+    .switch .on {
+      background: #101419;
+      color: #fff;
+    }
+    .section-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .section-title strong {
+      font-size: 16px;
+      font-weight: 820;
+    }
+    .section-title small {
+      color: #818898;
+      font-size: 11px;
+      font-weight: 760;
+    }
+    .rows {
+      display: grid;
+      gap: 10px;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 11px;
+      align-items: center;
+      border-radius: 16px;
+      background: #fff;
+      padding: 13px;
+      box-shadow: 0 8px 20px rgba(20, 28, 44, .06);
+    }
+    .row .check {
+      width: 24px;
+      height: 24px;
+      border-radius: 9px;
+      display: grid;
+      place-items: center;
+      background: #eff3f5;
+      color: var(--teal);
+      font-size: 16px;
+      font-weight: 900;
+    }
+    .row strong {
+      display: block;
+      margin-bottom: 2px;
+      font-size: 14px;
+    }
+    .row small {
+      display: block;
+      color: #7b8494;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .tag {
+      border-radius: 999px;
+      background: #f3f4f6;
+      padding: 6px 8px;
+      color: #8a93a2;
+      font-size: 11px;
+      font-weight: 760;
+    }
+    .choice {
+      border-radius: 20px;
+      background: #fff;
+      padding: 16px;
+      box-shadow: 0 10px 26px rgba(20, 28, 44, .07);
+    }
+    .choice.dark {
+      background: #11141a;
+      color: #fff;
+      box-shadow: 0 22px 42px rgba(17, 20, 26, .22);
+    }
+    .choice strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 15px;
+    }
+    .choice small {
+      color: #7b8494;
+      line-height: 1.55;
+      font-size: 12px;
+    }
+    .choice.dark small {
+      color: #a8b0bd;
+    }
+    .accent-teal { background: linear-gradient(135deg, #14d6b5, #0ea5e9); }
+    .accent-blue { background: linear-gradient(135deg, #3478f6, #77a6ff); }
+    .accent-green { background: linear-gradient(135deg, #22c55e, #14b8a6); }
+    .accent-amber { background: linear-gradient(135deg, #f59e0b, #fb7185); }
+    .accent-violet { background: linear-gradient(135deg, #7c3aed, #38bdf8); }
+    .accent-rose { background: linear-gradient(135deg, #f43f5e, #f59e0b); }
+    .accent-ink { background: linear-gradient(135deg, #111827, #475569); }
+    .accent-cyan { background: linear-gradient(135deg, #06b6d4, #10b981); }
+
+    .s1 .mock {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, .96), rgba(243, 248, 247, .92)),
+        #f6fbf9;
+    }
+    .s1 .body-grid {
+      display: grid;
+      grid-template-columns: .92fr 1.08fr;
+      gap: 14px;
+    }
+    .s1 .stack {
+      display: grid;
+      gap: 12px;
+    }
+    .s1 .surface {
+      border-radius: 22px;
+      background: rgba(255, 255, 255, .78);
+      padding: 16px;
+      box-shadow: 0 14px 34px rgba(20, 28, 44, .08);
+    }
+    .s1 .surface.active {
+      background: #12151b;
+      color: #fff;
+    }
+
+    .s2 .mock {
+      display: grid;
+      grid-template-columns: 172px 1fr;
+      gap: 18px;
+      background: #f7f8fb;
+    }
+    .s2 .rail {
+      border-radius: 22px;
+      background: #111827;
+      padding: 16px;
+      color: #fff;
+      display: grid;
+      align-content: start;
+      gap: 12px;
+    }
+    .s2 .step {
+      border-radius: 16px;
+      padding: 11px;
+      color: #aab2c1;
+      font-size: 12px;
+      font-weight: 760;
+    }
+    .s2 .step.active {
+      background: rgba(19, 201, 164, .17);
+      color: #fff;
+    }
+    .s2 .content {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 14px;
+    }
+    .s2 .hero-card {
+      border-radius: 24px;
+      background: linear-gradient(135deg, #e8fff8, #eff6ff);
+      padding: 18px;
+    }
+    .s2 .split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .s3 .mock {
+      background: #10151d;
+      color: #fff;
+    }
+    .s3 .pill,
+    .s3 .switch {
+      background: rgba(255, 255, 255, .1);
+      color: #d5dae4;
+    }
+    .s3 .switch .on {
+      background: #fff;
+      color: #111827;
+    }
+    .s3 .dash {
+      display: grid;
+      grid-template-columns: .85fr 1.15fr;
+      gap: 15px;
+    }
+    .s3 .metric {
+      border-radius: 26px;
+      background: linear-gradient(135deg, rgba(19, 201, 164, .24), rgba(52, 120, 246, .18));
+      padding: 18px;
+      min-height: 250px;
+      display: grid;
+      align-content: space-between;
+    }
+    .s3 .score {
+      font-size: 58px;
+      font-weight: 900;
+      letter-spacing: 0;
+    }
+    .s3 .choice {
+      background: rgba(255, 255, 255, .08);
+      color: #fff;
+      box-shadow: none;
+    }
+    .s3 .choice small {
+      color: #a8b0bd;
+    }
+
+    .s4 .mock {
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 16px;
+      background: #f5f1eb;
+    }
+    .s4 .canvas {
+      border-radius: 26px;
+      background: #fffaf3;
+      padding: 20px;
+      display: grid;
+      align-content: space-between;
+      box-shadow: 0 16px 34px rgba(130, 93, 44, .12);
+    }
+    .s4 .canvas h3 {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.2;
+    }
+    .s4 .side {
+      display: grid;
+      gap: 12px;
+    }
+    .s4 .choice {
+      box-shadow: 0 12px 24px rgba(130, 93, 44, .08);
+    }
+
+    .s5 .mock {
+      background: #f4f8ff;
+    }
+    .s5 .doc-stack {
+      position: relative;
+      height: 240px;
+      margin-top: 8px;
+    }
+    .s5 .paper {
+      position: absolute;
+      inset: auto 22px;
+      height: 72px;
+      border-radius: 22px;
+      background: #fff;
+      padding: 14px 17px;
+      box-shadow: 0 18px 36px rgba(52, 120, 246, .11);
+    }
+    .s5 .paper:nth-child(1) { top: 2px; transform: rotate(-1.5deg); }
+    .s5 .paper:nth-child(2) { top: 78px; left: 0; right: 44px; transform: rotate(.8deg); }
+    .s5 .paper:nth-child(3) { top: 154px; left: 44px; right: 0; transform: rotate(-.5deg); }
+    .s5 .paper strong {
+      display: block;
+      margin-bottom: 8px;
+    }
+    .s5 .paper span {
+      display: block;
+      width: 72%;
+      height: 8px;
+      border-radius: 999px;
+      background: #dbeafe;
+    }
+
+    .s6 .mock {
+      background: #f7faf7;
+    }
+    .s6 .flow {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .s6 .node {
+      border-radius: 22px;
+      background: #fff;
+      padding: 16px;
+      min-height: 116px;
+      box-shadow: 0 12px 26px rgba(20, 28, 44, .06);
+    }
+    .s6 .node.active {
+      background: #0f172a;
+      color: #fff;
+    }
+    .s6 .timeline {
+      border-radius: 24px;
+      background: rgba(255, 255, 255, .72);
+      padding: 18px;
+      display: grid;
+      gap: 10px;
+      box-shadow: 0 12px 30px rgba(20, 28, 44, .06);
+    }
+    .s6 .dot-row {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 12px;
+      align-items: center;
+      font-size: 13px;
+      font-weight: 760;
+    }
+    .s6 .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #16a34a;
+    }
+
+    .s7 .mock {
+      background:
+        linear-gradient(135deg, rgba(124, 58, 237, .12), transparent 48%),
+        #f8f7ff;
+    }
+    .s7 .workspace {
+      display: grid;
+      grid-template-columns: .85fr 1.15fr;
+      gap: 14px;
+    }
+    .s7 .module {
+      border-radius: 24px;
+      background: rgba(255, 255, 255, .78);
+      padding: 16px;
+      box-shadow: 0 12px 28px rgba(80, 60, 150, .09);
+    }
+    .s7 .module.dark {
+      background: #18122b;
+      color: #fff;
+    }
+    .s7 .module-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .s7 .mini-button {
+      border-radius: 16px;
+      background: #fff;
+      padding: 13px;
+      color: #5b6474;
+      font-size: 12px;
+      font-weight: 750;
+    }
+
+    .s8 .mock {
+      background: #fbfbfc;
+      padding: 28px;
+    }
+    .s8 .minimal {
+      max-width: 520px;
+      margin: 0 auto;
+    }
+    .s8 .minimal h3 {
+      margin: 18px 0 10px;
+      font-size: 30px;
+      letter-spacing: 0;
+    }
+    .s8 .minimal p {
+      margin: 0 0 20px;
+      color: #687083;
+      line-height: 1.65;
+    }
+    .s8 .plain-list {
+      display: grid;
+      gap: 12px;
+      margin-top: 18px;
+    }
+    .s8 .plain {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-radius: 18px;
+      background: #f3f5f7;
+      padding: 14px 16px;
+      font-size: 14px;
+      font-weight: 760;
+    }
+    .s8 .cta {
+      margin-top: 22px;
+      border-radius: 18px;
+      background: #101419;
+      color: #fff;
+      padding: 16px 18px;
+      text-align: center;
+      font-weight: 820;
+    }
+  </style>
+</head>
+<body>
+  <main class="board">
+    <section class="hero">
+      <div>
+        <div class="eyebrow">AI Engineering Kit / 低线条视觉探索</div>
+        <h1>8 个减少“线太多”的界面方向</h1>
+        <p>当前页的问题不是信息太多，而是边框、分割线、卡片套卡片把视线切碎了。下面 8 个方向都用更少的线，改用层级、留白、底色、阴影和模块节奏来组织信息。</p>
+      </div>
+      <aside class="principles">
+        <strong>共同原则</strong>
+        <span>边框只保留外层</span>
+        <span>列表用面承载</span>
+        <span>必选项弱禁用</span>
+        <span>主操作更聚焦</span>
+        <span>少卡片套卡片</span>
+      </aside>
+    </section>
+
+    <section class="grid">
+      <article class="scheme s1">
+        <div class="scheme-head">
+          <div class="num accent-teal">01</div>
+          <div>
+            <h2>Soft Surface 柔和面板</h2>
+            <p>保留当前结构，但去掉大部分内边框，用柔和底色和阴影分层。最适合当前页快速落地。</p>
+          </div>
+        </div>
+        <div class="mock">
+          <div class="mini-top">
+            <div class="brand"><span class="mark accent-teal">AI</span>工程助手</div>
+            <div class="switch"><span class="on">新项目</span><span>老项目</span></div>
+          </div>
+          <div class="body-grid">
+            <div class="stack">
+              <div class="surface">
+                <div class="section-title"><strong>协作模式</strong><small>已选</small></div>
+                <div class="choice dark"><strong>个人开发</strong><small>轻量上下文，快速推进</small></div>
+              </div>
+              <div class="surface active">
+                <strong>快速做个原型</strong>
+                <p style="margin:8px 0 0;color:#a8b0bd;font-size:12px;line-height:1.5;">先生成可见页面，再补规范。</p>
+              </div>
+            </div>
+            <div class="surface">
+              <div class="section-title"><strong>基础上下文资料</strong><small>自动锁定</small></div>
+              <div class="rows">
+                <div class="row"><span class="check">✓</span><span><strong>项目说明</strong><small>目标、用户、范围</small></span><span class="tag">必选</span></div>
+                <div class="row"><span class="check">✓</span><span><strong>AI 工作规则</strong><small>边界、禁区、流程</small></span><span class="tag">必选</span></div>
+                <div class="row"><span class="check">✓</span><span><strong>当前状态</strong><small>进度、风险、下一步</small></span><span class="tag">必选</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="scheme s2">
+        <div class="scheme-head">
+          <div class="num accent-blue">02</div>
+          <div>
+            <h2>左侧向导</h2>
+            <p>把“新老项目、协作、策略、资料”变成步骤。用户不需要一次理解整页，适合非技术用户。</p>
+          </div>
+        </div>
+        <div class="mock">
+          <div class="rail">
+            <div class="brand"><span class="mark accent-blue">AI</span>工程助手</div>
+            <div class="step active">1 选择项目类型</div>
+            <div class="step">2 确认工作方式</div>
+            <div class="step">3 生成资料包</div>
+            <div class="step">4 复制给 AI</div>
+          </div>
+          <div class="content">
+            <div class="hero-card">
+              <div class="section-title"><strong>你正在创建新项目</strong><small>1/4</small></div>
+              <p style="margin:0;color:#667085;font-size:13px;line-height:1.6;">先选最接近你的开始方式，系统会自动准备必选文档。</p>
+            </div>
+            <div class="split">
+              <div class="choice dark"><strong>快速原型</strong><small>先做能看的页面</small></div>
+              <div class="choice"><strong>认真建项目</strong><small>先把基础搭稳</small></div>
+            </div>
+            <div class="rows">
+              <div class="row"><span class="check">✓</span><span><strong>项目说明</strong><small>已锁定，不可取消</small></span><span class="tag">必选</span></div>
+              <div class="row"><span class="check">✓</span><span><strong>交接记录</strong><small>下一位怎么继续</small></span><span class="tag">必选</span></div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="scheme s3">
+        <div class="scheme-head">
+          <div class="num accent-ink">03</div>
+          <div>
+            <h2>Command Center 指挥台</h2>
+            <p>深色首屏强化“这是工具台”，线条几乎消失。适合想要更高级、更像工程控制台的版本。</p>
+          </div>
+        </div>
+        <div class="mock">
+          <div class="mini-top">
+            <div class="brand"><span class="mark accent-cyan">AI</span>Engineering Kit</div>
+            <div class="switch"><span class="on">创建</span><span>接手</span></div>
+          </div>
+          <div class="dash">
+            <div class="metric">
+              <div>
+                <small style="color:#9ca3af;font-weight:800;">当前资料完整度</small>
+                <div class="score">78</div>
+                <small style="color:#9ca3af;font-weight:800;">/100 可开始</small>
+              </div>
+              <div class="pill">缺 3 个关键上下文</div>
+            </div>
+            <div class="rows">
+              <div class="choice"><strong>创建新项目</strong><small>生成 AI 可接手的基础资料包</small></div>
+              <div class="choice"><strong>基础上下文</strong><small>项目说明、规则、状态已自动锁定</small></div>
+              <div class="choice"><strong>下一步动作</strong><small>复制初始化话术给 AI</small></div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="scheme s4">
+        <div class="scheme-head">
+          <div class="num accent-amber">04</div>
+          <div>
+            <h2>Canvas Split 大画布</h2>
+            <p>把主选择放成一块大画布，右侧才是资料清单。视觉更松，适合减少“表单感”。</p>
+          </div>
+        </div>
+        <div class="mock">
+          <div class="canvas">
+            <div>
+              <div class="pill" style="display:inline-flex;margin-bottom:18px;">推荐路径</div>
+              <h3>先做一个能看的原型</h3>
+              <p style="color:#7a6d5a;line-height:1.65;font-size:13px;">AI 会先拿最小上下文开始，后续再补治理文档。</p>
+            </div>
+            <div class="choice dark"><strong>生成初始化话术</strong><small>项目说明 + AI 规则 + 当前状态</small></div>
+          </div>
+          <div class="side">
+            <div class="choice"><strong>个人开发</strong><small>快速、轻量、少约束</small></div>
+            <div class="row"><span class="check">✓</span><span><strong>项目说明</strong><small>必选资料</small></span><span class="tag">锁定</span></div>
+            <div class="row"><span class="check">✓</span><span><strong>AI 工作规则</strong><small>必选资料</small></span><span class="tag">锁定</span></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="scheme s5">
+        <div class="scheme-head">
+          <div class="num accent-blue">05</div>
+          <div>
+            <h2>Document Stack 文档堆叠</h2>
+            <p>把文档资料视觉化成“资料包”，弱化表格和清单边界。适合强调 AI 接手资料的产品心智。</p>
+          </div>
+        </div>
+        <div class="mock">
+          <div class="mini-top">
+            <div class="brand"><span class="mark accent-blue">DOC</span>上下文资料包</div>
+            <div class="pill">已准备 3 份</div>
+          </div>
+          <div class="doc-stack">
+            <div class="paper"><strong>PROJECT.md</strong><span></span></div>
+            <div class="paper"><strong>AGENTS.md</strong><span></span></div>
+            <div class="paper"><strong>HANDOFF.md</strong><span></span></div>
+          </div>
+            <div class="choice dark" style="padding:13px 16px;"><strong>创建资料包</strong><small>生成可复制给 AI 的话</small></div>
+        </div>
+      </article>
+
+      <article class="scheme s6">
+        <div class="scheme-head">
+          <div class="num accent-green">06</div>
+          <div>
+            <h2>Flow Timeline 流程化</h2>
+            <p>用流程节点替代卡片堆叠，用户知道自己在哪一步，也知道下一步是什么。</p>
+          </div>
+        </div>
+        <div class="mock">
+          <div class="mini-top">
+            <div class="brand"><span class="mark accent-green">AI</span>启动流程</div>
+            <div class="pill">3 步完成</div>
+          </div>
+          <div class="flow">
+            <div class="node active"><strong>选择方式</strong><small style="display:block;margin-top:8px;color:#a8b0bd;">新项目 / 老项目</small></div>
+            <div class="node"><strong>准备资料</strong><small style="display:block;margin-top:8px;color:#7b8494;">自动锁定必选</small></div>
+            <div class="node"><strong>交给 AI</strong><small style="display:block;margin-top:8px;color:#7b8494;">复制话术继续</small></div>
+          </div>
+          <div class="timeline">
+            <div class="dot-row"><span class="dot"></span><span>项目说明已准备</span><span class="tag">必选</span></div>
+            <div class="dot-row"><span class="dot"></span><span>AI 工作规则已准备</span><span class="tag">必选</span></div>
+            <div class="dot-row"><span class="dot"></span><span>交接记录已准备</span><span class="tag">必选</span></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="scheme s7">
+        <div class="scheme-head">
+          <div class="num accent-violet">07</div>
+          <div>
+            <h2>Modular Workspace 模块工作台</h2>
+            <p>保留工作台感，但模块只用底色和阴影区分。适合未来扩展更多功能，但比现在少很多线。</p>
+          </div>
+        </div>
+        <div class="mock">
+          <div class="mini-top">
+            <div class="brand"><span class="mark accent-violet">KIT</span>AI 工作台</div>
+            <div class="pill">Workspace</div>
+          </div>
+          <div class="workspace">
+            <div class="module dark">
+              <strong>启动策略</strong>
+              <p style="color:#b8b4ca;font-size:12px;line-height:1.6;">快速原型优先，先生成能看的东西。</p>
+              <div class="module-grid">
+                <div class="mini-button">原型</div>
+                <div class="mini-button">治理</div>
+              </div>
+            </div>
+            <div class="module">
+              <div class="section-title"><strong>基础资料</strong><small>locked</small></div>
+              <div class="rows">
+                <div class="row"><span class="check">✓</span><span><strong>项目说明</strong><small>系统自动准备</small></span><span class="tag">必选</span></div>
+                <div class="row"><span class="check">✓</span><span><strong>当前状态</strong><small>系统自动准备</small></span><span class="tag">必选</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="scheme s8">
+        <div class="scheme-head">
+          <div class="num accent-rose">08</div>
+          <div>
+            <h2>Minimal Guided 极简引导</h2>
+            <p>把页面压到最少选择，先让用户完成动作。适合完全不懂代码的人，但可扩展性最弱。</p>
+          </div>
+        </div>
+        <div class="mock">
+          <div class="minimal">
+            <div class="brand"><span class="mark accent-rose">AI</span>项目工程助手</div>
+            <h3>你想从哪里开始？</h3>
+            <p>选择一个最接近的方式，系统会自动准备 AI 接手需要的文档。</p>
+            <div class="switch"><span class="on">创建新项目</span><span>接手老项目</span></div>
+            <div class="plain-list">
+              <div class="plain"><span>项目说明</span><span>必选</span></div>
+              <div class="plain"><span>AI 工作规则</span><span>必选</span></div>
+              <div class="plain"><span>当前状态</span><span>必选</span></div>
+            </div>
+            <div class="cta">生成给 AI 的初始化话术</div>
+          </div>
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>
