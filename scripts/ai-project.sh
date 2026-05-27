@@ -12,7 +12,7 @@ Usage:
 
 Commands:
   check    Print AI project completeness score
-  report   Print score and write markdown + HTML reports
+  report   Print score and write markdown + JSON reports（可视化打开根目录 index.html）
   install  Install selected AI engineering docs
 
 Examples:
@@ -34,7 +34,7 @@ case "$command" in
     bash "$script_dir/check-ai-project.sh" "${1:-.}"
     ;;
   report)
-    bash "$script_dir/check-ai-project.sh" "${1:-.}" --write-report --html
+    bash "$script_dir/check-ai-project.sh" "${1:-.}" --write-report
     ;;
   install)
     bash "$script_dir/install-project-os.sh" "$@"

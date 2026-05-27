@@ -3,7 +3,6 @@ set -u
 
 target="."
 write_report=0
-write_html=0
 
 if [ "$#" -gt 0 ] && [ "${1#-}" = "$1" ]; then
   target="$1"
@@ -17,14 +16,13 @@ while [ "$#" -gt 0 ]; do
       shift
       ;;
     --html)
-      write_html=1
-      write_report=1
+      # Deprecated: HTML 报告页已合并到根目录 index.html，不再生成副本。
       shift
       ;;
     -h|--help)
       cat <<'USAGE'
 Usage:
-  bash scripts/check-ai-project.sh [target] [--write-report] [--html]
+  bash scripts/check-ai-project.sh [target] [--write-report]
 
 Checks AI engineering completeness:
   - system rules
@@ -37,7 +35,8 @@ Checks AI engineering completeness:
 Reports:
   --write-report  Write .project-os/reports/ai-project-report.md
                   and .project-os/reports/ai-project-report.json
-  --html          Also write .project-os/reports/ai-project-report.html
+
+可视化报告：直接用浏览器打开项目根目录的 index.html。
 USAGE
       exit 0
       ;;
@@ -61,7 +60,6 @@ maturity_score=0
 maturity_max_score=100
 generated_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 report_file=".project-os/reports/ai-project-report.md"
-html_file=".project-os/reports/ai-project-report.html"
 json_file=".project-os/reports/ai-project-report.json"
 report_modules_file="${AI_PROJECT_REPORT_MODULES:-schemas/ai-project-report.v0.1.json}"
 tmp_report="$(mktemp)"
@@ -432,10 +430,10 @@ else
   maturity_gap "测试与质量门禁" 6 "check-template-sync.sh 应支持 --strict，作为 CI gate 使用"
 fi
 
-if has_any "scripts/check-ai-project.sh" "--html" "ai-project-report.html"; then
-  maturity_award "报告与组件工程" 5 "完整度报告支持 HTML 输出"
+if has_file "index.html" && has_any "index.html" "kitAnalyzeBtn" "JSZip"; then
+  maturity_award "报告与组件工程" 5 "存在浏览器可直接打开的 standalone 报告页"
 else
-  maturity_gap "报告与组件工程" 5 "建议支持 HTML 报告，方便非技术用户检查"
+  maturity_gap "报告与组件工程" 5 "建议提供浏览器可直接打开的 standalone 报告页（index.html）"
 fi
 
 if ! has_file "scripts/check-ai-project.sh"; then
@@ -547,208 +545,6 @@ fi
   printf '状态：%s\n' "$(maturity_status_text)"
 } | tee "$tmp_report"
 
-write_html_template() {
-  template_file="$1"
-  missing_items_file="$2"
-  module_grid_file="$3"
-  output_file="$4"
-  output_tmp="$output_file.tmp"
-
-  awk \
-    -v target_html="$target_html" \
-    -v generated_at="$generated_at" \
-    -v context_score="$score" \
-    -v context_max_score="$max_score" \
-    -v maturity_score="$maturity_score" \
-    -v maturity_max_score="$maturity_max_score" \
-    -v completion_percent="$completion_percent" \
-    -v status_html="$status" \
-    -v status_class="$class" \
-    -v gap_count="$gap_count" \
-    -v pass_count="$pass_count" \
-    -v context_gap_count="$context_gap_count" \
-    -v context_pass_count="$context_pass_count" \
-    -v verdict_title_html="$verdict_title_html" \
-    -v verdict_detail_html="$verdict_detail_html" \
-    -v next_action_html="$next_action_html" \
-    -v fix_prompt_html="$fix_prompt_html" \
-    -v old_project_prompt_html="$old_project_prompt_html" \
-    -v new_project_prompt_html="$new_project_prompt_html" \
-    -v missing_items_file="$missing_items_file" \
-    -v module_grid_file="$module_grid_file" '
-      function emit_file(path, line) {
-        while ((getline line < path) > 0) {
-          print line
-        }
-        close(path)
-      }
-      function replace_marker(line, marker, value, pos, out) {
-        out = ""
-        while ((pos = index(line, marker)) > 0) {
-          out = out substr(line, 1, pos - 1) value
-          line = substr(line, pos + length(marker))
-        }
-        return out line
-      }
-      {
-        if ($0 == "{{MISSING_ITEMS}}") {
-          emit_file(missing_items_file)
-          next
-        }
-        if ($0 == "{{MODULE_GRID}}") {
-          emit_file(module_grid_file)
-          next
-        }
-        line = $0
-        line = replace_marker(line, "{{TARGET_HTML}}", target_html)
-        line = replace_marker(line, "{{GENERATED_AT}}", generated_at)
-        line = replace_marker(line, "{{CONTEXT_SCORE}}", context_score)
-        line = replace_marker(line, "{{CONTEXT_MAX_SCORE}}", context_max_score)
-        line = replace_marker(line, "{{MATURITY_SCORE}}", maturity_score)
-        line = replace_marker(line, "{{MATURITY_MAX_SCORE}}", maturity_max_score)
-        line = replace_marker(line, "{{COMPLETION_PERCENT}}", completion_percent)
-        line = replace_marker(line, "{{STATUS_HTML}}", status_html)
-        line = replace_marker(line, "{{STATUS_CLASS}}", status_class)
-        line = replace_marker(line, "{{GAP_COUNT}}", gap_count)
-        line = replace_marker(line, "{{PASS_COUNT}}", pass_count)
-        line = replace_marker(line, "{{CONTEXT_GAP_COUNT}}", context_gap_count)
-        line = replace_marker(line, "{{CONTEXT_PASS_COUNT}}", context_pass_count)
-        line = replace_marker(line, "{{VERDICT_TITLE_HTML}}", verdict_title_html)
-        line = replace_marker(line, "{{VERDICT_DETAIL_HTML}}", verdict_detail_html)
-        line = replace_marker(line, "{{NEXT_ACTION_HTML}}", next_action_html)
-        line = replace_marker(line, "{{FIX_PROMPT_HTML}}", fix_prompt_html)
-        line = replace_marker(line, "{{OLD_PROJECT_PROMPT_HTML}}", old_project_prompt_html)
-        line = replace_marker(line, "{{NEW_PROJECT_PROMPT_HTML}}", new_project_prompt_html)
-        print line
-      }
-    ' "$template_file" > "$output_tmp"
-
-  mv "$output_tmp" "$output_file"
-}
-
-write_html_report() {
-  mkdir -p "$(dirname "$html_file")"
-  report_template="${AI_PROJECT_REPORT_TEMPLATE:-templates/report/ai-project-report.html}"
-
-  if [ ! -f "$report_template" ]; then
-    echo "ERROR: report template not found: $report_template"
-    echo "Expected: templates/report/ai-project-report.html"
-    exit 2
-  fi
-
-  if [ ! -f "$report_modules_file" ]; then
-    echo "ERROR: report modules data not found: $report_modules_file"
-    echo "Expected: schemas/ai-project-report.v0.1.json"
-    exit 2
-  fi
-
-  target_html="$(pwd | escape_html)"
-  status="$(maturity_status_text | escape_html)"
-  class="$(maturity_status_class)"
-  gap_count="$(awk -F '\t' '$2 == "GAP" { count++ } END { printf "%d", count }' "$tmp_maturity")"
-  pass_count="$(awk -F '\t' '$2 == "PASS" { count++ } END { printf "%d", count }' "$tmp_maturity")"
-  context_gap_count="$(awk -F '\t' '$2 == "GAP" { count++ } END { printf "%d", count }' "$tmp_items")"
-  context_pass_count="$(awk -F '\t' '$2 == "PASS" { count++ } END { printf "%d", count }' "$tmp_items")"
-  completion_percent=$((maturity_score * 100 / maturity_max_score))
-
-  if [ "$maturity_score" -ge 85 ]; then
-    verdict_title="工程闭环较完整"
-    verdict_detail="项目资料、测试、发布和交接链路都比较完整。别人或另一个 AI 进来后，不只是能读懂，也更容易验证和继续维护。"
-    next_action="下一步可以用真实老项目继续校准评分模型。"
-  elif [ "$maturity_score" -ge 65 ]; then
-    verdict_title="上下文可用，工程化还有缺口"
-    verdict_detail="AI 接手所需资料基本齐了，但测试、CI、报告组件化或发布闭环仍有缺口。"
-    next_action="下一步优先补工程成熟度缺口，补完后重新生成报告。"
-  else
-    verdict_title="文件骨架可用，工程闭环不足"
-    verdict_detail="AI 上下文文件已经比较完整，但还缺少可执行测试、CI、真实评分模型、报告组件化或发布验证。"
-    next_action="下一步先补测试和评分模型，不急着继续美化页面。"
-  fi
-
-  verdict_title_html="$(printf '%s' "$verdict_title" | escape_html)"
-  verdict_detail_html="$(printf '%s' "$verdict_detail" | escape_html)"
-  next_action_html="$(printf '%s' "$next_action" | escape_html)"
-  fix_prompt="请根据这份 AI 项目工程完整度报告里的工程成熟度缺口，补齐这个项目的测试、评分、报告、发布或交接闭环。只补工程化资料和检查方式，不改业务功能。补完后请重新生成报告，并告诉我上下文完整度、工程成熟度和剩余风险。"
-  old_project_prompt="请帮我体检这个老项目的 AI 工程完整度。先不要改业务代码，只扫描现有文档、规则、测试入口和交接资料，生成完整度报告，并告诉我最该补的 3 件事。"
-  new_project_prompt="请帮我把 AI Engineering Kit 接入这个项目。先判断是空项目还是已有项目，保留已有文档，只补必要的 AI 工程文件，并生成一份完整度报告。"
-  fix_prompt_html="$(printf '%s' "$fix_prompt" | escape_html)"
-  old_project_prompt_html="$(printf '%s' "$old_project_prompt" | escape_html)"
-  new_project_prompt_html="$(printf '%s' "$new_project_prompt" | escape_html)"
-
-  missing_items_tmp="$(mktemp)"
-  module_grid_tmp="$(mktemp)"
-
-  if [ "$gap_count" -eq 0 ]; then
-    printf '        <li class="ok"><span class="dot">✓</span><span>没有发现必须马上补的资料。可以把这个项目交给 AI 继续读、继续做。</span></li>\n' > "$missing_items_tmp"
-  else
-    awk -F '\t' '$2 == "GAP" { print $5 }' "$tmp_maturity" |
-    while IFS= read -r label; do
-      label_html="$(printf '%s' "$label" | escape_html)"
-      printf '        <li><span class="dot">!</span><span>%s</span></li>\n' "$label_html" >> "$missing_items_tmp"
-    done
-  fi
-
-  module_index=1
-  load_report_modules "$report_modules_file" |
-  while IFS="$(printf '\t')" read -r module_id module_title module_help module_sections; do
-    module_id_html="$(printf '%s' "$module_id" | escape_html)"
-    module_title_html="$(printf '%s' "$module_title" | escape_html)"
-    module_number="$(printf '%02d' "$module_index")"
-    module_index=$((module_index + 1))
-    module_earned=0
-    module_max=0
-
-    module_help_html="$(printf '%s' "$module_help" | escape_html)"
-
-    old_ifs="$IFS"
-    IFS="|"
-    for section in $module_sections; do
-      pair="$(section_score "$section")"
-      earned="${pair%/*}"
-      max="${pair#*/}"
-      module_earned=$((module_earned + earned))
-      module_max=$((module_max + max))
-    done
-    IFS="$old_ifs"
-
-    if [ "$module_max" -gt 0 ]; then
-      module_percent=$((module_earned * 100 / module_max))
-    else
-      module_percent=0
-    fi
-
-    {
-      printf '    <section data-module="%s">\n' "$module_id_html"
-      printf '      <div class="module-title"><span class="number">%s</span><h2>%s <span class="meta">%s/%s</span></h2></div>\n' "$module_number" "$module_title_html" "$module_earned" "$module_max"
-      printf '      <div class="bar"><span style="width:%s%%"></span></div>\n' "$module_percent"
-      printf '      <p class="module-help">%s</p>\n' "$module_help_html"
-      printf '      <ul>\n'
-    } >> "$module_grid_tmp"
-
-    old_ifs="$IFS"
-    IFS="|"
-    for section in $module_sections; do
-      awk -F '\t' -v section="$section" '$1 == section { print $2 "\t" $3 "\t" $4 "\t" $5 }' "$tmp_items" |
-      while IFS="$(printf '\t')" read -r item_status earned max label; do
-        label_html="$(printf '%s' "$label" | escape_html)"
-        if [ "$item_status" = "PASS" ]; then
-          printf '        <li><span class="tag pass">通过</span><span>%s</span></li>\n' "$label_html" >> "$module_grid_tmp"
-        else
-          printf '        <li><span class="tag gap">缺口</span><span>%s</span></li>\n' "$label_html" >> "$module_grid_tmp"
-        fi
-      done
-    done
-    IFS="$old_ifs"
-
-    {
-      printf '      </ul>\n'
-      printf '    </section>\n'
-    } >> "$module_grid_tmp"
-  done
-
-  write_html_template "$report_template" "$missing_items_tmp" "$module_grid_tmp" "$html_file"
-  rm -f "$missing_items_tmp" "$module_grid_tmp"
-}
 
 write_json_items() {
   source_file="$1"
@@ -791,7 +587,6 @@ write_json_report() {
     printf '\n  ],\n'
     printf '  "files": {\n'
     printf '    "markdown": "%s",\n' "$report_file"
-    printf '    "html": "%s",\n' "$html_file"
     printf '    "json": "%s"\n' "$json_file"
     printf '  }\n'
     printf '}\n'
@@ -806,9 +601,5 @@ if [ "$write_report" -eq 1 ]; then
   echo "JSON 报告已写入：$json_file"
 fi
 
-if [ "$write_html" -eq 1 ]; then
-  write_html_report
-  echo "HTML 报告已写入：$html_file"
-fi
 
 rm -f "$tmp_report" "$tmp_items" "$tmp_maturity"

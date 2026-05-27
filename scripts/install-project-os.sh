@@ -308,7 +308,7 @@ install_core() {
   install_file "schemas/ai-project-score.v0.2.json"
   install_file "schemas/ai-project-report.schema.json"
   install_file "schemas/ai-project-report.v0.1.json"
-  install_file "templates/report/ai-project-report.html"
+  install_file "index.html"
   install_dir "templates/project-docs"
 }
 

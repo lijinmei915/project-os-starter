@@ -2,7 +2,7 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-html_file="$root/.project-os/reports/ai-project-report.html"
+html_file="$root/index.html"
 screenshot_dir="$root/tests/screenshots"
 baseline_dir="$screenshot_dir/baseline"
 current_dir="$screenshot_dir/current"
@@ -146,9 +146,6 @@ compare_or_update_baseline() {
   node "$visual_diff_script" "$baseline_file" "$current_file" "$diff_file"
 }
 
-log "generate report"
-bash "$root/scripts/check-ai-project.sh" "$root" --write-report --html >/dev/null
-
 if [ ! -f "$html_file" ]; then
   echo "ERROR: report HTML not found: $html_file"
   exit 1
@@ -156,13 +153,15 @@ fi
 
 log "check report markers"
 assert_contains "$html_file" "AI 项目工程助手"
-assert_contains "$html_file" "当前报告"
+assert_contains "$html_file" "体检结果"
 assert_contains "$html_file" "上下文完整度"
 assert_contains "$html_file" "工程成熟度"
 assert_contains "$html_file" "kitProjectSwitch"
 assert_contains "$html_file" "data-component=\"SectionHeading\""
 assert_contains "$html_file" "data-component\", \"RequiredMaterialItem"
 assert_contains "$html_file" "function renderRequiredMaterialItem"
+assert_contains "$html_file" "kitAnalyzeBtn"
+assert_contains "$html_file" "JSZip"
 
 mkdir -p "$baseline_dir" "$current_dir" "$diff_dir"
 

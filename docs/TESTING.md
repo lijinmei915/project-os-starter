@@ -161,11 +161,11 @@ bash tests/run-tests.sh
 - `schemas/ai-project-report.schema.json`
 - `schemas/ai-project-report.v0.1.json`
 - `tests/check-report-model.mjs`
-- `scripts/check-ai-project.sh --write-report --html`
+- `scripts/check-ai-project.sh --write-report`
 - `scripts/add-project-docs.sh`
 - `tests/screenshot-regression.sh`
 - `tests/visual-diff.mjs --self-test`
-- `templates/report/ai-project-report.html`
+- `index.html`（standalone 可视化报告页）
 - `.project-os/reports/ai-project-report.json`
 - `tests/cross-tool-matrix.md`
 - 老项目占位文档夹具，验证 `TODO` / `未记录` 不会被误判为可用文档
@@ -180,7 +180,7 @@ bash tests/run-tests.sh
 - 如果存在 `tests/screenshots/baseline/ai-project-report-desktop.png` 或 `tests/screenshots/baseline/ai-project-report-mobile.png`，脚本会用 `tests/visual-diff.mjs` 做真实像素 diff。
 - 默认阈值为 `VISUAL_DIFF_THRESHOLD=0.01`，即 1% 像素变化；可用 `VISUAL_DIFF_PIXEL_DELTA` 调整单像素差异敏感度。
 - 没有浏览器或没有 baseline 时，默认跳过图片 diff；设置 `VISUAL_DIFF_STRICT=1` 后会把缺浏览器、缺 baseline 或差异超阈值都视为失败。
-- HTML 报告模板位于 `templates/report/ai-project-report.html`，测试会通过报告生成和截图回归间接验证模板可用。
+- 可视化报告页位于根目录 `index.html`，是 standalone HTML（浏览器本地分析，不依赖服务端）。截图回归脚本会直接用它做视觉验证。
 - 跨工具矩阵当前先验证 adapter 分发与规则源头一致性，真实模型会话表现仍应在发布前抽样复查。
 - 后续如果继续拆出评分执行层或报告渲染层，应继续把对应检查接入这个入口。
 - `tests/check-report-model.mjs` 会校验评分维度总分、报告模块引用的 section，以及上下文评分维度是否都被报告模块覆盖，避免页面分组和评分模型漂移。

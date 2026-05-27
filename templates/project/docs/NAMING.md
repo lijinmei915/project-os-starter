@@ -120,24 +120,18 @@ schemas/ai-project-report.v0.1.json
 - 如果模型规则会影响脚本评分、生成报告或 AI 行为，不能只藏在脚本里，应沉淀到 `schemas/`。
 - 报告模块、评分 section 分组和报告说明文案属于生成报告的数据源，应使用 `schemas/ai-project-report.*.json`。
 
-## 生成物命名
+## 报告页
 
-报告模板放在：
-
-```txt
-templates/report/
-```
-
-常见文件：
+报告页放在项目根目录：
 
 ```txt
-templates/report/ai-project-report.html
+index.html
 ```
 
 规则：
-- `templates/report/` 是运行时报告模板，不是生成物。
-- 生成脚本负责注入评分、缺口列表和模块卡片；模块标题、分组和说明来自 `schemas/ai-project-report.v0.1.json`，模板负责 HTML / CSS / JS 结构。
-- 安装到目标项目时，报告模板应随 `core` profile 一起分发。
+- 项目根目录的 `index.html` 是 standalone 可视化报告页：浏览器直接打开就能用，本地分析项目目录或 zip，不依赖服务端或 shell。
+- 模块标题、分组和说明来自 `schemas/ai-project-report.v0.1.json`（未来若加入数据加载层会读这个 schema）。
+- 安装到目标项目时，`index.html` 应随 `core` profile 一起分发。
 
 可追加工程文档模板放在：
 
@@ -160,7 +154,6 @@ templates/project-docs/
 
 ```txt
 .project-os/reports/ai-project-report.md
-.project-os/reports/ai-project-report.html
 .project-os/reports/ai-project-report.json
 ```
 

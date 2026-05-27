@@ -40,7 +40,13 @@ bash scripts/check-runtime.sh .
 
 ## 检查项目完整度
 
-安装后运行：
+**两种方式：**
+
+**1. 浏览器直接看（推荐）**
+
+直接打开项目根目录的 `index.html`，点"接手老项目"→选目录或上传 zip → 立刻出报告。无需任何命令、无需服务端。
+
+**2. 命令行（适合 CI / 脚本场景）**
 
 ```bash
 bash scripts/ai-project.sh report .
@@ -61,7 +67,6 @@ bash scripts/ai-project.sh report .
 
 ```txt
 .project-os/reports/ai-project-report.md
-.project-os/reports/ai-project-report.html
 .project-os/reports/ai-project-report.json
 ```
 
@@ -92,6 +97,7 @@ bash scripts/add-project-docs.sh . --profile product
 
 | 文件 | 职责 |
 |------|------|
+| `index.html` | 浏览器可视化报告页（standalone，浏览器本地分析，不依赖服务端） |
 | `AGENTS.md` | AI 运行规则（路由、约束、文档边界） |
 | `PROJECT.md` | 当前项目状态 |
 | `HANDOFF.md` | 当前交接上下文 |

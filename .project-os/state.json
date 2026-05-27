@@ -22,11 +22,12 @@
       "报告页截图回归入口",
       "报告页视觉 diff 入口",
       "报告页桌面 / 移动端视觉 baseline",
-      "报告页 HTML 模板层",
       "报告模块结构化数据源",
       "报告页 CSS token 对齐",
       "跨工具 adapter 验收矩阵",
-      "老项目空模板文档识别"
+      "老项目空模板文档识别",
+      "Standalone 浏览器体检页（index.html，本地分析项目目录 / zip）",
+      "去除 HTML 双副本：唯一 HTML 在根目录 index.html，shell 只输出 .md / .json"
     ],
     "doing": [
       "AI Engineering Kit 自身工程化补齐",

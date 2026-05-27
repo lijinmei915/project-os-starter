@@ -65,10 +65,11 @@ else
 fi
 
 log "AI project report"
-bash "$root/scripts/check-ai-project.sh" "$root" --write-report --html >/dev/null
+bash "$root/scripts/check-ai-project.sh" "$root" --write-report >/dev/null
 grep -q "AI 工程成熟度" "$root/.project-os/reports/ai-project-report.md"
 assert_file "$root/.project-os/reports/ai-project-report.json"
 assert_contains "$root/.project-os/reports/ai-project-report.json" '"scores"'
+assert_file "$root/index.html"
 
 log "old project document quality"
 poor_docs="$tmp_dir/poor-docs"
@@ -158,7 +159,7 @@ mkdir -p "$tmp_dir/core" "$tmp_dir/product" "$tmp_dir/full"
 
 bash "$root/scripts/install-project-os.sh" "$tmp_dir/core" --profile core >/dev/null
 bash "$tmp_dir/core/scripts/check-runtime.sh" "$tmp_dir/core" >/dev/null
-bash "$tmp_dir/core/scripts/check-ai-project.sh" "$tmp_dir/core" --write-report --html >/dev/null
+bash "$tmp_dir/core/scripts/check-ai-project.sh" "$tmp_dir/core" --write-report >/dev/null
 assert_file "$tmp_dir/core/AGENTS.md"
 assert_file "$tmp_dir/core/.env.example"
 assert_file "$tmp_dir/core/PROJECT.md"
@@ -172,9 +173,8 @@ assert_file "$tmp_dir/core/schemas/ai-project-score.schema.json"
 assert_file "$tmp_dir/core/schemas/ai-project-score.v0.2.json"
 assert_file "$tmp_dir/core/schemas/ai-project-report.schema.json"
 assert_file "$tmp_dir/core/schemas/ai-project-report.v0.1.json"
-assert_file "$tmp_dir/core/templates/report/ai-project-report.html"
+assert_file "$tmp_dir/core/index.html"
 assert_file "$tmp_dir/core/templates/project-docs/docs/ARCHITECTURE.md"
-assert_file "$tmp_dir/core/.project-os/reports/ai-project-report.html"
 assert_file "$tmp_dir/core/.project-os/reports/ai-project-report.json"
 assert_no_file "$tmp_dir/core/docs/ARCHITECTURE.md"
 bash "$tmp_dir/core/scripts/check-secrets.sh" "$tmp_dir/core" >/dev/null
