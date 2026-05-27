@@ -2116,9 +2116,36 @@
   });
   const kitGenerateBtn = document.getElementById("kitGenerateBtn");
   if (kitGenerateBtn) {
-    kitGenerateBtn.addEventListener("click", () => {
-      const target = document.getElementById("newProjectPanel");
-      if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+    kitGenerateBtn.addEventListener("click", async () => {
+      const collab = document.querySelector('[data-kit-collab].is-active')?.dataset.kitCollab || 'solo';
+      const start = document.querySelector('[data-kit-start].is-active')?.dataset.kitStart || 'prototype';
+      const collabLabel = collab === 'team' ? '团队协作' : '个人开发';
+      const startLabel = { prototype: '快速做个原型', serious: '认真建一个项目', handover: '只想让 AI 更好接手' }[start] || start;
+      const prompt = [
+        '我想开始一个新项目。',
+        '协作模式：' + collabLabel,
+        '启动方式：' + startLabel,
+        '',
+        '请先帮我整理成适合 AI 接手的项目基础资料：',
+        '- 项目说明：这个项目是什么、给谁用、目标是什么',
+        '- AI 工作规则：AI 该怎么干活、哪些事不能乱改',
+        '- 当前状态：现在做到哪一步、还缺什么',
+        '- 交接记录：下次打开怎么继续',
+        '',
+        '要求：',
+        '- 如果信息不够，请先问我最关键的 3 个问题',
+        '- 没有的信息标记为待确认，不要编造',
+        '- 先整理项目基础，再决定是否写业务代码'
+      ].join('\n');
+      const label = kitGenerateBtn.querySelector('[data-button-label]') || kitGenerateBtn.querySelector('span:last-child');
+      const orig = label ? label.textContent : '';
+      try {
+        await navigator.clipboard.writeText(prompt);
+        if (label) label.textContent = '已复制到剪贴板';
+      } catch (e) {
+        if (label) label.textContent = '复制失败';
+      }
+      setTimeout(() => { if (label) label.textContent = orig; }, 1600);
     });
   }
   document.querySelectorAll("[data-kit-source]").forEach((button) => {
@@ -2217,161 +2244,6 @@
   }
   renderKitRequired("solo");
 
-  const modeButtons = Array.from(document.querySelectorAll("[data-mode-choice]"));
-  const newPanel = document.getElementById("newProjectPanel");
-  const oldPanel = document.getElementById("oldProjectPanel");
-  function setMode(mode) {
-    document.body.dataset.mode = mode;
-    modeButtons.forEach((button) => {
-      button.classList.toggle("is-active", button.dataset.modeChoice === mode);
-    });
-    newPanel.classList.toggle("is-hidden", mode !== "new");
-    oldPanel.classList.toggle("is-hidden", mode !== "old");
-  }
-  modeButtons.forEach((button) => {
-    button.addEventListener("click", () => setMode(button.dataset.modeChoice));
-  });
-
-  const startCards = Array.from(document.querySelectorAll("[data-start-mode]"));
-  const docOptions = Array.from(document.querySelectorAll("[data-doc-option]"));
-  const generatedPrompt = document.getElementById("newProjectGeneratedPrompt");
-  let selectedStartMode = "快速做个原型";
-
-  const docDetails = {
-    "项目说明": {
-      file: "README.md / PROJECT.md",
-      sections: ["项目定位", "当前阶段", "协作文档入口", "当前进度", "已知问题", "下一步重点"],
-      note: "用来回答：这个项目是什么、现在在哪里、别人从哪开始读。"
-    },
-    "AI 工作规则": {
-      file: "AGENTS.md",
-      sections: ["AI 入口规则", "任务路由", "安全边界", "文档更新规则", "语言规则"],
-      note: "用来告诉 AI：怎么协作、什么能改、什么不能乱动。"
-    },
-    "当前状态": {
-      file: "PROJECT.md",
-      sections: ["项目定位", "当前架构", "当前进度", "已知问题", "下一步重点"],
-      note: "用来让下一位协作者快速知道项目真实状态。"
-    },
-    "交接记录": {
-      file: "HANDOFF.md",
-      sections: ["当前状态", "本次已完成", "风险与待确认", "下一步"],
-      note: "用来回答：这轮做到哪了，下轮怎么接着干。"
-    },
-    "README 入口说明": {
-      file: "README.md",
-      sections: ["项目定位", "当前阶段", "协作文档", "开始方式"],
-      note: "适合给人看，作为打开项目后的第一份说明。"
-    },
-    "架构说明": {
-      file: "docs/ARCHITECTURE.md",
-      sections: ["系统概览", "模块职责", "数据流 / 调用流", "关键边界", "待补充"],
-      note: "适合稍复杂的项目，避免 AI 不知道模块边界。"
-    },
-    "环境和启动说明": {
-      file: "docs/ENVIRONMENT.md",
-      sections: ["本地运行", "依赖", "环境变量", "外部服务", "常见环境问题"],
-      note: "适合需要安装依赖、配置环境变量或接外部服务的项目。"
-    },
-    "测试说明": {
-      file: "docs/TESTING.md",
-      sections: ["最小检查", "路由测试", "交付前检查"],
-      note: "适合让 AI 改完后知道怎么验证，而不是只说完成了。"
-    },
-    "运行手册": {
-      file: "docs/RUNBOOK.md",
-      sections: ["常用命令", "发布前检查", "回滚 / 恢复", "故障处理"],
-      note: "适合会长期运行、发布或排障的项目。"
-    },
-    "决策记录": {
-      file: "docs/DECISIONS.md",
-      sections: ["决策标题", "背景", "决定", "影响", "后续观察"],
-      note: "适合记录重要取舍，避免以后反复推翻同一个决定。"
-    },
-    "命名规范": {
-      file: "docs/NAMING.md",
-      sections: ["总原则", "根目录文件", "docs/ 文件", "工具适配文件", "生成物"],
-      note: "适合多人或多 AI 协作时统一文件命名。"
-    },
-    "设计规范": {
-      file: "docs/DESIGN_STANDARDS.md / docs/design/",
-      sections: ["当前状态", "基本规则", "设计 token", "布局规则", "组件索引"],
-      note: "适合有 UI 的项目，减少 AI 自由发挥界面风格。"
-    }
-  };
-
-  function renderDocDetail(name) {
-    const detail = docDetails[name];
-    if (!detail) return;
-    document.querySelectorAll("[data-doc-detail]").forEach((item) => {
-      item.classList.toggle("is-selected", item.dataset.docDetail === name);
-    });
-    document.getElementById("docPreviewTitle").textContent = name;
-    document.getElementById("docPreviewFile").textContent = detail.file;
-    const list = document.getElementById("docPreviewSections");
-    list.innerHTML = "";
-    detail.sections.forEach((section) => {
-      const li = document.createElement("li");
-      li.textContent = section;
-      list.appendChild(li);
-    });
-    document.getElementById("docPreviewNote").textContent = detail.note;
-  }
-
-  document.querySelectorAll("[data-doc-detail]").forEach((item) => {
-    item.addEventListener("click", () => renderDocDetail(item.dataset.docDetail));
-    item.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") {
-        renderDocDetail(item.dataset.docDetail);
-      }
-    });
-  });
-
-  function selectedOptions() {
-    return docOptions
-      .filter((input) => input.checked)
-      .map((input) => input.dataset.docOption);
-  }
-
-  function buildNewProjectPrompt() {
-    const options = selectedOptions();
-    const selectedText = options.length ? options.map((item) => "- " + item).join("\\n") : "- 暂不选择增强项";
-    const questionRule = "我还没有提供详细资料。请先问我项目名称、项目目标、使用场景和当前想法；每次最多问 3 个问题。";
-    generatedPrompt.value = [
-      "我想开始一个新项目。",
-      "启动方式：" + selectedStartMode,
-      "",
-      "请先帮我整理成适合 AI 接手的项目基础资料。",
-      "",
-      "必需生成或更新：",
-      "- 项目说明：这个项目是什么、给谁用、目标是什么",
-      "- AI 工作规则：AI 该怎么干活、哪些事不能乱改",
-      "- 当前状态：现在做到哪一步、还缺什么",
-      "- 交接记录：下次打开怎么继续",
-      "",
-      "我选择的可选增强：",
-      selectedText,
-      "",
-      "要求：",
-      "- 如果我粘贴的内容里已有相关信息，请复用并整理",
-      "- 没有的信息标记为待确认，不要编造",
-      "- 先整理项目基础，再决定是否写业务代码",
-      "- 如果信息不够，请先问我最关键的问题",
-      "",
-      questionRule
-    ].join("\\n");
-  }
-
-  startCards.forEach((button) => {
-    button.addEventListener("click", () => {
-      selectedStartMode = button.dataset.startMode;
-      startCards.forEach((item) => item.classList.toggle("is-active", item === button));
-      buildNewProjectPrompt();
-    });
-  });
-  docOptions.forEach((input) => input.addEventListener("change", buildNewProjectPrompt));
-  buildNewProjectPrompt();
-  renderDocDetail("项目说明");
 
   document.querySelectorAll("[data-copy-target]").forEach((button) => {
     button.addEventListener("click", async () => {
