@@ -1775,6 +1775,51 @@
       font-weight: var(--font-bold);
       font-size: var(--text-11);
     }
+    .kit-result-gap-row {
+      padding: 0;
+      background: var(--color-surface-panel);
+      border: 1px solid var(--color-border-subtle);
+      color: var(--color-text-primary);
+    }
+    .kit-result-gap-row:has(input:checked) {
+      background: #fff8ed;
+      border-color: #fde68a;
+    }
+    .kit-result-gap-label {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: var(--space-10);
+      align-items: start;
+      padding: var(--space-10) var(--space-12);
+      cursor: pointer;
+      width: 100%;
+    }
+    .kit-result-gap-label input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      margin-top: 2px;
+      cursor: pointer;
+      accent-color: #b45309;
+    }
+    .kit-result-gap-copy strong {
+      display: block;
+      font-size: var(--text-13);
+      font-weight: var(--font-medium);
+      color: var(--color-text-primary);
+      font-family: ui-monospace, "SF Mono", monospace;
+    }
+    .kit-result-gap-copy small {
+      display: block;
+      margin-top: 4px;
+      font-size: var(--text-11);
+      color: var(--color-text-secondary);
+      line-height: 1.4;
+    }
+    .kit-result-download-btn {
+      width: 100%;
+      justify-content: center;
+      margin-top: var(--space-8);
+    }
     .kit-check-item {
       display: grid;
       grid-template-columns: var(--component-check-icon-size) minmax(0, 1fr) var(--component-check-size);
@@ -2184,70 +2229,71 @@
     throw new Error("template not found: " + file);
   }
 
+  // Reusable: build a zip from given file list and trigger download
+  async function buildAndDownloadZip(files, button) {
+    const label = button && button.querySelector("[data-button-label]");
+    const orig = label ? label.textContent : "";
+    if (label) label.textContent = "打包中…";
+    if (button) button.disabled = true;
+
+    try {
+      if (typeof JSZip === "undefined") throw new Error("JSZip 未加载");
+      if (!files.length) throw new Error("没有选中任何模板");
+      const zip = new JSZip();
+      const fetched = await Promise.all(files.map(async (f) => {
+        try {
+          const text = await fetchTemplate(f);
+          return { file: f, text };
+        } catch (e) {
+          return { file: f, text: `# ${f}\n\n> 模板下载失败，请到 https://github.com/lijinmei915/project-os-starter 手动获取。\n` };
+        }
+      }));
+      fetched.forEach(({ file, text }) => zip.file(file, text));
+      zip.file("README-下载说明.md", [
+        "# AI 工程文档包",
+        "",
+        "这个 zip 是从 https://lijinmei915.github.io/project-os-starter/ 生成的。",
+        "",
+        "## 怎么用",
+        "",
+        "1. 解压到你项目的根目录",
+        "2. 打开每个 .md 文件按照里面的注释填写",
+        "3. 完成后丢给 AI 让它接手项目",
+        "",
+        "## 包含的文件",
+        "",
+        ...files.map(f => "- " + f),
+        ""
+      ].join("\n"));
+      const blob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "ai-project-docs.zip";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      if (label) label.textContent = "下载完成 ✓";
+      setTimeout(() => { if (label) label.textContent = orig; }, 1800);
+    } catch (e) {
+      if (label) label.textContent = "下载失败：" + e.message;
+      setTimeout(() => { if (label) label.textContent = orig; }, 2400);
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
   const kitDownloadBtn = document.getElementById("kitDownloadBtn");
   if (kitDownloadBtn) {
     kitDownloadBtn.addEventListener("click", async () => {
-      const label = kitDownloadBtn.querySelector("[data-button-label]");
-      const orig = label ? label.textContent : "";
-      if (label) label.textContent = "打包中…";
-      kitDownloadBtn.disabled = true;
-
-      try {
-        if (typeof JSZip === "undefined") throw new Error("JSZip 未加载");
-        const zip = new JSZip();
-        // Collect files: required + checked optional
-        const collab = document.querySelector('[data-kit-collab].is-active')?.dataset.kitCollab || 'solo';
-        const requiredItems = (kitRequiredMaterials[collab] || kitRequiredMaterials.solo).map(x => x.file);
-        const required = [...new Set([...REQUIRED_FILES, ...requiredItems])];
-        const optional = Array.from(document.querySelectorAll("[data-template-file]:checked")).map(i => i.dataset.templateFile);
-        const allFiles = [...new Set([...required, ...optional])];
-
-        const fetched = await Promise.all(allFiles.map(async (f) => {
-          try {
-            const text = await fetchTemplate(f);
-            return { file: f, text };
-          } catch (e) {
-            return { file: f, text: `# ${f}\n\n> 模板下载失败，请到 https://github.com/lijinmei915/project-os-starter 手动获取。\n` };
-          }
-        }));
-        fetched.forEach(({ file, text }) => zip.file(file, text));
-
-        // Add a README explaining how to use
-        zip.file("README-下载说明.md", [
-          "# AI 工程文档包",
-          "",
-          "这个 zip 是从 https://lijinmei915.github.io/project-os-starter/ 生成的。",
-          "",
-          "## 怎么用",
-          "",
-          "1. 解压到你项目的根目录",
-          "2. 打开每个 .md 文件按照里面的注释填写",
-          "3. 完成后丢给 AI 让它接手项目",
-          "",
-          "## 包含的文件",
-          "",
-          ...allFiles.map(f => "- " + f),
-          ""
-        ].join("\n"));
-
-        const blob = await zip.generateAsync({ type: "blob" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "ai-project-docs.zip";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-
-        if (label) label.textContent = "下载完成 ✓";
-        setTimeout(() => { if (label) label.textContent = orig; }, 1800);
-      } catch (e) {
-        if (label) label.textContent = "下载失败：" + e.message;
-        setTimeout(() => { if (label) label.textContent = orig; }, 2400);
-      } finally {
-        kitDownloadBtn.disabled = false;
-      }
+      const collab = document.querySelector('[data-kit-collab].is-active')?.dataset.kitCollab || 'solo';
+      const requiredItems = (kitRequiredMaterials[collab] || kitRequiredMaterials.solo).map(x => x.file);
+      const required = [...new Set([...REQUIRED_FILES, ...requiredItems])];
+      const optional = Array.from(document.querySelectorAll("[data-template-file]:checked")).map(i => i.dataset.templateFile);
+      const files = [...new Set([...required, ...optional])];
+      await buildAndDownloadZip(files, kitDownloadBtn);
     });
   }
   document.querySelectorAll("[data-kit-source]").forEach((button) => {
@@ -2420,15 +2466,15 @@
       let score = 0;
 
       function award(section, pts, label) { items.push({ section, status: 'PASS', pts, label }); score += pts; }
-      function gap(section, pts, label)   { items.push({ section, status: 'GAP',  pts, label }); }
+      function gap(section, pts, label, template)   { items.push({ section, status: 'GAP',  pts, label, template }); }
 
       async function checkDoc(section, path, pts, passLabel, minLines, gapLabel) {
         if (await isSubstantive(map, path, minLines)) award(section, pts, passLabel);
-        else gap(section, pts, gapLabel || (path + ' 缺失或仍像空模板'));
+        else gap(section, pts, gapLabel || (path + ' 缺失或仍像空模板'), path);
       }
       async function checkContent(section, path, pts, passLabel, minLines, patterns) {
         if (await hasQualityAny(map, path, minLines, patterns)) award(section, pts, passLabel);
-        else gap(section, pts, path + ' 内容不足或缺少关键说明');
+        else gap(section, pts, path + ' 内容不足或缺少关键说明', path);
       }
 
       await checkDoc('系统规则', 'AGENTS.md', 8, '存在可用 AGENTS.md，作为 AI 规则入口', 8);
@@ -2446,11 +2492,11 @@
 
       const hasArch = (await isSubstantive(map, 'docs/ARCHITECTURE.md', 4)) || (await isSubstantive(map, 'docs/CODE_STRUCTURE.md', 4));
       if (hasArch) award('项目文件', 7, '存在架构说明或代码结构说明');
-      else gap('项目文件', 7, '建议补 docs/ARCHITECTURE.md 或 docs/CODE_STRUCTURE.md');
+      else gap('项目文件', 7, '建议补 docs/ARCHITECTURE.md 或 docs/CODE_STRUCTURE.md', 'docs/ARCHITECTURE.md');
       const hasArchContent = (await hasQualityAny(map, 'docs/ARCHITECTURE.md', 4, ['模块','职责','数据流','边界','module','boundary'])) ||
                              (await hasQualityAny(map, 'docs/CODE_STRUCTURE.md', 4, ['职责','目录','结构']));
       if (hasArchContent) award('项目文件', 3, '架构文档说明了模块职责或边界');
-      else gap('项目文件', 3, '架构文档应说明模块职责或边界');
+      else gap('项目文件', 3, '架构文档应说明模块职责或边界', 'docs/ARCHITECTURE.md');
 
       await checkDoc('工具反馈', 'docs/TESTING.md', 7, '存在可用 docs/TESTING.md', 4);
       if (hasFile(map, 'scripts/check-runtime.sh') || hasFile(map, 'scripts/check-ai-project.sh') ||
@@ -2467,7 +2513,7 @@
       if ((await isSubstantive(map, 'docs/RUNBOOK.md', 3)) || (await isSubstantive(map, 'docs/CHANGELOG.md', 3))) {
         award('决策和运行', 5, '存在运行手册或变更记录');
       } else {
-        gap('决策和运行', 5, '建议补 docs/RUNBOOK.md 或 docs/CHANGELOG.md');
+        gap('决策和运行', 5, '建议补 docs/RUNBOOK.md 或 docs/CHANGELOG.md', 'docs/RUNBOOK.md');
       }
 
       await checkDoc('命名和文档治理', 'docs/NAMING.md', 3, '存在可用 docs/NAMING.md', 4);
@@ -2495,6 +2541,22 @@
 
       const el = document.getElementById('kitOldResults');
       if (!el) return;
+
+      // Build deduplicated template list from gaps that have a template mapping
+      const seenTemplates = new Set();
+      const gapsByTemplate = new Map(); // template -> array of gap labels
+      const gapsWithoutTemplate = [];
+      for (const g of gaps) {
+        if (g.template) {
+          if (!gapsByTemplate.has(g.template)) gapsByTemplate.set(g.template, []);
+          gapsByTemplate.get(g.template).push(g.label);
+        } else {
+          gapsWithoutTemplate.push(g);
+        }
+      }
+      const templates = [...gapsByTemplate.keys()];
+      const downloadable = templates.length;
+
       el.innerHTML = `
         <div class="kit-result-score">
           <div class="kit-result-ring" data-status="${statusClass}" style="--ring-pct:${pct}%">
@@ -2505,14 +2567,42 @@
             <div class="kit-result-sub">${passes.length} 项通过 · ${gaps.length} 项缺口</div>
           </div>
         </div>
-        ${gaps.length ? `<div class="kit-result-section">
-          <div class="kit-result-section-title">需要补齐（${gaps.length} 项）</div>
-          <ul class="kit-result-list">${gaps.map(i => `<li class="kit-result-item gap"><span class="kit-result-dot">!</span><span>${esc(i.label)}</span></li>`).join('')}</ul>
+        ${downloadable ? `<div class="kit-result-section">
+          <div class="kit-result-section-title">勾选要下载的模板（${downloadable} 个文件）</div>
+          <ul class="kit-result-list">${templates.map(t => `
+            <li class="kit-result-item gap kit-result-gap-row">
+              <label class="kit-result-gap-label">
+                <input type="checkbox" data-gap-template="${esc(t)}" checked>
+                <span class="kit-result-gap-copy">
+                  <strong>${esc(t)}</strong>
+                  ${gapsByTemplate.get(t).map(l => `<small>${esc(l)}</small>`).join('')}
+                </span>
+              </label>
+            </li>`).join('')}</ul>
+          <button class="kit-primary kit-result-download-btn" type="button" id="kitGapDownloadBtn">
+            <svg class="kit-icon"><use href="#i-folder-open"></use></svg>
+            <span data-button-label>下载所选模板 .zip</span>
+          </button>
         </div>` : ''}
-        <div class="kit-result-section">
+        ${gapsWithoutTemplate.length ? `<div class="kit-result-section">
+          <div class="kit-result-section-title">其他建议（${gapsWithoutTemplate.length}）</div>
+          <ul class="kit-result-list">${gapsWithoutTemplate.map(i => `<li class="kit-result-item gap"><span class="kit-result-dot">!</span><span>${esc(i.label)}</span></li>`).join('')}</ul>
+        </div>` : ''}
+        ${passes.length ? `<div class="kit-result-section">
           <div class="kit-result-section-title">已通过（${passes.length} 项）</div>
           <ul class="kit-result-list">${passes.map(i => `<li class="kit-result-item pass"><span class="kit-result-dot">✓</span><span>${esc(i.label)}</span></li>`).join('')}</ul>
-        </div>`;
+        </div>` : ''}`;
+
+      // Wire up the inline download button
+      const gapDownloadBtn = document.getElementById('kitGapDownloadBtn');
+      if (gapDownloadBtn) {
+        gapDownloadBtn.addEventListener('click', async () => {
+          const selected = Array.from(el.querySelectorAll('[data-gap-template]:checked')).map(i => i.dataset.gapTemplate);
+          if (typeof buildAndDownloadZip === 'function') {
+            await buildAndDownloadZip(selected, gapDownloadBtn);
+          }
+        });
+      }
     }
 
     function buildMapFromFileList(fileList) {
