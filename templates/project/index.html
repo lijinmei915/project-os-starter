@@ -1349,6 +1349,56 @@
       font-size: var(--text-12);
       line-height: 1.5;
     }
+    .kit-option-list {
+      display: grid;
+      gap: var(--space-8);
+    }
+    .kit-option {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: var(--space-12);
+      align-items: center;
+      border: 1px solid var(--color-border-subtle);
+      border-radius: var(--radius-md);
+      background: var(--color-surface-panel);
+      padding: var(--space-10) var(--space-12);
+      cursor: pointer;
+      transition: background var(--transition-fast), border-color var(--transition-fast);
+    }
+    .kit-option:hover {
+      background: var(--color-surface-page);
+      border-color: var(--color-border-default);
+    }
+    .kit-option input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      margin: 0;
+      cursor: pointer;
+      accent-color: var(--color-surface-inverse);
+    }
+    .kit-option-copy strong {
+      display: block;
+      font-size: var(--text-13);
+      font-weight: var(--font-medium);
+      color: var(--color-text-primary);
+    }
+    .kit-option-copy small {
+      display: block;
+      margin-top: 2px;
+      font-size: var(--text-11);
+      color: var(--color-text-muted);
+      font-family: ui-monospace, "SF Mono", monospace;
+    }
+    .kit-option-desc {
+      font-size: var(--text-11);
+      color: var(--color-text-secondary);
+      text-align: right;
+      max-width: 220px;
+    }
+    .kit-option:has(input:checked) {
+      background: var(--color-success-bg);
+      border-color: var(--color-success-text);
+    }
     .kit-empty-action {
       flex: 1;
       width: 100%;
@@ -1912,54 +1962,26 @@
           </div>
         </div>
 
-        <div class="kit-card">
-          <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered" data-source="docs/design/ai-project-assistant/data.ts">
-            <span class="kit-section-title" data-slot="title"><span class="kit-step-num" data-slot="step">2</span><span class="kit-section-label" data-slot="label">开始方式</span></span>
-          </div>
-          <div class="kit-strategy-list">
-            <button class="kit-strategy is-active" type="button" data-kit-start="prototype" data-component="OptionCard" data-variant="strategy" data-state="selected" data-source="docs/design/ai-project-assistant/data.ts">
-              <svg class="kit-icon"><use href="#i-rocket"></use></svg>
-              <span><strong>快速做个原型</strong><span>先让 AI 做出能看的页面或功能，再慢慢补规范。</span></span>
-              <svg class="kit-icon kit-active-check"><use href="#i-check-circle"></use></svg>
-            </button>
-            <button class="kit-strategy" type="button" data-kit-start="serious" data-component="OptionCard" data-variant="strategy" data-state="default" data-source="docs/design/ai-project-assistant/data.ts">
-              <svg class="kit-icon"><use href="#i-layers"></use></svg>
-              <span><strong>认真建一个项目</strong><span>适合产品、工具、长期维护项目，先把项目基础搭稳。</span></span>
-              <svg class="kit-icon kit-active-check"><use href="#i-check-circle"></use></svg>
-            </button>
-            <button class="kit-strategy" type="button" data-kit-start="handover" data-component="OptionCard" data-variant="strategy" data-state="default" data-source="docs/design/ai-project-assistant/data.ts">
-              <svg class="kit-icon"><use href="#i-shield"></use></svg>
-              <span><strong>只想让 AI 更好接手</strong><span>适合先整理规则、状态和交接，不急着写业务代码。</span></span>
-              <svg class="kit-icon kit-active-check"><use href="#i-check-circle"></use></svg>
-            </button>
-          </div>
-        </div>
       </div>
 
       <div class="kit-right kit-stack">
         <div class="kit-card">
-          <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered-with-description" data-source="docs/design/ai-project-assistant/data.ts">
-            <span class="kit-section-title" data-slot="title"><span class="kit-step-num" data-slot="step">3</span><span class="kit-section-label" data-slot="label">基础上下文资料</span></span>
-            <p class="kit-section-subtitle" data-slot="description">已自动勾选 AI 接手所需的最小数据集</p>
+          <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered-with-description">
+            <span class="kit-section-title"><span class="kit-step-num">2</span><span class="kit-section-label">基础上下文资料</span></span>
+            <p class="kit-section-subtitle">AI 接手所需的最小数据集，锁定不可取消</p>
           </div>
           <div class="kit-material-list" id="kitRequiredMaterials"></div>
         </div>
 
         <div class="kit-card fill">
-          <div class="kit-section-heading" data-component="SectionHeading" data-variant="plain" data-source="docs/design/ai-project-assistant/data.ts">
-            <span class="kit-section-title" data-slot="title"><span class="kit-section-label" data-slot="label">自定义增强</span></span>
-            <p class="kit-section-subtitle" data-slot="description">按需补充其他项目文档</p>
+          <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered-with-description">
+            <span class="kit-section-title"><span class="kit-step-num">3</span><span class="kit-section-label">可选增强模板</span></span>
+            <p class="kit-section-subtitle">按需勾选要带走的文档</p>
           </div>
-          <div class="kit-add-wrap">
-            <button class="kit-add kit-empty-action" type="button" data-component="AddItemCard" data-variant="document" data-state="copy" data-source="docs/design/ai-project-assistant/data.ts" data-kit-copy-doc-command aria-label="复制补齐工程文档命令">
-              <span><span class="kit-add-doc-control" aria-hidden="true"><svg class="kit-icon"><use href="#i-plus"></use></svg></span><strong data-button-label>复制补齐文档命令</strong><p><span class="kit-status-chip is-copy">可复制</span></p></span>
-            </button>
-            <div class="kit-feature-note"><span class="kit-status-chip is-copy">模板工具</span><span>会补齐 DOCUMENTATION / NAMING / ARCHITECTURE / ENVIRONMENT / TESTING / RUNBOOK / CHANGELOG / DECISIONS / LESSONS 等工程文档模板；默认不覆盖已有文件。</span></div>
-            <div class="kit-command-preview"><code>bash scripts/add-project-docs.sh . --profile product</code></div>
-          </div>
+          <div class="kit-option-list" id="kitOptionTemplates"></div>
         </div>
         <div class="kit-generate-bar">
-          <button class="kit-primary" type="button" id="kitGenerateBtn"><svg class="kit-icon"><use href="#i-sparkles"></use></svg><span>生成 AI 初始化话术</span></button>
+          <button class="kit-primary" type="button" id="kitDownloadBtn"><svg class="kit-icon"><use href="#i-folder-open"></use></svg><span data-button-label>下载文档包 .zip</span></button>
         </div>
       </div>
     </section>
@@ -2105,47 +2127,127 @@
       renderKitRequired(mode);
     });
   });
-  document.querySelectorAll("[data-kit-start]").forEach((button) => {
-    button.addEventListener("click", () => {
-      document.querySelectorAll("[data-kit-start]").forEach((item) => {
-        const isActive = item === button;
-        item.classList.toggle("is-active", isActive);
-        item.dataset.state = isActive ? "selected" : "default";
-      });
+  // ─── Optional templates list ──────────────────────────────
+  const OPTIONAL_TEMPLATES = [
+    { file: "docs/ARCHITECTURE.md", title: "架构和模块职责", desc: "模块、目录、数据流和边界" },
+    { file: "docs/ENVIRONMENT.md", title: "环境和启动方式", desc: "依赖、变量、怎么运行" },
+    { file: "docs/TESTING.md", title: "测试和验收方式", desc: "怎么验证改动没坏" },
+    { file: "docs/RUNBOOK.md", title: "运行手册", desc: "常见操作和故障处理" },
+    { file: "docs/CHANGELOG.md", title: "变更记录", desc: "结构性改动留痕" },
+    { file: "docs/DECISIONS.md", title: "决策记录", desc: "重要取舍为什么这样定" },
+    { file: "docs/NAMING.md", title: "命名规范", desc: "文档和目录怎么命名" },
+    { file: "docs/DESIGN_STANDARDS.md", title: "设计规范", desc: "界面、组件、视觉边界" },
+    { file: "docs/DOCUMENTATION.md", title: "文档治理", desc: "文档边界和更新时机" },
+    { file: "docs/PRODUCT_PLAN.md", title: "产品路线图", desc: "分阶段目标" },
+    { file: "docs/CODE_STRUCTURE.md", title: "代码结构", desc: "代码分层规则" },
+    { file: "docs/LESSONS.md", title: "经验教训", desc: "犯错后立即记录" }
+  ];
+  const REQUIRED_FILES = ["AGENTS.md", "PROJECT.md", "HANDOFF.md"];
+  // Source for fetching templates (works on GitHub Pages and local server)
+  const TEMPLATE_BASE_URLS = [
+    "templates/project-docs/",   // optional docs
+    "templates/project/"         // required files
+  ];
+
+  function renderOptionalTemplates() {
+    const target = document.getElementById("kitOptionTemplates");
+    if (!target) return;
+    target.innerHTML = "";
+    OPTIONAL_TEMPLATES.forEach((t) => {
+      const label = document.createElement("label");
+      label.className = "kit-option";
+      label.innerHTML = `
+        <input type="checkbox" data-template-file="${t.file}">
+        <span class="kit-option-copy">
+          <strong>${t.title}</strong>
+          <small>${t.file}</small>
+        </span>
+        <span class="kit-option-desc">${t.desc}</span>
+      `;
+      target.appendChild(label);
     });
-  });
-  const kitGenerateBtn = document.getElementById("kitGenerateBtn");
-  if (kitGenerateBtn) {
-    kitGenerateBtn.addEventListener("click", async () => {
-      const collab = document.querySelector('[data-kit-collab].is-active')?.dataset.kitCollab || 'solo';
-      const start = document.querySelector('[data-kit-start].is-active')?.dataset.kitStart || 'prototype';
-      const collabLabel = collab === 'team' ? '团队协作' : '个人开发';
-      const startLabel = { prototype: '快速做个原型', serious: '认真建一个项目', handover: '只想让 AI 更好接手' }[start] || start;
-      const prompt = [
-        '我想开始一个新项目。',
-        '协作模式：' + collabLabel,
-        '启动方式：' + startLabel,
-        '',
-        '请先帮我整理成适合 AI 接手的项目基础资料：',
-        '- 项目说明：这个项目是什么、给谁用、目标是什么',
-        '- AI 工作规则：AI 该怎么干活、哪些事不能乱改',
-        '- 当前状态：现在做到哪一步、还缺什么',
-        '- 交接记录：下次打开怎么继续',
-        '',
-        '要求：',
-        '- 如果信息不够，请先问我最关键的 3 个问题',
-        '- 没有的信息标记为待确认，不要编造',
-        '- 先整理项目基础，再决定是否写业务代码'
-      ].join('\n');
-      const label = kitGenerateBtn.querySelector('[data-button-label]') || kitGenerateBtn.querySelector('span:last-child');
-      const orig = label ? label.textContent : '';
+  }
+  renderOptionalTemplates();
+
+  async function fetchTemplate(file) {
+    // Required files live under templates/project/
+    // Optional files under templates/project-docs/
+    const candidates = REQUIRED_FILES.includes(file)
+      ? ["templates/project/" + file]
+      : ["templates/project-docs/" + file, "templates/project/" + file];
+    for (const path of candidates) {
       try {
-        await navigator.clipboard.writeText(prompt);
-        if (label) label.textContent = '已复制到剪贴板';
+        const r = await fetch(path);
+        if (r.ok) return await r.text();
+      } catch (e) { /* try next */ }
+    }
+    throw new Error("template not found: " + file);
+  }
+
+  const kitDownloadBtn = document.getElementById("kitDownloadBtn");
+  if (kitDownloadBtn) {
+    kitDownloadBtn.addEventListener("click", async () => {
+      const label = kitDownloadBtn.querySelector("[data-button-label]");
+      const orig = label ? label.textContent : "";
+      if (label) label.textContent = "打包中…";
+      kitDownloadBtn.disabled = true;
+
+      try {
+        if (typeof JSZip === "undefined") throw new Error("JSZip 未加载");
+        const zip = new JSZip();
+        // Collect files: required + checked optional
+        const collab = document.querySelector('[data-kit-collab].is-active')?.dataset.kitCollab || 'solo';
+        const requiredItems = (kitRequiredMaterials[collab] || kitRequiredMaterials.solo).map(x => x.file);
+        const required = [...new Set([...REQUIRED_FILES, ...requiredItems])];
+        const optional = Array.from(document.querySelectorAll("[data-template-file]:checked")).map(i => i.dataset.templateFile);
+        const allFiles = [...new Set([...required, ...optional])];
+
+        const fetched = await Promise.all(allFiles.map(async (f) => {
+          try {
+            const text = await fetchTemplate(f);
+            return { file: f, text };
+          } catch (e) {
+            return { file: f, text: `# ${f}\n\n> 模板下载失败，请到 https://github.com/lijinmei915/project-os-starter 手动获取。\n` };
+          }
+        }));
+        fetched.forEach(({ file, text }) => zip.file(file, text));
+
+        // Add a README explaining how to use
+        zip.file("README-下载说明.md", [
+          "# AI 工程文档包",
+          "",
+          "这个 zip 是从 https://lijinmei915.github.io/project-os-starter/ 生成的。",
+          "",
+          "## 怎么用",
+          "",
+          "1. 解压到你项目的根目录",
+          "2. 打开每个 .md 文件按照里面的注释填写",
+          "3. 完成后丢给 AI 让它接手项目",
+          "",
+          "## 包含的文件",
+          "",
+          ...allFiles.map(f => "- " + f),
+          ""
+        ].join("\n"));
+
+        const blob = await zip.generateAsync({ type: "blob" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "ai-project-docs.zip";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        if (label) label.textContent = "下载完成 ✓";
+        setTimeout(() => { if (label) label.textContent = orig; }, 1800);
       } catch (e) {
-        if (label) label.textContent = '复制失败';
+        if (label) label.textContent = "下载失败：" + e.message;
+        setTimeout(() => { if (label) label.textContent = orig; }, 2400);
+      } finally {
+        kitDownloadBtn.disabled = false;
       }
-      setTimeout(() => { if (label) label.textContent = orig; }, 1600);
     });
   }
   document.querySelectorAll("[data-kit-source]").forEach((button) => {
