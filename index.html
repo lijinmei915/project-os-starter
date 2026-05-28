@@ -2136,6 +2136,90 @@
       padding: 6px 9px;
       color: var(--color-text-muted);
     }
+    .kit-insights-host {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-10);
+      padding: var(--space-12);
+      margin-top: var(--space-10);
+      border: 1px solid var(--color-border-subtle);
+      border-radius: var(--radius-md);
+      background: var(--color-surface-page);
+    }
+    .kit-insights-host.is-hidden { display: none; }
+    .kit-insight-block {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-6);
+    }
+    .kit-insight-title {
+      font-size: var(--text-12);
+      font-weight: var(--font-medium);
+      color: var(--color-text-secondary);
+    }
+    .kit-insight-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--space-12);
+      padding: var(--space-8) var(--space-10);
+      background: var(--color-surface-panel);
+      border: 1px solid var(--color-border-subtle);
+      border-radius: var(--radius-md);
+    }
+    .kit-insight-row code {
+      font-family: ui-monospace, "SF Mono", monospace;
+      font-size: var(--text-12);
+      color: var(--color-text-primary);
+    }
+    .kit-insight-row .muted {
+      margin-left: var(--space-8);
+      font-size: var(--text-11);
+      color: var(--color-text-muted);
+    }
+    .kit-insight-actions {
+      display: flex;
+      gap: var(--space-6);
+    }
+    .kit-insight-empty {
+      padding: var(--space-8) var(--space-10);
+      font-size: var(--text-12);
+      color: var(--color-success-text);
+      background: var(--color-success-bg);
+      border-radius: var(--radius-md);
+    }
+    .kit-insight-tech-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-6);
+    }
+    .kit-insight-tech {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      background: var(--color-surface-panel);
+      border: 1px solid var(--color-border-subtle);
+      border-radius: var(--radius-full);
+      font-size: var(--text-12);
+    }
+    .kit-insight-export-bar {
+      margin-top: var(--space-8);
+      display: flex;
+      justify-content: flex-end;
+    }
+    .kit-personal-badge {
+      display: inline-block;
+      margin-left: 4px;
+      padding: 1px 6px;
+      font-size: 10px;
+      color: #6366f1;
+      background: #eef2ff;
+      border: 1px solid #c7d2fe;
+      border-radius: var(--radius-full);
+      font-weight: var(--font-medium);
+      vertical-align: middle;
+    }
     .kit-graph-issue-danger {
       background: #fef2f2;
       border-color: #fecaca;
@@ -2426,6 +2510,7 @@
             <p class="kit-section-subtitle">点击任意项目可一键再次体检（自动复用授权）</p>
           </div>
           <div id="kitBookmarksList" class="kit-bookmark-list"></div>
+          <div id="kitInsightsHost" class="kit-insights-host is-hidden"></div>
         </div>
         <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered-with-description" data-source="docs/design/ai-project-assistant/data.ts">
           <span class="kit-section-title" data-slot="title"><span class="kit-step-num" data-slot="step">1</span><span class="kit-section-label" data-slot="label">代码来源</span></span>
@@ -2591,20 +2676,26 @@
     "templates/project/"         // required files
   ];
 
+  // Effective templates = built-in + personal (from localStorage, set after promoting cross-project finding)
+  function effectiveOptionalTemplates() {
+    const personalRules = (typeof getPersonalRules === 'function') ? getPersonalRules() : { extraTemplates: [] };
+    return [...OPTIONAL_TEMPLATES, ...personalRules.extraTemplates.map(r => ({ ...r, isPersonal: true }))];
+  }
+
   function renderOptionalTemplates() {
     const target = document.getElementById("kitOptionTemplates");
     if (!target) return;
     target.innerHTML = "";
-    OPTIONAL_TEMPLATES.forEach((t) => {
+    effectiveOptionalTemplates().forEach((t) => {
       const label = document.createElement("label");
       label.className = "kit-option";
       label.innerHTML = `
         <input type="checkbox" data-template-file="${t.file}">
         <span class="kit-option-copy">
-          <strong>${t.title}</strong>
+          <strong>${t.title}</strong>${t.isPersonal ? ' <span class="kit-personal-badge">个人规则</span>' : ''}
           <small>${t.file}</small>
         </span>
-        <span class="kit-option-desc">${t.desc}</span>
+        <span class="kit-option-desc">${t.desc || ''}</span>
       `;
       target.appendChild(label);
     });
@@ -2681,24 +2772,29 @@
   }
 
   // Save / update a project record after analysis
-  async function saveProjectRecord(handle, result, info) {
+  async function saveProjectRecord(handle, result, info, map) {
     if (!handle) return;
     const id = projectIdFor(handle);
     const existing = await dbGet(id).catch(() => null);
     const passCount = result.items.filter(i => i.status === 'PASS').length;
     const gapCount = result.items.filter(i => i.status === 'GAP').length;
     const now = new Date().toISOString();
-    const history = (existing?.history || []).slice(-19); // keep last 19 + new = 20
+    const history = (existing?.history || []).slice(-19);
     history.push({ date: now, score: result.score, gapCount, passCount });
+    // Snapshot of all markdown / config files in the project — used for cross-project insights
+    const filesSnapshot = map ? [...map.keys()].filter(p =>
+      /\.md$/.test(p) || /^(package\.json|Cargo\.toml|go\.mod|pyproject\.toml|requirements\.txt|Gemfile|Makefile|CODEOWNERS|LICENSE|CONTRIBUTING|SECURITY)/i.test(p.split('/').pop())
+    ).slice(0, 200) : (existing?.filesSnapshot || []);
     const record = {
       id,
       name: handle.name,
-      handle, // FileSystemDirectoryHandle persists as-is
+      handle,
       lastAnalyzed: now,
       lastScore: result.score,
       lastGapCount: gapCount,
       lastPassCount: passCount,
       techStack: info?.techStack || [],
+      filesSnapshot,
       history,
       createdAt: existing?.createdAt || now,
     };
@@ -2728,6 +2824,177 @@
   function daysSince(iso) {
     if (!iso) return Infinity;
     return Math.floor((Date.now() - new Date(iso).getTime()) / (24 * 3600 * 1000));
+  }
+
+  // ─── Personal rules (localStorage) — additions to kit defaults ──
+  const PERSONAL_RULES_KEY = 'kit.personalRules.v1';
+  function getPersonalRules() {
+    try {
+      const raw = localStorage.getItem(PERSONAL_RULES_KEY);
+      if (!raw) return { extraTemplates: [] };
+      const parsed = JSON.parse(raw);
+      return { extraTemplates: Array.isArray(parsed.extraTemplates) ? parsed.extraTemplates : [] };
+    } catch (e) { return { extraTemplates: [] }; }
+  }
+  function savePersonalRule(rule) {
+    const rules = getPersonalRules();
+    if (rules.extraTemplates.some(r => r.file === rule.file)) return rules;
+    rules.extraTemplates.push(rule);
+    localStorage.setItem(PERSONAL_RULES_KEY, JSON.stringify(rules));
+    return rules;
+  }
+  function removePersonalRule(file) {
+    const rules = getPersonalRules();
+    rules.extraTemplates = rules.extraTemplates.filter(r => r.file !== file);
+    localStorage.setItem(PERSONAL_RULES_KEY, JSON.stringify(rules));
+    return rules;
+  }
+
+  // ─── Cross-project insights ────────────────────────────────────
+  // Files the kit already knows about (so we don't suggest re-adding them)
+  const KIT_KNOWN_FILES = new Set([
+    'AGENTS.md', 'PROJECT.md', 'HANDOFF.md', 'README.md', 'INSTALL.md',
+    'docs/ENVIRONMENT.md', 'docs/ARCHITECTURE.md', 'docs/CODE_STRUCTURE.md',
+    'docs/TESTING.md', 'docs/RUNBOOK.md', 'docs/CHANGELOG.md',
+    'docs/DECISIONS.md', 'docs/NAMING.md', 'docs/DOCUMENTATION.md',
+    'docs/DESIGN_STANDARDS.md', 'docs/PRODUCT_PLAN.md', 'docs/LESSONS.md',
+  ]);
+
+  function computeCrossProjectInsights(records) {
+    if (!records || records.length < 2) return null;
+    const total = records.length;
+    // Count file occurrences across projects
+    const fileCount = new Map();
+    const techCount = new Map();
+    for (const r of records) {
+      const seen = new Set();
+      for (const f of (r.filesSnapshot || [])) {
+        if (seen.has(f)) continue;
+        seen.add(f);
+        fileCount.set(f, (fileCount.get(f) || 0) + 1);
+      }
+      for (const t of (r.techStack || [])) {
+        techCount.set(t, (techCount.get(t) || 0) + 1);
+      }
+    }
+    // Untracked files = appear in ≥50% of projects but kit doesn't know about
+    const personal = getPersonalRules();
+    const personalFiles = new Set(personal.extraTemplates.map(r => r.file));
+    const untracked = [...fileCount.entries()]
+      .filter(([f, n]) => n >= Math.ceil(total / 2)
+        && !KIT_KNOWN_FILES.has(f)
+        && !personalFiles.has(f)
+        && /\.md$/.test(f)
+        && !f.startsWith('templates/')
+        && !f.includes('node_modules/'))
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([file, count]) => ({ file, count, total }));
+    // Tech stack distribution
+    const techDist = [...techCount.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([tech, count]) => ({ tech, count, total, pct: Math.round(count * 100 / total) }));
+    return { total, untracked, techDist, personalCount: personal.extraTemplates.length };
+  }
+
+  async function renderCrossProjectInsights() {
+    const host = document.getElementById('kitInsightsHost');
+    if (!host) return;
+    let records = [];
+    try { records = await dbList(); } catch (e) { return; }
+    const insights = computeCrossProjectInsights(records);
+    if (!insights) { host.innerHTML = ''; host.classList.add('is-hidden'); return; }
+    host.classList.remove('is-hidden');
+    const personal = getPersonalRules();
+    const untrackedHtml = insights.untracked.length ? insights.untracked.map(u => `
+      <div class="kit-insight-row">
+        <div>
+          <code>${esc(u.file)}</code>
+          <span class="muted">${u.count}/${u.total} 项目都有</span>
+        </div>
+        <div class="kit-insight-actions">
+          <button class="kit-bookmark-btn primary" data-promote-file="${esc(u.file)}">加入我的规则</button>
+          <button class="kit-bookmark-btn" data-export-file="${esc(u.file)}" title="复制为可贴回 kit 的代码">复制 patch</button>
+        </div>
+      </div>`).join('') : '<div class="kit-insight-empty">所有跨项目高频文件都已被 kit 追踪 ✓</div>';
+    const techHtml = insights.techDist.length ? insights.techDist.map(t => `
+      <span class="kit-insight-tech">${esc(t.tech)} <span class="muted">${t.count}/${t.total}</span></span>
+    `).join('') : '';
+    const personalHtml = personal.extraTemplates.length ? `
+      <div class="kit-insight-block">
+        <div class="kit-insight-title">我的个人规则（仅本浏览器生效）</div>
+        ${personal.extraTemplates.map(r => `
+          <div class="kit-insight-row">
+            <div><code>${esc(r.file)}</code> <span class="muted">${esc(r.title || '')}</span></div>
+            <button class="kit-bookmark-btn ghost" data-remove-personal="${esc(r.file)}" title="移除">✕</button>
+          </div>`).join('')}
+        <div class="kit-insight-export-bar">
+          <button class="kit-bookmark-btn" id="kitExportAllPersonal">导出所有个人规则为 JSON</button>
+        </div>
+      </div>` : '';
+    host.innerHTML = `
+      <div class="kit-section-heading">
+        <span class="kit-section-title"><span class="kit-step-num">∑</span><span class="kit-section-label">跨项目洞察</span></span>
+        <p class="kit-section-subtitle">基于你管的 ${insights.total} 个项目，自动发现可反哺给 kit 的模式</p>
+      </div>
+      <div class="kit-insight-block">
+        <div class="kit-insight-title">📁 高频但 kit 没追踪的文件</div>
+        ${untrackedHtml}
+      </div>
+      ${techHtml ? `
+        <div class="kit-insight-block">
+          <div class="kit-insight-title">📊 你的技术栈分布</div>
+          <div class="kit-insight-tech-list">${techHtml}</div>
+        </div>` : ''}
+      ${personalHtml}
+    `;
+    host.querySelectorAll('[data-promote-file]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const file = btn.dataset.promoteFile;
+        const title = file.split('/').pop().replace(/\.md$/i, '').replace(/_/g, ' ');
+        savePersonalRule({ file, title, desc: '从我的项目里反哺', source: 'personal' });
+        renderCrossProjectInsights();
+        if (typeof renderOptionalTemplates === 'function') renderOptionalTemplates();
+      });
+    });
+    host.querySelectorAll('[data-export-file]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const file = btn.dataset.exportFile;
+        const snippet = generateKitPatch(file);
+        const orig = btn.textContent;
+        try { await navigator.clipboard.writeText(snippet); btn.textContent = '已复制 ✓'; }
+        catch (e) { btn.textContent = '失败'; }
+        setTimeout(() => { btn.textContent = orig; }, 1400);
+      });
+    });
+    host.querySelectorAll('[data-remove-personal]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        removePersonalRule(btn.dataset.removePersonal);
+        renderCrossProjectInsights();
+        if (typeof renderOptionalTemplates === 'function') renderOptionalTemplates();
+      });
+    });
+    const exportAll = document.getElementById('kitExportAllPersonal');
+    if (exportAll) exportAll.addEventListener('click', () => {
+      const blob = new Blob([JSON.stringify(getPersonalRules(), null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'kit-personal-rules.json';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+  }
+
+  // Generate a copyable code snippet that promotes a file into the kit's OPTIONAL_TEMPLATES
+  function generateKitPatch(file) {
+    const title = file.split('/').pop().replace(/\.md$/i, '').replace(/_/g, ' ');
+    return [
+      '// 把下面这行加进 OPTIONAL_TEMPLATES 数组（index.html 里搜 "OPTIONAL_TEMPLATES = ["）',
+      `{ file: '${file}', title: '${title}', desc: '<!-- 在这里写一句这个模板的用途 -->' },`,
+      '',
+      '// 如果还想让它进入「理想连接」检测，也把这行加进 IDEAL_CONNECTIONS：',
+      `// ['AGENTS.md', ['${file}']],  // 视实际语义调整 from`,
+    ].join('\n');
   }
 
   async function renderProjectBookmarks() {
@@ -2782,6 +3049,8 @@
         await renderProjectBookmarks();
       });
     });
+    // Re-render insights whenever bookmarks list updates
+    if (typeof renderCrossProjectInsights === 'function') renderCrossProjectInsights();
     list.querySelectorAll('[data-bookmark-action="reanalyze"]').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
@@ -4104,7 +4373,7 @@
           try {
             previousRecord = await dbGet(projectIdFor(currentDirHandle)).catch(() => null);
             const info = await scanProjectForInfo(map, currentDirHandle.name).catch(() => null);
-            await saveProjectRecord(currentDirHandle, result, info);
+            await saveProjectRecord(currentDirHandle, result, info, map);
           } catch (e) { /* non-fatal */ }
         }
         result.__previousRecord = previousRecord;
