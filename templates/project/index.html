@@ -2503,17 +2503,217 @@
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
+  // ── Smart fill: scan project for inferable facts ─────────────────
+  async function scanProjectForInfo(map, rootName) {
+    const has = (p) => map.has(p);
+    const read = async (p) => {
+      const f = map.get(p);
+      if (!f) return null;
+      try { return typeof f.text === 'function' ? await f.text() : f; }
+      catch (e) { return null; }
+    };
+    const info = {
+      projectName: rootName || null,
+      description: null,
+      techStack: [],
+      packageManager: null,
+      scripts: {},
+      dependencies: [],
+      envFiles: [],
+      tree: '',
+      todoCount: 0,
+      hasGit: false,
+      detectedAt: new Date().toISOString(),
+    };
+    // package.json
+    if (has('package.json')) {
+      try {
+        const pkg = JSON.parse(await read('package.json'));
+        info.projectName = info.projectName || pkg.name || null;
+        info.description = pkg.description || null;
+        info.scripts = pkg.scripts || {};
+        info.dependencies = Object.keys(pkg.dependencies || {}).slice(0, 12);
+        info.techStack.push('Node.js');
+        const all = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
+        if (all.typescript) info.techStack.push('TypeScript');
+        if (all.react) info.techStack.push('React');
+        if (all.vue) info.techStack.push('Vue');
+        if (all.next) info.techStack.push('Next.js');
+        if (all.vite) info.techStack.push('Vite');
+        if (all.express || all.fastify || all.koa) info.techStack.push('Node 后端');
+      } catch (e) {}
+      if (has('pnpm-lock.yaml')) info.packageManager = 'pnpm';
+      else if (has('yarn.lock')) info.packageManager = 'yarn';
+      else if (has('bun.lockb')) info.packageManager = 'bun';
+      else info.packageManager = 'npm';
+    }
+    if (has('pyproject.toml') || has('requirements.txt') || has('setup.py') || has('Pipfile')) info.techStack.push('Python');
+    if (has('go.mod')) info.techStack.push('Go');
+    if (has('Cargo.toml')) info.techStack.push('Rust');
+    if (has('Gemfile')) info.techStack.push('Ruby');
+    if (has('pom.xml') || has('build.gradle')) info.techStack.push('Java');
+    if (has('composer.json')) info.techStack.push('PHP');
+    // env files
+    for (const p of map.keys()) {
+      const base = p.split('/').pop();
+      if (['.env.example', '.env.sample', '.env.template', '.env.local.example'].includes(base)) info.envFiles.push(p);
+    }
+    // git presence (rough — we can't read .git contents from File API, but the picker may include it if user picked root)
+    for (const p of map.keys()) { if (p.startsWith('.git/') || p === '.gitignore') { info.hasGit = true; break; } }
+    // directory tree (top-level + 1 deep, capped)
+    const dirSet = new Set();
+    for (const p of map.keys()) {
+      const parts = p.split('/').slice(0, -1);
+      if (parts[0] && !parts[0].startsWith('.') && parts[0] !== 'node_modules') {
+        dirSet.add(parts[0] + '/');
+        if (parts[1]) dirSet.add(parts[0] + '/' + parts[1] + '/');
+      }
+    }
+    info.tree = [...dirSet].sort().slice(0, 24).join('\n');
+    // TODO/FIXME count (cap at 10 source files for perf)
+    let scanned = 0;
+    for (const p of map.keys()) {
+      if (scanned >= 30) break;
+      if (!/\.(md|js|ts|tsx|jsx|py|go|rs|rb|java|sh|vue)$/.test(p)) continue;
+      if (p.includes('node_modules/')) continue;
+      const text = await read(p);
+      if (!text) continue;
+      const m = text.match(/\b(TODO|FIXME|XXX|HACK)\b/g);
+      if (m) info.todoCount += m.length;
+      scanned++;
+    }
+    return info;
+  }
+
+  function fmtList(arr, sep) { return (arr && arr.length) ? arr.join(sep || '、') : '—'; }
+
+  // Per-template snapshot prefix. Returns markdown to prepend (or null
+  // if this template doesn't get one).
+  function buildSnapshotPrefix(file, info) {
+    const header = `<!-- 以下为「智能填写」自动检测的项目快照，可以参考填写下方内容。删掉此整块也无影响。 -->\n\n`;
+    if (file === 'AGENTS.md') {
+      return header + [
+        '> **项目快照（自动检测）**',
+        `> - 项目名称：${info.projectName || '<!-- 待补 -->'}`,
+        `> - 技术栈：${fmtList(info.techStack)}`,
+        `> - 包管理：${info.packageManager || '—'}`,
+        `> - 启动命令：${info.scripts.dev ? '\`' + info.packageManager + ' run dev\`' : (info.scripts.start ? '\`' + info.packageManager + ' run start\`' : '<!-- 待补 -->')}`,
+        `> - 测试命令：${info.scripts.test ? '\`' + info.packageManager + ' test\`' : '<!-- 待补 -->'}`,
+        '',
+        ''
+      ].join('\n');
+    }
+    if (file === 'PROJECT.md') {
+      return header + [
+        '> **项目快照（自动检测）**',
+        `> - 项目名称：${info.projectName || '<!-- 待补 -->'}`,
+        `> - 简介：${info.description || '<!-- 待补：一句话说明这是什么项目 -->'}`,
+        `> - 技术栈：${fmtList(info.techStack)}`,
+        `> - 当前阶段：<!-- 待补：原型 / 内测 / 稳定 / 维护 -->`,
+        `> - 待办标记数（TODO/FIXME）：${info.todoCount}`,
+        '',
+        ''
+      ].join('\n');
+    }
+    if (file === 'HANDOFF.md') {
+      return header + [
+        '> **接手时间**：' + info.detectedAt.split('T')[0],
+        `> **项目根目录**：${info.projectName || '—'}`,
+        `> **当前状态**：<!-- 待补 -->`,
+        `> **下一步**：<!-- 待补 -->`,
+        `> **风险**：<!-- 待补 -->`,
+        '',
+        ''
+      ].join('\n');
+    }
+    if (file === 'docs/ARCHITECTURE.md') {
+      return header + [
+        '> **检测到的目录结构（顶层）**',
+        '',
+        '```',
+        info.tree || '<!-- 目录未扫描到 -->',
+        '```',
+        '',
+        ''
+      ].join('\n');
+    }
+    if (file === 'docs/ENVIRONMENT.md') {
+      return header + [
+        '> **环境检测**',
+        `> - 技术栈：${fmtList(info.techStack)}`,
+        `> - 包管理：${info.packageManager || '—'}`,
+        `> - 环境变量样板：${fmtList(info.envFiles) || '<!-- 待补 -->'}`,
+        `> - 安装：${info.packageManager ? '\`' + info.packageManager + ' install\`' : '<!-- 待补 -->'}`,
+        `> - 启动：${info.scripts.dev ? '\`' + info.packageManager + ' run dev\`' : '<!-- 待补 -->'}`,
+        '',
+        ''
+      ].join('\n');
+    }
+    if (file === 'docs/TESTING.md') {
+      return header + [
+        '> **测试检测**',
+        `> - 测试命令：${info.scripts.test ? '\`' + info.packageManager + ' test\`' : '<!-- 待补 -->'}`,
+        `> - 类型检查：${info.scripts.typecheck ? '\`' + info.packageManager + ' run typecheck\`' : (info.techStack.includes('TypeScript') ? '\`tsc --noEmit\`（建议）' : '<!-- 待补 -->')}`,
+        '',
+        ''
+      ].join('\n');
+    }
+    // No prefix for other templates
+    return null;
+  }
+
+  // Count <!-- 待补 ... --> markers in a string
+  function countUnfilledMarkers(text) {
+    const m = text.match(/<!--\s*待补[^-]*-->/g);
+    return m ? m.length : 0;
+  }
+
+  // Build the AI 补完 prompt
+  function generateFillPrompt(info, writtenFiles) {
+    return [
+      '我刚在项目里写入了一批 AI 工程文档骨架。每个文件开头都有「项目快照」自动检测内容，但下方还有一些 <!-- 待补 --> 标记需要你帮我填完。',
+      '',
+      `## 项目快照`,
+      `- 项目名称：${info.projectName || '（未检测到，请你帮我从代码里猜）'}`,
+      info.description ? `- 简介：${info.description}` : null,
+      info.techStack.length ? `- 技术栈：${info.techStack.join('、')}` : null,
+      info.packageManager ? `- 包管理：${info.packageManager}` : null,
+      info.tree ? `- 顶层目录：\n\`\`\`\n${info.tree}\n\`\`\`` : null,
+      '',
+      `## 我刚写入的文件`,
+      ...writtenFiles.map(f => '- ' + (typeof f === 'string' ? f : f.written)),
+      '',
+      `## 请你做`,
+      '1. 打开上面每个文件，搜索所有 `<!-- 待补 -->` 标记',
+      '2. 基于项目实际代码和你能看到的所有上下文，把每个标记替换成具体内容',
+      '3. 已填写的"项目快照"块可以保留作为参考，但下方人工部分要补完整',
+      '4. 不确定的字段保留 `<!-- 待补 -->` 不要瞎填',
+      '',
+      '填完后告诉我：哪些文件改了、哪些还没法确定。'
+    ].filter(x => x !== null).join('\n');
+  }
+
   // Write a list of template files into a chosen directory handle.
   // Existing files are written as <name>.template.md so the user's
   // original content is never overwritten.
-  async function writeTemplatesToHandle(handle, files, existingFiles) {
+  // If `info` is provided, prepend an auto-detected snapshot block.
+  async function writeTemplatesToHandle(handle, files, existingFiles, info) {
     const written = [];
+    let totalUnfilled = 0;
     for (const filePath of files) {
       const isExisting = existingFiles.has(filePath);
       const targetPath = isExisting ? filePath.replace(/\.md$/i, '.template.md') : filePath;
       let content;
       try { content = await fetchTemplate(filePath); }
       catch (e) { content = '# ' + filePath + '\n\n> 模板下载失败\n'; }
+      // Prepend smart snapshot prefix if info is available
+      let prefixApplied = false;
+      if (info) {
+        const prefix = buildSnapshotPrefix(filePath, info);
+        if (prefix) { content = prefix + content; prefixApplied = true; }
+      }
+      const unfilled = countUnfilledMarkers(content);
+      totalUnfilled += unfilled;
       const parts = targetPath.split('/');
       const fileName = parts.pop();
       let dir = handle;
@@ -2524,9 +2724,9 @@
       const w = await fh.createWritable();
       await w.write(content);
       await w.close();
-      written.push({ source: filePath, written: targetPath, existing: isExisting });
+      written.push({ source: filePath, written: targetPath, existing: isExisting, prefixed: prefixApplied, unfilled });
     }
-    return written;
+    return { written, totalUnfilled };
   }
 
   async function fetchTemplate(file) {
@@ -2622,7 +2822,8 @@
     } catch (e) { return false; }
   }
 
-  async function pickFolderAndWriteFiles(files, button) {
+  async function pickFolderAndWriteFiles(files, button, opts) {
+    opts = opts || {};
     const label = button.querySelector('[data-button-label]');
     const orig = label ? label.textContent : '';
     let handle;
@@ -2634,37 +2835,27 @@
       setTimeout(() => { if (label) label.textContent = orig; }, 1800);
       return;
     }
-    if (label) label.textContent = '写入中…';
+    if (label) label.textContent = opts.smart ? '扫描并写入中…' : '写入中…';
     button.disabled = true;
     try {
-      // Detect existing files so they get .template.md treatment
       const existing = new Set();
       for (const f of files) {
         if (await fileExistsInHandle(handle, f)) existing.add(f);
       }
-      const written = await writeTemplatesToHandle(handle, files, existing);
+      // If smart mode, scan project first
+      let info = null;
+      if (opts.smart) {
+        try {
+          const projectMap = await buildMapFromHandle(handle);
+          info = await scanProjectForInfo(projectMap, handle.name);
+        } catch (e) { /* scan failed, fall back to no-info write */ }
+      }
+      const { written, totalUnfilled } = await writeTemplatesToHandle(handle, files, existing, info);
       const addedCount = written.filter(w => !w.existing).length;
       const refCount = written.filter(w => w.existing).length;
-      // Replace the action bar with a success summary
+      const prefixedCount = written.filter(w => w.prefixed).length;
       const bar = document.getElementById('kitNewProjectActions');
-      if (bar) {
-        bar.innerHTML = `
-          <div class="kit-result-success">
-            <div class="kit-result-success-icon">✓</div>
-            <div>
-              <div class="kit-result-success-title">已写入 ${written.length} 个文件到 <code>${esc(handle.name)}/</code></div>
-              <div class="kit-result-success-sub">
-                ${addedCount} 个新增直接可用${refCount ? ' · ' + refCount + ' 个文件已有同名内容，写为 <code>.template.md</code> 参考版本' : ''}
-              </div>
-            </div>
-          </div>
-          <ul class="kit-result-list" style="margin-top:var(--space-8)">${written.map(w => `
-            <li class="kit-result-item pass"><span class="kit-result-dot">✓</span><span><code>${esc(w.written)}</code>${w.existing ? '（参考模板）' : ''}</span></li>
-          `).join('')}</ul>
-          <button class="kit-secondary-btn" type="button" id="kitNewProjectReset" style="margin-top:var(--space-8);width:100%;justify-content:center;">再写入到另一个目录</button>
-        `;
-        document.getElementById('kitNewProjectReset')?.addEventListener('click', renderNewProjectActions);
-      }
+      if (bar) renderWriteSuccess(bar, { written, totalUnfilled, info, handleName: handle.name, addedCount, refCount, prefixedCount });
     } catch (e) {
       if (label) label.textContent = '写入失败：' + (e.message || e.name || 'unknown');
       setTimeout(() => { if (label) label.textContent = orig; }, 2800);
@@ -2673,32 +2864,82 @@
     }
   }
 
+  // Render success card after write. Used by both new-project and audit panels.
+  function renderWriteSuccess(container, params) {
+    const { written, totalUnfilled, info, handleName, addedCount, refCount, prefixedCount } = params;
+    const subline = `${addedCount} 个新增直接可用${refCount ? ' · ' + refCount + ' 个已有同名写为 <code>.template.md</code>' : ''}${info ? ' · 自动填了 ' + prefixedCount + ' 个文件的项目快照' : ''}`;
+    container.innerHTML = `
+      <div class="kit-result-success">
+        <div class="kit-result-success-icon">✓</div>
+        <div>
+          <div class="kit-result-success-title">已写入 ${written.length} 个文件到 <code>${esc(handleName)}/</code></div>
+          <div class="kit-result-success-sub">${subline}</div>
+        </div>
+      </div>
+      <ul class="kit-result-list" style="margin-top:var(--space-8)">${written.map(w => `
+        <li class="kit-result-item pass"><span class="kit-result-dot">✓</span><span><code>${esc(w.written)}</code>${w.existing ? '（参考模板）' : ''}${w.unfilled ? ' <span class="muted">· ' + w.unfilled + ' 处待补</span>' : ''}</span></li>
+      `).join('')}</ul>
+      ${totalUnfilled > 0 ? `
+        <div class="kit-result-note" style="margin-top:var(--space-10)">
+          🤖 还有 <strong>${totalUnfilled}</strong> 处 <code>&lt;!-- 待补 --&gt;</code> 需要人工或 AI 补完。
+          复制下面这段话粘到 Claude / Cursor / Codex，让它接着填：
+        </div>
+        <button class="kit-secondary-btn" type="button" id="kitCopyFillPrompt" style="width:100%;justify-content:center;margin-top:var(--space-6);">
+          <span data-button-label>📋 复制 AI 补完 prompt</span>
+        </button>` : ''}
+      <button class="kit-secondary-btn" type="button" id="kitNewProjectReset" style="margin-top:var(--space-8);width:100%;justify-content:center;">再写入到另一个目录</button>
+    `;
+    const resetBtn = document.getElementById('kitNewProjectReset');
+    if (resetBtn) resetBtn.addEventListener('click', renderNewProjectActions);
+    const copyBtn = document.getElementById('kitCopyFillPrompt');
+    if (copyBtn && info) {
+      copyBtn.addEventListener('click', async () => {
+        const lab = copyBtn.querySelector('[data-button-label]');
+        const txt = lab.textContent;
+        const prompt = generateFillPrompt(info, written);
+        try { await navigator.clipboard.writeText(prompt); lab.textContent = '已复制 ✓'; }
+        catch (e) { lab.textContent = '复制失败'; }
+        setTimeout(() => { lab.textContent = txt; }, 1600);
+      });
+    }
+  }
+
   function renderNewProjectActions() {
     const bar = document.getElementById('kitNewProjectActions');
     if (!bar) return;
     const canWrite = typeof window.showDirectoryPicker === 'function';
     bar.innerHTML = canWrite ? `
-      <button class="kit-primary" type="button" id="kitNewProjectWriteBtn">
+      <button class="kit-primary" type="button" id="kitSmartWriteBtn">
         <svg class="kit-icon"><use href="#i-sparkles"></use></svg>
-        <span data-button-label>一键创建到项目目录</span>
+        <span data-button-label>✨ 智能填写并写入</span>
+      </button>
+      <button class="kit-secondary-btn" type="button" id="kitNewProjectWriteBtn" style="width:100%;justify-content:center;margin-top:var(--space-8);">
+        <span data-button-label>写入空模板（不扫描）</span>
       </button>
       <button class="kit-secondary-btn" type="button" id="kitDownloadBtn" style="width:100%;justify-content:center;margin-top:var(--space-8);">
         <svg class="kit-icon"><use href="#i-folder-open"></use></svg>
         <span data-button-label>或下载 zip</span>
       </button>
-      <div class="kit-result-hint" style="margin-top:var(--space-6);">已有同名文件不会被覆盖，会写为 <code>.template.md</code> 参考版本</div>
+      <div class="kit-result-hint" style="margin-top:var(--space-6);">智能填写会扫描你选的目录（package.json / 技术栈 / 目录结构 等），自动填到每个模板顶部的「项目快照」块；填不了的留 <code>&lt;!-- 待补 --&gt;</code> 标记。已有同名文件不覆盖，写为 <code>.template.md</code> 参考版本。</div>
     ` : `
       <button class="kit-primary" type="button" id="kitDownloadBtn">
         <svg class="kit-icon"><use href="#i-folder-open"></use></svg>
         <span data-button-label>下载文档包 .zip</span>
       </button>
-      <div class="kit-result-hint" style="margin-top:var(--space-6);">用 Chrome / Edge 打开本页面，可以一键直接写入项目目录</div>
+      <div class="kit-result-hint" style="margin-top:var(--space-6);">用 Chrome / Edge 打开本页面，可以智能扫描并一键写入项目目录</div>
     `;
+    const smartBtn = document.getElementById('kitSmartWriteBtn');
+    if (smartBtn) {
+      smartBtn.addEventListener('click', async () => {
+        const files = collectNewProjectFiles();
+        await pickFolderAndWriteFiles(files, smartBtn, { smart: true });
+      });
+    }
     const writeBtn = document.getElementById('kitNewProjectWriteBtn');
     if (writeBtn) {
       writeBtn.addEventListener('click', async () => {
         const files = collectNewProjectFiles();
-        await pickFolderAndWriteFiles(files, writeBtn);
+        await pickFolderAndWriteFiles(files, writeBtn, { smart: false });
       });
     }
     const dlBtn = document.getElementById('kitDownloadBtn');
@@ -3443,33 +3684,30 @@
         writeBackBtn.addEventListener('click', async () => {
           const label = writeBackBtn.querySelector('[data-button-label]');
           const orig = label ? label.textContent : '';
-          if (label) label.textContent = '写入中…';
+          if (label) label.textContent = '扫描并写入中…';
           writeBackBtn.disabled = true;
           try {
             const selected = Array.from(el.querySelectorAll('[data-gap-template]:checked')).map(i => i.dataset.gapTemplate);
             if (!selected.length) throw new Error('未选中任何模板');
             const existingSet = new Set([...gapsByTemplate.entries()].filter(([_, v]) => v.existing).map(([k]) => k));
-            const written = await writeTemplatesToHandle(currentDirHandle, selected, existingSet);
+            // Audit panel already has the analyzed map; reuse it for smart fill
+            let info = null;
+            try { info = await scanProjectForInfo(result.__map, currentDirHandle.name); } catch (e) {}
+            const { written, totalUnfilled } = await writeTemplatesToHandle(currentDirHandle, selected, existingSet, info);
             const addedCount = written.filter(w => !w.existing).length;
             const refCount = written.filter(w => w.existing).length;
-            // Replace the section with a success summary
+            const prefixedCount = written.filter(w => w.prefixed).length;
             const section = writeBackBtn.closest('.kit-result-section');
             if (section) {
-              section.innerHTML = `
-                <div class="kit-result-success">
-                  <div class="kit-result-success-icon">✓</div>
-                  <div>
-                    <div class="kit-result-success-title">已写入 ${written.length} 个文件</div>
-                    <div class="kit-result-success-sub">
-                      ${addedCount} 个新增直接可用 · ${refCount} 个参考模板（<code>.template.md</code>，不动你的原文件）
-                    </div>
-                  </div>
-                </div>
-                <ul class="kit-result-list">${written.map(w => `
-                  <li class="kit-result-item pass"><span class="kit-result-dot">✓</span><span><code>${esc(w.written)}</code>${w.existing ? '（参考模板）' : ''}</span></li>
-                `).join('')}</ul>
-                <div class="kit-result-hint">想重新检查？点上方"开始体检"再选一次目录即可。</div>
-              `;
+              if (typeof renderWriteSuccess === 'function') {
+                renderWriteSuccess(section, { written, totalUnfilled, info, handleName: currentDirHandle.name, addedCount, refCount, prefixedCount });
+                const resetBtn = document.getElementById('kitNewProjectReset');
+                if (resetBtn) {
+                  resetBtn.textContent = '想重新检查？点上方"开始体检"再选一次目录';
+                  resetBtn.style.cursor = 'default';
+                  resetBtn.disabled = true;
+                }
+              }
             }
           } catch (e) {
             if (label) label.textContent = '失败：' + (e.message || e.name || 'unknown');
