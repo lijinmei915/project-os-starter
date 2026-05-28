@@ -1775,45 +1775,40 @@
       font-weight: var(--font-bold);
       font-size: var(--text-11);
     }
-    .kit-result-gap-row {
-      padding: 0;
-      background: var(--color-surface-panel);
-      border: 1px solid var(--color-border-subtle);
-      color: var(--color-text-primary);
-    }
-    .kit-result-gap-row:has(input:checked) {
-      background: #fff8ed;
-      border-color: #fde68a;
-    }
-    .kit-result-gap-label {
-      display: grid;
-      grid-template-columns: auto 1fr;
-      gap: var(--space-10);
-      align-items: start;
-      padding: var(--space-10) var(--space-12);
-      cursor: pointer;
-      width: 100%;
-    }
-    .kit-result-gap-label input[type="checkbox"] {
-      width: 16px;
-      height: 16px;
-      margin-top: 2px;
-      cursor: pointer;
-      accent-color: #b45309;
-    }
-    .kit-result-gap-copy strong {
-      display: block;
-      font-size: var(--text-13);
+    .kit-status-tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+      font-size: var(--text-10);
       font-weight: var(--font-medium);
-      color: var(--color-text-primary);
-      font-family: ui-monospace, "SF Mono", monospace;
-    }
-    .kit-result-gap-copy small {
-      display: block;
-      margin-top: 4px;
-      font-size: var(--text-11);
-      color: var(--color-text-secondary);
       line-height: 1.4;
+    }
+    .kit-status-tag-miss {
+      background: #fef2f2;
+      color: #b91c1c;
+      border: 1px solid #fecaca;
+    }
+    .kit-status-tag-warn {
+      background: #fff8ed;
+      color: #b45309;
+      border: 1px solid #fde68a;
+    }
+    .kit-option-reason {
+      display: block;
+      margin-top: 3px;
+      font-size: var(--text-10);
+      color: var(--color-text-muted);
+      line-height: 1.45;
+    }
+    .kit-result-warning {
+      padding: var(--space-10) var(--space-12);
+      border-radius: var(--radius-md);
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      color: #92400e;
+      font-size: var(--text-12);
+      line-height: 1.55;
+      margin-top: var(--space-8);
     }
     .kit-result-download-btn {
       width: 100%;
@@ -2466,7 +2461,10 @@
       let score = 0;
 
       function award(section, pts, label) { items.push({ section, status: 'PASS', pts, label }); score += pts; }
-      function gap(section, pts, label, template)   { items.push({ section, status: 'GAP',  pts, label, template }); }
+      function gap(section, pts, label, template) {
+        const existing = template ? hasFile(map, template) : false;
+        items.push({ section, status: 'GAP', pts, label, template, existing });
+      }
 
       async function checkDoc(section, path, pts, passLabel, minLines, gapLabel) {
         if (await isSubstantive(map, path, minLines)) award(section, pts, passLabel);
@@ -2543,19 +2541,34 @@
       if (!el) return;
 
       // Build deduplicated template list from gaps that have a template mapping
-      const seenTemplates = new Set();
-      const gapsByTemplate = new Map(); // template -> array of gap labels
+      const gapsByTemplate = new Map(); // template -> { reasons: [...], existing: bool }
       const gapsWithoutTemplate = [];
       for (const g of gaps) {
         if (g.template) {
-          if (!gapsByTemplate.has(g.template)) gapsByTemplate.set(g.template, []);
-          gapsByTemplate.get(g.template).push(g.label);
+          if (!gapsByTemplate.has(g.template)) {
+            gapsByTemplate.set(g.template, { reasons: [], existing: g.existing });
+          }
+          gapsByTemplate.get(g.template).reasons.push(g.label);
         } else {
           gapsWithoutTemplate.push(g);
         }
       }
+
+      // Friendly title lookup from OPTIONAL_TEMPLATES + REQUIRED meta
+      const REQUIRED_META = {
+        'AGENTS.md': { title: 'AI 工作规则', desc: 'AI 该怎么做，哪些事不要乱改' },
+        'PROJECT.md': { title: '项目说明', desc: '这个项目是什么，给谁用，目标是什么' },
+        'HANDOFF.md': { title: '当前状态 / 交接记录', desc: '现在做到哪一步，还缺什么' }
+      };
+      function templateMeta(file) {
+        if (REQUIRED_META[file]) return REQUIRED_META[file];
+        const opt = OPTIONAL_TEMPLATES.find(t => t.file === file);
+        return opt ? { title: opt.title, desc: opt.desc } : { title: file, desc: '' };
+      }
+
       const templates = [...gapsByTemplate.keys()];
       const downloadable = templates.length;
+      const hasExisting = templates.some(t => gapsByTemplate.get(t).existing);
 
       el.innerHTML = `
         <div class="kit-result-score">
@@ -2569,16 +2582,26 @@
         </div>
         ${downloadable ? `<div class="kit-result-section">
           <div class="kit-result-section-title">勾选要下载的模板（${downloadable} 个文件）</div>
-          <ul class="kit-result-list">${templates.map(t => `
-            <li class="kit-result-item gap kit-result-gap-row">
-              <label class="kit-result-gap-label">
-                <input type="checkbox" data-gap-template="${esc(t)}" checked>
-                <span class="kit-result-gap-copy">
-                  <strong>${esc(t)}</strong>
-                  ${gapsByTemplate.get(t).map(l => `<small>${esc(l)}</small>`).join('')}
-                </span>
-              </label>
-            </li>`).join('')}</ul>
+          <div class="kit-option-list">${templates.map(t => {
+            const meta = templateMeta(t);
+            const info = gapsByTemplate.get(t);
+            const tag = info.existing
+              ? '<span class="kit-status-tag kit-status-tag-warn">已有，建议补充</span>'
+              : '<span class="kit-status-tag kit-status-tag-miss">缺失</span>';
+            return `
+            <label class="kit-option">
+              <input type="checkbox" data-gap-template="${esc(t)}" ${info.existing ? '' : 'checked'}>
+              <span class="kit-option-copy">
+                <strong>${esc(meta.title)}</strong>
+                <small>${esc(t)}</small>
+              </span>
+              <span class="kit-option-desc">
+                ${tag}
+                ${info.reasons.map(r => `<span class="kit-option-reason">${esc(r)}</span>`).join('')}
+              </span>
+            </label>`;
+          }).join('')}</div>
+          ${hasExisting ? '<div class="kit-result-warning">⚠️ 勾选的文件会写入 zip。已存在的文件在你解压时可能被覆盖，请先备份。</div>' : ''}
           <button class="kit-primary kit-result-download-btn" type="button" id="kitGapDownloadBtn">
             <svg class="kit-icon"><use href="#i-folder-open"></use></svg>
             <span data-button-label>下载所选模板 .zip</span>
