@@ -1936,6 +1936,107 @@
       border-radius: 3px;
       font-size: 11px;
     }
+    .kit-graph-host {
+      width: 100%;
+    }
+    .kit-graph-loading,
+    .kit-graph-empty,
+    .kit-graph-allgood {
+      padding: var(--space-16);
+      text-align: center;
+      color: var(--color-text-muted);
+      font-size: var(--text-12);
+      background: var(--color-surface-page);
+      border-radius: var(--radius-md);
+      border: 1px dashed var(--color-border-subtle);
+    }
+    .kit-graph-allgood {
+      color: var(--color-success-text);
+      border-color: var(--color-success-text);
+      background: var(--color-success-bg);
+    }
+    .kit-graph-frame {
+      background: var(--color-surface-panel);
+      border: 1px solid var(--color-border-subtle);
+      border-radius: var(--radius-md);
+      padding: var(--space-12);
+    }
+    .kit-graph-svg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    .kit-graph-node circle {
+      transition: stroke-width .15s;
+    }
+    .kit-graph-node:hover circle {
+      stroke-width: 3;
+      cursor: pointer;
+    }
+    .kit-graph-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-12);
+      margin-top: var(--space-10);
+      padding-top: var(--space-10);
+      border-top: 1px solid var(--color-border-subtle);
+      font-size: var(--text-11);
+      color: var(--color-text-secondary);
+    }
+    .kit-graph-legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .kit-graph-legend i {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .kit-graph-issues {
+      display: grid;
+      gap: var(--space-8);
+      margin-top: var(--space-10);
+    }
+    .kit-graph-issue {
+      padding: var(--space-10) var(--space-12);
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: var(--radius-md);
+    }
+    .kit-graph-issue-head {
+      display: flex;
+      align-items: baseline;
+      gap: var(--space-8);
+      margin-bottom: var(--space-6);
+    }
+    .kit-graph-issue-head strong {
+      font-size: var(--text-13);
+      color: #92400e;
+    }
+    .kit-graph-issue-head span {
+      font-size: var(--text-11);
+      color: var(--color-text-secondary);
+    }
+    .kit-graph-issue ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-6);
+    }
+    .kit-graph-issue li code {
+      display: inline-block;
+      background: rgba(255,255,255,.7);
+      border: 1px solid #fde68a;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: var(--text-11);
+      color: #78350f;
+      font-family: ui-monospace, "SF Mono", monospace;
+    }
     .kit-check-item {
       display: grid;
       grid-template-columns: var(--component-check-icon-size) minmax(0, 1fr) var(--component-check-size);
@@ -2641,6 +2742,174 @@
       return { score, maxScore: 100, items };
     }
 
+    // ─── Reference graph: parse + layout + render + diagnose ────────
+    function escRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+    async function parseReferences(map) {
+      // Only consider markdown files for the graph
+      const mdFiles = [...map.keys()].filter(p => p.toLowerCase().endsWith('.md'));
+      const patterns = mdFiles.map(target => {
+        const basename = target.split('/').pop();
+        return {
+          target,
+          full: new RegExp(escRegex(target), 'g'),
+          base: new RegExp('(?<![\\w/])' + escRegex(basename) + '(?![\\w])', 'g')
+        };
+      });
+      const edges = [];
+      for (const source of mdFiles) {
+        const text = await readText(map, source);
+        if (!text) continue;
+        for (const { target, full, base } of patterns) {
+          if (target === source) continue;
+          const fullCount = (text.match(full) || []).length;
+          const baseCount = fullCount > 0 ? 0 : (text.match(base) || []).length;
+          const count = fullCount || baseCount;
+          if (count > 0) edges.push({ from: source, to: target, count });
+        }
+      }
+      return { files: mdFiles, edges };
+    }
+
+    function diagnoseGraph(files, edges, gapTemplates) {
+      // gapTemplates = Set of templates that came up as gaps (missing or weak)
+      const inDeg = new Map(files.map(f => [f, 0]));
+      const outDeg = new Map(files.map(f => [f, 0]));
+      for (const e of edges) {
+        inDeg.set(e.to, (inDeg.get(e.to) || 0) + 1);
+        outDeg.set(e.from, (outDeg.get(e.from) || 0) + 1);
+      }
+      const findings = [];
+      // Orphans: no inbound and no outbound
+      const orphans = files.filter(f => (inDeg.get(f) || 0) === 0 && (outDeg.get(f) || 0) === 0);
+      // Sinks: referenced but reference nothing back (might be terminal — usually OK, only flag if it's a hub-y file like AGENTS/PROJECT/HANDOFF)
+      const HUB_FILES = new Set(['AGENTS.md', 'PROJECT.md', 'HANDOFF.md', 'README.md']);
+      const lonelyHubs = files.filter(f => HUB_FILES.has(f) && (inDeg.get(f) || 0) === 0);
+      // Suspicious missing edges between hub files
+      const edgeSet = new Set(edges.map(e => e.from + '→' + e.to));
+      const expected = [];
+      if (files.includes('AGENTS.md') && files.includes('PROJECT.md') && !edgeSet.has('AGENTS.md→PROJECT.md')) expected.push('AGENTS.md 通常应提到 PROJECT.md');
+      if (files.includes('AGENTS.md') && files.includes('HANDOFF.md') && !edgeSet.has('AGENTS.md→HANDOFF.md')) expected.push('AGENTS.md 通常应提到 HANDOFF.md');
+      if (files.includes('PROJECT.md') && files.includes('HANDOFF.md') && !edgeSet.has('PROJECT.md→HANDOFF.md') && !edgeSet.has('HANDOFF.md→PROJECT.md')) expected.push('PROJECT.md 与 HANDOFF.md 之间应有引用');
+      return { orphans, lonelyHubs, expected, inDeg, outDeg };
+    }
+
+    function runForceLayout(nodes, edges, width, height, iterations) {
+      iterations = iterations || 220;
+      nodes.forEach((n) => {
+        n.x = width / 2 + (Math.random() - .5) * width * .5;
+        n.y = height / 2 + (Math.random() - .5) * height * .5;
+        n.vx = 0; n.vy = 0;
+      });
+      const nodeMap = new Map(nodes.map(n => [n.id, n]));
+      const linkLength = 90;
+      const repulsion = 5500;
+      const springK = 0.06;
+      const damping = 0.82;
+      const centerK = 0.012;
+      for (let iter = 0; iter < iterations; iter++) {
+        for (let i = 0; i < nodes.length; i++) {
+          for (let j = i + 1; j < nodes.length; j++) {
+            const a = nodes[i], b = nodes[j];
+            const dx = b.x - a.x, dy = b.y - a.y;
+            const d2 = dx * dx + dy * dy + 0.1;
+            const d = Math.sqrt(d2);
+            const f = repulsion / d2;
+            const fx = (dx / d) * f, fy = (dy / d) * f;
+            a.vx -= fx; a.vy -= fy;
+            b.vx += fx; b.vy += fy;
+          }
+        }
+        for (const e of edges) {
+          const a = nodeMap.get(e.from), b = nodeMap.get(e.to);
+          if (!a || !b) continue;
+          const dx = b.x - a.x, dy = b.y - a.y;
+          const d = Math.sqrt(dx * dx + dy * dy) || 0.01;
+          const diff = d - linkLength;
+          const fx = (dx / d) * diff * springK, fy = (dy / d) * diff * springK;
+          a.vx += fx; a.vy += fy;
+          b.vx -= fx; b.vy -= fy;
+        }
+        const m = 40;
+        for (const n of nodes) {
+          n.vx += (width / 2 - n.x) * centerK;
+          n.vy += (height / 2 - n.y) * centerK;
+          n.vx *= damping; n.vy *= damping;
+          n.x += n.vx; n.y += n.vy;
+          n.x = Math.max(m, Math.min(width - m, n.x));
+          n.y = Math.max(m, Math.min(height - m, n.y));
+        }
+      }
+    }
+
+    function renderReferenceGraph(target, map, gaps) {
+      (async () => {
+        const { files, edges } = await parseReferences(map);
+        if (files.length < 2) {
+          target.innerHTML = '<div class="kit-graph-empty">少于 2 份 markdown 文件，画不出关系图</div>';
+          return;
+        }
+        const gapTemplates = new Set(gaps.filter(g => g.template).map(g => g.template));
+        const diag = diagnoseGraph(files, edges, gapTemplates);
+        const nodes = files.map(f => {
+          const isOrphan = diag.orphans.includes(f);
+          const isHub = ['AGENTS.md', 'PROJECT.md', 'HANDOFF.md', 'README.md'].includes(f);
+          const deg = (diag.inDeg.get(f) || 0) + (diag.outDeg.get(f) || 0);
+          let color;
+          if (isOrphan) color = '#94a3b8';        // gray — orphan
+          else if (gapTemplates.has(f)) color = '#f59e0b'; // amber — flagged gap
+          else if (isHub) color = '#0f172a';      // dark — hub
+          else color = '#3b82f6';                 // blue — connected normal
+          return { id: f, label: f.split('/').pop(), degree: deg, color, isOrphan, isHub };
+        });
+        const width = Math.max(target.clientWidth || 600, 500);
+        const height = Math.max(360, Math.min(560, nodes.length * 28));
+        runForceLayout(nodes, edges, width, height);
+        const nodeMap = new Map(nodes.map(n => [n.id, n]));
+        const r = (n) => 6 + Math.min(14, Math.sqrt(n.degree) * 3);
+        const edgesHtml = edges.map(e => {
+          const a = nodeMap.get(e.from), b = nodeMap.get(e.to);
+          const w = Math.min(2.5, 0.6 + Math.log2(e.count + 1) * 0.6);
+          return `<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="#cbd5e1" stroke-width="${w}" stroke-opacity=".7" marker-end="url(#kit-graph-arrow)"/>`;
+        }).join('');
+        const nodesHtml = nodes.map(n => `
+          <g class="kit-graph-node" transform="translate(${n.x.toFixed(1)}, ${n.y.toFixed(1)})">
+            <title>${esc(n.id)} · in ${diag.inDeg.get(n.id) || 0} / out ${diag.outDeg.get(n.id) || 0}</title>
+            <circle r="${r(n)}" fill="${n.color}" stroke="#fff" stroke-width="2"/>
+            <text dy="${r(n) + 11}" text-anchor="middle" font-size="10" fill="#475569" pointer-events="none">${esc(n.label)}</text>
+          </g>
+        `).join('');
+        const issues = [];
+        if (diag.orphans.length) issues.push({ kind: '孤岛', items: diag.orphans, hint: '没有任何文件引用它，也没引用任何文件' });
+        if (diag.lonelyHubs.length) issues.push({ kind: '关键文档无人引用', items: diag.lonelyHubs, hint: 'AGENTS/PROJECT/HANDOFF 这种应该被其他文档提到' });
+        if (diag.expected.length) issues.push({ kind: '建议补的连接', items: diag.expected, hint: '常见铁三角缺失' });
+        target.innerHTML = `
+          <div class="kit-graph-frame">
+            <svg viewBox="0 0 ${width} ${height}" class="kit-graph-svg" preserveAspectRatio="xMidYMid meet">
+              <defs>
+                <marker id="kit-graph-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"/>
+                </marker>
+              </defs>
+              <g class="kit-graph-edges">${edgesHtml}</g>
+              <g class="kit-graph-nodes">${nodesHtml}</g>
+            </svg>
+            <div class="kit-graph-legend">
+              <span><i style="background:#0f172a"></i>核心文档</span>
+              <span><i style="background:#3b82f6"></i>已互联</span>
+              <span><i style="background:#f59e0b"></i>有缺口</span>
+              <span><i style="background:#94a3b8"></i>孤岛</span>
+            </div>
+          </div>
+          ${issues.length ? `<div class="kit-graph-issues">${issues.map(g => `
+            <div class="kit-graph-issue">
+              <div class="kit-graph-issue-head"><strong>${esc(g.kind)}</strong><span>${esc(g.hint)}</span></div>
+              <ul>${g.items.map(it => `<li><code>${esc(it)}</code></li>`).join('')}</ul>
+            </div>`).join('')}</div>` : '<div class="kit-graph-allgood">✓ 文档关联看起来健康，没发现孤岛或断链</div>'}
+        `;
+      })();
+    }
+
     function renderResults(result) {
       const { score, maxScore, items } = result;
       const pct = Math.round(score * 100 / maxScore);
@@ -2750,7 +3019,17 @@
         ${passes.length ? `<div class="kit-result-section">
           <div class="kit-result-section-title">已通过（${passes.length} 项）</div>
           <ul class="kit-result-list">${passes.map(i => `<li class="kit-result-item pass"><span class="kit-result-dot">✓</span><span>${esc(i.label)}</span></li>`).join('')}</ul>
-        </div>` : ''}`;
+        </div>` : ''}
+        <div class="kit-result-section">
+          <div class="kit-result-section-title">文档关系图（诊断引用与孤岛）</div>
+          <div id="kitReferenceGraph" class="kit-graph-host"><div class="kit-graph-loading">分析中…</div></div>
+        </div>`;
+
+      // Render reference graph (async)
+      const graphHost = document.getElementById('kitReferenceGraph');
+      if (graphHost && typeof result.__map !== 'undefined') {
+        renderReferenceGraph(graphHost, result.__map, gaps);
+      }
 
       // Wire up the inline download button
       const gapDownloadBtn = document.getElementById('kitGapDownloadBtn');
@@ -2894,6 +3173,7 @@
       if (btn) btn.disabled = true;
       try {
         const result = await runChecks(map);
+        result.__map = map; // pass-through for reference graph
         renderResults(result);
         document.getElementById('kitOldResults').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       } finally {
