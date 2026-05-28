@@ -1307,10 +1307,17 @@
       background: rgba(250, 250, 250, .8);
     }
     .kit-material[aria-disabled="true"] {
-      background: var(--color-surface-panel);
+      background: var(--color-surface-page);
       border-color: var(--color-border-subtle);
-      cursor: pointer;
-      box-shadow: var(--shadow-sm);
+      cursor: not-allowed;
+      box-shadow: none;
+      opacity: .72;
+    }
+    .kit-material[aria-disabled="true"]:hover {
+      background: var(--color-surface-page);
+    }
+    .kit-material[aria-disabled="true"] .kit-check-control {
+      opacity: .85;
     }
     .kit-check-control {
       width: 18px;
@@ -1396,7 +1403,16 @@
     }
     .kit-option input[type="checkbox"]:disabled {
       cursor: not-allowed;
-      opacity: .75;
+      opacity: .55;
+    }
+    .kit-option:has(input:disabled) {
+      cursor: not-allowed;
+      background: var(--color-surface-page);
+      opacity: .7;
+    }
+    .kit-option:has(input:disabled):hover {
+      background: var(--color-surface-page);
+      border-color: var(--color-border-subtle);
     }
     .kit-option input[type="checkbox"]:focus-visible {
       outline: 2px solid var(--color-surface-inverse);
