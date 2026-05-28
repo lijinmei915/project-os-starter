@@ -1313,22 +1313,21 @@
       box-shadow: var(--shadow-sm);
     }
     .kit-check-control {
-      width: var(--component-check-size);
-      height: var(--component-check-size);
+      width: 18px;
+      height: 18px;
       margin-top: var(--space-3);
-      border-radius: var(--radius-xs);
+      border-radius: 4px;
       border: 0;
       background: var(--color-surface-inverse);
       display: inline-grid;
       place-items: center;
-      color: var(--color-success-icon);
+      color: #fff;
       flex: 0 0 auto;
-      box-shadow: 0 1px 2px rgba(24, 24, 27, .12);
     }
     .kit-check-control .kit-icon {
-      width: var(--component-icon-sm);
-      height: var(--component-icon-sm);
-      stroke-width: 4;
+      width: 12px;
+      height: 12px;
+      stroke-width: 3.5;
     }
     .kit-material-copy {
       display: block;
@@ -1370,11 +1369,40 @@
       border-color: var(--color-border-default);
     }
     .kit-option input[type="checkbox"] {
-      width: 16px;
-      height: 16px;
+      appearance: none;
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
       margin: 0;
+      border: 1.5px solid var(--color-border-default);
+      border-radius: 4px;
+      background: var(--color-surface-panel);
       cursor: pointer;
-      accent-color: var(--color-surface-inverse);
+      position: relative;
+      flex-shrink: 0;
+      transition: background var(--transition-fast), border-color var(--transition-fast);
+    }
+    .kit-option input[type="checkbox"]:hover {
+      border-color: var(--color-surface-inverse);
+    }
+    .kit-option input[type="checkbox"]:checked {
+      background: var(--color-surface-inverse);
+      border-color: var(--color-surface-inverse);
+    }
+    .kit-option input[type="checkbox"]:checked::after {
+      content: '';
+      position: absolute;
+      left: 5px;
+      top: 1px;
+      width: 4px;
+      height: 9px;
+      border: solid #fff;
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
+    }
+    .kit-option input[type="checkbox"]:focus-visible {
+      outline: 2px solid var(--color-surface-inverse);
+      outline-offset: 2px;
     }
     .kit-option-copy strong {
       display: block;
@@ -1396,8 +1424,8 @@
       max-width: 220px;
     }
     .kit-option:has(input:checked) {
-      background: var(--color-success-bg);
-      border-color: var(--color-success-text);
+      background: var(--color-surface-panel);
+      border-color: var(--color-surface-inverse);
     }
     .kit-empty-action {
       flex: 1;
