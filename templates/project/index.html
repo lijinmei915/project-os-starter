@@ -2331,8 +2331,8 @@
           </div>
           <div class="kit-option-list" id="kitOptionTemplates"></div>
         </div>
-        <div class="kit-generate-bar">
-          <button class="kit-primary" type="button" id="kitDownloadBtn"><svg class="kit-icon"><use href="#i-folder-open"></use></svg><span data-button-label>下载文档包 .zip</span></button>
+        <div class="kit-generate-bar" id="kitNewProjectActions">
+          <!-- Buttons rendered dynamically based on File System Access API support -->
         </div>
       </div>
     </section>
@@ -2520,6 +2520,37 @@
   }
   renderOptionalTemplates();
 
+  // Tiny outer-scope HTML escape, shared by new-project and audit panels
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  // Write a list of template files into a chosen directory handle.
+  // Existing files are written as <name>.template.md so the user's
+  // original content is never overwritten.
+  async function writeTemplatesToHandle(handle, files, existingFiles) {
+    const written = [];
+    for (const filePath of files) {
+      const isExisting = existingFiles.has(filePath);
+      const targetPath = isExisting ? filePath.replace(/\.md$/i, '.template.md') : filePath;
+      let content;
+      try { content = await fetchTemplate(filePath); }
+      catch (e) { content = '# ' + filePath + '\n\n> 模板下载失败\n'; }
+      const parts = targetPath.split('/');
+      const fileName = parts.pop();
+      let dir = handle;
+      for (const part of parts) {
+        dir = await dir.getDirectoryHandle(part, { create: true });
+      }
+      const fh = await dir.getFileHandle(fileName, { create: true });
+      const w = await fh.createWritable();
+      await w.write(content);
+      await w.close();
+      written.push({ source: filePath, written: targetPath, existing: isExisting });
+    }
+    return written;
+  }
+
   async function fetchTemplate(file) {
     // Required files live under templates/project/
     // Optional files under templates/project-docs/
@@ -2591,17 +2622,116 @@
     }
   }
 
-  const kitDownloadBtn = document.getElementById("kitDownloadBtn");
-  if (kitDownloadBtn) {
-    kitDownloadBtn.addEventListener("click", async () => {
-      const collab = document.querySelector('[data-kit-collab].is-active')?.dataset.kitCollab || 'solo';
-      const requiredItems = (kitRequiredMaterials[collab] || kitRequiredMaterials.solo).map(x => x.file);
-      const required = [...new Set([...REQUIRED_FILES, ...requiredItems])];
-      const optional = Array.from(document.querySelectorAll("[data-template-file]:checked")).map(i => i.dataset.templateFile);
-      const files = [...new Set([...required, ...optional])];
-      await buildAndDownloadZip(files, kitDownloadBtn);
-    });
+  function collectNewProjectFiles() {
+    const collab = document.querySelector('[data-kit-collab].is-active')?.dataset.kitCollab || 'solo';
+    const requiredItems = (kitRequiredMaterials[collab] || kitRequiredMaterials.solo).map(x => x.file);
+    const required = [...new Set([...REQUIRED_FILES, ...requiredItems])];
+    const optional = Array.from(document.querySelectorAll("[data-template-file]:checked")).map(i => i.dataset.templateFile);
+    return [...new Set([...required, ...optional])];
   }
+
+  // Check if a relative path exists in a directory handle (returns bool)
+  async function fileExistsInHandle(handle, path) {
+    try {
+      const parts = path.split('/');
+      const name = parts.pop();
+      let dir = handle;
+      for (const p of parts) {
+        dir = await dir.getDirectoryHandle(p);
+      }
+      await dir.getFileHandle(name);
+      return true;
+    } catch (e) { return false; }
+  }
+
+  async function pickFolderAndWriteFiles(files, button) {
+    const label = button.querySelector('[data-button-label]');
+    const orig = label ? label.textContent : '';
+    let handle;
+    try {
+      handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+      if (label) label.textContent = '需要授权访问目录';
+      setTimeout(() => { if (label) label.textContent = orig; }, 1800);
+      return;
+    }
+    if (label) label.textContent = '写入中…';
+    button.disabled = true;
+    try {
+      // Detect existing files so they get .template.md treatment
+      const existing = new Set();
+      for (const f of files) {
+        if (await fileExistsInHandle(handle, f)) existing.add(f);
+      }
+      const written = await writeTemplatesToHandle(handle, files, existing);
+      const addedCount = written.filter(w => !w.existing).length;
+      const refCount = written.filter(w => w.existing).length;
+      // Replace the action bar with a success summary
+      const bar = document.getElementById('kitNewProjectActions');
+      if (bar) {
+        bar.innerHTML = `
+          <div class="kit-result-success">
+            <div class="kit-result-success-icon">✓</div>
+            <div>
+              <div class="kit-result-success-title">已写入 ${written.length} 个文件到 <code>${esc(handle.name)}/</code></div>
+              <div class="kit-result-success-sub">
+                ${addedCount} 个新增直接可用${refCount ? ' · ' + refCount + ' 个文件已有同名内容，写为 <code>.template.md</code> 参考版本' : ''}
+              </div>
+            </div>
+          </div>
+          <ul class="kit-result-list" style="margin-top:var(--space-8)">${written.map(w => `
+            <li class="kit-result-item pass"><span class="kit-result-dot">✓</span><span><code>${esc(w.written)}</code>${w.existing ? '（参考模板）' : ''}</span></li>
+          `).join('')}</ul>
+          <button class="kit-secondary-btn" type="button" id="kitNewProjectReset" style="margin-top:var(--space-8);width:100%;justify-content:center;">再写入到另一个目录</button>
+        `;
+        document.getElementById('kitNewProjectReset')?.addEventListener('click', renderNewProjectActions);
+      }
+    } catch (e) {
+      if (label) label.textContent = '写入失败：' + (e.message || e.name || 'unknown');
+      setTimeout(() => { if (label) label.textContent = orig; }, 2800);
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  function renderNewProjectActions() {
+    const bar = document.getElementById('kitNewProjectActions');
+    if (!bar) return;
+    const canWrite = typeof window.showDirectoryPicker === 'function';
+    bar.innerHTML = canWrite ? `
+      <button class="kit-primary" type="button" id="kitNewProjectWriteBtn">
+        <svg class="kit-icon"><use href="#i-sparkles"></use></svg>
+        <span data-button-label>一键创建到项目目录</span>
+      </button>
+      <button class="kit-secondary-btn" type="button" id="kitDownloadBtn" style="width:100%;justify-content:center;margin-top:var(--space-8);">
+        <svg class="kit-icon"><use href="#i-folder-open"></use></svg>
+        <span data-button-label>或下载 zip</span>
+      </button>
+      <div class="kit-result-hint" style="margin-top:var(--space-6);">已有同名文件不会被覆盖，会写为 <code>.template.md</code> 参考版本</div>
+    ` : `
+      <button class="kit-primary" type="button" id="kitDownloadBtn">
+        <svg class="kit-icon"><use href="#i-folder-open"></use></svg>
+        <span data-button-label>下载文档包 .zip</span>
+      </button>
+      <div class="kit-result-hint" style="margin-top:var(--space-6);">用 Chrome / Edge 打开本页面，可以一键直接写入项目目录</div>
+    `;
+    const writeBtn = document.getElementById('kitNewProjectWriteBtn');
+    if (writeBtn) {
+      writeBtn.addEventListener('click', async () => {
+        const files = collectNewProjectFiles();
+        await pickFolderAndWriteFiles(files, writeBtn);
+      });
+    }
+    const dlBtn = document.getElementById('kitDownloadBtn');
+    if (dlBtn) {
+      dlBtn.addEventListener('click', async () => {
+        const files = collectNewProjectFiles();
+        await buildAndDownloadZip(files, dlBtn);
+      });
+    }
+  }
+  renderNewProjectActions();
   document.querySelectorAll("[data-kit-source]").forEach((button) => {
     button.addEventListener("click", () => {
       const source = button.dataset.kitSource;
@@ -3409,29 +3539,6 @@
       }
       await walk(handle, '');
       return map;
-    }
-
-    async function writeTemplatesToHandle(handle, files, existingFiles) {
-      const written = [];
-      for (const filePath of files) {
-        const isExisting = existingFiles.has(filePath);
-        const targetPath = isExisting ? filePath.replace(/\.md$/i, '.template.md') : filePath;
-        let content;
-        try { content = await fetchTemplate(filePath); }
-        catch (e) { content = '# ' + filePath + '\n\n> 模板下载失败\n'; }
-        const parts = targetPath.split('/');
-        const fileName = parts.pop();
-        let dir = handle;
-        for (const part of parts) {
-          dir = await dir.getDirectoryHandle(part, { create: true });
-        }
-        const fh = await dir.getFileHandle(fileName, { create: true });
-        const w = await fh.createWritable();
-        await w.write(content);
-        await w.close();
-        written.push({ source: filePath, written: targetPath, existing: isExisting });
-      }
-      return written;
     }
 
     async function buildMapFromZip(zipFile) {
