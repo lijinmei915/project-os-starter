@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <title>AI 项目工程完整度报告</title>
   <style>
     :root {
@@ -1357,7 +1358,7 @@
     }
     .kit-option {
       display: grid;
-      grid-template-columns: auto 1fr auto;
+      grid-template-columns: auto 1fr auto auto;
       gap: var(--space-12);
       align-items: center;
       border: 1px solid var(--color-border-subtle);
@@ -1811,6 +1812,19 @@
       background: var(--color-success-bg);
       color: var(--color-success-text);
     }
+    .kit-result-item.is-clickable {
+      cursor: pointer;
+      transition: filter var(--transition-fast);
+    }
+    .kit-result-item.is-clickable:hover {
+      filter: brightness(.96);
+    }
+    .kit-result-item.is-clickable::after {
+      content: '👁️';
+      margin-left: auto;
+      font-size: 11px;
+      opacity: .55;
+    }
     .kit-result-item.gap {
       background: #fff8ed;
       color: #92400e;
@@ -2220,6 +2234,156 @@
       font-weight: var(--font-medium);
       vertical-align: middle;
     }
+    /* ─── Markdown file viewer modal ────────────────────────── */
+    .kit-viewer-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .kit-viewer-overlay.is-hidden { display: none; }
+    .kit-viewer-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(15, 23, 42, .55);
+      backdrop-filter: blur(2px);
+      cursor: pointer;
+    }
+    .kit-viewer-panel {
+      position: relative;
+      width: min(960px, 100%);
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      background: #fff;
+      border-radius: var(--radius-xl);
+      box-shadow: 0 24px 80px rgba(15, 23, 42, .3);
+      overflow: hidden;
+    }
+    .kit-viewer-header {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--color-border-subtle);
+      background: var(--color-surface-page);
+    }
+    .kit-viewer-title-wrap { min-width: 0; flex: 1; }
+    .kit-viewer-title-wrap strong {
+      display: block;
+      font-family: ui-monospace, "SF Mono", monospace;
+      font-size: var(--text-13);
+      color: var(--color-text-primary);
+    }
+    .kit-viewer-source {
+      display: block;
+      font-size: var(--text-11);
+      color: var(--color-text-muted);
+      margin-top: 2px;
+    }
+    .kit-viewer-actions {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .kit-viewer-tab,
+    .kit-viewer-copy,
+    .kit-viewer-close {
+      border: 1px solid var(--color-border-default);
+      background: #fff;
+      border-radius: var(--radius-md);
+      padding: 5px 10px;
+      font-size: var(--text-12);
+      cursor: pointer;
+      transition: background var(--transition-fast);
+    }
+    .kit-viewer-tab.is-active {
+      background: var(--color-surface-inverse);
+      color: #fff;
+      border-color: var(--color-surface-inverse);
+    }
+    .kit-viewer-tab:hover:not(.is-active),
+    .kit-viewer-copy:hover,
+    .kit-viewer-close:hover { background: var(--color-surface-page); }
+    .kit-viewer-close { padding: 5px 9px; color: var(--color-text-muted); }
+    .kit-viewer-body {
+      flex: 1;
+      overflow: auto;
+      padding: 24px 28px;
+    }
+    .kit-viewer-raw {
+      margin: 0;
+      font-family: ui-monospace, "SF Mono", monospace;
+      font-size: var(--text-12);
+      line-height: 1.55;
+      color: var(--color-text-primary);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .kit-viewer-raw.is-hidden,
+    .kit-viewer-render.is-hidden { display: none; }
+    /* Markdown render styling */
+    .markdown-body { line-height: 1.65; color: var(--color-text-primary); font-size: var(--text-14); }
+    .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4 {
+      margin: 1.4em 0 .6em; font-weight: 700; line-height: 1.3;
+    }
+    .markdown-body h1 { font-size: 1.6em; border-bottom: 1px solid var(--color-border-subtle); padding-bottom: 6px; }
+    .markdown-body h2 { font-size: 1.3em; border-bottom: 1px solid var(--color-border-subtle); padding-bottom: 4px; }
+    .markdown-body h3 { font-size: 1.1em; }
+    .markdown-body p { margin: .7em 0; }
+    .markdown-body ul, .markdown-body ol { padding-left: 1.5em; margin: .6em 0; }
+    .markdown-body li { margin: .25em 0; }
+    .markdown-body code {
+      background: var(--color-surface-page);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-family: ui-monospace, "SF Mono", monospace;
+      font-size: .9em;
+    }
+    .markdown-body pre {
+      background: #f8fafc;
+      border: 1px solid var(--color-border-subtle);
+      padding: 12px;
+      border-radius: var(--radius-md);
+      overflow: auto;
+      font-size: var(--text-12);
+    }
+    .markdown-body pre code { background: transparent; padding: 0; }
+    .markdown-body blockquote {
+      border-left: 3px solid var(--color-border-default);
+      padding-left: 14px;
+      color: var(--color-text-secondary);
+      margin: .8em 0;
+    }
+    .markdown-body table { border-collapse: collapse; margin: 1em 0; }
+    .markdown-body th, .markdown-body td {
+      border: 1px solid var(--color-border-subtle);
+      padding: 6px 10px;
+      font-size: var(--text-12);
+    }
+    .markdown-body th { background: var(--color-surface-page); }
+    .markdown-body a { color: #2563eb; text-decoration: underline; }
+    .markdown-body hr { border: 0; border-top: 1px solid var(--color-border-subtle); margin: 1.4em 0; }
+    .kit-eye {
+      flex: 0 0 auto;
+      background: none;
+      border: 1px solid transparent;
+      padding: 3px 6px;
+      border-radius: 4px;
+      font-size: 14px;
+      cursor: pointer;
+      color: var(--color-text-muted);
+      transition: background var(--transition-fast), border-color var(--transition-fast);
+    }
+    .kit-eye:hover {
+      background: var(--color-surface-page);
+      border-color: var(--color-border-subtle);
+      color: var(--color-text-primary);
+    }
     .kit-graph-issue-danger {
       background: #fef2f2;
       border-color: #fecaca;
@@ -2276,6 +2440,14 @@
       font-family: ui-monospace, "SF Mono", monospace;
       margin-bottom: var(--space-8);
     }
+    .kit-graph-info-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-8);
+      margin-bottom: var(--space-8);
+    }
+    .kit-graph-info-head strong { margin-bottom: 0; }
     .kit-graph-info-cols {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -2592,6 +2764,27 @@
     </section>
   </section>
 </main>
+<div class="kit-viewer-overlay is-hidden" id="kitFileViewer" role="dialog" aria-modal="true" aria-labelledby="kitFileViewerTitle">
+  <div class="kit-viewer-backdrop" data-viewer-close></div>
+  <div class="kit-viewer-panel">
+    <div class="kit-viewer-header">
+      <div class="kit-viewer-title-wrap">
+        <strong id="kitFileViewerTitle"></strong>
+        <span class="kit-viewer-source" id="kitFileViewerSource"></span>
+      </div>
+      <div class="kit-viewer-actions">
+        <button class="kit-viewer-tab" data-viewer-mode="render" type="button">渲染</button>
+        <button class="kit-viewer-tab" data-viewer-mode="raw" type="button">原文</button>
+        <button class="kit-viewer-copy" id="kitFileViewerCopy" type="button">复制</button>
+        <button class="kit-viewer-close" data-viewer-close type="button" aria-label="关闭">✕</button>
+      </div>
+    </div>
+    <div class="kit-viewer-body">
+      <div class="kit-viewer-render markdown-body" id="kitFileViewerRender"></div>
+      <pre class="kit-viewer-raw is-hidden" id="kitFileViewerRaw"></pre>
+    </div>
+  </div>
+</div>
 <script>
   const kitRequiredMaterials = {
     solo: [
@@ -2690,14 +2883,22 @@
       const label = document.createElement("label");
       label.className = "kit-option";
       label.innerHTML = `
-        <input type="checkbox" data-template-file="${t.file}">
+        <input type="checkbox" data-template-file="${esc(t.file)}">
         <span class="kit-option-copy">
-          <strong>${t.title}</strong>${t.isPersonal ? ' <span class="kit-personal-badge">个人规则</span>' : ''}
-          <small>${t.file}</small>
+          <strong>${esc(t.title)}</strong>${t.isPersonal ? ' <span class="kit-personal-badge">个人规则</span>' : ''}
+          <small>${esc(t.file)}</small>
         </span>
-        <span class="kit-option-desc">${t.desc || ''}</span>
+        <span class="kit-option-desc">${esc(t.desc || '')}</span>
+        <button class="kit-eye" type="button" data-preview-template="${esc(t.file)}" title="预览模板内容" aria-label="预览模板">👁️</button>
       `;
       target.appendChild(label);
+    });
+    target.querySelectorAll('[data-preview-template]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openTemplateInViewer(btn.dataset.previewTemplate);
+      });
     });
   }
   renderOptionalTemplates();
@@ -2705,6 +2906,77 @@
   // Tiny outer-scope HTML escape, shared by new-project and audit panels
   function esc(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  // ─── File viewer modal: open any markdown file with render/raw tabs ─
+  function openFileViewer(title, content, source) {
+    const overlay = document.getElementById('kitFileViewer');
+    const titleEl = document.getElementById('kitFileViewerTitle');
+    const sourceEl = document.getElementById('kitFileViewerSource');
+    const renderEl = document.getElementById('kitFileViewerRender');
+    const rawEl = document.getElementById('kitFileViewerRaw');
+    if (!overlay) return;
+    titleEl.textContent = title || '';
+    sourceEl.textContent = source || '';
+    rawEl.textContent = content || '';
+    // Render markdown if marked is loaded, else show raw in render slot too
+    if (typeof marked !== 'undefined') {
+      try { renderEl.innerHTML = marked.parse(content || ''); }
+      catch (e) { renderEl.textContent = content || ''; }
+    } else {
+      renderEl.textContent = content || '';
+    }
+    // Default to render mode
+    setViewerMode('render');
+    overlay.classList.remove('is-hidden');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeFileViewer() {
+    const overlay = document.getElementById('kitFileViewer');
+    if (overlay) overlay.classList.add('is-hidden');
+    document.body.style.overflow = '';
+  }
+  function setViewerMode(mode) {
+    const renderEl = document.getElementById('kitFileViewerRender');
+    const rawEl = document.getElementById('kitFileViewerRaw');
+    const tabs = document.querySelectorAll('[data-viewer-mode]');
+    tabs.forEach(t => t.classList.toggle('is-active', t.dataset.viewerMode === mode));
+    renderEl.classList.toggle('is-hidden', mode !== 'render');
+    rawEl.classList.toggle('is-hidden', mode !== 'raw');
+  }
+  // Wire viewer controls once at startup
+  function initFileViewer() {
+    document.querySelectorAll('[data-viewer-close]').forEach(el => el.addEventListener('click', closeFileViewer));
+    document.querySelectorAll('[data-viewer-mode]').forEach(t => t.addEventListener('click', () => setViewerMode(t.dataset.viewerMode)));
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && !document.getElementById('kitFileViewer').classList.contains('is-hidden')) closeFileViewer();
+    });
+    const copyBtn = document.getElementById('kitFileViewerCopy');
+    if (copyBtn) copyBtn.addEventListener('click', async () => {
+      const text = document.getElementById('kitFileViewerRaw').textContent || '';
+      const orig = copyBtn.textContent;
+      try { await navigator.clipboard.writeText(text); copyBtn.textContent = '已复制 ✓'; }
+      catch (e) { copyBtn.textContent = '失败'; }
+      setTimeout(() => { copyBtn.textContent = orig; }, 1400);
+    });
+  }
+  initFileViewer();
+
+  // Convenience: open a template file (fetches from kit repo)
+  async function openTemplateInViewer(file) {
+    try {
+      const text = await fetchTemplate(file);
+      openFileViewer(file, text, '来自 kit 模板');
+    } catch (e) {
+      openFileViewer(file, '模板加载失败：' + (e.message || e.name), '错误');
+    }
+  }
+
+  // Best-effort: pull a file path out of a check label (e.g. "存在可用 docs/TESTING.md")
+  function extractFilePath(label) {
+    if (!label) return null;
+    const m = label.match(/([A-Z][\w/.-]*\.md)/);
+    return m ? m[1] : null;
   }
 
   // ─── Project bookmarks: IndexedDB persistence ─────────────────
@@ -4046,8 +4318,12 @@
           if (nodeId) {
             const outRefs = edges.filter(e => e.from === nodeId);
             const inRefs = edges.filter(e => e.to === nodeId);
+            const canView = map && map.has(nodeId);
             info.innerHTML = `
-              <strong>${esc(nodeId)}</strong>
+              <div class="kit-graph-info-head">
+                <strong>${esc(nodeId)}</strong>
+                ${canView ? '<button class="kit-bookmark-btn" type="button" data-graph-view="' + esc(nodeId) + '">👁️ 查看内容</button>' : ''}
+              </div>
               <div class="kit-graph-info-cols">
                 <div><span class="kit-graph-info-label">引用了（${outRefs.length}）</span>
                   ${outRefs.length ? '<ul>' + outRefs.map(r => `<li><code>${esc(r.to)}</code> <span class="muted">×${r.count}</span></li>`).join('') + '</ul>' : '<span class="muted">无</span>'}
@@ -4057,6 +4333,17 @@
                 </div>
               </div>`;
             info.classList.add('is-active');
+            const viewBtn = info.querySelector('[data-graph-view]');
+            if (viewBtn) viewBtn.addEventListener('click', async () => {
+              const file = viewBtn.dataset.graphView;
+              const fileObj = map.get(file);
+              try {
+                const text = typeof fileObj.text === 'function' ? await fileObj.text() : fileObj;
+                openFileViewer(file, text || '', '你项目里的实际内容');
+              } catch (err) {
+                openFileViewer(file, '读取失败', '错误');
+              }
+            });
           } else {
             info.innerHTML = '';
             info.classList.remove('is-active');
@@ -4208,6 +4495,7 @@
                 ${tag}
                 ${info.reasons.map(r => `<span class="kit-option-reason">${esc(r)}</span>`).join('')}
               </span>
+              <button class="kit-eye" type="button" data-gap-preview="${esc(t)}" data-gap-existing="${info.existing ? '1' : '0'}" title="${info.existing ? '查看你项目里的实际内容 + 模板对照' : '查看模板原文'}" aria-label="预览">👁️</button>
             </label>`;
           }).join('')}</div>
           ${currentDirHandle ? `
@@ -4237,7 +4525,11 @@
         </div>` : ''}
         ${passes.length ? `<div class="kit-result-section">
           <div class="kit-result-section-title">已通过（${passes.length} 项）</div>
-          <ul class="kit-result-list">${passes.map(i => `<li class="kit-result-item pass"><span class="kit-result-dot">✓</span><span>${esc(i.label)}</span></li>`).join('')}</ul>
+          <ul class="kit-result-list">${passes.map(i => {
+            const passFile = extractFilePath(i.label);
+            const clickable = passFile && result.__map && result.__map.has(passFile);
+            return `<li class="kit-result-item pass${clickable ? ' is-clickable' : ''}"${clickable ? ' data-pass-file="' + esc(passFile) + '" title="点击查看你项目里的实际内容"' : ''}><span class="kit-result-dot">✓</span><span>${esc(i.label)}</span></li>`;
+          }).join('')}</ul>
         </div>` : ''}
         <div class="kit-result-section">
           <div class="kit-result-section-title">文档关系图（诊断引用与孤岛）</div>
@@ -4249,6 +4541,43 @@
       if (graphHost && typeof result.__map !== 'undefined') {
         renderReferenceGraph(graphHost, result.__map, gaps);
       }
+
+      // Wire up gap preview buttons (look up template + actual file content)
+      el.querySelectorAll('[data-gap-preview]').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const file = btn.dataset.gapPreview;
+          const existing = btn.dataset.gapExisting === '1';
+          if (existing && result.__map && result.__map.has(file)) {
+            // Show user's actual content
+            const fileObj = result.__map.get(file);
+            try {
+              const text = typeof fileObj.text === 'function' ? await fileObj.text() : fileObj;
+              openFileViewer(file, text || '', '你项目里的实际内容');
+            } catch (err) {
+              openFileViewer(file, '读取失败', '错误');
+            }
+          } else {
+            // Show kit template
+            if (typeof openTemplateInViewer === 'function') openTemplateInViewer(file);
+          }
+        });
+      });
+      // Wire up pass items (click to view actual file from map)
+      el.querySelectorAll('[data-pass-file]').forEach(li => {
+        li.addEventListener('click', async () => {
+          const file = li.dataset.passFile;
+          if (!result.__map || !result.__map.has(file)) return;
+          const fileObj = result.__map.get(file);
+          try {
+            const text = typeof fileObj.text === 'function' ? await fileObj.text() : fileObj;
+            openFileViewer(file, text || '', '你项目里的实际内容');
+          } catch (err) {
+            openFileViewer(file, '读取失败', '错误');
+          }
+        });
+      });
 
       // Wire up the inline download button
       const gapDownloadBtn = document.getElementById('kitGapDownloadBtn');
