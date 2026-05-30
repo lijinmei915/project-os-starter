@@ -21,8 +21,8 @@
 
 ## 当前状态速览（每次收尾更新，保持 5 行以内）
 
-- **上次做到**：claim-merge 功能（相似文件认领合并）、4 个模板文档精简为通用版、/os CLI 路由从模板中移除、安装 Impeccable + Taste Skill + Baseline UI 设计 skill
-- **下一步**：简化 REGISTRY.md 和 frontend/SKILL.md 模板中残留的 project-setup 引用；继续 UI 打磨
+- **上次做到**：impeccable typeset + colorize + polish 三轮视觉优化，统一 teal 品牌色，130+ 硬编码值 token 化，新增 PRODUCT.md
+- **下一步**：impeccable bolder 视觉强化；简化 REGISTRY.md 和 frontend/SKILL.md 模板残留引用
 - **线上地址**：https://lijinmei915.github.io/project-os-starter/
 
 ---
