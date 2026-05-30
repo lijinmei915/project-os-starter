@@ -1365,6 +1365,18 @@
       font-size: var(--text-12);
       line-height: 1.5;
     }
+    .kit-template-group-header {
+      font-size: var(--text-sm);
+      font-weight: var(--font-semibold);
+      color: var(--gray-500);
+      letter-spacing: 0.02em;
+      padding: var(--space-12) 0 var(--space-4);
+      border-bottom: 1px solid var(--gray-200);
+      margin-bottom: var(--space-4);
+    }
+    .kit-template-group-header:first-child {
+      padding-top: 0;
+    }
     .kit-option-list {
       display: grid;
       gap: var(--space-8);
@@ -2893,18 +2905,23 @@
   });
   // ─── Optional templates list ──────────────────────────────
   const OPTIONAL_TEMPLATES = [
-    { file: "docs/ARCHITECTURE.md", title: "架构和模块职责", desc: "模块、目录、数据流和边界" },
-    { file: "docs/ENVIRONMENT.md", title: "环境和启动方式", desc: "依赖、变量、怎么运行" },
-    { file: "docs/TESTING.md", title: "测试和验收方式", desc: "怎么验证改动没坏" },
-    { file: "docs/RUNBOOK.md", title: "运行手册", desc: "常见操作和故障处理" },
-    { file: "docs/CHANGELOG.md", title: "变更记录", desc: "结构性改动留痕" },
-    { file: "docs/DECISIONS.md", title: "决策记录", desc: "重要取舍为什么这样定" },
-    { file: "docs/NAMING.md", title: "命名规范", desc: "文档和目录怎么命名" },
-    { file: "docs/DESIGN_STANDARDS.md", title: "设计规范", desc: "界面、组件、视觉边界" },
-    { file: "docs/DOCUMENTATION.md", title: "文档治理", desc: "文档边界和更新时机" },
-    { file: "docs/PRODUCT_PLAN.md", title: "产品路线图", desc: "分阶段目标" },
-    { file: "docs/CODE_STRUCTURE.md", title: "代码结构", desc: "代码分层规则" },
-    { file: "docs/LESSONS.md", title: "经验教训", desc: "犯错后立即记录" }
+    { file: "PRODUCT.md", title: "产品定义", desc: "产品定位、用户画像、设计原则", group: "项目基础" },
+    { file: "docs/ARCHITECTURE.md", title: "架构和模块职责", desc: "模块、目录、数据流和边界", group: "项目基础" },
+    { file: "docs/ENVIRONMENT.md", title: "环境和启动方式", desc: "依赖、变量、怎么运行", group: "项目基础" },
+    { file: "docs/CODE_STRUCTURE.md", title: "代码结构", desc: "代码分层规则", group: "项目基础" },
+    { file: "docs/TESTING.md", title: "测试和验收方式", desc: "怎么验证改动没坏", group: "流程规范" },
+    { file: "docs/RUNBOOK.md", title: "运行手册", desc: "常见操作和故障处理", group: "流程规范" },
+    { file: "docs/NAMING.md", title: "命名规范", desc: "文档和目录怎么命名", group: "流程规范" },
+    { file: "docs/DOCUMENTATION.md", title: "文档治理", desc: "文档边界和更新时机", group: "流程规范" },
+    { file: "docs/DESIGN_STANDARDS.md", title: "设计规范", desc: "界面、组件、视觉边界", group: "流程规范" },
+    { file: "docs/PRODUCT_PLAN.md", title: "产品路线图", desc: "分阶段目标", group: "流程规范" },
+    { file: "docs/CHANGELOG.md", title: "变更记录", desc: "结构性改动留痕", group: "记录与追踪" },
+    { file: "docs/DECISIONS.md", title: "决策记录", desc: "重要取舍为什么这样定", group: "记录与追踪" },
+    { file: "docs/LESSONS.md", title: "经验教训", desc: "犯错后立即记录", group: "记录与追踪" },
+    { file: ".claude/CLAUDE.md", title: "Claude 项目配置", desc: "Claude 行为规则和状态速览", group: "AI 工具配置" },
+    { file: ".claude/launch.json", title: "Claude 启动配置", desc: "dev server 启动方式", group: "AI 工具配置" },
+    { file: ".cursorrules", title: "Cursor 规则", desc: "Cursor AI 的项目级指令", group: "AI 工具配置" },
+    { file: ".github/copilot-instructions.md", title: "Copilot 指令", desc: "GitHub Copilot 项目级规则", group: "AI 工具配置" }
   ];
   const REQUIRED_FILES = ["AGENTS.md", "PROJECT.md", "HANDOFF.md"];
   // Source for fetching templates (works on GitHub Pages and local server)
@@ -2923,7 +2940,16 @@
     const target = document.getElementById("kitOptionTemplates");
     if (!target) return;
     target.innerHTML = "";
+    let currentGroup = null;
     effectiveOptionalTemplates().forEach((t) => {
+      const group = t.group || '其他';
+      if (group !== currentGroup) {
+        currentGroup = group;
+        const header = document.createElement("div");
+        header.className = "kit-template-group-header";
+        header.textContent = group;
+        target.appendChild(header);
+      }
       const label = document.createElement("label");
       label.className = "kit-option";
       label.innerHTML = `
@@ -3587,7 +3613,37 @@
   // Existing files are written as <name>.template.md so the user's
   // original content is never overwritten.
   // If `info` is provided, prepend an auto-detected snapshot block.
+  // Strip "相关文件" table rows that reference files not in the project
+  function trimRelatedFiles(content, knownFiles) {
+    // Match the "## 相关文件" section and filter its table rows
+    return content.replace(
+      /(## 相关文件\s*\n\n\|[^\n]+\|\s*\n\|[-| :]+\|\s*\n)((?:\|[^\n]+\|\s*\n)*)/g,
+      (match, header, rows) => {
+        if (!rows.trim()) return match;
+        const filtered = rows.split('\n').filter(line => {
+          if (!line.trim()) return false;
+          // Extract file path from table row: | `docs/FOO.md` | ... |
+          const m = line.match(/`([^`]+)`/);
+          if (!m) return true;
+          const ref = m[1];
+          return knownFiles.has(ref) ||
+            [...knownFiles].some(f => f.endsWith('/' + ref) || ref.endsWith('/' + f));
+        });
+        if (filtered.length === 0) return ''; // Remove entire section if no rows left
+        return header + filtered.join('\n') + '\n';
+      }
+    );
+  }
+
   async function writeTemplatesToHandle(handle, files, existingFiles, info) {
+    // Build set of all files that will exist: already in project + being written now
+    const knownFiles = new Set([...existingFiles, ...files, ...REQUIRED_FILES]);
+    // Also add common root files that are often present
+    try {
+      for await (const entry of handle.values()) {
+        if (entry.kind === 'file' && entry.name.endsWith('.md')) knownFiles.add(entry.name);
+      }
+    } catch(e) { /* ignore */ }
     const written = [];
     let totalUnfilled = 0;
     for (const filePath of files) {
@@ -3602,6 +3658,8 @@
         const prefix = buildSnapshotPrefix(filePath, info);
         if (prefix) { content = prefix + content; prefixApplied = true; }
       }
+      // Trim "相关文件" references to only include files that exist
+      content = trimRelatedFiles(content, knownFiles);
       const unfilled = countUnfilledMarkers(content);
       totalUnfilled += unfilled;
       const parts = targetPath.split('/');
@@ -3680,7 +3738,8 @@
           return { file: f, text: `# ${f}\n\n> 模板下载失败，请到 https://github.com/lijinmei915/project-os-starter 手动获取。\n` };
         }
       }));
-      fetched.forEach(({ file, text }) => zip.file(file, text));
+      const knownInZip = new Set(files);
+      fetched.forEach(({ file, text }) => zip.file(file, trimRelatedFiles(text, knownInZip)));
       zip.file("README-下载说明.md", [
         "# AI 工程文档包",
         "",
@@ -4096,6 +4155,31 @@
 
       await checkDoc('命名和文档治理', 'docs/NAMING.md', 3, '存在可用 docs/NAMING.md', 4);
       await checkDoc('命名和文档治理', 'docs/DOCUMENTATION.md', 2, '存在可用 docs/DOCUMENTATION.md', 4);
+
+      // 产品定义：PRODUCT.md
+      if (await isSubstantive(map, 'PRODUCT.md', 5)) {
+        award('产品定义', 3, '存在可用 PRODUCT.md，定义了产品方向');
+      } else {
+        gap('产品定义', 3, '建议补 PRODUCT.md，让 AI 理解产品定位和设计原则', 'PRODUCT.md');
+      }
+
+      // AI 工具配置：检测各 AI 助手的项目级配置文件
+      const hasClaudeMd = hasFile(map, '.claude/CLAUDE.md') || hasFile(map, 'CLAUDE.md');
+      const hasCursorRules = hasFile(map, '.cursorrules');
+      const hasCopilot = hasFile(map, '.github/copilot-instructions.md');
+      const hasLaunchJson = hasFile(map, '.claude/launch.json');
+      const aiToolCount = [hasClaudeMd, hasCursorRules, hasCopilot].filter(Boolean).length;
+      if (aiToolCount >= 2) {
+        award('AI 工具配置', 5, '配置了 ' + aiToolCount + ' 个 AI 助手的项目级规则');
+      } else if (aiToolCount === 1) {
+        award('AI 工具配置', 2, '配置了 1 个 AI 助手规则，建议覆盖更多工具');
+        gap('AI 工具配置', 3, '建议补齐其他 AI 工具配置（.cursorrules / .github/copilot-instructions.md）', '.cursorrules');
+      } else {
+        gap('AI 工具配置', 5, '缺少 AI 工具配置文件，建议至少补一个', '.claude/CLAUDE.md');
+      }
+      if (hasLaunchJson) {
+        award('AI 工具配置', 2, '存在 .claude/launch.json 启动配置');
+      }
 
       return { score, maxScore: 100, items };
     }

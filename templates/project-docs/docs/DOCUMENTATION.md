@@ -13,6 +13,7 @@
 | 问题 | SSOT |
 |------|------|
 | 怎么开始用 | `README.md` |
+| 产品定位和设计方向 | `PRODUCT.md` |
 | AI 怎么行动 | `AGENTS.md` |
 | 项目当前状态 | `PROJECT.md` |
 | 交接 / 接手 | `HANDOFF.md` |
@@ -96,3 +97,11 @@
 - `HANDOFF.md` 写成永久历史
 - `CHANGELOG.md` 写成 TODO
 - 把运行规则写进 `README.md`
+
+## 相关文件
+
+| 文件 | 关系 |
+|------|------|
+| `docs/NAMING.md` | 文件命名和放置位置 |
+| `AGENTS.md` | AI 的文档职责定义 |
+| `PRODUCT.md` | 产品方向（文档内容需对齐产品定位） |

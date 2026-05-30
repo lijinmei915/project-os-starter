@@ -4,27 +4,26 @@
 > 什么时候更新：安全边界、文档职责变化时。
 > 不要写什么：项目介绍、产品路线、交接流水、个人偏好。
 
-## 体检入口
-
-浏览器打开项目根目录的 `index.html`，选目录或拖 zip，直接看工程完整度报告。
-
-CLI 快速检查：
-
-```bash
-bash scripts/check-runtime.sh .
-```
-
 ## 安全规则
 
 - 不确定意图时，先问再改
 - 不覆盖已有文件，除非用户明确确认
 - 用户说"只看不改"时，不修改任何文件
+- 涉及删除、重命名、发布等不可逆操作，必须等明确确认
+
+## 协作约定
+
+- 改动前说明意图和影响范围
+- 改完给出验证方式（命令、URL、预期结果）
+- 遇到不确定的设计或架构决策，先问再动手
+- 产品方向和设计调性参考 `PRODUCT.md`
 
 ## 文档职责
 
 ```txt
 README.md              -> 项目入口说明
-PROJECT.md             -> 当前项目状态
+PRODUCT.md             -> 产品定位、用户画像、设计原则
+PROJECT.md             -> 当前项目状态和进度
 HANDOFF.md             -> 交接上下文
 docs/ARCHITECTURE.md   -> 架构和模块职责
 docs/ENVIRONMENT.md    -> 环境、依赖、启动
@@ -36,3 +35,12 @@ docs/LESSONS.md        -> 错误复盘
 ```
 
 写文档前先看 `docs/DOCUMENTATION.md` 确认边界。
+
+## 收尾 Checklist
+
+每次完成任务后检查：
+
+- [ ] `HANDOFF.md` 是否需要更新（跨文件改动时）
+- [ ] `docs/CHANGELOG.md` 是否需要记录（结构性改动时）
+- [ ] `docs/DECISIONS.md` 是否需要记录（有明确技术决策时）
+- [ ] `docs/LESSONS.md` 是否需要记录（犯错时）

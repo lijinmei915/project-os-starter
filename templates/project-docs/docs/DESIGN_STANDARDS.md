@@ -25,3 +25,10 @@
 - `docs/design/tokens.md`
 - `docs/design/layout.md`
 - `docs/design/component-index.md`
+
+## 相关文件
+
+| 文件 | 关系 |
+|------|------|
+| `PRODUCT.md` | 产品定位和品牌调性（设计方向的源头） |
+| `docs/NAMING.md` | 组件和文件命名规范 |

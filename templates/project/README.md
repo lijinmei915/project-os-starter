@@ -23,6 +23,7 @@
 ## 协作文档
 
 - AI 运行规则：`AGENTS.md`
+- 产品定义：`PRODUCT.md`
 - 当前项目状态：`PROJECT.md`
 - 当前交接上下文：`HANDOFF.md`
 - 文档命名规范：`docs/NAMING.md`
