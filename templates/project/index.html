@@ -1356,6 +1356,37 @@
       display: grid;
       gap: var(--space-8);
     }
+    .kit-option-row {
+      display: grid;
+      gap: var(--space-6);
+    }
+    .kit-claim {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--space-8);
+      padding: 0 var(--space-12) 0 calc(var(--space-12) + 28px);
+      font-size: var(--font-size-12, 12px);
+      color: var(--color-text-muted, #888);
+    }
+    .kit-claim-label {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-6);
+      cursor: pointer;
+    }
+    .kit-claim select {
+      font: inherit;
+      padding: 2px 6px;
+      border: 1px solid var(--color-border-default);
+      border-radius: var(--radius-sm, 6px);
+      background: var(--color-surface-page);
+      color: var(--color-text-default, inherit);
+      max-width: 220px;
+    }
+    .kit-claim-note:not(:empty) {
+      color: var(--color-accent, #2563eb);
+    }
     .kit-option {
       display: grid;
       grid-template-columns: auto 1fr auto auto;
@@ -3575,6 +3606,33 @@
     return { written, totalUnfilled };
   }
 
+  // Merge a user's "similar-function" file into the canonical standard file.
+  // We DON'T rename/delete their file (deletion is risky). Instead we generate
+  // the standard-named file = our snapshot + template structure + their original
+  // content preserved at the bottom, and leave the original untouched.
+  async function mergeClaimedIntoStandard(handle, template, theirPath, theirContent, info) {
+    let tpl;
+    try { tpl = await fetchTemplate(template); }
+    catch (e) { tpl = '# ' + template + '\n'; }
+    const prefix = info ? (buildSnapshotPrefix(template, info) || '') : '';
+    const body = prefix
+      + '<!-- 以下是 AI Engineering Kit 标准结构，请对照补全。你原文件的内容保留在文件最下方。 -->\n\n'
+      + tpl
+      + '\n\n---\n\n'
+      + '<!-- ↓ 原文件 ' + theirPath + ' 的内容（已合并保留；确认无误后可手动删除原文件） ↓ -->\n\n'
+      + (theirContent || '');
+    const unfilled = countUnfilledMarkers(body);
+    const parts = template.split('/');
+    const fileName = parts.pop();
+    let dir = handle;
+    for (const part of parts) dir = await dir.getDirectoryHandle(part, { create: true });
+    const fh = await dir.getFileHandle(fileName, { create: true });
+    const w = await fh.createWritable();
+    await w.write(body);
+    await w.close();
+    return { source: theirPath, written: template, existing: false, merged: true, prefixed: !!prefix, unfilled };
+  }
+
   async function fetchTemplate(file) {
     // Required files live under templates/project/
     // Optional files under templates/project-docs/
@@ -3713,7 +3771,8 @@
   // Render success card after write. Used by both new-project and audit panels.
   function renderWriteSuccess(container, params) {
     const { written, totalUnfilled, info, handleName, addedCount, refCount, prefixedCount } = params;
-    const subline = `${addedCount} 个新增直接可用${refCount ? ' · ' + refCount + ' 个已有同名写为 <code>.template.md</code>' : ''}${info ? ' · 自动填了 ' + prefixedCount + ' 个文件的项目快照' : ''}`;
+    const mergedCount = written.filter(w => w.merged).length;
+    const subline = `${addedCount} 个新增直接可用${refCount ? ' · ' + refCount + ' 个已有同名写为 <code>.template.md</code>' : ''}${mergedCount ? ' · ' + mergedCount + ' 个合并自你已有文件' : ''}${info ? ' · 自动填了 ' + prefixedCount + ' 个文件的项目快照' : ''}`;
     container.innerHTML = `
       <div class="kit-result-success">
         <div class="kit-result-success-icon">✓</div>
@@ -3723,7 +3782,7 @@
         </div>
       </div>
       <ul class="kit-result-list" style="margin-top:var(--space-8)">${written.map(w => `
-        <li class="kit-result-item pass"><span class="kit-result-dot">✓</span><span><code>${esc(w.written)}</code>${w.existing ? '（参考模板）' : ''}${w.unfilled ? ' <span class="muted">· ' + w.unfilled + ' 处待补</span>' : ''}</span></li>
+        <li class="kit-result-item pass"><span class="kit-result-dot">✓</span><span><code>${esc(w.written)}</code>${w.existing ? '（参考模板）' : ''}${w.merged ? '（合并自 <code>' + esc(w.source) + '</code>，原文件保留）' : ''}${w.unfilled ? ' <span class="muted">· ' + w.unfilled + ' 处待补</span>' : ''}</span></li>
       `).join('')}</ul>
       ${totalUnfilled > 0 ? `
         <div class="kit-result-note" style="margin-top:var(--space-10)">
@@ -4459,6 +4518,15 @@
       const downloadable = templates.length;
       const hasExisting = templates.some(t => gapsByTemplate.get(t).existing);
 
+      // "Claim an existing similar-function file" support.
+      // User has extra .md files the kit doesn't know about (e.g. docs/ARCH.md
+      // instead of docs/ARCHITECTURE.md). Let them map one onto a missing
+      // standard slot; we merge our structure into it under the standard name.
+      const claimedMap = {}; // template -> their existing file path
+      const allMdKeys = result.__map ? [...result.__map.keys()].filter(p => /\.md$/i.test(p)) : [];
+      const extraMd = allMdKeys.filter(p => !KIT_KNOWN_FILES.has(p) && !/\.template\.md$/i.test(p));
+      const canClaim = !!currentDirHandle && extraMd.length > 0;
+
       el.innerHTML = `
         <div class="kit-result-score">
           <div class="kit-result-ring" data-status="${statusClass}" style="--ring-pct:${pct}%">
@@ -4484,7 +4552,18 @@
             const tag = info.existing
               ? '<span class="kit-status-tag kit-status-tag-warn">已有，建议补充</span>'
               : '<span class="kit-status-tag kit-status-tag-miss">缺失</span>';
+            const claimControl = (canClaim && !info.existing) ? `
+              <div class="kit-claim">
+                <label class="kit-claim-label">我已经有类似文件 →
+                  <select data-claim-template="${esc(t)}">
+                    <option value="">这是新文件，新建</option>
+                    ${extraMd.map(f => `<option value="${esc(f)}">${esc(f)}</option>`).join('')}
+                  </select>
+                </label>
+                <span class="kit-claim-note" data-claim-note="${esc(t)}"></span>
+              </div>` : '';
             return `
+            <div class="kit-option-row">
             <label class="kit-option">
               <input type="checkbox" data-gap-template="${esc(t)}" ${info.existing ? '' : 'checked'}>
               <span class="kit-option-copy">
@@ -4496,7 +4575,9 @@
                 ${info.reasons.map(r => `<span class="kit-option-reason">${esc(r)}</span>`).join('')}
               </span>
               <button class="kit-eye" type="button" data-gap-preview="${esc(t)}" data-gap-existing="${info.existing ? '1' : '0'}" title="${info.existing ? '查看你项目里的实际内容 + 模板对照' : '查看模板原文'}" aria-label="预览">👁️</button>
-            </label>`;
+            </label>
+            ${claimControl}
+            </div>`;
           }).join('')}</div>
           ${currentDirHandle ? `
             <div class="kit-result-note">${hasExisting
@@ -4564,6 +4645,24 @@
           }
         });
       });
+      // Wire up "claim existing file" selects
+      el.querySelectorAll('[data-claim-template]').forEach(sel => {
+        sel.addEventListener('click', e => e.stopPropagation());
+        sel.addEventListener('change', () => {
+          const t = sel.dataset.claimTemplate;
+          const note = el.querySelector(`[data-claim-note="${CSS.escape(t)}"]`);
+          const cb = el.querySelector(`[data-gap-template="${CSS.escape(t)}"]`);
+          if (sel.value) {
+            claimedMap[t] = sel.value;
+            if (cb) cb.checked = true;
+            if (note) note.textContent = `将把模板结构合并进 ${sel.value}，按标准名生成 ${t}（原文件保留，确认后可自己删）`;
+          } else {
+            delete claimedMap[t];
+            if (note) note.textContent = '';
+          }
+        });
+      });
+
       // Wire up pass items (click to view actual file from map)
       el.querySelectorAll('[data-pass-file]').forEach(li => {
         li.addEventListener('click', async () => {
@@ -4602,11 +4701,26 @@
             const selected = Array.from(el.querySelectorAll('[data-gap-template]:checked')).map(i => i.dataset.gapTemplate);
             if (!selected.length) throw new Error('未选中任何模板');
             const existingSet = new Set([...gapsByTemplate.entries()].filter(([_, v]) => v.existing).map(([k]) => k));
+            // Split claimed (merge into user's existing similar file) from fresh
+            const claimList = selected.filter(t => claimedMap[t]);
+            const freshSelected = selected.filter(t => !claimedMap[t]);
             // Audit panel already has the analyzed map; reuse it for smart fill
             let info = null;
             try { info = await scanProjectForInfo(result.__map, currentDirHandle.name); } catch (e) {}
-            const { written, totalUnfilled } = await writeTemplatesToHandle(currentDirHandle, selected, existingSet, info);
-            const addedCount = written.filter(w => !w.existing).length;
+            const { written, totalUnfilled: freshUnfilled } = await writeTemplatesToHandle(currentDirHandle, freshSelected, existingSet, info);
+            let totalUnfilled = freshUnfilled;
+            for (const t of claimList) {
+              const theirPath = claimedMap[t];
+              let theirContent = '';
+              try {
+                const fo = result.__map.get(theirPath);
+                if (fo) theirContent = typeof fo.text === 'function' ? await fo.text() : '';
+              } catch (e) {}
+              const rec = await mergeClaimedIntoStandard(currentDirHandle, t, theirPath, theirContent, info);
+              written.push(rec);
+              totalUnfilled += rec.unfilled;
+            }
+            const addedCount = written.filter(w => !w.existing && !w.merged).length;
             const refCount = written.filter(w => w.existing).length;
             const prefixedCount = written.filter(w => w.prefixed).length;
             const section = writeBackBtn.closest('.kit-result-section');

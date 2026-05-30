@@ -1,37 +1,18 @@
 # Cursor Adapter
 
-This file is a Cursor adapter for Project OS.
+> 用途：把 `AGENTS.md` 的通用规则翻译成 Cursor rules。
+> 安装位置：`.cursor/rules/project-os.md`
+> 什么时候更新：Cursor 专属行为变化时。
 
-`AGENTS.md` is the single source of truth. This file should be installed into Cursor rules, usually:
-
-```txt
-.cursor/rules/project-os.md
-```
-
-中文说明：
-这是 Cursor 适配文件，应写入 `.cursor/rules/project-os.md`。
-
----
+通用规则以 `AGENTS.md` 为准。
 
 ## Cursor Rule
 
-Always follow `AGENTS.md` first.
-
-For project-level requests, route before coding:
+先读 `AGENTS.md`，再动代码。
 
 ```txt
-Project OS install/check/upgrade -> project-setup / INSTALL
-vague product request -> project-setup / CLARIFICATION
-new software/system/app -> project-setup / INIT
-analyze only -> project-setup / AUDIT
-existing/messy project takeover -> project-setup / HYBRID
-design tokens / UI rules -> design-system
-specific page/component implementation -> frontend
+设计规范 / tokens / UI 规则 -> design-system
+具体页面 / 组件实现 -> frontend
 ```
 
-Do not generate unrelated UI or code before route classification.
-If the route is `INSTALL / INIT`, print that route first and continue into INIT start mode selection after installation/check completes.
-
-中文说明：
-Cursor 里也要先分流，再写代码。
-`AGENTS.md` 是总规则。
+不要跳过意图确认直接写代码。

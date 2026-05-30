@@ -1,47 +1,26 @@
 ---
 name: design-system
 description: >
-  Internal Project OS skill for design rules, Design Tokens, layout constraints,
-  and UI system guidance. Use this skill for Chinese requests such as
-  "帮我设计 tokens 规范", "设计 tokens", "tokens 规范", "设计规范",
-  "UI 规范", or "组件规范" when the task is about visual or design-system
-  tokens. Do not treat "设计 tokens" as auth tokens or LLM context tokens.
-  Broad project requests still go through project-setup first.
+  负责设计规范、Design Tokens、布局约束和 UI 系统。
+  适用请求："帮我设计 tokens 规范"、"设计规范"、"UI 规范"等。
+  注意"设计 tokens"指 Design Tokens，不是 Auth Tokens 或 LLM Tokens。
 ---
 
 # design-system
 
-## Role
+## 职责
 
-Design rules and visual system guidance for Project OS.
-
-中文说明：
 负责设计规则、tokens、布局约束和 UI 规范。
 
-## Boundary
+## 边界
 
-Use this skill after `project-setup` has clarified the project-level intent.
+- 明确是设计规范、tokens、布局或 UI 规则时直接响应
+- 不负责具体页面实现（交给 frontend）
+- 不负责项目初始化、架构决策
 
-Use this skill directly when the request is clearly about design rules, Design Tokens, UI standards, layout rules, or component standards.
+## 示例
 
-Do not act as the first responder for broad project requests.
+用户：帮我设计 tokens 规范
 
-中文说明：
-不要抢项目入口。只有当任务明确进入设计规范、tokens、布局或 UI 规则时才使用。
-
-## Current Status
-
-Placeholder skill for v1 routing stability.
-
-Do not add component library implementation yet.
-
-## Expected Behavior
-
-User:
-帮我设计 tokens 规范
-
-Correct response:
-进入 `design-system`，按 Design Tokens 处理颜色、字号、间距、圆角、阴影、层级等规范。
-
-Incorrect response:
-先问 tokens 是 Auth Tokens、LLM Tokens 还是 Design Tokens。
+按 Design Tokens 处理颜色、字号、间距、圆角、阴影、层级等。
+不要先问"是 Auth Tokens 还是 Design Tokens"。
