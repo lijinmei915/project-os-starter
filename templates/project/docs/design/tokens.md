@@ -252,9 +252,15 @@
 | `WorkbenchLayout` | section gap | `--component-workbench-section-gap: 32px` |
 | `WorkbenchLayout` | list item gap | `--component-workbench-list-gap: 12px` |
 | `WorkbenchLayout` | control gap | `--component-workbench-control-gap: 16px` |
-| `SegmentedSwitch` | shell radius | `--radius-lg` |
-| `SegmentedSwitch` | slider radius | `--radius-md` |
-| `MetaPanel` | font | `--font-mono` / `--text-11` |
+| `DocumentGrid` | card min width | `--component-document-card-min: 176px` |
+| `DocumentGrid` | grid gap | `--component-document-grid-gap: 12px` |
+| `DocumentGrid` | preview action size | `--component-document-action-size: 22px` |
+| `DocumentGrid` | preview icon size | `--component-document-action-icon-size: 14px` |
+| `SegmentedSwitch` | header pill padding | `--space-6` |
+| `SegmentedSwitch` | header pill gap | `--space-4` |
+| `SegmentedSwitch` | header pill radius | `--radius-lg` |
+| `SegmentedSwitch` | selected tab radius | `--radius-md` |
+| `MetaPanel` | font | `--font-mono` / `--text-11`，仅历史/备用状态卡使用 |
 | `SectionHeading` | number size | `--component-step-size: 20px` |
 | `SectionHeading` | title size | `--text-14` |
 | `SectionHeading` | description size | `--text-12` |
@@ -263,6 +269,10 @@
 | `SectionHeading` | code source description / first source card | `--component-section-content-gap: 16px` |
 | `SectionHeading` | current directory description / path field | `--component-section-content-gap: 16px` |
 | `SectionHeading` | audit description / first checklist item | `--component-section-content-gap: 16px` |
+| `SectionBlock` | heading / content gap | `--component-section-content-gap: 16px` |
+| `SectionBlock` | content control gap | `--component-workbench-control-gap: 16px` |
+| `WizardQuestion` | label / options gap | `--component-question-content-gap: 8px` |
+| `WizardQuestion` | question group gap | `--component-question-section-gap: 20px` |
 | `OptionCard` | choice radius | `--radius-card` |
 | `OptionCard` | strategy radius | `--radius-lg` |
 | `OptionCard` | selected border | `--color-surface-inverse` |
@@ -284,6 +294,11 @@
 | `AddItemCard` | idle border | `--gray-300` |
 | `AddItemCard` | icon size | `--component-add-size: 32px` |
 | `AddItemCard` | hover border | `--emerald-300` |
+| `WritePlanPanel` | panel padding | `--space-14` |
+| `WritePlanPanel` | panel gap | `--space-12` |
+| `WritePlanPanel` | summary row padding | `--space-10 --space-12` |
+| `WritePlanPanel` | row label column | `88px` |
+| `WritePlanPanel` | action gap | `--component-workbench-list-gap` |
 | `TextField` | radius | `--radius-md` |
 | `TextField` | focus border | `--color-success-strong` |
 | `TextField` | field action size | `--component-field-action-size: 32px` |

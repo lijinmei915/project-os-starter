@@ -19,6 +19,7 @@
 - token 表见 `docs/design/tokens.md`
 - 布局规则见 `docs/design/layout.md`
 - 页面需要说明默认态、空态、错态、加载态
+- 产品定位和体验原则见 `PRODUCT.md`
 
 ## 参考文档
 

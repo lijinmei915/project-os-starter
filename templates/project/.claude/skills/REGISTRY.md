@@ -1,13 +1,28 @@
-# Skill Registry
+# Project OS Skill Registry
 
-> 用途：列出项目里可用的 AI skill 及职责边界。
-> 什么时候更新：新增或删除 skill 时。
+Project OS does not depend on external skills.
+
+All required clarification and routing must be handled internally.
+
+中文说明：
+Project OS 不依赖外部 skill。
+所有必要的澄清和路由都由内部 skill 自己完成。
 
 ## Skills
 
-| Skill | 职责 | 边界 |
-|-------|------|------|
-| `design-system` | 设计规范和视觉系统 | tokens、布局、UI 约束 |
-| `frontend` | 页面 / 组件实现 | 设计边界明确后实现 |
+| Skill | Role | Boundary |
+|-------|------|----------|
+| `project-setup` | Entry controller for project-level work | Owns INIT / AUDIT / HYBRID / clarification |
+| `design-system` | Design rules and visual system | Owns tokens, layout rules, UI constraints |
+| `frontend` | UI/page implementation | Owns implementation after project-setup and design-system boundaries are clear |
 
-领域 skill 之间不抢入口，按职责划分。
+## Routing Principle
+
+`project-setup` is the default controller for Project OS.
+
+Domain skills do not compete for entry.
+They are called after the project-level mode and intent are clear.
+
+中文说明：
+`project-setup` 是 Project OS 的默认控制器。
+领域 skill 不抢入口，只在边界明确后被调用。

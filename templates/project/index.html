@@ -173,8 +173,14 @@
       --component-workbench-section-gap: var(--space-32);
       --component-workbench-list-gap: var(--space-12);
       --component-workbench-control-gap: var(--space-16);
+      --component-document-card-min: 176px;
+      --component-document-grid-gap: var(--component-workbench-list-gap);
+      --component-document-action-size: 22px;
+      --component-document-action-icon-size: 14px;
       --component-section-title-gap: var(--space-4);
       --component-section-content-gap: var(--space-16);
+      --component-question-content-gap: var(--space-8);
+      --component-question-section-gap: var(--space-20);
       --transition-fast: .18s ease;
       --transition-switch: .24s ease;
 
@@ -858,8 +864,8 @@
       color: var(--color-text-primary);
     }
     .kit-header {
-      display: flex;
-      justify-content: space-between;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
       align-items: end;
       gap: var(--space-24);
       margin-bottom: var(--space-32);
@@ -933,7 +939,7 @@
     .kit-meta-icon {
       width: 32px;
       height: 32px;
-      border-radius: var(--radius-md);
+      border-radius: var(--radius-xs);
       background: var(--color-surface-control);
       color: var(--color-success-strong);
       display: grid;
@@ -968,7 +974,7 @@
     .kit-score-pill {
       padding: var(--space-8);
       border: 1px solid var(--color-border-subtle);
-      border-radius: var(--radius-md);
+      border-radius: var(--radius-xs);
       background: var(--color-surface-page);
       display: grid;
       gap: var(--space-2);
@@ -1006,25 +1012,18 @@
       position: relative;
       display: inline-flex;
       width: min(100%, 390px);
-      margin-bottom: var(--space-24);
+      gap: var(--space-4);
+      margin: 0;
       padding: var(--space-6);
       border: 1px solid var(--color-border-default);
       border-radius: var(--radius-lg);
-      background: var(--color-surface-panel);
-      box-shadow: var(--shadow-sm);
+      background: var(--color-surface-control);
+      box-shadow: none;
+      justify-self: end;
+      align-items: center;
     }
     .kit-switch-slider {
-      position: absolute;
-      top: var(--space-6);
-      bottom: var(--space-6);
-      left: var(--space-6);
-      width: calc(50% - var(--space-6));
-      border-radius: var(--radius-md);
-      background: var(--color-surface-inverse);
-      transition: transform var(--transition-switch);
-    }
-    .kit-switch[data-project="old"] .kit-switch-slider {
-      transform: translateX(calc(100% + 0px));
+      display: none;
     }
     .kit-switch button {
       position: relative;
@@ -1038,19 +1037,20 @@
       font-weight: var(--font-semibold);
       cursor: pointer;
       border-radius: var(--radius-md);
+      padding: 0 var(--space-16);
       display: inline-flex;
       align-items: center;
       justify-content: center;
       gap: var(--space-8);
-      transition: color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
+      transition: color var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
       user-select: none;
     }
     .kit-switch button:hover {
       color: var(--color-text-primary);
+      background: rgba(255, 255, 255, .64);
     }
     .kit-switch button:active {
       transform: none;
-      background: transparent;
     }
     .kit-switch button:focus-visible {
       outline: none;
@@ -1064,6 +1064,7 @@
       color: var(--color-success-icon);
     }
     .kit-switch button.is-active {
+      background: var(--color-surface-inverse);
       color: var(--color-text-inverse);
     }
     .kit-panel {
@@ -1133,6 +1134,20 @@
       font-size: var(--text-12);
       line-height: 1.55;
     }
+    .kit-section-block {
+      display: grid;
+      gap: var(--component-section-content-gap);
+    }
+    .kit-section-block > .kit-section-heading {
+      margin-bottom: 0;
+    }
+    .kit-section-block > .kit-section-content {
+      min-width: 0;
+    }
+    .kit-section-content {
+      display: grid;
+      gap: var(--component-workbench-control-gap);
+    }
     .kit-section-heading {
       margin-bottom: var(--component-section-content-gap);
     }
@@ -1154,6 +1169,7 @@
       display: grid;
       align-items: center;
       gap: var(--space-8);
+      grid-template-columns: var(--component-step-size) minmax(0, 1fr);
     }
     .kit-section-heading[data-variant="numbered"] .kit-section-title,
     .kit-section-heading[data-variant="numbered-with-description"] .kit-section-title {
@@ -1175,6 +1191,12 @@
     .kit-section-heading[data-variant="numbered-with-description"] .kit-section-subtitle {
       margin-left: var(--section-heading-indent);
     }
+    .kit-question-label {
+      color: var(--color-text-primary);
+      font-size: var(--text-13);
+      font-weight: var(--font-bold);
+      line-height: 1.45;
+    }
     .kit-icon-note {
       width: var(--component-icon-lg);
       height: var(--component-icon-lg);
@@ -1189,10 +1211,119 @@
     .kit-choice-list,
     .kit-strategy-list,
     .kit-source-list,
-    .kit-material-list,
-    .kit-check-list {
+    .kit-material-list {
       display: grid;
       gap: var(--component-workbench-list-gap);
+    }
+    .kit-choice-list,
+    .kit-strategy-list,
+    .kit-source-list {
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+    .kit-choice-list.compact,
+    .kit-choice-list.is-two-col {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .kit-material-list {
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, max(var(--component-document-card-min), calc((100% - var(--component-document-grid-gap) - var(--component-document-grid-gap)) / 3))), 1fr));
+    }
+    .kit-choice-sm {
+      padding: var(--space-8) var(--space-12);
+      border: 1px solid var(--color-border-subtle);
+      border-radius: var(--radius-md);
+      background: var(--color-surface-panel);
+      font-size: var(--text-12);
+      font-weight: var(--font-medium);
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      text-align: left;
+      transition: all var(--transition-fast);
+      display: flex;
+      align-items: center;
+      gap: var(--space-6);
+    }
+    .kit-choice-sm:hover {
+      background: var(--color-surface-control);
+      border-color: var(--color-border-default);
+    }
+    .kit-choice-sm.is-active {
+      background: var(--color-brand-primary);
+      color: white;
+      border-color: var(--color-brand-primary);
+      box-shadow: var(--shadow-sm);
+    }
+    .kit-wizard-q {
+      display: grid;
+      gap: var(--component-question-content-gap);
+      animation: fadeIn var(--transition-medium);
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .kit-wizard-card-sm {
+      padding: var(--space-8) var(--space-12);
+      border: 1px solid var(--color-border-subtle);
+      border-radius: var(--radius-md);
+      background: var(--color-surface-panel);
+      cursor: pointer;
+      text-align: left;
+      transition: all var(--transition-fast);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+    .kit-wizard-card-sm strong {
+      font-size: var(--text-12);
+      color: var(--color-text-primary);
+    }
+    .kit-wizard-card-sm span {
+      font-size: var(--text-11);
+      color: var(--color-text-muted);
+      line-height: 1.3;
+    }
+    .kit-wizard-card-sm:hover {
+      border-color: var(--color-border-default);
+      background: var(--color-surface-control);
+    }
+    .kit-wizard-card-sm.is-active {
+      border-color: var(--color-brand-primary);
+      background: rgba(var(--color-brand-primary-rgb), 0.04);
+      box-shadow: 0 0 0 1px var(--color-brand-primary);
+    }
+    .kit-wizard-diagnosis {
+      border: 1px solid var(--color-brand-subtle);
+      background: var(--color-surface-page);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+    .kit-diagnosis-header {
+      background: var(--color-surface-panel);
+      padding: var(--space-8) var(--space-16);
+      border-bottom: 1px solid var(--color-brand-subtle);
+      font-size: var(--text-12);
+      font-weight: var(--font-bold);
+      display: flex;
+      align-items: center;
+      gap: var(--space-8);
+      color: var(--color-brand-text);
+    }
+    .kit-diagnosis-body {
+      padding: var(--space-12) var(--space-16);
+      font-size: var(--text-12);
+      line-height: 1.6;
+      color: var(--color-text-secondary);
+    }
+    .kit-wizard-diagnosis strong {
+      color: var(--color-brand-text);
+    }
+    .kit-choice-list {
+      display: grid;
+      gap: var(--component-workbench-list-gap);
+    }
+    .kit-wizard-steps {
+      display: grid;
+      gap: var(--component-question-section-gap);
     }
     .kit-choice-list,
     .kit-strategy-list,
@@ -1204,7 +1335,7 @@
       padding-left: 0;
     }
     .kit-source-list + .kit-source-config-wrap {
-      margin-top: var(--component-workbench-section-gap);
+      margin-top: 0;
     }
     .kit-add-wrap {
       display: grid;
@@ -1366,6 +1497,7 @@
       line-height: 1.5;
     }
     .kit-template-group-header {
+      grid-column: 1 / -1;
       font-size: var(--text-sm);
       font-weight: var(--font-semibold);
       color: var(--gray-500);
@@ -1379,7 +1511,8 @@
     }
     .kit-option-list {
       display: grid;
-      gap: var(--space-8);
+      gap: var(--component-document-grid-gap);
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, max(var(--component-document-card-min), calc((100% - var(--component-document-grid-gap) - var(--component-document-grid-gap)) / 3))), 1fr));
     }
     .kit-option-row {
       display: grid;
@@ -1413,10 +1546,11 @@
       color: var(--color-brand-text);
     }
     .kit-option {
+      position: relative;
       display: grid;
-      grid-template-columns: auto 1fr auto auto;
-      gap: var(--space-12);
-      align-items: center;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: var(--space-8) var(--space-10);
+      align-items: start;
       border: 1px solid var(--color-border-subtle);
       border-radius: var(--radius-md);
       background: var(--color-surface-panel);
@@ -1471,11 +1605,23 @@
       outline: 2px solid var(--color-surface-inverse);
       outline-offset: 2px;
     }
+    .kit-option[aria-disabled="true"] {
+      cursor: not-allowed;
+      background: var(--color-surface-page);
+      opacity: .72;
+    }
+    .kit-option[aria-disabled="true"]:hover {
+      border-color: var(--color-border-subtle);
+    }
     .kit-option-copy strong {
       display: block;
       font-size: var(--text-13);
       font-weight: var(--font-medium);
       color: var(--color-text-primary);
+    }
+    .kit-option-copy {
+      padding-right: calc(var(--component-document-action-size) + var(--space-12));
+      min-width: 0;
     }
     .kit-option-copy small {
       display: block;
@@ -1483,12 +1629,17 @@
       font-size: var(--text-11);
       color: var(--color-text-muted);
       font-family: ui-monospace, "SF Mono", monospace;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .kit-option-desc {
+      grid-column: 2 / 3;
       font-size: var(--text-11);
       color: var(--color-text-secondary);
-      text-align: right;
-      max-width: 220px;
+      text-align: left;
+      max-width: none;
+      line-height: 1.45;
     }
     .kit-option:has(input:checked) {
       background: var(--color-surface-panel);
@@ -1698,8 +1849,8 @@
     .kit-command-preview {
       padding: var(--space-10);
       border-radius: var(--radius-md);
-      background: var(--color-surface-page);
-      border: 1px solid var(--color-border-subtle);
+      background: transparent;
+      border: 0;
     }
     .kit-command-preview code {
       display: block;
@@ -1710,8 +1861,11 @@
     }
     .kit-generate-bar {
       padding-top: var(--space-4);
+      display: grid;
+      gap: var(--component-workbench-list-gap);
     }
-    .kit-generate-bar .kit-primary {
+    .kit-generate-bar .kit-primary,
+    .kit-generate-bar .kit-secondary-btn {
       width: 100%;
       justify-content: center;
     }
@@ -1856,6 +2010,9 @@
       display: grid;
       gap: var(--space-4);
     }
+    .kit-result-success + .kit-result-list {
+      margin-top: var(--space-8);
+    }
     .kit-result-item {
       display: flex;
       gap: var(--space-8);
@@ -1876,7 +2033,7 @@
       filter: brightness(.96);
     }
     .kit-result-item.is-clickable::after {
-      content: '👁️';
+      content: '查看';
       margin-left: auto;
       font-size: var(--text-11);
       opacity: .55;
@@ -1959,6 +2116,10 @@
       line-height: 1.55;
       margin-top: var(--space-8);
     }
+    .kit-result-note + .kit-secondary-btn,
+    .kit-result-list + .kit-secondary-btn {
+      margin-top: var(--space-8);
+    }
     .kit-result-note code {
       background: rgba(255,255,255,.5);
       padding: 1px var(--space-5);
@@ -1966,7 +2127,7 @@
       font-size: var(--text-11);
     }
     .kit-result-hint {
-      margin-top: var(--space-8);
+      margin-top: 0;
       padding: var(--space-8) var(--space-12);
       font-size: var(--text-11);
       color: var(--color-text-muted);
@@ -2009,6 +2170,103 @@
       padding: 1px var(--space-4);
       border-radius: var(--radius-xs);
       font-size: var(--text-11);
+    }
+    .kit-plan-card {
+      display: grid;
+      gap: var(--space-12);
+      padding: var(--space-14);
+      border: 1px solid var(--color-border-subtle);
+      border-radius: var(--radius-lg);
+      background: var(--color-surface-panel);
+    }
+    .kit-plan-head {
+      display: grid;
+      gap: var(--space-4);
+    }
+    .kit-plan-head strong {
+      font-size: var(--text-14);
+      color: var(--color-text-primary);
+    }
+    .kit-plan-head p {
+      margin: 0;
+      color: var(--color-text-secondary);
+      font-size: var(--text-12);
+      line-height: 1.55;
+    }
+    .kit-plan-summary {
+      display: grid;
+      gap: var(--space-6);
+    }
+    .kit-plan-row {
+      display: grid;
+      grid-template-columns: 88px minmax(0, 1fr);
+      gap: var(--space-10);
+      align-items: start;
+      padding: var(--space-10) var(--space-12);
+      border: 1px solid var(--color-border-subtle);
+      border-radius: var(--radius-md);
+      background: var(--color-surface-page);
+      font-size: var(--text-12);
+      color: var(--color-text-secondary);
+      line-height: 1.45;
+    }
+    .kit-plan-row strong {
+      color: var(--color-text-primary);
+      font-weight: var(--font-bold);
+    }
+    .kit-plan-section {
+      display: grid;
+      gap: var(--space-8);
+    }
+    .kit-plan-section-title {
+      font-size: var(--text-12);
+      font-weight: var(--font-bold);
+      color: var(--color-text-primary);
+    }
+    .kit-plan-match {
+      display: grid;
+      gap: var(--space-6);
+      padding: var(--space-10) var(--space-12);
+      border: 1px solid var(--color-border-subtle);
+      border-radius: var(--radius-md);
+      background: var(--color-surface-page);
+    }
+    .kit-plan-match label {
+      display: grid;
+      gap: var(--space-4);
+      font-size: var(--text-12);
+      color: var(--color-text-secondary);
+      line-height: 1.45;
+    }
+    .kit-plan-match strong,
+    .kit-plan-match code {
+      color: var(--color-text-primary);
+    }
+    .kit-plan-select {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid var(--color-border-default);
+      border-radius: var(--radius-sm);
+      background: var(--color-surface-panel);
+      color: var(--color-text-primary);
+      padding: var(--space-8) var(--space-10);
+      font-size: var(--text-12);
+      font-family: var(--font-sans);
+    }
+    .kit-plan-select:focus-visible {
+      outline: none;
+      box-shadow: var(--shadow-focus-muted);
+      border-color: var(--color-focus);
+    }
+    .kit-plan-actions {
+      display: grid;
+      gap: var(--space-8);
+    }
+    .kit-plan-error {
+      min-height: 18px;
+      color: #b91c1c;
+      font-size: var(--text-12);
+      line-height: 1.5;
     }
     .kit-graph-host {
       width: 100%;
@@ -2425,20 +2683,32 @@
     .markdown-body a { color: var(--color-action-primary); text-decoration: underline; }
     .markdown-body hr { border: 0; border-top: 1px solid var(--color-border-subtle); margin: 1.4em 0; }
     .kit-eye {
-      flex: 0 0 auto;
-      background: none;
-      border: 1px solid transparent;
-      padding: var(--space-3) var(--space-6);
+      position: absolute;
+      top: var(--space-10);
+      right: var(--space-12);
+      width: var(--component-document-action-size);
+      height: var(--component-document-action-size);
+      background: var(--color-surface-page);
+      border: 1px solid var(--color-border-subtle);
+      padding: 0;
       border-radius: var(--radius-xs);
-      font-size: var(--text-base);
       cursor: pointer;
-      color: var(--color-text-muted);
-      transition: background var(--transition-fast), border-color var(--transition-fast);
+      color: var(--color-text-primary);
+      transition: background var(--transition-fast), color var(--transition-fast);
+      display: inline-grid;
+      place-items: center;
     }
     .kit-eye:hover {
-      background: var(--color-surface-page);
-      border-color: var(--color-border-subtle);
+      background: var(--color-surface-control);
       color: var(--color-text-primary);
+    }
+    .kit-eye:focus-visible {
+      outline: none;
+      box-shadow: var(--shadow-focus-muted);
+    }
+    .kit-eye .kit-icon {
+      width: var(--component-document-action-icon-size);
+      height: var(--component-document-action-icon-size);
     }
     .kit-graph-issue-danger {
       background: #fef2f2;
@@ -2608,6 +2878,19 @@
         --component-workbench-panel-padding-inline: var(--space-20);
         --component-workbench-section-gap: var(--space-24);
       }
+      .kit-switch {
+        width: 100%;
+        min-width: 0;
+        justify-self: stretch;
+      }
+      .kit-switch button {
+        min-width: 0;
+      }
+      .kit-choice-list.compact,
+      .kit-choice-list.is-two-col,
+      .kit-source-list {
+        grid-template-columns: 1fr;
+      }
       .kit-left,
       .kit-right {
         grid-column: auto;
@@ -2660,6 +2943,7 @@
     <symbol id="i-file-json" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M10 13l-2 2 2 2"></path><path d="M14 13l2 2-2 2"></path></symbol>
     <symbol id="i-check-square" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"></rect><path d="M8 12l3 3 5-6"></path></symbol>
     <symbol id="i-file-text" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M8 13h8"></path><path d="M8 17h6"></path></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></symbol>
   </svg>
   <section class="kit-shell" aria-label="AI 项目工程助手">
     <header class="kit-header">
@@ -2668,101 +2952,153 @@
         <h1>AI 项目工程助手</h1>
         <p>选择新项目走初始化向导，老项目看体检报告。</p>
       </div>
-      <div class="kit-meta" data-component="MetaPanel" data-variant="status-card" data-state="default" data-source="docs/design/ai-project-assistant/data.ts">
-        <div class="kit-meta-top">
-          <span class="kit-meta-icon" aria-hidden="true"><svg class="kit-icon"><use href="#i-activity"></use></svg></span>
-          <span class="kit-meta-title"><strong>体检结果</strong><span id="kitReportTime">选择目录后显示</span></span>
-        </div>
-        <div class="kit-score-grid">
-          <span class="kit-score-pill"><span>上下文完整度</span><strong id="kitContextScorePill">—</strong></span>
-          <span class="kit-score-pill"><span>工程成熟度</span><strong id="kitMaturityScorePill">—</strong></span>
-        </div>
+      <div class="kit-switch" role="tablist" aria-label="项目类型" data-component="SegmentedSwitch" data-variant="header-pill-tabs" data-project="new" id="kitProjectSwitch">
+        <div class="kit-switch-slider" aria-hidden="true"></div>
+        <button class="is-active" type="button" role="tab" aria-selected="true" aria-controls="kitNewPanel" data-kit-project="new" data-state="selected"><svg class="kit-icon"><use href="#i-plus"></use></svg>创建新项目</button>
+        <button type="button" role="tab" aria-selected="false" aria-controls="kitOldPanel" data-kit-project="old" data-state="default"><svg class="kit-icon"><use href="#i-refresh"></use></svg>接手老项目</button>
       </div>
     </header>
 
-    <div class="kit-switch" data-component="SegmentedSwitch" data-variant="two-options" data-project="new" id="kitProjectSwitch">
-      <div class="kit-switch-slider"></div>
-      <button class="is-active" type="button" data-kit-project="new" data-state="selected"><svg class="kit-icon"><use href="#i-plus"></use></svg>创建新项目</button>
-      <button type="button" data-kit-project="old" data-state="default"><svg class="kit-icon"><use href="#i-refresh"></use></svg>接手老项目</button>
-    </div>
-
     <section class="kit-panel" id="kitNewPanel">
       <div class="kit-left kit-stack">
-        <div class="kit-card">
-          <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered" data-source="docs/design/ai-project-assistant/data.ts">
-            <span class="kit-section-title" data-slot="title"><span class="kit-step-num" data-slot="step">1</span><span class="kit-section-label" data-slot="label">协作模式</span></span>
-          </div>
-          <div class="kit-choice-list">
-            <button class="kit-choice is-active" type="button" data-kit-collab="solo" data-component="OptionCard" data-variant="choice" data-state="selected" data-source="docs/design/ai-project-assistant/data.ts">
-              <svg class="kit-icon"><use href="#i-user"></use></svg>
-              <span><strong>个人开发</strong><span>AI 提供敏捷上下文，重视开发速度与灵活性。</span></span>
-              <svg class="kit-icon kit-active-check"><use href="#i-check-circle"></use></svg>
-            </button>
-            <button class="kit-choice" type="button" data-kit-collab="team" data-component="OptionCard" data-variant="choice" data-state="default" data-source="docs/design/ai-project-assistant/data.ts">
-              <svg class="kit-icon"><use href="#i-users"></use></svg>
-              <span><strong>团队协作</strong><span>补齐协作规则、决策记录和交接资料，避免项目越做越散。</span></span>
-              <svg class="kit-icon kit-active-check"><use href="#i-check-circle"></use></svg>
-            </button>
+        <div id="kitNewProjectFlowWizard" class="kit-stack">
+          <div class="kit-card">
+            <div class="kit-section-block" data-component="SectionBlock" data-variant="with-options" data-source="docs/design/ai-project-assistant/components.ts">
+              <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered-with-description" data-source="docs/design/ai-project-assistant/data.ts">
+                <span class="kit-section-title" data-slot="title"><span class="kit-step-num" data-slot="step">1</span><span class="kit-section-label" data-slot="label">模板选择向导</span></span>
+                <p class="kit-section-subtitle" data-slot="description">先回答 3 个问题，帮你自动勾选需要的项目文档和 AI 规则文件。</p>
+              </div>
+
+              <div class="kit-section-content" data-slot="content">
+                <div class="kit-wizard-steps">
+                  <!-- 问题 1: 协作关系 -->
+                  <div class="kit-wizard-q">
+                    <label class="kit-question-label">Q1：这个项目谁来维护？</label>
+                    <div class="kit-choice-list compact" id="wizardQ1">
+                      <button class="kit-wizard-card-sm is-active" type="button" data-val="solo">
+                        <strong>我一个人</strong>
+                        <span>先保持轻量，别被文档拖慢。</span>
+                      </button>
+                      <button class="kit-wizard-card-sm" type="button" data-val="team">
+                        <strong>有团队一起做</strong>
+                        <span>需要规则、决策记录和交接资料。</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- 问题 2: 核心战场 -->
+                  <div class="kit-wizard-q">
+                    <label class="kit-question-label">Q2：你现在最想先解决什么？（可多选）</label>
+                    <div class="kit-choice-list is-two-col" id="wizardQ2">
+                      <button class="kit-wizard-card-sm is-active" type="button" data-val="product">
+                        <strong>想清楚产品方向</strong>
+                        <span>定位、用户、MVP 和路线图。</span>
+                      </button>
+                      <button class="kit-wizard-card-sm" type="button" data-val="frontend">
+                        <strong>先把页面做出来</strong>
+                        <span>UI 规范、组件和视觉边界。</span>
+                      </button>
+                      <button class="kit-wizard-card-sm" type="button" data-val="backend">
+                        <strong>项目结构要稳</strong>
+                        <span>架构、环境、目录和模块边界。</span>
+                      </button>
+                      <button class="kit-wizard-card-sm" type="button" data-val="testing">
+                        <strong>方便测试和交接</strong>
+                        <span>验收方式、运行手册和经验教训。</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- 问题 3: 发展预期 -->
+                  <div class="kit-wizard-q">
+                    <label class="kit-question-label">Q3：你现在想怎么推进？</label>
+                    <div class="kit-choice-list compact" id="wizardQ3">
+                      <button class="kit-wizard-card-sm is-active" type="button" data-val="mvp">
+                        <strong>快速做出原型</strong>
+                        <span>先跑通核心功能，少放长期治理文档。</span>
+                      </button>
+                      <button class="kit-wizard-card-sm" type="button" data-val="longterm">
+                        <strong>搭长期项目基础</strong>
+                        <span>先把结构、规范和交接打稳。</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 诊断报告面板 -->
+                <div id="wizardReport" class="kit-wizard-diagnosis">
+                  <div class="kit-diagnosis-header">
+                    <svg class="kit-icon" style="color:var(--color-brand-primary)"><use href="#i-sparkles"></use></svg>
+                    <span>已为你推荐一套模板</span>
+                  </div>
+                  <div class="kit-diagnosis-body" id="wizardSummary">
+                    <!-- 内容动态填充 -->
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-
       </div>
 
       <div class="kit-right kit-stack">
         <div class="kit-card">
-          <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered-with-description">
-            <span class="kit-section-title"><span class="kit-step-num">2</span><span class="kit-section-label">基础上下文资料</span></span>
-            <p class="kit-section-subtitle">AI 接手所需的最小数据集，锁定不可取消</p>
+          <div class="kit-section-block" data-component="SectionBlock" data-variant="with-results" data-source="docs/design/ai-project-assistant/components.ts">
+            <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered-with-description" data-source="docs/design/ai-project-assistant/data.ts">
+              <span class="kit-section-title" data-slot="title"><span class="kit-step-num" data-slot="step">2</span><span class="kit-section-label" data-slot="label">将生成这些项目文档</span></span>
+              <p class="kit-section-subtitle" data-slot="description">先看预览；选择目录后生成写入前安全方案，确认后再生成骨架或下载 zip。</p>
+            </div>
+            <div class="kit-section-content" data-slot="content">
+              <div class="kit-template-group-header">必选文件：AI 接手最小上下文</div>
+              <div class="kit-material-list" id="kitRequiredMaterials" data-component="DocumentGrid" data-variant="required"></div>
+              <div class="kit-option-list" id="kitOptionTemplates" data-component="DocumentGrid" data-variant="optional-grouped"></div>
+            </div>
           </div>
-          <div class="kit-material-list" id="kitRequiredMaterials"></div>
         </div>
 
-        <div class="kit-card fill">
-          <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered-with-description">
-            <span class="kit-section-title"><span class="kit-step-num">3</span><span class="kit-section-label">可选增强模板</span></span>
-            <p class="kit-section-subtitle">按需勾选要带走的文档</p>
-          </div>
-          <div class="kit-option-list" id="kitOptionTemplates"></div>
-        </div>
         <div class="kit-generate-bar" id="kitNewProjectActions">
-          <!-- Buttons rendered dynamically based on File System Access API support -->
+          <!-- Buttons rendered dynamically -->
         </div>
       </div>
     </section>
 
     <section class="kit-panel is-hidden" id="kitOldPanel">
       <div class="kit-left">
-        <div id="kitBookmarksWrap" class="kit-bookmarks-wrap is-hidden">
-          <div class="kit-section-heading">
-            <span class="kit-section-title"><span class="kit-step-num">★</span><span class="kit-section-label">我的项目</span></span>
-            <p class="kit-section-subtitle">点击任意项目可一键再次体检（自动复用授权）</p>
+        <div id="kitBookmarksWrap" class="kit-bookmarks-wrap kit-section-block is-hidden" data-component="SectionBlock" data-variant="with-results">
+          <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered-with-description">
+            <span class="kit-section-title" data-slot="title"><span class="kit-step-num" data-slot="step">★</span><span class="kit-section-label" data-slot="label">我的项目</span></span>
+            <p class="kit-section-subtitle" data-slot="description">点击任意项目可一键再次体检（自动复用授权）</p>
           </div>
-          <div id="kitBookmarksList" class="kit-bookmark-list"></div>
-          <div id="kitInsightsHost" class="kit-insights-host is-hidden"></div>
+          <div class="kit-section-content" data-slot="content">
+            <div id="kitBookmarksList" class="kit-bookmark-list"></div>
+            <div id="kitInsightsHost" class="kit-insights-host is-hidden"></div>
+          </div>
         </div>
-        <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered-with-description" data-source="docs/design/ai-project-assistant/data.ts">
-          <span class="kit-section-title" data-slot="title"><span class="kit-step-num" data-slot="step">1</span><span class="kit-section-label" data-slot="label">代码来源</span></span>
-          <p class="kit-section-subtitle" data-slot="description">输入老项目代码，生成 AI 可读的接手报告。</p>
-        </div>
-        <div class="kit-source-list">
-          <button class="kit-source is-active" type="button" data-kit-source="local" data-component="OptionCard" data-variant="source" data-state="selected" data-source="docs/design/ai-project-assistant/data.ts">
-            <svg class="kit-icon"><use href="#i-folder-git"></use></svg>
-            <span><strong>读取本机目录</strong><span>直接分析当前运行所在的路径，速度最快。</span></span>
-            <svg class="kit-icon kit-active-check"><use href="#i-check-circle"></use></svg>
-          </button>
-          <button class="kit-source" type="button" data-kit-source="git" data-component="OptionCard" data-variant="source" data-state="default" data-source="docs/design/ai-project-assistant/data.ts">
-            <svg class="kit-icon"><use href="#i-github"></use></svg>
-            <span><strong>Git 仓库地址</strong><span>输入一段公开的或有权限的仓库链接。</span></span>
-            <svg class="kit-icon kit-active-check"><use href="#i-check-circle"></use></svg>
-          </button>
-          <button class="kit-source" type="button" data-kit-source="upload" data-component="OptionCard" data-variant="source" data-state="default" data-source="docs/design/ai-project-assistant/data.ts">
-            <svg class="kit-icon"><use href="#i-upload-cloud"></use></svg>
-            <span><strong>上传压缩包</strong><span>把源码打包传上来，不上传云端仅本地解析。</span></span>
-            <svg class="kit-icon kit-active-check"><use href="#i-check-circle"></use></svg>
-          </button>
+        <div class="kit-section-block" data-component="SectionBlock" data-variant="with-options" data-source="docs/design/ai-project-assistant/components.ts">
+          <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered-with-description" data-source="docs/design/ai-project-assistant/data.ts">
+            <span class="kit-section-title" data-slot="title"><span class="kit-step-num" data-slot="step">1</span><span class="kit-section-label" data-slot="label">代码来源</span></span>
+            <p class="kit-section-subtitle" data-slot="description">输入老项目代码，生成 AI 可读的接手报告。</p>
+          </div>
+          <div class="kit-source-list" data-slot="content">
+            <button class="kit-source is-active" type="button" data-kit-source="local" data-component="OptionCard" data-variant="source" data-state="selected" data-source="docs/design/ai-project-assistant/data.ts">
+              <svg class="kit-icon"><use href="#i-folder-git"></use></svg>
+              <span><strong>读取本机目录</strong><span>直接分析当前运行所在的路径，速度最快。</span></span>
+              <svg class="kit-icon kit-active-check"><use href="#i-check-circle"></use></svg>
+            </button>
+            <button class="kit-source" type="button" data-kit-source="git" data-component="OptionCard" data-variant="source" data-state="default" data-source="docs/design/ai-project-assistant/data.ts">
+              <svg class="kit-icon"><use href="#i-github"></use></svg>
+              <span><strong>Git 仓库地址</strong><span>输入一段公开的或有权限的仓库链接。</span></span>
+              <svg class="kit-icon kit-active-check"><use href="#i-check-circle"></use></svg>
+            </button>
+            <button class="kit-source" type="button" data-kit-source="upload" data-component="OptionCard" data-variant="source" data-state="default" data-source="docs/design/ai-project-assistant/data.ts">
+              <svg class="kit-icon"><use href="#i-upload-cloud"></use></svg>
+              <span><strong>上传压缩包</strong><span>把源码打包传上来，不上传云端仅本地解析。</span></span>
+              <svg class="kit-icon kit-active-check"><use href="#i-check-circle"></use></svg>
+            </button>
+          </div>
         </div>
         <div class="kit-source-config-wrap">
-          <div class="kit-source-config is-active" data-kit-source-panel="local">
+          <div class="kit-source-config is-active" data-kit-source-panel="local" data-component="SectionBlock" data-variant="with-form">
             <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered-with-description" data-source="docs/design/ai-project-assistant/data.ts">
               <span class="kit-section-title" data-slot="title"><span class="kit-step-num" data-slot="step">2</span><span class="kit-section-label" data-slot="label">当前工作目录</span></span>
               <p class="kit-section-subtitle" data-slot="description">将在下方路径执行代码体检</p>
@@ -2777,7 +3113,7 @@
             <button class="kit-primary" type="button" id="kitAnalyzeBtn"><svg class="kit-icon"><use href="#i-activity"></use></svg><span data-button-label>开始体检</span></button>
             <div class="kit-feature-note" id="kitLocalNote"><span class="kit-status-chip is-copy">浏览器直接分析</span><span>文件仅在本地读取，不上传任何数据。</span></div>
           </div>
-          <div class="kit-source-config" data-kit-source-panel="git">
+          <div class="kit-source-config" data-kit-source-panel="git" data-component="SectionBlock" data-variant="with-form">
             <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered-with-description" data-source="docs/design/ai-project-assistant/data.ts">
               <span class="kit-section-title" data-slot="title"><span class="kit-step-num" data-slot="step">2</span><span class="kit-section-label" data-slot="label">Git 仓库地址</span></span>
               <p class="kit-section-subtitle" data-slot="description">支持公开仓库或携带凭证的私有仓库</p>
@@ -2789,7 +3125,7 @@
             </div>
             <div class="kit-feature-note"><span class="kit-status-chip is-live">命令可用</span><span>填写仓库地址后复制命令，在终端中 clone 到临时目录并生成体检报告。</span></div>
           </div>
-          <div class="kit-source-config" data-kit-source-panel="upload">
+          <div class="kit-source-config" data-kit-source-panel="upload" data-component="SectionBlock" data-variant="with-form">
             <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered-with-description" data-source="docs/design/ai-project-assistant/data.ts">
               <span class="kit-section-title" data-slot="title"><span class="kit-step-num" data-slot="step">2</span><span class="kit-section-label" data-slot="label">上传压缩包</span></span>
               <p class="kit-section-subtitle" data-slot="description">支持 .zip 格式的代码包</p>
@@ -2805,14 +3141,16 @@
 
       <div class="kit-right kit-stack">
         <div class="kit-card fill" id="kitOldResultsCard">
-          <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered-with-description">
-            <span class="kit-section-title"><span class="kit-step-num">3</span><span class="kit-section-label">体检结果</span></span>
-            <p class="kit-section-subtitle">选择左侧目录或上传 zip 后自动显示</p>
-          </div>
-          <div id="kitOldResults" class="kit-stack">
-            <div class="kit-results-empty">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>
-              <span>选择项目目录或上传 zip<br>结果会显示在这里</span>
+          <div class="kit-section-block" data-component="SectionBlock" data-variant="with-results" data-source="docs/design/ai-project-assistant/components.ts">
+            <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered-with-description">
+              <span class="kit-section-title" data-slot="title"><span class="kit-step-num" data-slot="step">3</span><span class="kit-section-label" data-slot="label">体检结果</span></span>
+              <p class="kit-section-subtitle" data-slot="description">选择左侧目录或上传 zip 后自动显示</p>
+            </div>
+            <div id="kitOldResults" class="kit-stack" data-slot="content">
+              <div class="kit-results-empty">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>
+                <span>选择项目目录或上传 zip<br>结果会显示在这里</span>
+              </div>
             </div>
           </div>
         </div>
@@ -2850,10 +3188,8 @@
     ],
     team: [
       { id: "project-brief", title: "项目说明", description: "这个项目是什么，给谁用，目标是什么", file: "PROJECT.md", state: "locked" },
-      { id: "team-rules", title: "团队工作规则", description: "组件规范、禁止魔数、样式统一", file: "AGENTS.md", state: "locked" },
-      { id: "architecture-rules", title: "架构与约定", description: "目录结构、状态管理和路由规则", file: "docs/ARCHITECTURE.md", state: "locked" },
-      { id: "project-status", title: "当前状态", description: "现在做到哪一步，还缺什么", file: "PROJECT.md", state: "locked" },
-      { id: "handoff-record", title: "交接记录", description: "下一个队友或 AI 接手时需要的信息", file: "HANDOFF.md", state: "locked" }
+      { id: "agent-rules", title: "AI 工作规则", description: "AI 该怎么做，哪些事不要乱改", file: "AGENTS.md", state: "locked" },
+      { id: "project-status", title: "当前状态", description: "现在做到哪一步，还缺什么", file: "HANDOFF.md", state: "locked" }
     ]
   };
   function renderKitRequired(mode) {
@@ -2863,16 +3199,141 @@
     kitRequiredMaterials[mode].forEach((item) => target.appendChild(renderRequiredMaterialItem(item)));
   }
   function renderRequiredMaterialItem(item) {
-    const row = document.createElement("label");
-    row.className = "kit-material";
+    const row = document.createElement("div");
+    row.className = "kit-option required";
     row.setAttribute("data-component", "RequiredMaterialItem");
-    row.setAttribute("data-source", "docs/design/ai-project-assistant/data.ts");
     row.setAttribute("data-state", item.state);
     row.setAttribute("aria-disabled", item.state === "locked" ? "true" : "false");
     row.setAttribute("title", item.file + " · 已自动勾选，当前不可取消");
-    row.innerHTML = '<span class="kit-check-control" aria-hidden="true"><svg class="kit-icon"><use href="#i-check"></use></svg></span><span class="kit-material-copy"><strong>' + item.title + '</strong><span>' + item.description + '</span></span>';
+    row.innerHTML = `
+      <span class="kit-check-control" aria-hidden="true">
+        <svg class="kit-icon"><use href="#i-check"></use></svg>
+      </span>
+      <span class="kit-option-copy">
+        <strong>${esc(item.title)}</strong>
+        <small>${esc(item.file)}</small>
+      </span>
+      <span class="kit-option-desc">${esc(item.description)}</span>
+      <button class="kit-eye" type="button" data-preview-template="${esc(item.file)}" title="预览 ${esc(item.file)}" aria-label="预览 ${esc(item.file)}">
+        <svg class="kit-icon" aria-hidden="true"><use href="#i-eye"></use></svg>
+      </button>
+    `;
+    row.querySelector('[data-preview-template]').addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openTemplateInViewer(item.file);
+    });
     return row;
   }
+  // ─── AI Project Wizard Logic ──────────────────────────────
+  function updateWizardSelections() {
+    const collab = document.querySelector("#wizardQ1 .is-active")?.dataset.val;
+    const focuses = Array.from(document.querySelectorAll("#wizardQ2 .is-active")).map(el => el.dataset.val);
+    const pType = document.querySelector("#wizardQ3 .is-active")?.dataset.val;
+    const summary = document.getElementById("wizardSummary");
+
+    const autoCheck = new Set();
+    let advice = { collab: "", fields: [], growth: "", template: "core-template", reason: "" };
+
+    // --- 维度 1: 协作关系 (Q1) -> 侧重交接与治理 ---
+    if (collab === "team") {
+      autoCheck.add("docs/DOCUMENTATION.md");
+      advice.collab = "<strong>有团队维护</strong>：会补上文档治理，减少交接时信息丢失。";
+    } else {
+      advice.collab = "<strong>一个人维护</strong>：先保持轻量，只保留必要文档，避免一开始负担太重。";
+    }
+
+    // --- 维度 2: 核心战场 (Q2) -> 侧重技术与功能 (多选并集) ---
+    focuses.forEach(f => {
+      if (f === "product") {
+        autoCheck.add("PRODUCT.md");
+        autoCheck.add("docs/PRODUCT_PLAN.md");
+        advice.fields.push("产品方向");
+      } else if (f === "frontend") {
+        autoCheck.add("docs/DESIGN_STANDARDS.md");
+        autoCheck.add("docs/CODE_STRUCTURE.md");
+        advice.fields.push("页面和组件规范");
+      } else if (f === "backend") {
+        autoCheck.add("docs/ARCHITECTURE.md");
+        autoCheck.add("docs/ENVIRONMENT.md");
+        autoCheck.add("docs/RUNBOOK.md");
+        advice.fields.push("项目结构和运行方式");
+      } else if (f === "testing") {
+        autoCheck.add("docs/TESTING.md");
+        autoCheck.add("docs/RUNBOOK.md");
+        autoCheck.add("docs/LESSONS.md");
+        advice.fields.push("测试、验收和交接");
+      }
+    });
+
+    // --- 维度 3: 发展预期 (Q3) -> 侧重架构、命名与生命周期 ---
+    if (pType === "longterm") {
+      autoCheck.add("docs/ARCHITECTURE.md");
+      autoCheck.add("docs/CODE_STRUCTURE.md");
+      autoCheck.add("docs/NAMING.md");
+      autoCheck.add("docs/CHANGELOG.md");
+      autoCheck.add("docs/DECISIONS.md");
+      autoCheck.add("docs/RUNBOOK.md");
+      advice.growth = "<strong>长期项目</strong>：建议补齐架构、命名、变更、决策和运行手册，后面接手更稳。";
+    } else {
+      advice.growth = "<strong>快速原型</strong>：先保证核心功能能跑通，长期治理文档可以后面再补。";
+    }
+
+    const optionalCount = autoCheck.size;
+    if (pType === "mvp" && collab === "solo" && optionalCount <= 2) {
+      advice.template = "core-template";
+      advice.reason = "你现在更适合轻量启动，先让 AI 拿到最小上下文。";
+    } else if (pType === "longterm" || collab === "team" || optionalCount >= 3) {
+      advice.template = "product-template";
+      advice.reason = "你需要更多工程文档来支撑维护、测试和交接。";
+    } else {
+      advice.template = "product-template";
+      advice.reason = "你已经选择了具体项目关注点，推荐在 core 之外补几份工程文档。";
+    }
+
+    if (summary) {
+      const fieldLabels = advice.fields.length ? `重点补齐：<strong>${advice.fields.join("、")}</strong>。` : "暂未选择具体关注点，只保留最小模板。";
+      summary.innerHTML = `
+        <p><strong>推荐：</strong>${advice.template}</p>
+        <p style="margin-top:var(--space-6)">${advice.reason}</p>
+        <p>${advice.collab}</p>
+        <p style="margin-top:var(--space-6)">${fieldLabels}</p>
+        <p style="margin-top:var(--space-10); border-top:1px dashed var(--color-border-subtle); padding-top:var(--space-10)">
+          ${advice.growth}
+        </p>
+      `;
+    }
+
+    // 执行勾选同步
+    document.querySelectorAll("[data-template-file]").forEach(input => {
+      input.checked = autoCheck.has(input.dataset.templateFile);
+    });
+  }
+
+  // 绑定向导按钮事件 (支持 Q2 多选)
+  document.querySelectorAll(".kit-wizard-card-sm").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const parent = btn.parentElement;
+      const isMulti = parent.id === "wizardQ2";
+
+      if (!isMulti) {
+        parent.querySelectorAll(".kit-wizard-card-sm").forEach(b => b.classList.remove("is-active"));
+        btn.classList.add("is-active");
+      } else {
+        // 多选模式：Toggle 状态，但保持至少选中一个（可选，为了防止完全为空逻辑断档）
+        const activeCount = parent.querySelectorAll(".is-active").length;
+        if (btn.classList.contains("is-active") && activeCount <= 1) {
+          // 如果只剩一个且正准备取消，不予理会或提示，这里选择允许取消（灵活）
+        }
+        btn.classList.toggle("is-active");
+      }
+      updateWizardSelections();
+    });
+  });
+
+  // 初始运行一次
+  updateWizardSelections();
+
   document.querySelectorAll("[data-kit-project]").forEach((button) => {
     button.addEventListener("click", () => {
       const project = button.dataset.kitProject;
@@ -2884,6 +3345,7 @@
         const isActive = item === button;
         item.classList.toggle("is-active", isActive);
         item.dataset.state = isActive ? "selected" : "default";
+        item.setAttribute("aria-selected", isActive ? "true" : "false");
       });
       newPanel.classList.toggle("is-hidden", project !== "new");
       oldPanel.classList.toggle("is-hidden", project !== "old");
@@ -2905,23 +3367,23 @@
   });
   // ─── Optional templates list ──────────────────────────────
   const OPTIONAL_TEMPLATES = [
-    { file: "PRODUCT.md", title: "产品定义", desc: "产品定位、用户画像、设计原则", group: "项目基础" },
-    { file: "docs/ARCHITECTURE.md", title: "架构和模块职责", desc: "模块、目录、数据流和边界", group: "项目基础" },
-    { file: "docs/ENVIRONMENT.md", title: "环境和启动方式", desc: "依赖、变量、怎么运行", group: "项目基础" },
-    { file: "docs/CODE_STRUCTURE.md", title: "代码结构", desc: "代码分层规则", group: "项目基础" },
-    { file: "docs/TESTING.md", title: "测试和验收方式", desc: "怎么验证改动没坏", group: "流程规范" },
-    { file: "docs/RUNBOOK.md", title: "运行手册", desc: "常见操作和故障处理", group: "流程规范" },
-    { file: "docs/NAMING.md", title: "命名规范", desc: "文档和目录怎么命名", group: "流程规范" },
-    { file: "docs/DOCUMENTATION.md", title: "文档治理", desc: "文档边界和更新时机", group: "流程规范" },
-    { file: "docs/DESIGN_STANDARDS.md", title: "设计规范", desc: "界面、组件、视觉边界", group: "流程规范" },
-    { file: "docs/PRODUCT_PLAN.md", title: "产品路线图", desc: "分阶段目标", group: "流程规范" },
-    { file: "docs/CHANGELOG.md", title: "变更记录", desc: "结构性改动留痕", group: "记录与追踪" },
-    { file: "docs/DECISIONS.md", title: "决策记录", desc: "重要取舍为什么这样定", group: "记录与追踪" },
-    { file: "docs/LESSONS.md", title: "经验教训", desc: "犯错后立即记录", group: "记录与追踪" },
-    { file: ".claude/CLAUDE.md", title: "Claude 项目配置", desc: "Claude 行为规则和状态速览", group: "AI 工具配置" },
-    { file: ".claude/launch.json", title: "Claude 启动配置", desc: "dev server 启动方式", group: "AI 工具配置" },
-    { file: ".cursorrules", title: "Cursor 规则", desc: "Cursor AI 的项目级指令", group: "AI 工具配置" },
-    { file: ".github/copilot-instructions.md", title: "Copilot 指令", desc: "GitHub Copilot 项目级规则", group: "AI 工具配置" }
+    { file: "PRODUCT.md", title: "产品定义", desc: "产品定位、用户画像、设计原则", group: "推荐文件：产品和结构" },
+    { file: "docs/PRODUCT_PLAN.md", title: "产品路线图", desc: "分阶段目标", group: "推荐文件：产品和结构" },
+    { file: "docs/ARCHITECTURE.md", title: "架构和模块职责", desc: "模块、目录、数据流和边界", group: "推荐文件：产品和结构" },
+    { file: "docs/ENVIRONMENT.md", title: "环境和启动方式", desc: "依赖、变量、怎么运行", group: "推荐文件：产品和结构" },
+    { file: "docs/CODE_STRUCTURE.md", title: "代码结构", desc: "代码分层规则", group: "推荐文件：产品和结构" },
+    { file: "docs/DESIGN_STANDARDS.md", title: "设计规范", desc: "界面、组件、视觉边界", group: "推荐文件：产品和结构" },
+    { file: "docs/TESTING.md", title: "测试和验收方式", desc: "怎么验证改动没坏", group: "推荐文件：流程和验收" },
+    { file: "docs/RUNBOOK.md", title: "运行手册", desc: "常见操作和故障处理", group: "推荐文件：流程和验收" },
+    { file: "docs/NAMING.md", title: "命名规范", desc: "文档和目录怎么命名", group: "推荐文件：流程和验收" },
+    { file: "docs/DOCUMENTATION.md", title: "文档治理", desc: "文档边界和更新时机", group: "推荐文件：流程和验收" },
+    { file: "docs/CHANGELOG.md", title: "变更记录", desc: "结构性改动留痕", group: "记录文件：变更和决策" },
+    { file: "docs/DECISIONS.md", title: "决策记录", desc: "重要取舍为什么这样定", group: "记录文件：变更和决策" },
+    { file: "docs/LESSONS.md", title: "经验教训", desc: "犯错后立即记录", group: "记录文件：变更和决策" },
+    { file: ".claude/CLAUDE.md", title: "Claude 项目配置", desc: "Claude 行为规则和状态速览", group: "高级配置：AI 工具" },
+    { file: ".claude/launch.json", title: "Claude 启动配置", desc: "dev server 启动方式", group: "高级配置：AI 工具" },
+    { file: ".cursorrules", title: "Cursor 规则", desc: "Cursor AI 的项目级指令", group: "高级配置：AI 工具" },
+    { file: ".github/copilot-instructions.md", title: "Copilot 指令", desc: "GitHub Copilot 项目级规则", group: "高级配置：AI 工具" }
   ];
   const REQUIRED_FILES = ["AGENTS.md", "PROJECT.md", "HANDOFF.md"];
   // Source for fetching templates (works on GitHub Pages and local server)
@@ -2955,11 +3417,13 @@
       label.innerHTML = `
         <input type="checkbox" data-template-file="${esc(t.file)}">
         <span class="kit-option-copy">
-          <strong>${esc(t.title)}</strong>${t.isPersonal ? ' <span class="kit-personal-badge">个人规则</span>' : ''}
+          <strong>${esc(t.title)}</strong>
           <small>${esc(t.file)}</small>
         </span>
         <span class="kit-option-desc">${esc(t.desc || '')}</span>
-        <button class="kit-eye" type="button" data-preview-template="${esc(t.file)}" title="预览模板内容" aria-label="预览模板">👁️</button>
+        <button class="kit-eye" type="button" data-preview-template="${esc(t.file)}" title="预览 ${esc(t.file)}" aria-label="预览 ${esc(t.file)}">
+          <svg class="kit-icon" aria-hidden="true"><use href="#i-eye"></use></svg>
+        </button>
       `;
       target.appendChild(label);
     });
@@ -3275,9 +3739,9 @@
         </div>
       </div>` : '';
     host.innerHTML = `
-      <div class="kit-section-heading">
-        <span class="kit-section-title"><span class="kit-step-num">∑</span><span class="kit-section-label">跨项目洞察</span></span>
-        <p class="kit-section-subtitle">基于你管的 ${insights.total} 个项目，自动发现可反哺给 kit 的模式</p>
+      <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered-with-description">
+        <span class="kit-section-title" data-slot="title"><span class="kit-step-num" data-slot="step">∑</span><span class="kit-section-label" data-slot="label">跨项目洞察</span></span>
+        <p class="kit-section-subtitle" data-slot="description">基于你管的 ${insights.total} 个项目，自动发现可反哺给 kit 的模式</p>
       </div>
       <div class="kit-insight-block">
         <div class="kit-insight-title">📁 高频但 kit 没追踪的文件</div>
@@ -3420,6 +3884,27 @@
   }
 
   // ── Smart fill: scan project for inferable facts ─────────────────
+  const PROJECT_MAP_SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.next', '__pycache__', '.venv', 'venv', '.cache']);
+
+  async function buildProjectMapFromHandle(handle) {
+    const map = new Map();
+    async function walk(dir, prefix) {
+      for await (const [name, entry] of dir.entries()) {
+        if (entry.kind === 'directory') {
+          if (PROJECT_MAP_SKIP_DIRS.has(name)) continue;
+          await walk(entry, prefix + name + '/');
+        } else if (entry.kind === 'file') {
+          try {
+            const file = await entry.getFile();
+            map.set(prefix + name, file);
+          } catch (e) { /* skip unreadable files */ }
+        }
+      }
+    }
+    await walk(handle, '');
+    return map;
+  }
+
   async function scanProjectForInfo(map, rootName) {
     const has = (p) => map.has(p);
     const read = async (p) => {
@@ -3798,6 +4283,280 @@
     } catch (e) { return false; }
   }
 
+  const TEMPLATE_MATCHERS = {
+    'AGENTS.md': {
+      aliases: ['CLAUDE.md', 'CODEX.md', 'GEMINI.md', '.cursorrules', '.cursor/rules/project-os.md', '.github/copilot-instructions.md', 'AI_RULES.md', 'RULES.md'],
+      keywords: ['agent', 'ai-rule', 'ai_rules', 'rules', 'prompt', 'claude', 'cursor', 'codex', 'copilot', '规则', '规范', '助手']
+    },
+    'PROJECT.md': {
+      aliases: ['README.md', 'PRD.md', 'PRODUCT_REQUIREMENTS.md', '需求文档.md', '项目说明.md', '产品说明.md'],
+      keywords: ['readme', 'prd', 'product', 'requirement', 'brief', 'overview', '需求', '产品', '项目', '说明']
+    },
+    'HANDOFF.md': {
+      aliases: ['HANDOVER.md', 'NEXT.md', 'TODO.md', 'ROADMAP.md', '交接.md', '待办.md'],
+      keywords: ['handoff', 'handover', 'next', 'todo', 'roadmap', '交接', '待办', '下一步', '进度']
+    },
+    'PRODUCT.md': {
+      aliases: ['PRD.md', 'PRODUCT_REQUIREMENTS.md', '需求文档.md', '产品说明.md'],
+      keywords: ['prd', 'product', 'requirement', 'mvp', '需求', '产品', '用户', '定位']
+    },
+    'docs/PRODUCT_PLAN.md': {
+      aliases: ['ROADMAP.md', 'docs/ROADMAP.md', '产品路线图.md'],
+      keywords: ['roadmap', 'plan', 'milestone', '路线', '计划', '阶段']
+    },
+    'docs/ARCHITECTURE.md': {
+      aliases: ['ARCHITECTURE.md', 'docs/SYSTEM_DESIGN.md', 'SYSTEM_DESIGN.md', '架构.md'],
+      keywords: ['architecture', 'system', 'design', 'module', '架构', '模块', '系统']
+    },
+    'docs/CODE_STRUCTURE.md': {
+      aliases: ['CODE_STRUCTURE.md', 'docs/STRUCTURE.md', 'STRUCTURE.md', '目录结构.md'],
+      keywords: ['structure', 'code', 'directory', 'folder', '目录', '结构', '代码']
+    },
+    'docs/ENVIRONMENT.md': {
+      aliases: ['SETUP.md', 'docs/SETUP.md', 'ENVIRONMENT.md', 'INSTALL.md', '环境.md'],
+      keywords: ['setup', 'install', 'environment', 'env', '启动', '安装', '环境', '依赖']
+    },
+    'docs/DESIGN_STANDARDS.md': {
+      aliases: ['DESIGN.md', 'STYLEGUIDE.md', 'UI_GUIDE.md', '设计规范.md'],
+      keywords: ['design', 'styleguide', 'ui', 'component', '视觉', '设计', '组件']
+    },
+    'docs/TESTING.md': {
+      aliases: ['TESTING.md', 'QA.md', '测试.md', '验收.md'],
+      keywords: ['test', 'testing', 'qa', 'acceptance', '测试', '验收']
+    },
+    'docs/RUNBOOK.md': {
+      aliases: ['RUNBOOK.md', 'OPERATIONS.md', 'DEPLOYMENT.md', '运维.md', '运行手册.md'],
+      keywords: ['runbook', 'ops', 'operation', 'deploy', '故障', '发布', '运行']
+    },
+    'docs/DECISIONS.md': {
+      aliases: ['DECISIONS.md', 'ADR.md', 'docs/ADR.md', '决策.md'],
+      keywords: ['decision', 'adr', 'architecture-decision', '决策', '取舍']
+    },
+    'docs/CHANGELOG.md': {
+      aliases: ['CHANGELOG.md', 'RELEASES.md', '变更记录.md'],
+      keywords: ['changelog', 'release', 'change', '变更', '发布']
+    },
+    'docs/NAMING.md': {
+      aliases: ['NAMING.md', '命名规范.md'],
+      keywords: ['naming', 'name', '命名']
+    },
+    'docs/DOCUMENTATION.md': {
+      aliases: ['DOCUMENTATION.md', 'DOCS.md', '文档规范.md'],
+      keywords: ['documentation', 'docs', 'doc', '文档']
+    },
+    'docs/LESSONS.md': {
+      aliases: ['LESSONS.md', 'POSTMORTEM.md', 'RETROSPECTIVE.md', '经验教训.md', '复盘.md'],
+      keywords: ['lesson', 'postmortem', 'retro', '复盘', '经验', '教训']
+    }
+  };
+
+  function normForMatch(path) {
+    return String(path || '').replace(/\\/g, '/').toLowerCase();
+  }
+
+  function templateTitle(file) {
+    const required = {
+      'AGENTS.md': 'AI 工作规则',
+      'PROJECT.md': '项目说明',
+      'HANDOFF.md': '当前状态 / 交接记录'
+    };
+    if (required[file]) return required[file];
+    const opt = effectiveOptionalTemplates().find(t => t.file === file);
+    return opt ? opt.title : file;
+  }
+
+  function scoreTemplateCandidate(template, candidate) {
+    const matcher = TEMPLATE_MATCHERS[template];
+    if (!matcher) return 0;
+    const full = normForMatch(candidate);
+    const base = full.split('/').pop();
+    let score = 0;
+    for (const alias of matcher.aliases || []) {
+      const a = normForMatch(alias);
+      if (full === a || base === a.split('/').pop()) score += 80;
+    }
+    for (const keyword of matcher.keywords || []) {
+      const key = normForMatch(keyword);
+      if (base.includes(key)) score += 32;
+      else if (full.includes(key)) score += 14;
+    }
+    if (template === 'PROJECT.md' && base === 'readme.md') score += 30;
+    if (template === 'docs/ENVIRONMENT.md' && (base === 'readme.md' || base === 'install.md')) score += 22;
+    return score;
+  }
+
+  function findTemplateCandidates(template, map, selectedSet) {
+    return [...map.keys()]
+      .filter(path => /\.md$/i.test(path))
+      .filter(path => !/\.template\.md$/i.test(path))
+      .filter(path => path !== template)
+      .filter(path => !selectedSet.has(path))
+      .map(path => ({ path, score: scoreTemplateCandidate(template, path) }))
+      .filter(item => item.score >= 32)
+      .sort((a, b) => b.score - a.score || a.path.localeCompare(b.path))
+      .slice(0, 3);
+  }
+
+  function buildTemplateWritePlan(files, map) {
+    const selectedSet = new Set(files);
+    const exact = [];
+    const similar = [];
+    const missing = [];
+    for (const file of files) {
+      if (map.has(file)) {
+        exact.push(file);
+        continue;
+      }
+      const candidates = findTemplateCandidates(file, map, selectedSet);
+      if (candidates.length) similar.push({ file, candidates });
+      else missing.push(file);
+    }
+    return { exact, similar, missing, total: files.length };
+  }
+
+  function renderPlanRow(label, text) {
+    return `<div class="kit-plan-row"><strong>${esc(label)}</strong><span>${text}</span></div>`;
+  }
+
+  function renderNewProjectWritePlan(container, params) {
+    const { handle, files, map, info, plan } = params;
+    const exactText = plan.exact.length
+      ? `发现 ${plan.exact.length} 个标准文件已存在。默认不覆盖原文件，只生成 <code>.template.md</code> 参考版本。`
+      : '没有发现同名标准文件。';
+    const similarText = plan.similar.length
+      ? `发现 ${plan.similar.length} 个可能已经用别的名字记录过的资料。你可以选择合并来源，原文件会保留。`
+      : '没有发现明显的相似命名资料。';
+    const missingText = plan.missing.length
+      ? `${plan.missing.length} 个文件会按标准骨架新建，并尽量写入项目快照。`
+      : '没有纯新增文件。';
+
+    container.innerHTML = `
+      <div class="kit-plan-card" data-component="WritePlanPanel" data-state="ready">
+        <div class="kit-plan-head">
+          <span class="kit-status-chip is-live">已检查写入位置</span>
+          <strong>${esc(handle.name)} 的项目骨架生成方案</strong>
+          <p>这是写入前安全检查：同名文件不覆盖，相似命名先合并成标准文件，原始资料保留在原位置。</p>
+        </div>
+        <div class="kit-plan-summary">
+          ${renderPlanRow('同名文件', exactText)}
+          ${renderPlanRow('相似资料', similarText)}
+          ${renderPlanRow('缺失文件', missingText)}
+        </div>
+        ${plan.similar.length ? `
+          <div class="kit-plan-section">
+            <div class="kit-plan-section-title">相似资料怎么归档</div>
+            ${plan.similar.map(item => `
+              <div class="kit-plan-match">
+                <label>
+                  <span><strong>${esc(templateTitle(item.file))}</strong> <code>${esc(item.file)}</code></span>
+                  <select class="kit-plan-select" data-plan-claim="${esc(item.file)}" aria-label="${esc(item.file)} 的合并来源">
+                    ${item.candidates.map(c => `<option value="${esc(c.path)}">合并 ${esc(c.path)}，原文件保留</option>`).join('')}
+                    <option value="">不合并，只生成标准模板</option>
+                  </select>
+                </label>
+              </div>
+            `).join('')}
+          </div>` : ''}
+        <div class="kit-plan-error" id="kitPlanError" role="status" aria-live="polite"></div>
+        <div class="kit-plan-actions">
+          <button class="kit-primary" type="button" id="kitConfirmWritePlan">
+            <svg class="kit-icon"><use href="#i-sparkles"></use></svg>
+            <span data-button-label>确认生成骨架</span>
+          </button>
+          <button class="kit-secondary-btn" type="button" id="kitRecheckDirectory">
+            <span data-button-label>重新选择目录</span>
+          </button>
+          <button class="kit-secondary-btn" type="button" id="kitDownloadBtn">
+            <svg class="kit-icon"><use href="#i-folder-open"></use></svg>
+            <span data-button-label>下载空白模板 zip</span>
+          </button>
+        </div>
+      </div>
+    `;
+
+    const confirmBtn = document.getElementById('kitConfirmWritePlan');
+    if (confirmBtn) {
+      confirmBtn.addEventListener('click', async () => {
+        const label = confirmBtn.querySelector('[data-button-label]');
+        const original = label ? label.textContent : '';
+        const error = document.getElementById('kitPlanError');
+        if (label) label.textContent = '生成中...';
+        confirmBtn.disabled = true;
+        if (error) error.textContent = '';
+        try {
+          const exactSet = new Set(plan.exact);
+          const claimedMap = {};
+          container.querySelectorAll('[data-plan-claim]').forEach(select => {
+            if (select.value) claimedMap[select.dataset.planClaim] = select.value;
+          });
+          const claimList = files.filter(file => claimedMap[file] && !exactSet.has(file));
+          const freshSelected = files.filter(file => !claimList.includes(file));
+          const { written, totalUnfilled: freshUnfilled } = await writeTemplatesToHandle(handle, freshSelected, exactSet, info);
+          let totalUnfilled = freshUnfilled;
+          for (const template of claimList) {
+            const theirPath = claimedMap[template];
+            let theirContent = '';
+            try {
+              const fileObj = map.get(theirPath);
+              theirContent = fileObj && typeof fileObj.text === 'function' ? await fileObj.text() : '';
+            } catch (e) { /* keep empty */ }
+            const rec = await mergeClaimedIntoStandard(handle, template, theirPath, theirContent, info);
+            written.push(rec);
+            totalUnfilled += rec.unfilled;
+          }
+          const addedCount = written.filter(w => !w.existing && !w.merged).length;
+          const refCount = written.filter(w => w.existing).length;
+          const prefixedCount = written.filter(w => w.prefixed).length;
+          renderWriteSuccess(container, { written, totalUnfilled, info, handleName: handle.name, addedCount, refCount, prefixedCount });
+        } catch (e) {
+          if (error) error.textContent = '生成失败：' + (e.message || e.name || 'unknown');
+          if (label) label.textContent = original;
+          confirmBtn.disabled = false;
+        }
+      });
+    }
+    const recheckBtn = document.getElementById('kitRecheckDirectory');
+    if (recheckBtn) {
+      recheckBtn.addEventListener('click', async () => {
+        await scanDirectoryAndRenderWritePlan(files, recheckBtn);
+      });
+    }
+    const dlBtn = document.getElementById('kitDownloadBtn');
+    if (dlBtn) {
+      dlBtn.addEventListener('click', async () => {
+        await buildAndDownloadZip(files, dlBtn);
+      });
+    }
+  }
+
+  async function scanDirectoryAndRenderWritePlan(files, button) {
+    const label = button.querySelector('[data-button-label]');
+    const orig = label ? label.textContent : '';
+    let handle;
+    try {
+      handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+      if (label) label.textContent = '需要授权访问目录';
+      setTimeout(() => { if (label) label.textContent = orig; }, 1800);
+      return;
+    }
+    if (label) label.textContent = '检查写入位置...';
+    button.disabled = true;
+    try {
+      const map = await buildProjectMapFromHandle(handle);
+      const info = await scanProjectForInfo(map, handle.name).catch(() => null);
+      const plan = buildTemplateWritePlan(files, map);
+      const bar = document.getElementById('kitNewProjectActions');
+      if (bar) renderNewProjectWritePlan(bar, { handle, files, map, info, plan });
+    } catch (e) {
+      if (label) label.textContent = '目录检查失败：' + (e.message || e.name || 'unknown');
+      setTimeout(() => { if (label) label.textContent = orig; }, 2400);
+    } finally {
+      button.disabled = false;
+    }
+  }
+
   async function pickFolderAndWriteFiles(files, button, opts) {
     opts = opts || {};
     const label = button.querySelector('[data-button-label]');
@@ -3822,7 +4581,7 @@
       let info = null;
       if (opts.smart) {
         try {
-          const projectMap = await buildMapFromHandle(handle);
+          const projectMap = await buildProjectMapFromHandle(handle);
           info = await scanProjectForInfo(projectMap, handle.name);
         } catch (e) { /* scan failed, fall back to no-info write */ }
       }
@@ -3853,18 +4612,18 @@
           <div class="kit-result-success-sub">${subline}</div>
         </div>
       </div>
-      <ul class="kit-result-list" style="margin-top:var(--space-8)">${written.map(w => `
+      <ul class="kit-result-list">${written.map(w => `
         <li class="kit-result-item pass"><span class="kit-result-dot">✓</span><span><code>${esc(w.written)}</code>${w.existing ? '（参考模板）' : ''}${w.merged ? '（合并自 <code>' + esc(w.source) + '</code>，原文件保留）' : ''}${w.unfilled ? ' <span class="muted">· ' + w.unfilled + ' 处待补</span>' : ''}</span></li>
       `).join('')}</ul>
       ${totalUnfilled > 0 ? `
-        <div class="kit-result-note" style="margin-top:var(--space-10)">
+        <div class="kit-result-note">
           🤖 还有 <strong>${totalUnfilled}</strong> 处 <code>&lt;!-- 待补 --&gt;</code> 需要人工或 AI 补完。
           复制下面这段话粘到 Claude / Cursor / Codex，让它接着填：
         </div>
-        <button class="kit-secondary-btn" type="button" id="kitCopyFillPrompt" style="width:100%;justify-content:center;margin-top:var(--space-6);">
+        <button class="kit-secondary-btn" type="button" id="kitCopyFillPrompt">
           <span data-button-label>📋 复制 AI 补完 prompt</span>
         </button>` : ''}
-      <button class="kit-secondary-btn" type="button" id="kitNewProjectReset" style="margin-top:var(--space-8);width:100%;justify-content:center;">再写入到另一个目录</button>
+      <button class="kit-secondary-btn" type="button" id="kitNewProjectReset">再写入到另一个目录</button>
     `;
     const resetBtn = document.getElementById('kitNewProjectReset');
     if (resetBtn) resetBtn.addEventListener('click', renderNewProjectActions);
@@ -3888,35 +4647,25 @@
     bar.innerHTML = canWrite ? `
       <button class="kit-primary" type="button" id="kitSmartWriteBtn">
         <svg class="kit-icon"><use href="#i-sparkles"></use></svg>
-        <span data-button-label>✨ 智能填写并写入</span>
+        <span data-button-label>选择目录并生成骨架</span>
       </button>
-      <button class="kit-secondary-btn" type="button" id="kitNewProjectWriteBtn" style="width:100%;justify-content:center;margin-top:var(--space-8);">
-        <span data-button-label>写入空模板（不扫描）</span>
-      </button>
-      <button class="kit-secondary-btn" type="button" id="kitDownloadBtn" style="width:100%;justify-content:center;margin-top:var(--space-8);">
+      <button class="kit-secondary-btn" type="button" id="kitDownloadBtn">
         <svg class="kit-icon"><use href="#i-folder-open"></use></svg>
-        <span data-button-label>或下载 zip</span>
+        <span data-button-label>下载空白模板 zip</span>
       </button>
-      <div class="kit-result-hint" style="margin-top:var(--space-6);">智能填写会扫描你选的目录（package.json / 技术栈 / 目录结构 等），自动填到每个模板顶部的「项目快照」块；填不了的留 <code>&lt;!-- 待补 --&gt;</code> 标记。已有同名文件不覆盖，写为 <code>.template.md</code> 参考版本。</div>
+      <div class="kit-result-hint">选择一个空文件夹或项目根目录。系统只做写入前安全检查：同名不覆盖，相似命名先提示，确认后再生成 AI 工程文件骨架。</div>
     ` : `
       <button class="kit-primary" type="button" id="kitDownloadBtn">
         <svg class="kit-icon"><use href="#i-folder-open"></use></svg>
-        <span data-button-label>下载文档包 .zip</span>
+        <span data-button-label>下载空白模板 zip</span>
       </button>
-      <div class="kit-result-hint" style="margin-top:var(--space-6);">用 Chrome / Edge 打开本页面，可以智能扫描并一键写入项目目录</div>
+      <div class="kit-result-hint">当前浏览器不能选择写入目录。可以先下载空白模板 zip；用 Chrome / Edge 打开后，可选择目录并生成项目骨架。</div>
     `;
     const smartBtn = document.getElementById('kitSmartWriteBtn');
     if (smartBtn) {
       smartBtn.addEventListener('click', async () => {
         const files = collectNewProjectFiles();
-        await pickFolderAndWriteFiles(files, smartBtn, { smart: true });
-      });
-    }
-    const writeBtn = document.getElementById('kitNewProjectWriteBtn');
-    if (writeBtn) {
-      writeBtn.addEventListener('click', async () => {
-        const files = collectNewProjectFiles();
-        await pickFolderAndWriteFiles(files, writeBtn, { smart: false });
+        await scanDirectoryAndRenderWritePlan(files, smartBtn);
       });
     }
     const dlBtn = document.getElementById('kitDownloadBtn');
@@ -4478,7 +5227,7 @@
             info.innerHTML = `
               <div class="kit-graph-info-head">
                 <strong>${esc(nodeId)}</strong>
-                ${canView ? '<button class="kit-bookmark-btn" type="button" data-graph-view="' + esc(nodeId) + '">👁️ 查看内容</button>' : ''}
+                ${canView ? '<button class="kit-bookmark-btn" type="button" data-graph-view="' + esc(nodeId) + '"><svg class="kit-icon" aria-hidden="true"><use href="#i-eye"></use></svg>查看内容</button>' : ''}
               </div>
               <div class="kit-graph-info-cols">
                 <div><span class="kit-graph-info-label">引用了（${outRefs.length}）</span>
@@ -4570,36 +5319,30 @@
       const pct = Math.round(score * 100 / maxScore);
       const gaps = items.filter(i => i.status === 'GAP');
       const passes = items.filter(i => i.status === 'PASS');
+
+      // Group items by section
+      const sections = {};
+      items.forEach(item => {
+        const sec = item.section || '通用检查';
+        if (!sections[sec]) sections[sec] = { pass: [], gap: [], total: 0, earned: 0 };
+        if (item.status === 'PASS') {
+          sections[sec].pass.push(item);
+          sections[sec].earned += (item.earned || 0);
+        } else {
+          sections[sec].gap.push(item);
+        }
+        sections[sec].total += (item.max || 0);
+      });
+
       let statusText, statusClass;
       if (score >= 85) { statusText = '状态良好'; statusClass = 'strong'; }
       else if (score >= 70) { statusText = '可用，有缺口'; statusClass = 'usable'; }
       else { statusText = '需要补工程文档'; statusClass = 'weak'; }
 
-      const timeEl = document.getElementById('kitReportTime');
-      if (timeEl) timeEl.textContent = new Date().toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-');
-      const ctxEl = document.getElementById('kitContextScorePill');
-      if (ctxEl) ctxEl.textContent = passes.length + ' 项通过';
-      const matEl = document.getElementById('kitMaturityScorePill');
-      if (matEl) matEl.textContent = score + ' 分 · ' + gaps.length + ' 缺口';
-
       const el = document.getElementById('kitOldResults');
       if (!el) return;
 
-      // Build deduplicated template list from gaps that have a template mapping
-      const gapsByTemplate = new Map(); // template -> { reasons: [...], existing: bool }
-      const gapsWithoutTemplate = [];
-      for (const g of gaps) {
-        if (g.template) {
-          if (!gapsByTemplate.has(g.template)) {
-            gapsByTemplate.set(g.template, { reasons: [], existing: g.existing });
-          }
-          gapsByTemplate.get(g.template).reasons.push(g.label);
-        } else {
-          gapsWithoutTemplate.push(g);
-        }
-      }
-
-      // Friendly title lookup from OPTIONAL_TEMPLATES + REQUIRED meta
+      //Friendly title lookup
       const REQUIRED_META = {
         'AGENTS.md': { title: 'AI 工作规则', desc: 'AI 该怎么做，哪些事不要乱改' },
         'PROJECT.md': { title: '项目说明', desc: '这个项目是什么，给谁用，目标是什么' },
@@ -4611,15 +5354,6 @@
         return opt ? { title: opt.title, desc: opt.desc } : { title: file, desc: '' };
       }
 
-      const templates = [...gapsByTemplate.keys()];
-      const downloadable = templates.length;
-      const hasExisting = templates.some(t => gapsByTemplate.get(t).existing);
-
-      // "Claim an existing similar-function file" support.
-      // User has extra .md files the kit doesn't know about (e.g. docs/ARCH.md
-      // instead of docs/ARCHITECTURE.md). Let them map one onto a missing
-      // standard slot; we merge our structure into it under the standard name.
-      const claimedMap = {}; // template -> their existing file path
       const allMdKeys = result.__map ? [...result.__map.keys()].filter(p => /\.md$/i.test(p)) : [];
       const extraMd = allMdKeys.filter(p => !KIT_KNOWN_FILES.has(p) && !/\.template\.md$/i.test(p));
       const canClaim = !!currentDirHandle && extraMd.length > 0;
@@ -4632,83 +5366,31 @@
           <div>
             <div class="kit-result-label">${esc(statusText)}</div>
             <div class="kit-result-sub">${passes.length} 项通过 · ${gaps.length} 项缺口</div>
-            ${result.__previousRecord && result.__previousRecord.lastScore != null ? (() => {
-              const diff = score - result.__previousRecord.lastScore;
-              const cls = diff > 0 ? 'up' : (diff < 0 ? 'down' : 'flat');
-              const arrow = diff > 0 ? '↑' : (diff < 0 ? '↓' : '—');
-              const ago = relativeDate(result.__previousRecord.lastAnalyzed);
-              return '<div class="kit-result-trend ' + cls + '">' + arrow + ' ' + (diff > 0 ? '+' : '') + diff + ' 分（vs ' + esc(ago) + '：' + result.__previousRecord.lastScore + '/100）</div>';
-            })() : ''}
           </div>
         </div>
-        ${downloadable ? `<div class="kit-result-section">
-          <div class="kit-result-section-title">勾选要下载的模板（${downloadable} 个文件）</div>
-          <div class="kit-option-list">${templates.map(t => {
-            const meta = templateMeta(t);
-            const info = gapsByTemplate.get(t);
-            const tag = info.existing
-              ? '<span class="kit-status-tag kit-status-tag-warn">已有，建议补充</span>'
-              : '<span class="kit-status-tag kit-status-tag-miss">缺失</span>';
-            const claimControl = (canClaim && !info.existing) ? `
-              <div class="kit-claim">
-                <label class="kit-claim-label">我已经有类似文件 →
-                  <select data-claim-template="${esc(t)}">
-                    <option value="">这是新文件，新建</option>
-                    ${extraMd.map(f => `<option value="${esc(f)}">${esc(f)}</option>`).join('')}
-                  </select>
-                </label>
-                <span class="kit-claim-note" data-claim-note="${esc(t)}"></span>
-              </div>` : '';
+
+        <div class="kit-result-grid" style="display:grid;grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));gap:var(--space-16);margin-top:var(--space-20)">
+          ${Object.entries(sections).map(([name, data]) => {
+            const secPct = data.total > 0 ? Math.round(data.earned * 100 / data.total) : 0;
+            const secClass = secPct >= 80 ? 'pass' : (secPct >= 50 ? 'warn' : 'miss');
             return `
-            <div class="kit-option-row">
-            <label class="kit-option">
-              <input type="checkbox" data-gap-template="${esc(t)}" ${info.existing ? '' : 'checked'}>
-              <span class="kit-option-copy">
-                <strong>${esc(meta.title)}</strong>
-                <small>${esc(t)}</small>
-              </span>
-              <span class="kit-option-desc">
-                ${tag}
-                ${info.reasons.map(r => `<span class="kit-option-reason">${esc(r)}</span>`).join('')}
-              </span>
-              <button class="kit-eye" type="button" data-gap-preview="${esc(t)}" data-gap-existing="${info.existing ? '1' : '0'}" title="${info.existing ? '查看你项目里的实际内容 + 模板对照' : '查看模板原文'}" aria-label="预览">👁️</button>
-            </label>
-            ${claimControl}
-            </div>`;
-          }).join('')}</div>
-          ${currentDirHandle ? `
-            <div class="kit-result-note">${hasExisting
-              ? '✨ 勾选的缺失文件会直接补进你的项目里；已有文件会写一份 <code>.template.md</code> 参考版本（不动原文件）。'
-              : '✨ 勾选的文件会直接补进你的项目里，不上传任何数据。'}</div>
-            <button class="kit-primary kit-result-download-btn" type="button" id="kitWriteBackBtn">
-              <svg class="kit-icon"><use href="#i-sparkles"></use></svg>
-              <span data-button-label>一键补到项目里</span>
-            </button>
-            <button class="kit-secondary-btn kit-result-download-btn" type="button" id="kitGapDownloadBtn">
-              <svg class="kit-icon"><use href="#i-folder-open"></use></svg>
-              <span data-button-label>或下载 zip 备份</span>
-            </button>
-          ` : `
-            ${hasExisting ? '<div class="kit-result-warning">⚠️ 勾选的文件会写入 zip。已存在的文件在你解压时可能被覆盖，请先备份。</div>' : ''}
-            <button class="kit-primary kit-result-download-btn" type="button" id="kitGapDownloadBtn">
-              <svg class="kit-icon"><use href="#i-folder-open"></use></svg>
-              <span data-button-label>下载所选模板 .zip</span>
-            </button>
-            <div class="kit-result-hint">提示：用 Chrome 或 Edge 打开本页面，可以一键直接写入你的项目，无需下载解压。</div>
-          `}
-        </div>` : ''}
-        ${gapsWithoutTemplate.length ? `<div class="kit-result-section">
-          <div class="kit-result-section-title">其他建议（${gapsWithoutTemplate.length}）</div>
-          <ul class="kit-result-list">${gapsWithoutTemplate.map(i => `<li class="kit-result-item gap"><span class="kit-result-dot">!</span><span>${esc(i.label)}</span></li>`).join('')}</ul>
-        </div>` : ''}
-        ${passes.length ? `<div class="kit-result-section">
-          <div class="kit-result-section-title">已通过（${passes.length} 项）</div>
-          <ul class="kit-result-list">${passes.map(i => {
-            const passFile = extractFilePath(i.label);
-            const clickable = passFile && result.__map && result.__map.has(passFile);
-            return `<li class="kit-result-item pass${clickable ? ' is-clickable' : ''}"${clickable ? ' data-pass-file="' + esc(passFile) + '" title="点击查看你项目里的实际内容"' : ''}><span class="kit-result-dot">✓</span><span>${esc(i.label)}</span></li>`;
-          }).join('')}</ul>
-        </div>` : ''}
+              <div class="kit-result-section card" style="margin:0">
+                <div class="kit-result-section-title" style="display:flex;justify-content:space-between">
+                  <span>${esc(name)}</span>
+                  <small style="color:var(--color-text-muted)">${data.earned}/${data.total}</small>
+                </div>
+                <div class="kit-progress-bar" style="height:4px;background:var(--color-border-subtle);border-radius:2px;margin-bottom:var(--space-12)">
+                  <div style="width:${secPct}%;height:100%;background:var(--color-${secClass}-strong);border-radius:2px"></div>
+                </div>
+                <ul class="kit-result-list">
+                  ${data.gap.map(i => `<li class="kit-result-item gap"><span class="kit-result-dot">!</span><span>${esc(i.label)}</span></li>`).join('')}
+                  ${data.pass.map(i => `<li class="kit-result-item pass"><span class="kit-result-dot">✓</span><span>${esc(i.label)}</span></li>`).join('')}
+                </ul>
+              </div>
+            `;
+          }).join('')}
+        </div>
+
         <div class="kit-result-section">
           <div class="kit-result-section-title">文档关系图（诊断引用与孤岛）</div>
           <div id="kitReferenceGraph" class="kit-graph-host"><div class="kit-graph-loading">分析中…</div></div>

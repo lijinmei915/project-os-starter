@@ -41,78 +41,54 @@ bash scripts/check-runtime.sh .
 
 完整安装说明（profiles / adapters / upgrade）见 `INSTALL.md`。
 
-## 检查项目完整度
+## 快速开始 (CLI 中控台)
 
-**两种方式：**
+如果你喜欢简单，只需记住一个命令。它将集成体检、反思、同步等所有功能：
+
+```bash
+# 启动交互式菜单
+./kit
+
+# 或者使用快捷命令
+./kit check    # 运行体检
+./kit reflect  # 自动反思
+./kit sync     # 同步规则
+```
+
+## 检查项目完整度
 
 **1. 浏览器直接看（推荐）**
 
-直接打开项目根目录的 `index.html`，点"接手老项目"→选目录或上传 zip → 立刻出报告。无需任何命令、无需服务端。
+直接打开项目根目录的 `index.html`，点"接手老项目"→选目录或上传 zip → 立刻出报告。
 
-**2. 命令行（适合 CI / 脚本场景）**
+**2. 命令行领域体检（针对具体技术栈）**
 
-```bash
-bash scripts/ai-project.sh report .
-```
+除了通用的 `ai-project.sh`，你还可以运行领域专属检查：
+- 前端规范检查：`bash scripts/check-frontend.sh .`
+- 后端规范检查：`bash scripts/check-backend.sh .`
+- 测试与 CI 检查：`bash scripts/check-testing.sh .`
+- UI 与设计检查：`bash scripts/check-design.sh .`
 
-它会检查：
+## 自动成长引擎 (Auto-Growth)
 
-```txt
-系统规则：AGENTS.md
-开发者规则：docs/ENVIRONMENT.md
-用户意图：PROJECT.md / README.md
-项目文件：docs/ARCHITECTURE.md
-工具反馈：docs/TESTING.md / scripts
-交接摘要：HANDOFF.md
-```
+本项目内置了 AI 自驱动迭代能力，让项目“越用越聪明”：
 
-报告会写入：
-
-```txt
-.project-os/reports/ai-project-report.md
-.project-os/reports/ai-project-report.json
-```
-
-如果后续想补齐更多工程文档模板：
-
-```bash
-bash scripts/add-project-docs.sh . --profile product
-```
-
-## AI 交互
-
-直接对 AI 说你要做什么，例如"帮我初始化这个项目"或"这个老项目有点乱，帮我接管一下"。系统自动判断状态并进入对应流程。高级用户可输入 `/os` 显式触发。
-
-如果你不用 Claude，没关系——Project OS 核心依赖 `AGENTS.md` + `docs/` + `scripts/`，Claude 只是当前第一个参考实现。
-
-## 常用 slash commands
-
-在 Claude Code 中可以使用项目级 `/` 命令：
-
-| 命令 | 用途 |
-|------|------|
-| `/os` | 进入 Project OS 安装 / 接入 / 检查流程 |
-| `/os-check` | 跑 Project OS 体检，检查核心文件和工作区状态 |
-| `/os-test` | 跑或引导 v1 路由测试 |
-| `/os-handoff` | 汇总当前状态、提交情况和下一步 |
+- **自动反思**：对 AI 说“自动反思”，它会抓取最近代码改动并沉淀经验到 `docs/LESSONS.md`。
+- **唯一真相 (SSOT)**：所有文档通过 `scripts/sync-ai-rules.sh` 自动映射到 `.ai/rules/`，AI 永远读取最新规则。
+- **规则修剪**：对 AI 说“优化规则”，它会自动识别并清理陈旧或冲突的约束。
 
 ## 关键文件
 
-| 文件 | 职责 |
+| 文件 / 目录 | 职责 |
 |------|------|
-| `index.html` | 浏览器可视化报告页（standalone，浏览器本地分析，不依赖服务端） |
-| `AGENTS.md` | AI 运行规则（路由、约束、文档边界） |
-| `PROJECT.md` | 当前项目状态 |
+| `.ai/` | **统一 AI 资产目录**（含规则映射、AI 技能定义、MCP 配置） |
+| `index.html` | 浏览器可视化报告页 |
+| `AGENTS.md` | AI 运行规则总入口 |
+| `PROJECT.md` | 项目当前状态 |
 | `HANDOFF.md` | 当前交接上下文 |
-| `docs/NAMING.md` | 文档命名规范 |
-| `docs/ARCHITECTURE.md` | 架构和模块职责 |
-| `docs/ENVIRONMENT.md` | 环境变量、依赖、启动方式 |
-| `docs/TESTING.md` | 测试和验收方式 |
-| `docs/RUNBOOK.md` | 常见操作和故障处理 |
-| `INSTALL.md` | 安装说明 |
-| `docs/` | 长期治理、产品规划、设计规范 |
-| `templates/` | 安装到目标项目的干净模板 |
-| `scripts/` | 安装脚本、校验脚本 |
-| `adapters/` | 各工具适配模板 |
+| `docs/AUTO_GROWTH.md` | 自动成长机制说明 |
+| `docs/FRONTEND.md` | 前端技术规范模板 |
+| `docs/BACKEND.md` | 后端技术规范模板 |
+| `scripts/` | 包含 `sync-ai-rules`, `auto-reflect`, `check-*` 等核心引擎脚本 |
 
 当前状态见 `PROJECT.md`，交接上下文见 `HANDOFF.md`。

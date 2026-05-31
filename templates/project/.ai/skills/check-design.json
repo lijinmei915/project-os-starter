@@ -1,0 +1,9 @@
+{
+  "name": "check-design",
+  "description": "检查当前项目的设计 Token 和 UI 测试覆盖度",
+  "trigger": "检查设计, design check, UI check",
+  "action": {
+    "type": "shell",
+    "command": "bash scripts/check-design.sh ."
+  }
+}

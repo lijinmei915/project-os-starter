@@ -1,0 +1,40 @@
+# Cursor Rules
+
+## 项目概述
+
+<!-- 一句话描述项目用途 -->
+
+## 技术栈
+
+<!-- 列出主要技术栈，例如：
+- 语言：TypeScript
+- 框架：React / Next.js
+- 样式：Tailwind CSS
+- 数据库：PostgreSQL
+-->
+
+## 代码规范
+
+- 使用中文注释
+- 函数命名：camelCase
+- 组件命名：PascalCase
+- 文件命名：kebab-case
+
+## 项目结构
+
+<!-- 列出关键目录及职责，例如：
+src/
+├── components/  # UI 组件
+├── hooks/       # 自定义 hooks
+├── utils/       # 工具函数
+├── lib/         # 第三方封装
+└── pages/       # 页面路由
+-->
+
+## AI 协作约定
+
+- 改动前说明意图，改完给出验证方式
+- 不要自作主张删除或重命名已有文件
+- 遇到不确定的设计决策，先问再动手
+- 参考 `AGENTS.md` 获取完整协作规范
+- 参考 `PRODUCT.md` 了解产品定位和设计原则

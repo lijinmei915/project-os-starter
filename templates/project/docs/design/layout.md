@@ -92,8 +92,12 @@ Main Workbench Card
 | 大区块纵向间距 | `--component-workbench-section-gap` | `32px` | `24px` | `代码来源` 到下一组、`当前工作目录` 到 `体检内容` |
 | 列表项间距 | `--component-workbench-list-gap` | `12px` | `12px` | 来源卡片、资料卡片、体检项之间 |
 | 表单控件间距 | `--component-workbench-control-gap` | `16px` | `16px` | 路径框、按钮、上传区等控件之间 |
+| 项目文档卡片最小宽度 | `--component-document-card-min` | `176px` | `176px` | 必选文件、推荐文件自适应列数 |
+| 项目文档网格间距 | `--component-document-grid-gap` | `12px` | `12px` | 项目文档卡片之间 |
 | 小标题内部间距 | `--component-section-title-gap` | `4px` | `4px` | 标题到说明文案 |
 | 小标题到内容间距 | `--component-section-content-gap` | `16px` | `16px` | 说明文案到第一张卡片、路径框、体检项 |
+| 问题标题到选项 | `--component-question-content-gap` | `8px` | `8px` | 向导题目到选项组 |
+| 问题块之间 | `--component-question-section-gap` | `20px` | `20px` | Q1 到 Q2、Q2 到 Q3 |
 
 规则：
 - 左栏和右栏的首个标题距离面板顶部必须一致。
@@ -102,6 +106,7 @@ Main Workbench Card
 - 列表项之间只使用 list gap，不在单个卡片上额外加 margin。
 - `SectionHeading` 到它后面第一个内容组件之间只使用 `--component-section-content-gap`，不在内容组件上补 `margin-top`。
 - 如果父容器已经用 `gap` 管理标题和内容间距，`SectionHeading` 自身的 `margin-bottom` 必须归零，避免 16px + 16px 叠加成 32px。
+- 标题和下方选项 / 表单 / 结果必须优先包在 `SectionBlock` 中；不能让标题是一个孤立 DOM、内容另靠父级 `gap` 或 inline margin 拼接。
 - 来源选项列表和来源配置区之间使用 `--component-workbench-section-gap`，因为它们是两个业务小节，不是同一个标题下的内容。
 - `kit-left` / `kit-right` 是布局分栏，不和内容卡片 class 叠加使用，避免 padding 被覆盖。
 
@@ -109,21 +114,21 @@ Main Workbench Card
 
 ## Header 布局
 
-Header 负责建立当前产品和当前项目状态。
+Header 负责建立当前产品身份，不承载具体流程结果。
 
 结构：
 
 ```txt
-Brand / Title / Description
-Meta Panel
+Brand / Title / Description        Primary Mode Switch
 ```
 
 规则：
-- 标题区和 meta 区桌面端左右排布。
-- meta 区内容要能截断，不撑破布局。
+- 顶部左侧放品牌、标题和说明；右侧放“创建新项目 / 接手老项目”一级入口切换。
+- 顶部不放 `MetaPanel` 或体检分数，避免把“体检结果”误表达成和“创建新项目 / 接手老项目”同级。
+- `体检结果` 属于“接手老项目”流程输出，必须放在老项目右侧结果区。
+- Header 右侧切换器使用轻量胶囊 tab 组件，允许浅底细边框，不加厚重投影。
 - 页面 H1 不进入卡片。
 - 小型工作台标题使用 `--text-32`，不要使用 hero 级大字。
-- 宽度不足时 meta 区下移，而不是压缩标题。
 
 ---
 
@@ -132,9 +137,11 @@ Meta Panel
 用于“新项目 / 老项目”这类互斥入口。
 
 规则：
+- Header 入口切换使用 `header-pill-tabs` 变体：tab 组右对齐，浅底胶囊外壳，两个选项都有明确点击区域。
 - 宽度可小于容器，不强行满屏。
 - 每个选项同宽。
-- 选中滑块使用绝对定位，不改变按钮尺寸。
+- 选中态不改变按钮尺寸。
+- 未选中 tab 不能只像文字链接，必须留在浅底胶囊热区内。
 - 图标和文字间距使用 `--space-8`。
 - 移动端仍保持一行；如果文案过长，优先缩短文案，不换成多行按钮。
 
@@ -142,7 +149,7 @@ Meta Panel
 
 ## Section 布局
 
-小节标题统一使用 `SectionHeading`。
+小节标题统一使用 `SectionHeading`，标题与下方内容统一由 `SectionBlock` 承载。
 
 规则：
 - 编号小节：编号、标题在同一行。
@@ -154,16 +161,27 @@ Meta Panel
 - 标题与说明的距离使用 `--component-section-title-gap: 4px`。
 - 小节标题块到底下内容组件的距离使用 `--component-section-content-gap: 16px`。
 - 同一个小节内不能同时使用 `SectionHeading margin-bottom` 和父容器 `gap` 表达同一段距离。
+- `SectionBlock` 必须包含 `SectionHeading` 和内容区，内容区可以是选项列表、表单控件组、资料列表或结果列表。
+- 新项目向导、模板文档预览、老项目代码来源、当前工作目录、上传 zip、体检结果都属于 `SectionBlock` 场景。
+- 问题型内容使用 `kit-wizard-steps` 管多个问题的 20px 间距，单个问题用 `kit-wizard-q` 管题目到选项的 8px 间距。
+- 选项列表必须显式使用 grid / flex；不允许只声明 `gap` 但保持默认 block 流，避免选项堆叠贴在一起。
 
 间距映射：
 
 | 场景 | 使用 |
 |------|------|
+| SectionHeading 到内容区 | `--component-section-content-gap` |
 | `代码来源` 说明到第一张来源卡片 | `--component-section-content-gap` |
 | `当前工作目录` 说明到路径框 | `--component-section-content-gap` |
 | `体检将包含以下内容` 说明到第一条体检项 | `--component-section-content-gap` |
+| 向导问题标题到选项 | `--component-question-content-gap` |
+| 向导多个问题块之间 | `--component-question-section-gap` |
 | 代码来源卡片组到当前工作目录配置组 | `--component-workbench-section-gap` |
 | 路径框到 `开始体检` 按钮 | `--component-workbench-control-gap` |
+| 新项目模板列表到操作区 | `--component-workbench-section-gap` |
+| `选择目录并生成骨架` 到 `下载空白模板 zip` | `--component-workbench-list-gap` |
+| 骨架生成方案摘要行之间 | `--component-workbench-list-gap` |
+| 骨架生成方案到确认按钮组 | `--component-workbench-control-gap` |
 
 ---
 
@@ -202,10 +220,16 @@ Result / Preview
 列表用于资料项、体检项、模块结果。
 
 规则：
+- 项目文档列表使用 `DocumentGrid`，按容器宽度自动形成 3 / 2 / 1 列。
+- `DocumentGrid` 的分组标题必须跨整行，不能占一个卡片列。
+- 文档卡片路径必须单行省略，避免长路径撑破卡片。
+- 文档卡片的查看入口浮动在右上角，使用图标库 eye 图标，不单独占一行；按钮为 22px，图标为 14px，圆角与 checkbox 一致；默认只显示图标，hover 才出现轻量底色；标题和路径为按钮预留空间，描述文案不被操作列持续挤窄。
 - 资料项使用两列：状态控件 / 内容。
 - 可选右侧操作时使用三列：状态控件 / 内容 / 操作。
 - 列表项高度由内容决定，但图标列宽固定。
 - 添加资料入口使用 `AddItemCard`，必须与同组资料卡片同宽、同左边缘。
+- 写入前骨架生成方案使用 `WritePlanPanel`，必须跟随所在右栏宽度，不使用浮层或全局弹窗。
+- `WritePlanPanel` 内部摘要列表使用同组列表间距，按钮组使用控件间距，不再用临时 inline margin。
 - 上传入口和添加资料入口都属于虚线空态操作区，统一使用 `EmptyAction` 外框 token。
 - `EmptyAction` 优先保证上下内边距一致；内容多一行时允许高度自然增加。
 - `ChecklistItem` 使用固定三列图标槽，leading / content / trailing 在整卡中垂直居中。

@@ -32,12 +32,6 @@ export interface SegmentedSwitchOption {
   icon: IconName;
 }
 
-export interface MetaPanelItem {
-  label: string;
-  value: string;
-  truncate?: boolean;
-}
-
 export interface SectionHeading {
   id: string;
   title: string;
@@ -104,46 +98,20 @@ export const projectModeOptions: SegmentedSwitchOption[] = [
   },
 ];
 
-export const reportMetaItems: MetaPanelItem[] = [
-  {
-    label: "生成时间",
-    value: "2026-05-20T08:00:08Z",
-  },
-  {
-    label: "上下文完整度",
-    value: "100/100",
-  },
-  {
-    label: "工程成熟度",
-    value: "100/100",
-  },
-];
-
 export const sectionHeadings: SectionHeading[] = [
   {
-    id: "new-collaboration",
-    title: "协作模式",
-    variant: "numbered",
-    step: 1,
-  },
-  {
-    id: "new-start-strategy",
-    title: "启动策略",
-    variant: "numbered",
-    step: 2,
-  },
-  {
-    id: "new-required-materials",
-    title: "基础上下文资料",
+    id: "new-template-wizard",
+    title: "模板选择向导",
     variant: "numbered-with-description",
-    step: 3,
-    description: "已自动勾选 AI 接手所需的最小数据集",
+    step: 1,
+    description: "先回答 3 个问题，帮你自动勾选需要的项目文档和 AI 规则文件。",
   },
   {
-    id: "new-custom-enhancement",
-    title: "自定义增强",
-    variant: "plain",
-    description: "按需补充其他项目文档",
+    id: "new-template-preview",
+    title: "将生成这些项目文档",
+    variant: "numbered-with-description",
+    step: 2,
+    description: "先看预览；选择目录后生成写入前安全方案，确认后再生成骨架或下载 zip。",
   },
   {
     id: "old-code-source",
@@ -171,8 +139,8 @@ export const sectionHeadings: SectionHeading[] = [
 export const collaborationOptions: OptionCard[] = [
   {
     id: "solo",
-    title: "个人开发",
-    description: "AI 提供敏捷上下文，重视开发速度与灵活性。",
+    title: "我一个人",
+    description: "先保持轻量，别被文档拖慢。",
     icon: "user",
     variant: "choice",
     tone: "light",
@@ -181,8 +149,8 @@ export const collaborationOptions: OptionCard[] = [
   },
   {
     id: "team",
-    title: "团队协作",
-    description: "补齐协作规则、决策记录和交接资料，避免项目越做越散。",
+    title: "有团队一起做",
+    description: "需要规则、决策记录和交接资料。",
     icon: "users",
     variant: "choice",
     tone: "light",
@@ -194,8 +162,8 @@ export const collaborationOptions: OptionCard[] = [
 export const startStrategies: OptionCard[] = [
   {
     id: "prototype",
-    title: "快速做个原型",
-    description: "先让 AI 做出能看的页面或功能，再慢慢补规范。",
+    title: "快速做出原型",
+    description: "先跑通核心功能，少放长期治理文档。",
     icon: "rocket",
     variant: "strategy",
     tone: "light",
@@ -204,8 +172,8 @@ export const startStrategies: OptionCard[] = [
   },
   {
     id: "serious",
-    title: "认真建一个项目",
-    description: "适合产品、工具、长期维护项目，先把项目基础搭稳。",
+    title: "搭长期项目基础",
+    description: "先把结构、规范和交接打稳。",
     icon: "layers",
     variant: "strategy",
     tone: "light",
@@ -214,7 +182,7 @@ export const startStrategies: OptionCard[] = [
   },
   {
     id: "handover",
-    title: "只想让 AI 更好接手",
+    title: "先让 AI 更好接手",
     description: "适合先整理规则、状态和交接，不急着写业务代码。",
     icon: "shield",
     variant: "strategy",
@@ -269,21 +237,11 @@ export const requiredMaterialsByCollaborationMode: Record<CollaborationMode, Che
       trailing: "none",
     },
     {
-      id: "team-rules",
+      id: "agent-rules",
       type: "material",
-      title: "团队工作规则",
-      description: "组件规范、禁止魔数、样式统一",
+      title: "AI 工作规则",
+      description: "AI 该怎么做，哪些事不要乱改",
       file: "AGENTS.md",
-      icon: "check",
-      state: "locked",
-      trailing: "none",
-    },
-    {
-      id: "architecture-rules",
-      type: "material",
-      title: "架构与约定",
-      description: "目录结构、状态管理和路由规则",
-      file: "docs/ARCHITECTURE.md",
       icon: "check",
       state: "locked",
       trailing: "none",
@@ -293,16 +251,6 @@ export const requiredMaterialsByCollaborationMode: Record<CollaborationMode, Che
       type: "material",
       title: "当前状态",
       description: "现在做到哪一步，还缺什么",
-      file: "PROJECT.md",
-      icon: "check",
-      state: "locked",
-      trailing: "none",
-    },
-    {
-      id: "handoff-record",
-      type: "material",
-      title: "交接记录",
-      description: "下一个队友或 AI 接手时需要的信息",
       file: "HANDOFF.md",
       icon: "check",
       state: "locked",

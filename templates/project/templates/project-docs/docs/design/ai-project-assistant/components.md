@@ -47,13 +47,16 @@ docs/design/ai-project-assistant/components.ts
 
 | 组件 | 层级 | 用途 |
 |------|------|------|
-| `ProductHeader` | Pattern | 顶部品牌、标题、说明 |
+| `ProductHeader` | Pattern | 顶部品牌、标题、说明；不承载体检结果 |
 | `SegmentedSwitch` | Primitive | 新项目 / 老项目等互斥切换 |
-| `MetaPanel` | Pattern | 当前报告、生成时间和关键分数 |
+| `MetaPanel` | Deprecated Pattern | 历史状态卡；当前页面不在顶部使用 |
 | `SectionHeading` | Pattern | 编号小标题和说明 |
+| `SectionBlock` | Pattern | 绑定小标题和下方内容，统一标题到选项 / 表单 / 结果的间距 |
+| `DocumentGrid` | Pattern | 项目文档卡片自适应网格 |
 | `OptionCard` | Pattern | 个人开发、团队协作、启动策略等可选方案 |
 | `ChecklistItem` | Pattern | 必选资料、体检项、缺口项 |
 | `AddItemCard` | Pattern | 添加更多文档等空态操作入口 |
+| `WritePlanPanel` | Pattern | 写入前的安全检查和骨架生成方案 |
 | `TextField` | Primitive | 路径、仓库地址、只读文本字段 |
 | `Button` | Primitive | 主操作和普通按钮 |
 
@@ -105,12 +108,13 @@ Description
 
 用途：展示互斥模式切换，比如“创建新项目 / 接手老项目”。
 
-覆盖截图：双按钮切换条。
+覆盖截图：Header 右侧一级入口 tabs。
 
 变体：
 
 | Variant | 用途 |
 |---------|------|
+| `header-pill-tabs` | Header 右侧一级入口 tabs，轻量胶囊外壳，选中项自身反色 |
 | `two-options` | 两个选项 |
 | `multi-options` | 三个及以上选项 |
 
@@ -119,13 +123,16 @@ Description
 | State | 要求 |
 |-------|------|
 | `default` | 未聚焦 |
-| `selected` | 反色选中态：深色滑块、白色文字、品牌色图标 |
+| `selected` | 当前 tab：深色胶囊、白色文字、品牌色图标 |
 | `hover` | 不改变尺寸 |
 | `focus-visible` | 使用 focus token 外圈 |
 | `disabled` | 禁止点击并降低对比度 |
 
 行为：
-- 选中滑块不能改变容器高度。
+- Header 内使用 `header-pill-tabs`，外层只允许轻量浅底和细边框，不能加厚重投影。
+- 两个选项必须按 tab 语义实现：`role="tablist"` / `role="tab"` / `aria-selected` / `aria-controls`。
+- 未选中 tab 位于同一个浅底胶囊容器里，必须有完整点击区域，不能只是文字按钮。
+- 选中态不能改变容器高度。
 - 每个选项同宽。
 - 移动端优先缩短文案，不把按钮挤成多行。
 
@@ -133,9 +140,14 @@ Description
 
 ## MetaPanel
 
-用途：展示当前报告状态、生成时间和关键分数。
+用途：历史状态卡，用于展示当前报告状态、生成时间和关键分数。
 
-覆盖截图：顶部当前报告状态卡。
+当前规则：
+- `MetaPanel` 不放在顶层 Header。
+- `体检结果` 属于“接手老项目”流程的输出，必须放在 `OldProjectAuditWorkbench` 右侧结果区。
+- 顶层 Header 只表达产品身份：品牌、标题、说明。
+
+覆盖截图：历史顶部状态卡。
 
 变体：
 
@@ -197,8 +209,107 @@ Description
 - 说明文案不能只作为 title 属性存在。
 - 编号只服务当前小标题，不作为纵向时间线或导航栏使用。
 - 不允许按左右栏覆盖编号颜色或位置；左右栏必须共用同一套 `SectionHeading` 样式。
+- 所有带编号或符号徽标的小标题，必须保持“编号在左、标题文字在右”；说明文案与标题文字起点对齐。
+- 静态 DOM 必须写完整 `data-component` / `data-variant` / `data-slot`，CSS 仅保留兜底，不能依赖浏览器默认 grid 排版。
 - `SectionHeading` 到第一项内容的距离固定使用 `--component-section-content-gap`，覆盖资料卡片、来源卡片、路径框、上传区和体检项。
 - 当 `SectionHeading` 放在已设置 `gap` 的配置容器中时，必须清掉自身 `margin-bottom`，不能叠加出双倍间距。
+
+---
+
+## SectionBlock
+
+用途：把一个 `SectionHeading` 和它下面的选项、表单或结果列表绑定成同一组，避免标题和内容靠临时 margin 拼接。
+
+覆盖截图：新项目模板选择向导、将生成这些项目文档、老项目代码来源、当前工作目录、体检结果。
+
+结构：
+
+```txt
+SectionBlock
+  SectionHeading
+  Content
+```
+
+变体：
+
+| Variant | 用途 | 示例 |
+|---------|------|------|
+| `with-options` | 标题下方是选择卡片组 | 代码来源、模板选择向导 |
+| `with-form` | 标题下方是输入框、上传区或按钮 | 当前工作目录、Git 仓库地址 |
+| `with-results` | 标题下方是结果、资料或体检列表 | 将生成这些项目文档、体检结果 |
+
+间距规范：
+
+| 距离 | Token | 要求 |
+|------|-------|------|
+| 标题到内容 | `--component-section-content-gap` | 固定 16px |
+| 问题标题到选项 | `--component-question-content-gap` | 固定 8px |
+| 多个问题块之间 | `--component-question-section-gap` | 固定 20px |
+| 同组卡片之间 | `--component-workbench-list-gap` | 固定 12px |
+| 同组控件之间 | `--component-workbench-control-gap` | 固定 16px |
+
+规则：
+- `SectionBlock` 内的 `SectionHeading` 必须清掉自身 `margin-bottom`，由父级 `gap` 管标题到内容。
+- 新项目和老项目的“标题 + 下方选项 / 表单 / 结果”都必须使用这个结构。
+- 选项列表必须是 grid / flex 这类显式布局，不能只写 `gap` 却保持 block 流。
+- 不允许在标题、选项列表、表单控件上写 `style="margin-top:..."` 作为间距补丁。
+- 内容区如果包含多个控件，使用 `kit-section-content` 管内部间距。
+
+可访问性：
+- 标题仍由 `SectionHeading` 表达，不用纯视觉分隔线代替标题。
+- 互斥或多选卡片必须保留按钮语义和状态属性。
+- 隐藏态小节必须完整隐藏标题和内容，不能只隐藏内容。
+
+---
+
+## DocumentGrid
+
+用途：展示“将生成这些项目文档”里的必选文件和推荐文件，让文档卡片按容器宽度自动从 3 列、2 列收缩到 1 列。
+
+覆盖截图：`必选文件：AI 接手最小上下文`、`推荐文件：产品和结构`、`推荐文件：流程和验收`。
+
+结构：
+
+```txt
+DocumentGrid
+  GroupHeader?
+  DocumentCard[]
+```
+
+变体：
+
+| Variant | 用途 | 示例 |
+|---------|------|------|
+| `required` | 必选文件网格 | `AGENTS.md`、`PROJECT.md`、`HANDOFF.md` |
+| `optional-grouped` | 带分组标题的可选文件网格 | 产品、流程、记录、高级配置 |
+
+布局规范：
+
+| 项 | 规范 |
+|----|------|
+| 最小卡片宽度 | `--component-document-card-min: 176px` |
+| 卡片间距 | `--component-document-grid-gap`，默认跟随 `--component-workbench-list-gap: 12px` |
+| 桌面 | 容器足够时一排 3 个 |
+| 中等宽度 | 自动变成一排 2 个 |
+| 移动端 | 自动变成一排 1 个 |
+| 分组标题 | `grid-column: 1 / -1`，必须跨整行 |
+| 文档路径 | 单行省略，不能撑破卡片 |
+| 查看入口 | 右上角浮动 `i-eye` 图标按钮，按钮尺寸 `--component-document-action-size: 22px`，图标尺寸 `--component-document-action-icon-size: 14px`，圆角跟随 checkbox 的 `--radius-xs` |
+
+规则：
+- `DocumentGrid` 使用 `auto-fit + minmax`，同时用三列宽度作为动态下限，保证最多 3 列、空间不足时自动退到 2 / 1 列。
+- 必选文件和可选文件共用同一套网格规则，区别只在分组标题和选中状态。
+- 卡片内部使用“勾选/复选框 + 标题路径 + 预览按钮 + 描述”的紧凑结构。
+- 描述文案在窄卡片内放到标题下方，不右对齐。
+- 预览入口使用图标库 `i-eye`，绝对定位在卡片右上角；不使用 emoji，不单独占一行。
+- 预览入口默认态只展示深色 `i-eye` 图标，不显示外框和底色；hover 只出现轻量底色，不出现边框。
+- 预览入口圆角必须与 checkbox 控件一致，统一使用 `--radius-xs`。
+- 标题和路径区域为右上角按钮预留空间；描述文案恢复正文列宽度，不能被操作列长期挤窄。
+
+可访问性：
+- 预览按钮必须有 `aria-label`。
+- 必选文件 locked 状态必须保留 `aria-disabled`。
+- 复选框不能只靠颜色表达是否选中。
 
 ---
 
@@ -317,6 +428,7 @@ Description
 | State | 要求 |
 |-------|------|
 | `idle` | 虚线边框、浅色加号 |
+| `copy` | 复制补齐文档命令，不直接执行本机操作 |
 | `planned` | 保留入口但标记为待接入 |
 | `hover` | 边框和加号转品牌色 |
 | `focus-visible` | focus token 外圈 |
@@ -326,7 +438,41 @@ Description
 - `AddDocumentButton` 是旧别名；当前 DOM 必须使用 `AddItemCard[variant="document"]`。
 - `UploadDropZone` 是旧别名；上传区当前也归入 `AddItemCard[variant="upload"]`。
 - 该组件视觉上是卡片式空态入口，不命名为 `Button`。
+- 如果已有命令行工具能承接动作，使用 `copy` 状态，并明确复制后需要到终端运行。
 - 未实现真实添加或上传流程时必须使用 `planned` 状态和 `待接入` 标签，不伪装成可执行功能。
+
+---
+
+## WritePlanPanel
+
+用途：新项目把工程文档写入目录前，先展示“写入位置检查 + 骨架生成方案 + 确认操作”。
+
+覆盖截图：新项目底部操作区，从“选择目录并生成骨架”进入的写入前安全方案。
+
+变体：
+
+| Variant | 用途 |
+|---------|------|
+| `directory-organize` | 选择本机目录后生成骨架写入方案 |
+
+状态：
+
+| State | 要求 |
+|-------|------|
+| `ready` | 已生成方案，等待用户确认 |
+| `writing` | 正在写入，按钮保持宽度和禁用态 |
+| `error` | 错误显示在操作区附近 |
+| `success` | 切换到写入结果列表 |
+
+规则：
+- 该组件必须出现在实际写入之前，不能把“选择目录”和“生成骨架”合并成一个不可逆按钮。
+- 摘要必须明确三类处理：同名文件、相似资料、缺失文件。
+- 同名文件默认不覆盖，只能写成 `.template.md` 参考版本。
+- 相似资料必须让用户选择合并来源；合并时原文件保留，标准文件内追加原内容。
+- 主操作只允许一个：`确认生成骨架`。
+- 次操作允许 `重新选择目录` 和 `下载空白模板 zip`。
+- 错误文案使用靠近按钮的 `role="status"` 区域，不弹全局 alert。
+- `hover` / `active` / `focus-visible` 不改变面板尺寸。
 
 ---
 
@@ -418,6 +564,7 @@ WorkbenchLayout
   OptionCard group
   ChecklistItem group
   AddItemCard
+  WritePlanPanel
 ```
 
 要求：
@@ -425,6 +572,7 @@ WorkbenchLayout
 - 用户能看懂下一步要复制什么给 AI。
 - 面板内边距、区块间距、列表间距必须使用 `WorkbenchLayout` token。
 - 自定义增强入口不抢必选资料视觉。
+- 写入项目之前必须先展示 `WritePlanPanel`，说明同名、相似命名和缺失文件的处理方式。
 
 ### OldProjectAuditWorkbench
 

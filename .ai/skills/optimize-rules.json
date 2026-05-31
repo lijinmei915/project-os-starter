@@ -1,0 +1,9 @@
+{
+  "name": "optimize-rules",
+  "description": "触发规则库自动修剪机制：审查当前 AI 规则库，清理冲突和冗余，防止上下文爆炸",
+  "trigger": "优化规则, 清理规则, 审查约束, optimize rules",
+  "action": {
+    "type": "shell",
+    "command": "bash scripts/optimize-rules.sh"
+  }
+}

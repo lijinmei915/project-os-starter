@@ -304,11 +304,20 @@ install_core() {
   install_file "scripts/check-ai-project.sh"
   install_file "scripts/ai-project.sh"
   install_file "scripts/add-project-docs.sh"
+  install_file "scripts/check-frontend.sh"
+  install_file "scripts/check-backend.sh"
+  install_file "scripts/check-testing.sh"
+  install_file "scripts/check-design.sh"
+  install_file "scripts/sync-ai-rules.sh"
+  install_file "scripts/auto-reflect.sh"
+  install_file "scripts/optimize-rules.sh"
   install_file "schemas/ai-project-score.schema.json"
   install_file "schemas/ai-project-score.v0.2.json"
   install_file "schemas/ai-project-report.schema.json"
   install_file "schemas/ai-project-report.v0.1.json"
   install_file "index.html"
+  install_file "kit"
+  install_dir ".ai"
   install_dir "templates/project-docs"
 }
 
@@ -331,6 +340,9 @@ install_product_docs() {
   install_file "docs/CHANGELOG.md"
   install_file "docs/DECISIONS.md"
   install_file "docs/LESSONS.md"
+  install_file "docs/FRONTEND.md"
+  install_file "docs/BACKEND.md"
+  install_file "docs/AUTO_GROWTH.md"
 }
 
 install_design_docs() {
@@ -447,6 +459,12 @@ if [ "$upgrade" -eq 0 ] && [ ! -f "$state_file" ]; then
 }
 STATE
   log "created .project-os/state.json — fill in name, phase, stage, status"
+fi
+
+# 自动建立 AI 规则映射
+if [ -f "$target_abs/scripts/sync-ai-rules.sh" ]; then
+  bash "$target_abs/scripts/sync-ai-rules.sh" "$target_abs" > /dev/null 2>&1
+  log "auto-synced AI rules to .ai/rules/"
 fi
 
 log "installed items: $installed"

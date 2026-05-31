@@ -33,11 +33,14 @@
 |----------------|------|------|-------------|----------|
 | `ProductHeader` | Pattern | `docs/design/ai-project-assistant/components.md` | `docs/design/ai-project-assistant/components.ts` / `data.ts` | `templates/report/ai-project-report.html` |
 | `SegmentedSwitch` | Primitive | `docs/design/ai-project-assistant/components.md` | `docs/design/ai-project-assistant/components.ts` / `data.ts` | `templates/report/ai-project-report.html` |
-| `MetaPanel` | Pattern | `docs/design/ai-project-assistant/components.md` | `docs/design/ai-project-assistant/components.ts` / `data.ts` | `templates/report/ai-project-report.html` |
+| `MetaPanel` | Deprecated Pattern | `docs/design/ai-project-assistant/components.md` | `docs/design/ai-project-assistant/components.ts` | 历史/备用状态卡，当前页面不在 Header 使用 |
 | `SectionHeading` | Pattern | `docs/design/ai-project-assistant/components.md` | `docs/design/ai-project-assistant/components.ts` / `data.ts` | `templates/report/ai-project-report.html` |
+| `SectionBlock` | Pattern | `docs/design/ai-project-assistant/components.md` | `docs/design/ai-project-assistant/components.ts` | `templates/report/ai-project-report.html` |
+| `DocumentGrid` | Pattern | `docs/design/ai-project-assistant/components.md` | `docs/design/ai-project-assistant/components.ts` / `data.ts` | `templates/report/ai-project-report.html` |
 | `OptionCard` | Pattern | `docs/design/ai-project-assistant/components.md` | `docs/design/ai-project-assistant/components.ts` / `data.ts` | `templates/report/ai-project-report.html` |
 | `ChecklistItem` | Pattern | `docs/design/ai-project-assistant/components.md` | `docs/design/ai-project-assistant/components.ts` / `data.ts` | `templates/report/ai-project-report.html` |
 | `AddItemCard` | Pattern | `docs/design/ai-project-assistant/components.md` | `docs/design/ai-project-assistant/components.ts` / `data.ts` | `templates/report/ai-project-report.html` |
+| `WritePlanPanel` | Pattern | `docs/design/ai-project-assistant/components.md` | `docs/design/ai-project-assistant/components.ts` / `data.ts` | `templates/report/ai-project-report.html` |
 | `TextField` | Primitive | `docs/design/ai-project-assistant/components.md` | `docs/design/ai-project-assistant/components.ts` / `data.ts` | `templates/report/ai-project-report.html` |
 | `Button` | Primitive | `docs/design/ai-project-assistant/components.md` | `docs/design/ai-project-assistant/components.ts` / `data.ts` | `templates/report/ai-project-report.html` |
 
@@ -45,8 +48,8 @@
 
 | 组合模式 | 分层 | 用途 | 主要使用组件 |
 |----------|------|------|--------------|
-| `NewProjectWorkbench` | Composition | 新项目初始化工作台 | `ProductHeader`、`SegmentedSwitch`、`SectionHeading`、`OptionCard`、`ChecklistItem`、`AddItemCard` |
-| `OldProjectAuditWorkbench` | Composition | 老项目体检工作台 | `ProductHeader`、`SegmentedSwitch`、`SectionHeading`、`TextField`、`ChecklistItem`、`Button` |
+| `NewProjectWorkbench` | Composition | 新项目初始化工作台 | `ProductHeader`、`SegmentedSwitch`、`SectionHeading`、`SectionBlock`、`DocumentGrid`、`OptionCard`、`ChecklistItem`、`AddItemCard`、`WritePlanPanel`、`Button` |
+| `OldProjectAuditWorkbench` | Composition | 老项目体检工作台 | `ProductHeader`、`SegmentedSwitch`、`SectionHeading`、`SectionBlock`、`TextField`、`ChecklistItem`、`Button` |
 
 ## 兼容别名
 

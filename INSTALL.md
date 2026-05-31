@@ -64,17 +64,25 @@ bash "$tmp_dir/project-os-starter/scripts/install-project-os.sh" . --profile cor
 
 然后再写入 Project OS 文件。
 
-默认 `core` 只安装：
+默认 `core` 会安装：
 
 ```txt
 AGENTS.md
 PROJECT.md
 HANDOFF.md
+.ai/                         (统一 AI 资产目录与规则映射)
 scripts/check-runtime.sh
 scripts/check-secrets.sh
 scripts/check-ai-project.sh
 scripts/ai-project.sh
 scripts/add-project-docs.sh
+scripts/check-frontend.sh    (前端规范检查)
+scripts/check-backend.sh     (后端规范检查)
+scripts/check-testing.sh     (测试/CI 检查)
+scripts/check-design.sh      (设计/UI 检查)
+scripts/sync-ai-rules.sh     (自动规则映射引擎)
+scripts/auto-reflect.sh      (自动反思引擎)
+scripts/optimize-rules.sh    (规则修剪引擎)
 schemas/ai-project-score.schema.json
 schemas/ai-project-score.v0.2.json
 schemas/ai-project-report.schema.json
@@ -83,8 +91,11 @@ templates/report/ai-project-report.html
 templates/project-docs/
 ```
 
+安装完成后，系统会自动运行 `bash scripts/sync-ai-rules.sh .` 建立初始 AI 规则映射。
+
 中文说明：
 核心规则源头是 `AGENTS.md`。
+`.ai/` 目录是 Project OS 推荐的跨工具 AI 资产存放点。
 `.claude/*` 是当前仓库自带的参考实现，只有 `full` 或 `--with-skills` 才会安装。
 `adapters/*` 是面向不同工具的适配层，只有 `full` 或 `--with-adapters` 才会安装。
 `.claude/settings.local.json` 是本地增强配置，不作为公开运行时文件安装到目标项目。

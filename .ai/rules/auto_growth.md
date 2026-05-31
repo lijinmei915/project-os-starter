@@ -1,0 +1,1 @@
+../../docs/AUTO_GROWTH.md

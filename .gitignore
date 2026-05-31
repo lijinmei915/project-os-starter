@@ -16,6 +16,7 @@ build/
 # Local Project OS / personal files
 CLAUDE.md
 !templates/project/adapters/CLAUDE.md
+.codex/
 .claude/settings.local.json
 .project-os/reports/
 tests/screenshots/*.png

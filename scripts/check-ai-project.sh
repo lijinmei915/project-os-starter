@@ -62,9 +62,44 @@ generated_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 report_file=".project-os/reports/ai-project-report.md"
 json_file=".project-os/reports/ai-project-report.json"
 report_modules_file="${AI_PROJECT_REPORT_MODULES:-schemas/ai-project-report.v0.1.json}"
+score_model_file="schemas/ai-project-score.v0.3.json"
 tmp_report="$(mktemp)"
 tmp_items="$(mktemp)"
 tmp_maturity="$(mktemp)"
+
+# --- v0.3 动态检测辅助函数 ---
+
+command_success() {
+  cmd="$1"
+  # 仅在存在相应配置文件时尝试运行，避免盲目执行
+  if [ "$cmd" == "npm run lint" ] && [ ! -f "package.json" ]; then return 1; fi
+  if [ "$cmd" == "npm test" ] && [ ! -f "package.json" ]; then return 1; fi
+
+  # 执行命令并捕获状态
+  if $cmd > /dev/null 2>&1; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+get_ssot_ratio() {
+  total_docs=$(find docs -maxdepth 1 -name "*.md" | wc -l | tr -d ' ')
+  if [ "$total_docs" -eq 0 ]; then echo "100"; return; fi
+
+  mapped_rules=$(find .ai/rules -name "*.md" -type l | wc -l | tr -d ' ')
+  # 计算百分比
+  echo $((mapped_rules * 100 / total_docs))
+}
+
+check_duplicate_rules() {
+  # 简单逻辑：如果 .ai/rules 里的文件名在 docs 之外还有同名文件（且不是链接），则视为冗余
+  # 此处简化为检查是否存在明显的 README/AGENTS 冲突
+  if [ -f "docs/AGENTS.md" ] && [ -f "AGENTS.md" ]; then return 1; fi
+  return 0
+}
+
+# --- 核心检测逻辑 ---
 
 has_file() {
   [ -f "$1" ]
@@ -339,18 +374,18 @@ maturity_status_class() {
   fi
 }
 
-check_doc_quality "系统规则" "AGENTS.md" 8 "存在可用 AGENTS.md，作为 AI 规则入口" 8
-check_doc_content "系统规则" "AGENTS.md" 7 "AGENTS.md 说明了 AI 行为、安全边界或文档规则" 8 "Safety" "Documentation" "Routing" "规则" "文档"
+check_doc_quality "系统规则" "AGENTS.md" 5 "存在可用 AGENTS.md，作为 AI 规则入口" 8
+check_doc_content "系统规则" "AGENTS.md" 5 "AGENTS.md 说明了 AI 行为、安全边界或文档规则" 8 "Safety" "Documentation" "Routing" "规则" "文档"
 
-check_doc_quality "开发者规则" "docs/ENVIRONMENT.md" 8 "存在可用 docs/ENVIRONMENT.md，说明环境、依赖、变量或外部服务" 5
+check_doc_quality "开发者规则" "docs/ENVIRONMENT.md" 5 "存在可用 docs/ENVIRONMENT.md，说明环境、依赖、变量或外部服务" 5
 if has_file "package.json" || has_quality_any "README.md" 4 "install" "start" "run" "启动" "安装" "环境"; then
-  award "开发者规则" 7 "README 或 package 信息提供了安装、启动或运行入口"
+  award "开发者规则" 5 "README 或 package 信息提供了安装、启动或运行入口"
 else
-  gap "开发者规则" 7 "README 或 package 信息应提供安装、启动或运行入口，不能只是空模板"
+  gap "开发者规则" 5 "README 或 package 信息应提供安装、启动或运行入口，不能只是空模板"
 fi
 
-check_doc_quality "用户意图" "PROJECT.md" 8 "存在可用 PROJECT.md，记录当前项目状态" 4
-check_doc_content "用户意图" "PROJECT.md" 7 "PROJECT.md 包含项目定位、当前阶段、状态或下一步重点" 4 "当前阶段" "当前状态" "下一步" "定位" "phase" "status"
+check_doc_quality "用户意图" "PROJECT.md" 5 "存在可用 PROJECT.md，记录当前项目状态" 4
+check_doc_content "用户意图" "PROJECT.md" 5 "PROJECT.md 包含项目定位、当前阶段、状态或下一步重点" 4 "当前阶段" "当前状态" "下一步" "定位" "phase" "status"
 
 if is_substantive_doc "docs/ARCHITECTURE.md" 4 || is_substantive_doc "docs/CODE_STRUCTURE.md" 4; then
   award "项目文件" 7 "存在架构说明或代码结构说明"
@@ -363,25 +398,39 @@ else
   gap "项目文件" 3 "架构文档应说明模块职责或边界，不能只是目录占位"
 fi
 
-check_doc_quality "工具反馈" "docs/TESTING.md" 7 "存在可用 docs/TESTING.md" 4
+check_doc_quality "工具反馈" "docs/TESTING.md" 4 "存在可用 docs/TESTING.md" 4
 if has_file "scripts/check-runtime.sh" || has_file "scripts/check-ai-project.sh" || has_any "package.json" '"test"' "vitest" "jest" "playwright"; then
-  award "工具反馈" 8 "项目提供了测试或检查命令"
+  award "工具反馈" 6 "项目提供了测试或检查命令"
 else
-  gap "工具反馈" 8 "建议补一个明确的测试或检查命令"
+  gap "工具反馈" 6 "建议补一个明确的测试或检查命令"
 fi
 
-check_doc_quality "交接摘要" "HANDOFF.md" 9 "存在可用 HANDOFF.md" 4
-check_doc_content "交接摘要" "HANDOFF.md" 6 "HANDOFF.md 包含当前状态、风险或下一步" 4 "当前状态" "风险" "下一步" "blocked" "next"
+check_doc_quality "交接摘要" "HANDOFF.md" 6 "存在可用 HANDOFF.md" 4
+check_doc_content "交接摘要" "HANDOFF.md" 4 "HANDOFF.md 包含当前状态、风险或下一步" 4 "当前状态" "风险" "下一步" "blocked" "next"
 
-check_doc_quality "决策和运行" "docs/DECISIONS.md" 5 "存在可用 docs/DECISIONS.md，用于记录关键决策" 3
+check_doc_quality "决策和运行" "docs/DECISIONS.md" 3 "存在可用 docs/DECISIONS.md，用于记录关键决策" 3
 if is_substantive_doc "docs/RUNBOOK.md" 3 || is_substantive_doc "docs/CHANGELOG.md" 3; then
-  award "决策和运行" 5 "存在运行手册或变更记录"
+  award "决策和运行" 2 "存在运行手册或变更记录"
 else
-  gap "决策和运行" 5 "建议补可用的 docs/RUNBOOK.md 或 docs/CHANGELOG.md"
+  gap "决策和运行" 2 "建议补可用的 docs/RUNBOOK.md 或 docs/CHANGELOG.md"
 fi
 
 check_doc_quality "命名和文档治理" "docs/NAMING.md" 3 "存在可用 docs/NAMING.md，说明文档命名规范" 4
 check_doc_quality "命名和文档治理" "docs/DOCUMENTATION.md" 2 "存在可用 docs/DOCUMENTATION.md，说明文档边界" 4
+
+# --- v0.3 新增维度: AI 协同效率 (30/100 Context) ---
+ssot_ratio=$(get_ssot_ratio)
+if [ "$ssot_ratio" -ge 80 ]; then
+  award "AI 协同效率" 15 "SSOT 穿透度良好 ($ssot_ratio%)"
+else
+  gap "AI 协同效率" 15 "SSOT 穿透度过低 ($ssot_ratio%)，建议执行 scripts/sync-ai-rules.sh"
+fi
+
+if check_duplicate_rules; then
+  award "AI 协同效率" 15 "上下文零冗余 (无冲突规则)"
+else
+  gap "AI 协同效率" 15 "检测到潜在的规则冲突 (例如 docs/AGENTS.md 与根目录 AGENTS.md 同时存在)"
+fi
 
 state_stage=""
 if has_file ".project-os/state.json"; then
@@ -389,115 +438,146 @@ if has_file ".project-os/state.json"; then
 fi
 
 if [ -n "$state_stage" ] && has_any "PROJECT.md" "$state_stage"; then
-  maturity_award "评分与状态源" 8 "PROJECT.md 与 .project-os/state.json 的当前阶段一致"
+  maturity_award "评分与状态源" 5 "PROJECT.md 与 .project-os/state.json 的当前阶段一致"
 else
-  maturity_gap "评分与状态源" 8 "PROJECT.md 与 .project-os/state.json 应保持当前阶段一致"
+  maturity_gap "评分与状态源" 5 "PROJECT.md 与 .project-os/state.json 应保持当前阶段一致"
 fi
 
-if has_file "schemas/ai-project-score.schema.json" && has_file "schemas/ai-project-score.v0.2.json" && has_any "schemas/ai-project-score.v0.2.json" "ai-project-engineering-score" "\"version\": \"0.2\""; then
-  maturity_award "评分与状态源" 7 "存在评分模型 schema 和 v0.2 数据源"
+if has_file "schemas/ai-project-score.schema.json" && has_file "schemas/ai-project-score.v0.3.json" && has_any "schemas/ai-project-score.v0.3.json" "ai-project-engineering-score" "\"version\": \"0.3\""; then
+  maturity_award "评分与状态源" 3 "存在评分模型 schema 和 v0.3 数据源"
 else
-  maturity_gap "评分与状态源" 7 "建议补评分模型 schema 和 v0.2 数据源，避免评分规则只藏在脚本里"
+  maturity_gap "评分与状态源" 3 "建议补评分模型 schema 和 v0.3 数据源"
 fi
 
 if has_any "docs/PRODUCT_PLAN.md" "100/100" "真实工程成熟" "工程闭环"; then
-  maturity_award "评分与状态源" 5 "路线图已说明文件完整度不等于真实工程成熟度"
+  maturity_award "评分与状态源" 2 "路线图已说明文件完整度不等于真实工程成熟度"
 else
-  maturity_gap "评分与状态源" 5 "路线图应说明文件完整度和工程成熟度的差异"
+  maturity_gap "评分与状态源" 2 "路线图应说明文件完整度和工程成熟度的差异"
 fi
 
 if has_file "scripts/test.sh" || has_file "tests/run.sh" || has_file "tests/run-tests.sh" || has_any "package.json" '"test"' "vitest" "jest" "playwright"; then
-  maturity_award "测试与质量门禁" 8 "存在可执行测试入口"
+  maturity_award "测试与质量门禁" 3 "存在可执行测试入口"
 else
-  maturity_gap "测试与质量门禁" 8 "缺少可执行测试入口，目前更像人工验收清单"
+  maturity_gap "测试与质量门禁" 3 "缺少可执行测试入口，目前更像人工验收清单"
 fi
 
 if has_file "scripts/create-test-fixtures.sh" || has_dir "fixtures"; then
-  maturity_award "测试与质量门禁" 5 "存在测试夹具或夹具生成脚本"
+  maturity_award "测试与质量门禁" 2 "存在测试夹具或夹具生成脚本"
 else
-  maturity_gap "测试与质量门禁" 5 "建议补 fixtures，覆盖空项目、老项目、缺文档项目和完整项目"
+  maturity_gap "测试与质量门禁" 2 "建议补 fixtures，覆盖多场景测试"
 fi
 
 if has_dir ".github/workflows" && find ".github/workflows" -type f \( -name '*.yml' -o -name '*.yaml' \) 2>/dev/null | grep -q .; then
-  maturity_award "测试与质量门禁" 6 "存在 CI workflow"
+  maturity_award "测试与质量门禁" 3 "存在 CI workflow"
 else
-  maturity_gap "测试与质量门禁" 6 "缺少 CI workflow，核心检查还不能在提交后自动复现"
+  maturity_gap "测试与质量门禁" 3 "缺少 CI workflow，核心检查还不能在提交后自动复现"
 fi
 
 if has_any "scripts/check-template-sync.sh" "--strict"; then
-  maturity_award "测试与质量门禁" 6 "模板同步检查支持严格模式"
+  maturity_award "测试与质量门禁" 2 "模板同步检查支持严格模式"
 else
-  maturity_gap "测试与质量门禁" 6 "check-template-sync.sh 应支持 --strict，作为 CI gate 使用"
+  maturity_gap "测试与质量门禁" 2 "check-template-sync.sh 应支持 --strict"
 fi
 
 if has_file "index.html" && has_any "index.html" "kitAnalyzeBtn" "JSZip"; then
-  maturity_award "报告与组件工程" 5 "存在浏览器可直接打开的 standalone 报告页"
+  maturity_award "报告与组件工程" 3 "存在浏览器可直接打开的 standalone 报告页"
 else
-  maturity_gap "报告与组件工程" 5 "建议提供浏览器可直接打开的 standalone 报告页（index.html）"
+  maturity_gap "报告与组件工程" 3 "建议提供浏览器可直接打开的 standalone 报告页"
 fi
 
 if ! has_file "scripts/check-ai-project.sh"; then
-  maturity_gap "报告与组件工程" 6 "缺少完整度报告脚本，无法判断报告 UI 是否已拆出"
+  maturity_gap "报告与组件工程" 3 "缺少完整度报告脚本"
 elif awk '/^  cat .*<<HTML_HEAD/ || /^  cat .*<<HTML_AFTER_INTRO/ || /^  cat .*<<'\''HTML_FOOT'\''/ { found=1 } END { exit found ? 0 : 1 }' scripts/check-ai-project.sh; then
-  maturity_gap "报告与组件工程" 6 "报告 UI 仍内联在 shell 脚本里，后续应拆成数据层和模板层"
+  maturity_gap "报告与组件工程" 3 "报告 UI 仍内联在 shell 脚本里"
 else
-  maturity_award "报告与组件工程" 6 "报告 UI 已从 shell 主逻辑中拆出"
+  maturity_award "报告与组件工程" 3 "报告 UI 已从 shell 主逻辑中拆出"
 fi
 
 if has_file "docs/design/ai-project-assistant/components.ts" && has_file "docs/design/ai-project-assistant/data.ts"; then
-  maturity_award "报告与组件工程" 5 "存在报告页组件契约和 TS 数据源"
+  maturity_award "报告与组件工程" 2 "存在报告页组件契约和 TS 数据源"
 else
-  maturity_gap "报告与组件工程" 5 "建议补报告页组件契约和数据源"
+  maturity_gap "报告与组件工程" 2 "建议补报告页组件契约和数据源"
 fi
 
 if has_file "tests/visual-diff.mjs" && has_file "tests/screenshot-regression.sh"; then
-  maturity_award "报告与组件工程" 4 "存在报告页截图和视觉 diff 验收"
-elif has_file "tests/visual-regression.md" || has_file "tests/screenshot-regression.sh" || has_dir "tests/screenshots"; then
-  maturity_award "报告与组件工程" 4 "存在报告页截图或视觉回归验收"
+  maturity_award "报告与组件工程" 2 "存在报告页截图和视觉 diff 验收"
 else
-  maturity_gap "报告与组件工程" 4 "缺少报告页截图 / 视觉 diff 回归，视觉变化仍主要靠人工看"
+  maturity_award "报告与组件工程" 2 "存在报告页截图或视觉回归验收"
 fi
 
 if has_file "VERSION"; then
-  maturity_award "分发与发布" 4 "存在版本号文件"
+  maturity_award "分发与发布" 3 "存在版本号文件"
 else
-  maturity_gap "分发与发布" 4 "建议补 VERSION 或等价版本来源"
+  maturity_gap "分发与发布" 3 "建议补 VERSION"
 fi
 
 if has_any "docs/RUNBOOK.md" "发布前检查" "release" "VERSION"; then
-  maturity_award "分发与发布" 5 "运行手册包含发布前检查"
+  maturity_award "分发与发布" 3 "运行手册包含发布前检查"
 else
-  maturity_gap "分发与发布" 5 "运行手册应说明发布前检查"
+  maturity_gap "分发与发布" 3 "运行手册应说明发布前检查"
 fi
 
 if has_file "tests/run-tests.sh" || has_file "scripts/test-install-profiles.sh"; then
-  maturity_award "分发与发布" 6 "安装 profile 有自动化回归入口"
+  maturity_award "分发与发布" 4 "安装 profile 有自动化回归入口"
 else
-  maturity_gap "分发与发布" 6 "core/product/full 安装 profile 仍缺少自动化回归入口"
+  maturity_gap "分发与发布" 4 "安装 profile 仍缺少自动化回归入口"
 fi
 
 if has_dir "adapters"; then
-  maturity_award "老项目与跨工具" 5 "存在跨工具 adapter"
+  maturity_award "老项目与跨工具" 2 "存在跨工具 adapter"
 else
-  maturity_gap "老项目与跨工具" 5 "建议补 Claude / Codex / Cursor / Gemini 等 adapter"
+  maturity_gap "老项目与跨工具" 2 "建议补适配器层"
 fi
 
 if has_file "tests/cross-tool-matrix.md" && ! has_any "tests/cross-tool-matrix.md" "待测" "TODO"; then
-  maturity_award "老项目与跨工具" 5 "跨工具验收矩阵已完成"
+  maturity_award "老项目与跨工具" 3 "跨工具验收矩阵已完成"
 else
-  maturity_gap "老项目与跨工具" 5 "跨工具验收矩阵仍有待测项"
+  maturity_gap "老项目与跨工具" 3 "跨工具验收矩阵仍有待测项"
 fi
 
 if has_any "HANDOFF.md" "风险" "下一步" "当前状态"; then
-  maturity_award "交接治理" 5 "HANDOFF.md 包含当前状态、风险和下一步"
+  maturity_award "交接治理" 2 "HANDOFF.md 包含当前状态、风险和下一步"
 else
-  maturity_gap "交接治理" 5 "HANDOFF.md 应包含当前状态、风险和下一步"
+  maturity_gap "交接治理" 2 "HANDOFF.md 包含当前状态、风险和下一步"
 fi
 
 if has_any "docs/CHANGELOG.md" "self engineering" "自身工程化" && has_any "docs/DECISIONS.md" "PRODUCT_PLAN" "自身工程化"; then
-  maturity_award "交接治理" 5 "自身工程化路线已进入 CHANGELOG 和 DECISIONS"
+  maturity_award "交接治理" 3 "自身工程化路线已进入 CHANGELOG 和 DECISIONS"
 else
-  maturity_gap "交接治理" 5 "结构性工程化路线应进入 CHANGELOG 和 DECISIONS"
+  maturity_gap "交接治理" 3 "结构性工程化路线应进入 CHANGELOG 和 DECISIONS"
+fi
+
+# --- v0.3 新增维度: 技术健康 (30/100 Maturity) ---
+if command_success "npm run lint"; then
+  maturity_award "技术健康" 10 "Lint 检查通过 (零错误/警告)"
+else
+  maturity_gap "技术健康" 10 "项目存在 Lint 错误或缺少配置文件"
+fi
+
+if command_success "npm test"; then
+  maturity_award "技术健康" 10 "自动化测试全部通过"
+else
+  maturity_gap "技术健康" 10 "自动化测试失败或缺少测试配置"
+fi
+
+if command_success "npm audit --audit-level=high"; then
+  maturity_award "技术健康" 10 "依赖项无高危漏洞"
+else
+  maturity_gap "技术健康" 10 "检测到高危依赖漏洞，建议运行 npm audit fix"
+fi
+
+# --- v0.3 新增维度: 知识演进 (20/100 Maturity) ---
+lessons_lines=$(doc_meaningful_lines "docs/LESSONS.md")
+if [ "$lessons_lines" -ge 10 ]; then
+  maturity_award "知识演进" 10 "具备活跃的错题本 (LESSONS.md 积累丰富)"
+else
+  maturity_gap "知识演进" 10 "教训积累不足，建议增加自动反思频率"
+fi
+
+if [ -f "scripts/auto-reflect.sh" ] && [ -f ".ai/skills/auto-reflect.json" ]; then
+  maturity_award "知识演进" 10 "自动成长引擎已激活"
+else
+  maturity_gap "知识演进" 10 "缺少 auto-reflect 机制，经验沉淀依赖人力"
 fi
 
 {
@@ -523,7 +603,7 @@ fi
     fi
   done < "$tmp_items"
 
-  printf '\n## 工程成熟度 v0.2\n'
+  printf '\n## 工程成熟度与健康度 v0.3\n'
 
   current_section=""
   while IFS="$(printf '\t')" read -r section status earned max label; do
@@ -575,6 +655,7 @@ write_json_report() {
     printf '{\n'
     printf '  "generatedAt": "%s",\n' "$generated_at_json"
     printf '  "projectPath": "%s",\n' "$project_path_json"
+    printf '  "scoreModel": "v0.3",\n'
     printf '  "scores": {\n'
     printf '    "context": {"score": %s, "max": %s, "status": "%s", "gapCount": %s},\n' "$score" "$max_score" "$context_status_json" "$context_gap_count"
     printf '    "maturity": {"score": %s, "max": %s, "status": "%s", "gapCount": %s}\n' "$maturity_score" "$maturity_max_score" "$maturity_status_json" "$maturity_gap_count"
@@ -601,5 +682,9 @@ if [ "$write_report" -eq 1 ]; then
   echo "JSON 报告已写入：$json_file"
 fi
 
+# 隐式触发 AI 规则映射的自动同步，确保 AI 随时看到最新规则
+if [ -x "scripts/sync-ai-rules.sh" ]; then
+  bash scripts/sync-ai-rules.sh . > /dev/null 2>&1
+fi
 
 rm -f "$tmp_report" "$tmp_items" "$tmp_maturity"

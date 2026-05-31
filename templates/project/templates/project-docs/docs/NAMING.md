@@ -22,6 +22,7 @@ docs/ 放工程治理。
 | `AGENTS.md` | AI 工作规则 |
 | `PROJECT.md` | 项目当前状态 |
 | `HANDOFF.md` | 交接上下文 |
+| `PRODUCT.md` | 产品定义 |
 | `INSTALL.md` | 安装说明 |
 
 规则：社区约定或工具自动读取的文件放根目录，不要为了统一风格改名。
@@ -32,7 +33,7 @@ docs/ 放工程治理。
 |------|----------|
 | 通用 agents | `AGENTS.md` |
 | Claude | `CLAUDE.md` |
-| Cursor | `.cursor/rules/*.mdc` |
+| Cursor | `.cursorrules` 或 `.cursor/rules/*.mdc` |
 | Gemini | `GEMINI.md` |
 
 规则：adapter 只翻译工具读取方式，通用规则写 `AGENTS.md`。
@@ -65,3 +66,11 @@ docs/design/layout.md
 避免：`notes.md`、`misc.md`、`todo.md`、`final.md` —— 没有语义边界。
 
 不知道放哪里时，先写进 `HANDOFF.md`，稳定后再沉淀到对应 docs 文件。
+
+## 相关文件
+
+| 文件 | 关系 |
+|------|------|
+| `docs/DOCUMENTATION.md` | 文档编写规范和边界 |
+| `docs/CODE_STRUCTURE.md` | 代码目录命名 |
+| `AGENTS.md` | 文档职责总表 |

@@ -1,0 +1,9 @@
+{
+  "name": "check-testing",
+  "description": "从 QA/测试工程师视角检查项目的测试用例覆盖和 CI 自动化门禁情况",
+  "trigger": "检查测试, testing check, QA check",
+  "action": {
+    "type": "shell",
+    "command": "bash scripts/check-testing.sh ."
+  }
+}

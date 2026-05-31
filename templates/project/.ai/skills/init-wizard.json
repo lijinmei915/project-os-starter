@@ -1,0 +1,9 @@
+{
+  "name": "init-wizard",
+  "description": "智能项目初始化向导：先调研项目意图，再按需自动组装并烙印工程文件",
+  "trigger": "初始化新项目, 创建新项目, 项目向导, init project",
+  "action": {
+    "type": "shell",
+    "command": "bash scripts/init-wizard.sh"
+  }
+}

@@ -50,7 +50,10 @@ else
 fi
 
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  if git grep -n -E 'sk-[A-Za-z0-9_-]{20,}|DEEPSEEK_API_KEY=[^[:space:]#]+' -- ':!*.png' ':!*.jpg' ':!*.jpeg' ':!*.gif' ':!*.webp' >"$secret_scan_tmp" 2>/dev/null; then
+  if git grep -n -E 'sk-[A-Za-z0-9_-]{20,}|DEEPSEEK_API_KEY=[^[:space:]#]+' -- \
+    ':!*.png' ':!*.jpg' ':!*.jpeg' ':!*.gif' ':!*.webp' \
+    ':!scripts/check-secrets.sh' ':!templates/project/scripts/check-secrets.sh' \
+    >"$secret_scan_tmp" 2>/dev/null; then
     cat "$secret_scan_tmp"
     error "possible secret found in tracked files"
   else

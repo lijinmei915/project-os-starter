@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+
+# kit - AI Engineering Kit 统一中控台
+# 提供一键式交互菜单，集成体检、巡检、反思与同步功能。
+
+set -e
+
+# 颜色定义
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+BOLD='\033[1m'
+NC='\033[0m' # No Color
+
+# 路径设置
+SCRIPT_DIR="scripts"
+
+show_logo() {
+  echo -e "${BLUE}${BOLD}"
+  echo "  🚀 AI Engineering Kit Control Center"
+  echo "  ------------------------------------"
+  echo -e "${NC}"
+}
+
+run_check() {
+  echo -e "\n${BLUE}🔎 正在运行全局工程体检...${NC}"
+  bash "$SCRIPT_DIR/ai-project.sh" report .
+}
+
+run_domain_checks() {
+  echo -e "\n${BOLD}领域专项巡检菜单:${NC}"
+  echo "1) 前端规范检查"
+  echo "2) 后端规范检查"
+  echo "3) 测试与 QA 检查"
+  echo "4) 设计与 UI 检查"
+  echo "q) 返回主菜单"
+  read -p "请选择 [1-4]: " domain_choice
+  case $domain_choice in
+    1) bash "$SCRIPT_DIR/check-frontend.sh" . ;;
+    2) bash "$SCRIPT_DIR/check-backend.sh" . ;;
+    3) bash "$SCRIPT_DIR/check-testing.sh" . ;;
+    4) bash "$SCRIPT_DIR/check-design.sh" . ;;
+    *) return ;;
+  esac
+}
+
+run_reflect() {
+  echo -e "\n${YELLOW}🤖 正在启动自动反思引擎...${NC}"
+  bash "$SCRIPT_DIR/auto-reflect.sh"
+}
+
+run_sync() {
+  echo -e "\n${GREEN}🔄 正在强制同步 AI 规则映射 (SSOT)...${NC}"
+  bash "$SCRIPT_DIR/sync-ai-rules.sh" .
+}
+
+# 快捷命令行支持
+if [ $# -gt 0 ]; then
+  case "$1" in
+    check) run_check; exit 0 ;;
+    reflect) run_reflect; exit 0 ;;
+    sync) run_sync; exit 0 ;;
+    *) echo "用法: $0 [check|reflect|sync]"; exit 1 ;;
+  esac
+fi
+
+# 交互式菜单
+while true; do
+  show_logo
+  echo -e "${BOLD}请选择操作:${NC}"
+  echo "1) 全局体检 (生成 HTML 报告)"
+  echo "2) 专项巡检 (前后端/测试/设计)"
+  echo "3) 自动反思 (沉淀改动教训)"
+  echo "4) 规则同步 (建立 AI 链接)"
+  echo "------------------------------------"
+  echo "5) 🚀 智能 AI 初始化 (先聊意图, 按需落子)"
+  echo "6) 🛠️ 自定义外科手术式注入 (逐个勾选文件)"
+  echo "q) 退出"
+  echo ""
+  read -p "请选择 [1-6/q]: " choice
+
+  case $choice in
+    1) run_check ;;
+    2) run_domain_checks ;;
+    3) run_reflect ;;
+    4) run_sync ;;
+    5)
+      read -p "请输入要初始化的目录路径: " target_path
+      bash "$SCRIPT_DIR/init-wizard.sh" "$target_path"
+      ;;
+    6)
+      read -p "请输入目标项目目录的绝对路径: " target_path
+      bash "$SCRIPT_DIR/surgical-install.sh" "$target_path"
+      ;;
+    q|Q) echo "再见!"; exit 0 ;;
+    *) echo -e "${RED}无效选择，请重试。${NC}" ;;
+  esac
+  echo -e "\n${YELLOW}------------------------------------${NC}"
+done

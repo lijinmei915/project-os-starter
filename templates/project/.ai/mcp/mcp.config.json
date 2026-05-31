@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "project-os-analyzer": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@project-os/mcp-server",
+        "--dir",
+        "."
+      ],
+      "env": {}
+    }
+  }
+}

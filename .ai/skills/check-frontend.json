@@ -1,0 +1,9 @@
+{
+  "name": "check-frontend",
+  "description": "检查当前项目的前端规范执行度",
+  "trigger": "检查前端, frontend check",
+  "action": {
+    "type": "shell",
+    "command": "bash scripts/check-frontend.sh ."
+  }
+}

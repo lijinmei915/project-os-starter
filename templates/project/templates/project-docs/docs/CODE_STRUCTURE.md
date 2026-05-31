@@ -22,3 +22,11 @@
 ## 待补充
 
 - `TODO`
+
+## 相关文件
+
+| 文件 | 关系 |
+|------|------|
+| `docs/ARCHITECTURE.md` | 系统级结构（本文件偏目录和代码分层） |
+| `docs/NAMING.md` | 文件和目录命名规范 |
+| `docs/DOCUMENTATION.md` | 文档编写边界 |

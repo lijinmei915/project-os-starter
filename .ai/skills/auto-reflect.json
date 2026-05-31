@@ -1,0 +1,9 @@
+{
+  "name": "auto-reflect",
+  "description": "触发全自动反思机制：读取最近代码差异，提取工程教训，并自动追加到错题本 (LESSONS.md) 中",
+  "trigger": "自动反思, 沉淀经验, 总结刚才的工作, auto reflect",
+  "action": {
+    "type": "shell",
+    "command": "bash scripts/auto-reflect.sh"
+  }
+}

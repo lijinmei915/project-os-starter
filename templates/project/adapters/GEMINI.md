@@ -1,21 +1,41 @@
 # Gemini Adapter
 
-> 用途：把 `AGENTS.md` 的通用规则翻译成 Gemini 的读取入口。
-> 什么时候更新：Gemini 专属行为变化时。
+This file is a Gemini adapter for Project OS.
 
-通用规则以 `AGENTS.md` 为准。
+`AGENTS.md` is the single source of truth. This file only translates the shared Project OS rules into Gemini-friendly guidance.
 
-## 读取顺序
+中文说明：
+这是 Gemini 适配文件，不是新的规则源头。
 
-1. `AGENTS.md`（通用规则）
-2. `PROJECT.md`（判断项目状态时）
-3. `HANDOFF.md`（接手已有工作时）
+---
 
-## 请求分流
+## Required Reading
+
+For project-level work:
+
+1. Read `AGENTS.md`
+2. Read `PROJECT.md`
+3. Read `HANDOFF.md` if continuing existing work
+
+中文说明：
+Gemini 进入项目任务时，先读通用规则和当前状态。
+
+---
+
+## Routing
+
+Classify before execution:
 
 ```txt
-设计规范 / tokens / UI 规则 -> design-system
-具体页面 / 组件实现 -> frontend
+Project OS install/check/upgrade -> project-setup / INSTALL
+vague product request -> project-setup / CLARIFICATION
+new software/system/app -> project-setup / INIT
+analyze only -> project-setup / AUDIT
+existing/messy project takeover -> project-setup / HYBRID
+design tokens / UI rules -> design-system
+specific page/component implementation -> frontend
 ```
 
-不要跳过意图确认直接生成代码。
+中文说明：
+不要跳过 Project OS 路由直接生成业务代码。
+如果是 `INSTALL / INIT`，先明确打印这个路由；安装结束后同一轮继续进入 INIT 启动方式选择。

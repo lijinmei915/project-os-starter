@@ -23,6 +23,15 @@ assert_contains() {
   fi
 }
 
+assert_not_contains() {
+  file="$1"
+  pattern="$2"
+  if grep -q "$pattern" "$file"; then
+    echo "ERROR: unexpected pattern found in $file: $pattern"
+    exit 1
+  fi
+}
+
 find_browser() {
   if [ -n "${CHROME_BIN:-}" ] && [ -x "$CHROME_BIN" ]; then
     printf '%s\n' "$CHROME_BIN"
@@ -153,9 +162,12 @@ fi
 
 log "check report markers"
 assert_contains "$html_file" "AI 项目工程助手"
+assert_contains "$html_file" "模板选择向导"
+assert_contains "$html_file" "将生成这些项目文档"
 assert_contains "$html_file" "体检结果"
-assert_contains "$html_file" "上下文完整度"
-assert_contains "$html_file" "工程成熟度"
+assert_not_contains "$html_file" "kitReportTime"
+assert_not_contains "$html_file" "kitContextScorePill"
+assert_not_contains "$html_file" "kitMaturityScorePill"
 assert_contains "$html_file" "kitProjectSwitch"
 assert_contains "$html_file" "data-component=\"SectionHeading\""
 assert_contains "$html_file" "data-component\", \"RequiredMaterialItem"
