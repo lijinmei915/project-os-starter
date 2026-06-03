@@ -134,6 +134,7 @@ scripts/check-secrets.sh
 scripts/check-ai-project.sh
 scripts/ai-project.sh
 scripts/add-project-docs.sh
+scripts/build-project-graph.sh
 schemas/ai-project-score.schema.json
 schemas/ai-project-score.v0.2.json
 schemas/ai-project-report.schema.json
@@ -169,6 +170,7 @@ scripts/check-secrets.sh
 scripts/check-ai-project.sh
 scripts/ai-project.sh
 scripts/add-project-docs.sh
+scripts/build-project-graph.sh
 schemas/ai-project-score.schema.json
 schemas/ai-project-score.v0.2.json
 schemas/ai-project-report.schema.json
@@ -194,7 +196,7 @@ scripts/install-adapter.sh
 
 | profile | 目标 | 内容 |
 |---------|------|------|
-| `core` | 最小 AI 协作规则和体检入口 | `AGENTS.md` / `PROJECT.md` / `HANDOFF.md` / `scripts/check-runtime.sh` / `scripts/check-secrets.sh` / `scripts/check-ai-project.sh` / `scripts/ai-project.sh` / `scripts/add-project-docs.sh` / `schemas/ai-project-score.*.json` / `schemas/ai-project-report.*.json` / `templates/report/ai-project-report.html` / `templates/project-docs/` |
+| `core` | 最小 AI 协作规则和体检入口 | `AGENTS.md` / `PROJECT.md` / `HANDOFF.md` / `scripts/check-runtime.sh` / `scripts/check-secrets.sh` / `scripts/check-ai-project.sh` / `scripts/ai-project.sh` / `scripts/add-project-docs.sh` / `scripts/build-project-graph.sh` / `schemas/ai-project-score.*.json` / `schemas/ai-project-report.*.json` / `templates/report/ai-project-report.html` / `templates/project-docs/` |
 | `product` | 基础 AI 工程治理 | `core` + README / INSTALL / DOCUMENTATION / NAMING / ARCHITECTURE / ENVIRONMENT / TESTING / RUNBOOK / CHANGELOG / DECISIONS / LESSONS |
 | `full` | 完整 Project OS runtime | `product` + 设计文档 + `.claude` runtime + adapters |
 

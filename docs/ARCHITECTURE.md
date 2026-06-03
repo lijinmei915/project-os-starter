@@ -26,6 +26,7 @@ Project OS 正在收敛为通用的 AI Engineering Kit：
 3. 工程文档层：docs/*
 4. 工具脚本层：scripts/*
 5. 模板分发层：templates/project/*
+6. 本地生成物层：.project-os/reports/* / .project-os/graph/*
 ```
 
 ## 运行路径
@@ -38,6 +39,17 @@ scripts/check-ai-project.sh
 -> 按系统规则 / 环境 / 用户意图 / 项目文件 / 工具反馈 / 交接摘要评分
 -> 输出完整度报告
 ```
+
+### 关系图路径
+
+```txt
+scripts/build-project-graph.sh
+-> 扫描核心文档、脚本、schema、模板和 AI 资产
+-> 识别文件节点、层级、SSOT 标记、模板标记、引用关系和 .ai/rules 映射
+-> 输出 .project-os/graph/project-graph.json
+```
+
+关系图只做静态结构分析，不调用 LLM、不联网、不取代人工 review。
 
 ### 安装路径
 
@@ -71,6 +83,7 @@ scripts/check-template-sync.sh
 | `templates/project/` | 安装到目标项目的干净模板 |
 | `adapters/` | Claude / Codex / Cursor / Gemini 适配 |
 | `.claude/` | Claude Code 参考实现 |
+| `.project-os/graph/` | 本地生成的项目关系图 |
 
 ## 边界
 

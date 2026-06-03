@@ -102,6 +102,7 @@ compare_path "scripts/check-secrets.sh" "templates/project/scripts/check-secrets
 compare_path "scripts/check-ai-project.sh" "templates/project/scripts/check-ai-project.sh"
 compare_path "scripts/ai-project.sh" "templates/project/scripts/ai-project.sh"
 compare_path "scripts/add-project-docs.sh" "templates/project/scripts/add-project-docs.sh"
+compare_path "scripts/build-project-graph.sh" "templates/project/scripts/build-project-graph.sh"
 compare_path "scripts/install-adapter.sh" "templates/project/scripts/install-adapter.sh"
 
 if [ "$warnings" -gt 0 ]; then

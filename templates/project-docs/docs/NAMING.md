@@ -51,6 +51,8 @@ docs/ 放工程治理。
 | `docs/DECISIONS.md` | 决策及原因 |
 | `docs/CHANGELOG.md` | 结构性变更 |
 | `docs/LESSONS.md` | 踩坑复盘 |
+| `docs/SECURITY.md` | 工程安全边界，按需 |
+| `docs/AI_SAFETY.md` | AI 输出和工具调用安全边界，按需 |
 
 ## 子目录命名
 

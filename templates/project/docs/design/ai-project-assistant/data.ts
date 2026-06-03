@@ -1,6 +1,7 @@
 export type ProjectKind = "new" | "old";
 export type CollaborationMode = "solo" | "team";
-export type StartStrategyId = "prototype" | "serious" | "handover";
+export type OutcomeId = "product" | "page" | "run" | "handoff" | "ai" | "rag";
+export type ContractLayerId = "entry" | "run" | "structure" | "quality" | "runtime";
 export type SectionHeadingVariant = "numbered" | "numbered-with-description" | "plain";
 export type OptionCardTone = "light" | "dark";
 export type OptionCardState = "default" | "selected" | "disabled";
@@ -78,6 +79,24 @@ export interface ButtonData {
   state: ButtonState;
 }
 
+export interface ContractRecommendationData {
+  title: string;
+  description: string;
+}
+
+export interface ContractLayerData {
+  id: ContractLayerId;
+  title: string;
+  description: string;
+  meter: string;
+}
+
+export interface NextCommandData {
+  title: string;
+  description: string;
+  command: string;
+}
+
 export const productHeader: ProductHeaderData = {
   eyebrow: "AI ENGINEERING KIT",
   title: "AI 项目工程助手",
@@ -104,14 +123,14 @@ export const sectionHeadings: SectionHeading[] = [
     title: "模板选择向导",
     variant: "numbered-with-description",
     step: 1,
-    description: "先回答 3 个问题，帮你自动勾选需要的项目文档和 AI 规则文件。",
+    description: "先回答 2 个问题，帮你生成一套可理解、可运行、可检查的工程契约。",
   },
   {
     id: "new-template-preview",
-    title: "将生成这些项目文档",
+    title: "生成工程契约",
     variant: "numbered-with-description",
     step: 2,
-    description: "先看预览；选择目录后生成写入前安全方案，确认后再生成骨架或下载 zip。",
+    description: "结果会按 5 层组织，让项目从说明文档升级成可落地的工程契约。",
   },
   {
     id: "old-code-source",
@@ -151,7 +170,7 @@ export const collaborationOptions: OptionCard[] = [
     id: "team",
     title: "有团队一起做",
     description: "需要规则、决策记录和交接资料。",
-    icon: "users",
+    icon: "layers",
     variant: "choice",
     tone: "light",
     state: "default",
@@ -159,21 +178,21 @@ export const collaborationOptions: OptionCard[] = [
   },
 ];
 
-export const startStrategies: OptionCard[] = [
+export const outcomeOptions: OptionCard[] = [
   {
-    id: "prototype",
-    title: "快速做出原型",
-    description: "先跑通核心功能，少放长期治理文档。",
+    id: "product",
+    title: "看清方向",
+    description: "定位、用户、MVP 和路线图。",
     icon: "rocket",
     variant: "strategy",
     tone: "light",
-    state: "default",
+    state: "selected",
     trailing: "none",
   },
   {
-    id: "serious",
-    title: "搭长期项目基础",
-    description: "先把结构、规范和交接打稳。",
+    id: "page",
+    title: "先有页面",
+    description: "页面原型、设计规范和视觉边界。",
     icon: "layers",
     variant: "strategy",
     tone: "light",
@@ -181,19 +200,59 @@ export const startStrategies: OptionCard[] = [
     trailing: "none",
   },
   {
-    id: "handover",
-    title: "先让 AI 更好接手",
-    description: "适合先整理规则、状态和交接，不急着写业务代码。",
+    id: "run",
+    title: "能运行起来",
+    description: "环境、启动方式、目录和模块边界。",
     icon: "shield",
     variant: "strategy",
-    tone: "dark",
-    state: "selected",
-    trailing: "check",
+    tone: "light",
+    state: "default",
+    trailing: "none",
+  },
+  {
+    id: "handoff",
+    title: "方便测试和交接",
+    description: "验收方式、运行手册和经验教训。",
+    icon: "users",
+    variant: "strategy",
+    tone: "light",
+    state: "default",
+    trailing: "none",
+  },
+  {
+    id: "ai",
+    title: "AI 工程支持",
+    description: "agents、tools、prompts、evals 和 guardrails。",
+    icon: "shield",
+    variant: "strategy",
+    tone: "light",
+    state: "default",
+    trailing: "none",
+  },
+  {
+    id: "rag",
+    title: "知识库 / RAG",
+    description: "data、ingestion、retrieval、evals 和 observability。",
+    icon: "layers",
+    variant: "strategy",
+    tone: "light",
+    state: "default",
+    trailing: "none",
   },
 ];
 
 export const requiredMaterialsByCollaborationMode: Record<CollaborationMode, ChecklistItem[]> = {
   solo: [
+    {
+      id: "readme",
+      type: "material",
+      title: "使用入口",
+      description: "项目是什么、怎么开始、先看哪里",
+      file: "README.md",
+      icon: "check",
+      state: "locked",
+      trailing: "none",
+    },
     {
       id: "project-brief",
       type: "material",
@@ -227,6 +286,16 @@ export const requiredMaterialsByCollaborationMode: Record<CollaborationMode, Che
   ],
   team: [
     {
+      id: "readme",
+      type: "material",
+      title: "使用入口",
+      description: "项目是什么、怎么开始、先看哪里",
+      file: "README.md",
+      icon: "check",
+      state: "locked",
+      trailing: "none",
+    },
+    {
       id: "project-brief",
       type: "material",
       title: "项目说明",
@@ -257,6 +326,66 @@ export const requiredMaterialsByCollaborationMode: Record<CollaborationMode, Che
       trailing: "none",
     },
   ],
+};
+
+export const contractRecommendationSample: ContractRecommendationData = {
+  title: "推荐：轻量工程契约",
+  description: "当前会按「页面原型 / 快速原型」准备页面原型骨架，并优先补齐项目入口和产品方向。",
+};
+
+export const contractLayers: ContractLayerData[] = [
+  {
+    id: "entry",
+    title: "项目入口",
+    description: "让人和 AI 先知道这是什么、怎么开始；这些文件会作为项目入口生成，可在下方调整推荐项。",
+    meter: "4/6",
+  },
+  {
+    id: "run",
+    title: "工程运行",
+    description: "让项目能安装、启动、配置和复现；这里放技术栈、环境变量、命名和文档更新规则。",
+    meter: "0/5",
+  },
+  {
+    id: "structure",
+    title: "代码结构",
+    description: "本次先准备当前项目类型的位置；具体会生成的目录在底部文件树里确认。",
+    meter: "1/3",
+  },
+  {
+    id: "quality",
+    title: "质量保障层",
+    description: "让项目能测试、回归、交接；命中后端或 AI 风险时补安全边界。",
+    meter: "0/5",
+  },
+  {
+    id: "runtime",
+    title: "AI 支持文件",
+    description: "让提示词、评测和安全边界有固定位置；轻量项目只放提示词示例。",
+    meter: "自动包含",
+  },
+];
+
+export const contractPreviewSample = {
+  tree: [
+    "README.md",
+    "PROJECT.md",
+    "AGENTS.md",
+    "HANDOFF.md",
+    "docs/",
+    "  ENVIRONMENT.md",
+    "  SECURITY.md",
+    "  AI_SAFETY.md",
+    "  TECH_STACK.md",
+    "  TESTING.md",
+    "prompts/",
+    "evals/",
+  ],
+  nextCommand: {
+    title: "生成后第一步",
+    description: "先检查 Project OS 入口、规则、环境、安全边界和 AI 支持文件是否完整。",
+    command: "bash scripts/check-runtime.sh .\nbash scripts/check-secrets.sh .",
+  } satisfies NextCommandData,
 };
 
 export const auditChecklistItems: ChecklistItem[] = [

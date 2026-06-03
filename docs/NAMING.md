@@ -69,11 +69,14 @@ docs/ 放工程治理。
 | `docs/CHANGELOG.md` | 结构性变更记录 |
 | `docs/LESSONS.md` | 踩坑复盘和新增约束 |
 | `docs/DESIGN_STANDARDS.md` | UI / 设计系统规范 |
+| `docs/SECURITY.md` | 工程安全边界、密钥和权限规则 |
+| `docs/AI_SAFETY.md` | AI 输出、工具调用和 RAG 安全边界 |
 
 兼容规则：
 - 旧项目已有 `docs/CODE_STRUCTURE.md` 时可以保留。
 - 新项目优先使用 `docs/ARCHITECTURE.md`。
 - 如果两个文件同时存在，`ARCHITECTURE.md` 负责系统结构，`CODE_STRUCTURE.md` 只负责代码目录职责。
+- `docs/SECURITY.md` 和 `docs/AI_SAFETY.md` 是按需条件文件，不作为轻量项目默认上下文。
 
 ## 子目录命名
 
@@ -161,6 +164,23 @@ templates/project-docs/
 - 生成物默认不作为项目文档 SSOT。
 - 报告可以辅助补文档，但不要替代 `PROJECT.md` / `HANDOFF.md`。
 - 生成报告目录应加入 `.gitignore`。
+
+工具生成的项目关系图放在：
+
+```txt
+.project-os/graph/
+```
+
+常见文件：
+
+```txt
+.project-os/graph/project-graph.json
+```
+
+规则：
+- 关系图是脚本生成物，不作为手写文档维护。
+- 关系图可以辅助影响分析，但不要替代 `docs/ARCHITECTURE.md` 和人工判断。
+- 生成目录应加入 `.gitignore`。
 
 ## 不建议的命名
 

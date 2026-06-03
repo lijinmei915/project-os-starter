@@ -76,6 +76,7 @@ scripts/check-secrets.sh
 scripts/check-ai-project.sh
 scripts/ai-project.sh
 scripts/add-project-docs.sh
+scripts/build-project-graph.sh (项目关系图生成)
 scripts/check-frontend.sh    (前端规范检查)
 scripts/check-backend.sh     (后端规范检查)
 scripts/check-testing.sh     (测试/CI 检查)

@@ -122,7 +122,7 @@ for file in README.md AGENTS.md PROJECT.md HANDOFF.md INSTALL.md CLAUDE.md docs/
   check_guidance_header "$file"
 done
 
-for file in scripts/check-runtime.sh scripts/check-secrets.sh scripts/check-ai-project.sh scripts/ai-project.sh scripts/add-project-docs.sh; do
+for file in scripts/check-runtime.sh scripts/check-secrets.sh scripts/check-ai-project.sh scripts/ai-project.sh scripts/add-project-docs.sh scripts/build-project-graph.sh; do
   if ! has_file "$file"; then
     warn "missing Project OS runtime helper: $file"
   fi

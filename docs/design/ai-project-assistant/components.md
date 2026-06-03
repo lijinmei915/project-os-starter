@@ -53,6 +53,10 @@ docs/design/ai-project-assistant/components.ts
 | `SectionHeading` | Pattern | 编号小标题和说明 |
 | `SectionBlock` | Pattern | 绑定小标题和下方内容，统一标题到选项 / 表单 / 结果的间距 |
 | `DocumentGrid` | Pattern | 项目文档卡片自适应网格 |
+| `ContractRecommendation` | Pattern | 展示当前推荐的工程契约、推导来源和关键标签 |
+| `ContractLayerStack` | Pattern | 把必选文件、推荐文件、代码骨架和 AI 支持文件归入 5 层工程契约 |
+| `ContractBlueprintPreview` | Pattern | 预览最终仓库文件树和生成后的第一步命令 |
+| `NextCommandSummary` | Pattern | 展示生成骨架后的第一条检查命令 |
 | `OptionCard` | Pattern | 个人开发、团队协作、启动策略等可选方案 |
 | `ChecklistItem` | Pattern | 必选资料、体检项、缺口项 |
 | `AddItemCard` | Pattern | 添加更多文档等空态操作入口 |
@@ -220,7 +224,7 @@ Description
 
 用途：把一个 `SectionHeading` 和它下面的选项、表单或结果列表绑定成同一组，避免标题和内容靠临时 margin 拼接。
 
-覆盖截图：新项目模板选择向导、将生成这些项目文档、老项目代码来源、当前工作目录、体检结果。
+覆盖截图：新项目模板选择向导、生成工程契约、老项目代码来源、当前工作目录、体检结果。
 
 结构：
 
@@ -236,7 +240,7 @@ SectionBlock
 |---------|------|------|
 | `with-options` | 标题下方是选择卡片组 | 代码来源、模板选择向导 |
 | `with-form` | 标题下方是输入框、上传区或按钮 | 当前工作目录、Git 仓库地址 |
-| `with-results` | 标题下方是结果、资料或体检列表 | 将生成这些项目文档、体检结果 |
+| `with-results` | 标题下方是结果、资料或体检列表 | 生成工程契约、体检结果 |
 
 间距规范：
 
@@ -264,9 +268,9 @@ SectionBlock
 
 ## DocumentGrid
 
-用途：展示“将生成这些项目文档”里的必选文件和推荐文件，让文档卡片按容器宽度自动从 3 列、2 列收缩到 1 列。
+用途：展示“生成工程契约”里的必选入口文件和推荐工程文件，让文档卡片在桌面保持稳定三列节奏，小屏再收缩到一列。
 
-覆盖截图：`必选文件：AI 接手最小上下文`、`推荐文件：产品和结构`、`推荐文件：流程和验收`。
+覆盖截图：`项目入口：必选最小上下文`、`项目入口：产品和方向`、`工程运行：安装和协作`、`代码结构：架构和目录`、`质量保障层：测试和交接`。
 
 结构：
 
@@ -289,16 +293,16 @@ DocumentGrid
 |----|------|
 | 最小卡片宽度 | `--component-document-card-min: 176px` |
 | 卡片间距 | `--component-document-grid-gap`，默认跟随 `--component-workbench-list-gap: 12px` |
-| 桌面 | 容器足够时一排 3 个 |
-| 中等宽度 | 自动变成一排 2 个 |
+| 桌面 | `optional-grouped` 固定一排 3 个；不足 3 个时保留空列，不拉宽卡片 |
+| 中等宽度 | `required` 可自动变成一排 2 个；`optional-grouped` 仍保持三列节奏 |
 | 移动端 | 自动变成一排 1 个 |
 | 分组标题 | `grid-column: 1 / -1`，必须跨整行 |
 | 文档路径 | 单行省略，不能撑破卡片 |
 | 查看入口 | 右上角浮动 `i-eye` 图标按钮，按钮尺寸 `--component-document-action-size: 22px`，图标尺寸 `--component-document-action-icon-size: 14px`，圆角跟随 checkbox 的 `--radius-xs` |
 
 规则：
-- `DocumentGrid` 使用 `auto-fit + minmax`，同时用三列宽度作为动态下限，保证最多 3 列、空间不足时自动退到 2 / 1 列。
-- 必选文件和可选文件共用同一套网格规则，区别只在分组标题和选中状态。
+- `required` 可使用 `auto-fit + minmax` 适应必选入口文件数量。
+- `optional-grouped` 在桌面固定 `repeat(3, minmax(0, 1fr))`；两张卡片也只占前两列，第三列留空。
 - 卡片内部使用“勾选/复选框 + 标题路径 + 预览按钮 + 描述”的紧凑结构。
 - 描述文案在窄卡片内放到标题下方，不右对齐。
 - 预览入口使用图标库 `i-eye`，绝对定位在卡片右上角；不使用 emoji，不单独占一行。
@@ -310,6 +314,105 @@ DocumentGrid
 - 预览按钮必须有 `aria-label`。
 - 必选文件 locked 状态必须保留 `aria-disabled`。
 - 复选框不能只靠颜色表达是否选中。
+
+---
+
+## ContractRecommendation
+
+用途：在生成工程契约区顶部，用一行摘要告诉用户当前推荐结果来自哪些选择，而不是让用户在左侧说明和右侧配置之间来回对照。
+
+结构：
+
+```txt
+ContractRecommendation
+  Title
+  Description
+  SummaryChips
+```
+
+规则：
+- 标题显示最终推荐的契约名称，例如 `轻量工程契约`、`MVP 工程契约`、`生产工程契约`。
+- 说明文案必须同时点明生成方案、成熟度、代码骨架和优先补齐方向。
+- 摘要 chips 只放推导结果，不放新的可选项。
+- 该组件只做摘要，不承载复选框；更详细的可生成项归入下方 `ContractLayerStack`。
+
+---
+
+## ContractLayerStack
+
+用途：把必选资料、推荐文档、代码骨架和 AI 支持文件合并进 5 层工程契约。每层只保留用户能理解的文件归属，不在层内暴露技术推导大卡片。
+
+结构：
+
+```txt
+ContractLayerStack
+  ContractLayer[entry]
+    Required DocumentGrid
+    Optional DocumentGrid
+  ContractLayer[run]
+    Optional DocumentGrid
+  ContractLayer[structure]
+    Optional DocumentGrid
+  ContractLayer[quality]
+    Optional DocumentGrid
+  ContractLayer[runtime]
+    SupportChips
+```
+
+层级：
+
+| Layer | 用途 | 内容来源 |
+|-------|------|----------|
+| `entry` | 项目入口 | `REQUIRED_FILES`、产品方向推荐文件 |
+| `run` | 工程运行 | 环境、命名、文档治理 |
+| `structure` | 代码结构 | 结构文档和设计边界文件 |
+| `quality` | 质量保障 | 测试、运行手册、变更、决策、经验复盘，按需安全边界 |
+| `runtime` | AI 支持文件 | prompts、agents、tools、evals、guardrails、mcp、observability、secrets |
+
+规则：
+- 层头必须显示层名、说明和状态；说明文独占第二行并横跨层头宽度。
+- 工程运行层包含技术栈、环境变量、命名和文档治理；`docs/TECH_STACK.md` 只在工程落地型方案中自动推荐。
+- 可手动调整的文件统一使用 `DocumentGrid`；自动包含的 AI 辅助项只展示结果 chip，不展示 `1/6` 这类可勾选计数。
+- `docs/SECURITY.md` 和 `docs/AI_SAFETY.md` 属于条件生成文件，不展示为常驻勾选卡片；后端 / 全栈 / Agent / RAG 生成 `docs/SECURITY.md`，Agent / RAG 额外生成 `docs/AI_SAFETY.md`。
+- 各层固定展开，不使用折叠控件。
+- 5 层完成度只表达工程契约完整度，不等同于项目业务完成度。
+
+---
+
+## ContractBlueprintPreview
+
+用途：在“选择目录并生成骨架”之前展示最终仓库骨架和生成后的第一步命令。
+
+覆盖截图：文件树、生成后第一步。
+
+结构：
+
+```txt
+ContractBlueprintPreview
+  Title
+  FileTree
+  NextCommandSummary
+```
+
+规则：
+- 文件树由当前必选文件、已勾选推荐文件、条件生成文件、生成方案目录和 AI 支持文件 stub 合并生成。
+- `.gitkeep` 不在预览里逐个展示；只展示它所代表的目录。
+- 预览区可以滚动，但不能改变右侧主操作按钮高度。
+- 预览只解释当前会生成的内容，不引入新的必答问题。
+
+---
+
+## NextCommandSummary
+
+用途：给用户生成骨架后的第一条行动命令，降低“下载之后不知道干什么”的断点。
+
+覆盖截图：`生成后第一步` 命令块。
+
+规则：
+- 命令跟随生成方案自动变化。
+- 默认第一条命令是 Project OS runtime 自检；复杂工程或 AI 项目类型会追加 AI 工程完整度检查。
+- 命令块使用等宽字体，允许多行，但标题仍表达为“第一步”。
+- 纯文档包场景下，说明文案必须提醒用户先把模板放在项目根目录。
 
 ---
 

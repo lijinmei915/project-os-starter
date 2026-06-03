@@ -21,9 +21,8 @@
 
 ## 当前状态速览（每次收尾更新，保持 5 行以内）
 
-- **上次做到**：impeccable typeset + colorize + polish 三轮视觉优化，统一 teal 品牌色，130+ 硬编码值 token 化，新增 PRODUCT.md
-- **上次做到**：新增 AI 工具配置 + PRODUCT.md 模板，四组分类，20 模板互引补齐，写入自动裁剪断链，check-templates.sh + pre-commit hook
-- **下一步**：push 验证线上；简化 REGISTRY.md 和 frontend/SKILL.md 模板残留引用
+- **上次做到**：新增 build-project-graph.sh 本地关系图生成，AI_SAFETY / SECURITY / TECH_STACK 文档模板，index.html 报告页大幅增强，模板层同步
+- **下一步**：push 验证线上；用真实老项目样本校准成熟度评分模型
 - **线上地址**：https://lijinmei915.github.io/project-os-starter/
 
 ---

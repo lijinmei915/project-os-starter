@@ -304,6 +304,7 @@ install_core() {
   install_file "scripts/check-ai-project.sh"
   install_file "scripts/ai-project.sh"
   install_file "scripts/add-project-docs.sh"
+  install_file "scripts/build-project-graph.sh"
   install_file "scripts/check-frontend.sh"
   install_file "scripts/check-backend.sh"
   install_file "scripts/check-testing.sh"

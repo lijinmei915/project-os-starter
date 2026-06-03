@@ -1012,15 +1012,15 @@
       position: relative;
       display: inline-flex;
       width: min(100%, 390px);
-      gap: var(--space-4);
+      gap: 0;
       margin: 0;
-      padding: var(--space-6);
-      border: 1px solid var(--color-border-default);
+      padding: 0;
+      border: 0;
       border-radius: var(--radius-lg);
       background: var(--color-surface-control);
       box-shadow: none;
       justify-self: end;
-      align-items: center;
+      align-items: stretch;
     }
     .kit-switch-slider {
       display: none;
@@ -1047,7 +1047,7 @@
     }
     .kit-switch button:hover {
       color: var(--color-text-primary);
-      background: rgba(255, 255, 255, .64);
+      background: rgba(255, 255, 255, .52);
     }
     .kit-switch button:active {
       transform: none;
@@ -1291,32 +1291,6 @@
       background: rgba(var(--color-brand-primary-rgb), 0.04);
       box-shadow: 0 0 0 1px var(--color-brand-primary);
     }
-    .kit-wizard-diagnosis {
-      border: 1px solid var(--color-brand-subtle);
-      background: var(--color-surface-page);
-      border-radius: var(--radius-lg);
-      overflow: hidden;
-    }
-    .kit-diagnosis-header {
-      background: var(--color-surface-panel);
-      padding: var(--space-8) var(--space-16);
-      border-bottom: 1px solid var(--color-brand-subtle);
-      font-size: var(--text-12);
-      font-weight: var(--font-bold);
-      display: flex;
-      align-items: center;
-      gap: var(--space-8);
-      color: var(--color-brand-text);
-    }
-    .kit-diagnosis-body {
-      padding: var(--space-12) var(--space-16);
-      font-size: var(--text-12);
-      line-height: 1.6;
-      color: var(--color-text-secondary);
-    }
-    .kit-wizard-diagnosis strong {
-      color: var(--color-brand-text);
-    }
     .kit-choice-list {
       display: grid;
       gap: var(--component-workbench-list-gap);
@@ -1509,10 +1483,251 @@
     .kit-template-group-header:first-child {
       padding-top: 0;
     }
+    .kit-contract-stack {
+      display: grid;
+      gap: var(--space-10);
+    }
+    .kit-contract-summary {
+      display: grid;
+      gap: var(--space-8);
+      padding: var(--space-12);
+      border: 1px solid var(--color-border-subtle);
+      border-radius: var(--radius-md);
+      background: linear-gradient(180deg, rgba(223, 247, 243, .42), rgba(255, 255, 255, .92));
+    }
+    .kit-contract-summary strong {
+      color: var(--color-brand-text);
+      font-size: var(--text-13);
+      font-weight: var(--font-semibold);
+    }
+    .kit-contract-summary p {
+      margin: 0;
+      color: var(--color-text-secondary);
+      font-size: var(--text-12);
+      line-height: 1.5;
+    }
+    .kit-contract-layer {
+      border: 1px solid var(--color-border-subtle);
+      border-radius: var(--radius-md);
+      background: rgba(255, 255, 255, .88);
+      overflow: clip;
+      transition: border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
+    }
+    .kit-contract-layer:hover {
+      border-color: var(--color-border-strong);
+    }
+    .kit-contract-layer-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      column-gap: var(--space-10);
+      row-gap: var(--space-3);
+      align-items: start;
+      padding: var(--space-12);
+    }
+    .kit-layer-heading {
+      display: contents;
+    }
+    .kit-layer-heading > strong {
+      grid-column: 1;
+      grid-row: 1;
+      color: var(--color-text-primary);
+      font-size: var(--text-14);
+      font-weight: var(--font-bold);
+      line-height: 1.35;
+    }
+    .kit-layer-heading > span {
+      grid-column: 1 / -1;
+      grid-row: 2;
+      color: var(--color-text-secondary);
+      font-size: var(--text-12);
+      line-height: 1.5;
+    }
+    .kit-contract-layer-body {
+      display: grid;
+      gap: var(--space-12);
+      padding: 0 var(--space-12) var(--space-12);
+      border-top: 1px solid var(--color-border-subtle);
+    }
+    .kit-layer-note,
+    .kit-layer-subtitle {
+      color: var(--color-text-secondary);
+      font-size: var(--text-12);
+      line-height: 1.5;
+    }
+    .kit-layer-subtitle {
+      color: var(--color-text-primary);
+      font-size: var(--text-12);
+      font-weight: var(--font-semibold);
+    }
+    .kit-layer-panel {
+      display: grid;
+      gap: var(--space-8);
+      padding: var(--space-10);
+      border: 1px solid var(--color-border-subtle);
+      border-radius: var(--radius-sm);
+      background: var(--color-surface-muted);
+    }
+    .kit-contract-files {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-6);
+    }
+    .kit-contract-file {
+      display: inline-flex;
+      width: fit-content;
+      padding: var(--space-3) var(--space-8);
+      border-radius: var(--radius-xs);
+      background: var(--color-surface-control);
+      color: var(--color-text-primary);
+      font-family: var(--font-mono);
+      font-size: var(--text-11);
+      line-height: 1.3;
+    }
+    .kit-contract-meter {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 72px;
+      padding: var(--space-4) var(--space-8);
+      border-radius: var(--radius-full);
+      background: var(--color-surface-control);
+      color: var(--color-text-secondary);
+      font-size: var(--text-11);
+      font-weight: var(--font-semibold);
+      line-height: 1.2;
+      white-space: nowrap;
+      grid-column: 2;
+      grid-row: 1;
+      justify-self: end;
+    }
+    .kit-contract-layer.is-complete .kit-contract-meter {
+      background: var(--color-success-bg);
+      color: var(--color-success-text);
+    }
+    .kit-contract-layer.is-structure .kit-contract-meter {
+      min-width: 86px;
+    }
+    .kit-advanced-summary,
+    .kit-blueprint-preview,
+    .kit-structure-summary,
+    .kit-runtime-summary {
+      display: grid;
+      gap: var(--space-8);
+      padding: var(--space-12);
+      border: 1px solid var(--color-border-subtle);
+      border-radius: var(--radius-md);
+      background: var(--color-surface-muted);
+    }
+    .kit-contract-layer-body .kit-advanced-summary,
+    .kit-contract-layer-body .kit-structure-summary,
+    .kit-contract-layer-body .kit-runtime-summary {
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+    }
+    .kit-advanced-summary strong,
+    .kit-blueprint-preview strong,
+    .kit-structure-summary strong,
+    .kit-runtime-summary strong {
+      color: var(--color-text-primary);
+      font-size: var(--text-13);
+      font-weight: var(--font-semibold);
+    }
+    .kit-advanced-summary p,
+    .kit-blueprint-preview p,
+    .kit-structure-summary p,
+    .kit-runtime-summary p {
+      margin: 0;
+      color: var(--color-text-secondary);
+      font-size: var(--text-12);
+      line-height: 1.5;
+    }
+    .kit-blueprint-grid {
+      display: grid;
+      gap: var(--space-8);
+      align-items: start;
+    }
+    .kit-file-tree {
+      min-height: 180px;
+      max-height: 320px;
+      overflow: auto;
+      margin: 0;
+      padding: var(--space-10);
+      border: 1px solid var(--color-border-subtle);
+      border-radius: var(--radius-sm);
+      background: var(--color-surface-panel);
+      color: var(--color-text-primary);
+      font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+      font-size: var(--text-11);
+      line-height: 1.55;
+      white-space: pre;
+    }
+    .kit-next-command {
+      display: grid;
+      gap: var(--space-6);
+      padding-top: var(--space-10);
+      border-top: 1px dashed var(--color-border-subtle);
+    }
+    .kit-command-preview.is-filled {
+      background: var(--color-surface-panel);
+      border: 1px solid var(--color-border-subtle);
+    }
+    .kit-command-preview.is-filled code {
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.55;
+    }
+    .kit-advanced-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: var(--space-8);
+    }
+    .kit-preview-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-6);
+    }
+    .kit-advanced-item {
+      display: grid;
+      gap: var(--space-6);
+      padding: var(--space-10);
+      border: 1px solid var(--color-border-subtle);
+      border-radius: var(--radius-sm);
+      background: var(--color-surface-panel);
+    }
+    .kit-runtime-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-6);
+    }
+    .kit-runtime-capabilities {
+      display: grid;
+      gap: var(--space-8);
+    }
+    .kit-runtime-capability {
+      display: grid;
+      gap: var(--space-6);
+      padding-top: var(--space-8);
+      border-top: 1px solid var(--color-border-subtle);
+    }
+    .kit-runtime-capability:first-child {
+      padding-top: 0;
+      border-top: 0;
+    }
+    .kit-runtime-capability-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-10);
+    }
+    .kit-runtime-capability-head strong {
+      min-width: 0;
+    }
     .kit-option-list {
       display: grid;
       gap: var(--component-document-grid-gap);
-      grid-template-columns: repeat(auto-fit, minmax(min(100%, max(var(--component-document-card-min), calc((100% - var(--component-document-grid-gap) - var(--component-document-grid-gap)) / 3))), 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
     .kit-option-row {
       display: grid;
@@ -1899,12 +2114,21 @@
       align-items: center;
       flex-wrap: wrap;
     }
+    .kit-hint-row .kit-primary,
+    .kit-hint-row .kit-secondary-btn {
+      width: auto;
+      flex: 1 1 180px;
+    }
     .kit-hint {
       color: var(--color-text-muted);
       font-size: var(--text-11);
     }
     .kit-upload {
       min-height: var(--component-empty-action-min-height);
+    }
+    .kit-upload[aria-disabled="true"] {
+      cursor: not-allowed;
+      opacity: .62;
     }
     .kit-upload-icon {
       width: var(--component-add-size);
@@ -2886,8 +3110,27 @@
       .kit-switch button {
         min-width: 0;
       }
+      .kit-contract-layer-head {
+        grid-template-columns: 1fr;
+      }
+      .kit-layer-heading > strong,
+      .kit-layer-heading > span,
+      .kit-contract-meter {
+        grid-column: 1;
+        grid-row: auto;
+      }
+      .kit-contract-meter {
+        justify-self: start;
+      }
+      .kit-blueprint-grid {
+        grid-template-columns: 1fr;
+      }
+      .kit-advanced-grid {
+        grid-template-columns: 1fr;
+      }
       .kit-choice-list.compact,
       .kit-choice-list.is-two-col,
+      .kit-option-list,
       .kit-source-list {
         grid-template-columns: 1fr;
       }
@@ -2966,7 +3209,7 @@
             <div class="kit-section-block" data-component="SectionBlock" data-variant="with-options" data-source="docs/design/ai-project-assistant/components.ts">
               <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered-with-description" data-source="docs/design/ai-project-assistant/data.ts">
                 <span class="kit-section-title" data-slot="title"><span class="kit-step-num" data-slot="step">1</span><span class="kit-section-label" data-slot="label">模板选择向导</span></span>
-                <p class="kit-section-subtitle" data-slot="description">先回答 3 个问题，帮你自动勾选需要的项目文档和 AI 规则文件。</p>
+                <p class="kit-section-subtitle" data-slot="description">先回答 2 个问题，帮你生成一套可理解、可运行、可检查的工程契约。</p>
               </div>
 
               <div class="kit-section-content" data-slot="content">
@@ -2986,55 +3229,38 @@
                     </div>
                   </div>
 
-                  <!-- 问题 2: 核心战场 -->
+                  <!-- 问题 2: 生成目标 -->
                   <div class="kit-wizard-q">
-                    <label class="kit-question-label">Q2：你现在最想先解决什么？（可多选）</label>
+                    <label class="kit-question-label">Q2：这次你想先拿到什么？</label>
                     <div class="kit-choice-list is-two-col" id="wizardQ2">
                       <button class="kit-wizard-card-sm is-active" type="button" data-val="product">
-                        <strong>想清楚产品方向</strong>
+                        <strong>看清方向</strong>
                         <span>定位、用户、MVP 和路线图。</span>
                       </button>
-                      <button class="kit-wizard-card-sm" type="button" data-val="frontend">
-                        <strong>先把页面做出来</strong>
-                        <span>UI 规范、组件和视觉边界。</span>
+                      <button class="kit-wizard-card-sm" type="button" data-val="page">
+                        <strong>先有页面</strong>
+                        <span>页面原型、设计规范和视觉边界。</span>
                       </button>
-                      <button class="kit-wizard-card-sm" type="button" data-val="backend">
-                        <strong>项目结构要稳</strong>
-                        <span>架构、环境、目录和模块边界。</span>
+                      <button class="kit-wizard-card-sm" type="button" data-val="run">
+                        <strong>能运行起来</strong>
+                        <span>环境、启动方式、目录和模块边界。</span>
                       </button>
-                      <button class="kit-wizard-card-sm" type="button" data-val="testing">
+                      <button class="kit-wizard-card-sm" type="button" data-val="handoff">
                         <strong>方便测试和交接</strong>
                         <span>验收方式、运行手册和经验教训。</span>
                       </button>
-                    </div>
-                  </div>
-
-                  <!-- 问题 3: 发展预期 -->
-                  <div class="kit-wizard-q">
-                    <label class="kit-question-label">Q3：你现在想怎么推进？</label>
-                    <div class="kit-choice-list compact" id="wizardQ3">
-                      <button class="kit-wizard-card-sm is-active" type="button" data-val="mvp">
-                        <strong>快速做出原型</strong>
-                        <span>先跑通核心功能，少放长期治理文档。</span>
+                      <button class="kit-wizard-card-sm" type="button" data-val="ai">
+                        <strong>AI 工程支持</strong>
+                        <span>agents、tools、prompts、evals 和 guardrails。</span>
                       </button>
-                      <button class="kit-wizard-card-sm" type="button" data-val="longterm">
-                        <strong>搭长期项目基础</strong>
-                        <span>先把结构、规范和交接打稳。</span>
+                      <button class="kit-wizard-card-sm" type="button" data-val="rag">
+                        <strong>知识库 / RAG</strong>
+                        <span>data、ingestion、retrieval、evals 和 observability。</span>
                       </button>
                     </div>
                   </div>
                 </div>
 
-                <!-- 诊断报告面板 -->
-                <div id="wizardReport" class="kit-wizard-diagnosis">
-                  <div class="kit-diagnosis-header">
-                    <svg class="kit-icon" style="color:var(--color-brand-primary)"><use href="#i-sparkles"></use></svg>
-                    <span>已为你推荐一套模板</span>
-                  </div>
-                  <div class="kit-diagnosis-body" id="wizardSummary">
-                    <!-- 内容动态填充 -->
-                  </div>
-                </div>
               </div>
             </div>
           </div>
@@ -3045,13 +3271,100 @@
         <div class="kit-card">
           <div class="kit-section-block" data-component="SectionBlock" data-variant="with-results" data-source="docs/design/ai-project-assistant/components.ts">
             <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered-with-description" data-source="docs/design/ai-project-assistant/data.ts">
-              <span class="kit-section-title" data-slot="title"><span class="kit-step-num" data-slot="step">2</span><span class="kit-section-label" data-slot="label">将生成这些项目文档</span></span>
-              <p class="kit-section-subtitle" data-slot="description">先看预览；选择目录后生成写入前安全方案，确认后再生成骨架或下载 zip。</p>
+              <span class="kit-section-title" data-slot="title"><span class="kit-step-num" data-slot="step">2</span><span class="kit-section-label" data-slot="label">生成工程契约</span></span>
+              <p class="kit-section-subtitle" data-slot="description">结果会按 5 层组织，让项目从说明文档升级成可落地的工程契约。</p>
             </div>
             <div class="kit-section-content" data-slot="content">
-              <div class="kit-template-group-header">必选文件：AI 接手最小上下文</div>
-              <div class="kit-material-list" id="kitRequiredMaterials" data-component="DocumentGrid" data-variant="required"></div>
-              <div class="kit-option-list" id="kitOptionTemplates" data-component="DocumentGrid" data-variant="optional-grouped"></div>
+              <div class="kit-contract-summary" data-component="ContractRecommendation">
+                <strong data-contract-summary-title>推荐：轻量工程契约</strong>
+                <p data-contract-summary-desc>根据左侧选择自动合并必选文件、推荐文件、代码骨架和 AI 支持文件。</p>
+              </div>
+
+              <div class="kit-contract-stack" data-component="ContractLayerStack" aria-label="工程契约配置器">
+                <div class="kit-contract-layer" data-contract-layer="entry">
+                  <div class="kit-contract-layer-head">
+                    <div class="kit-layer-heading">
+                      <strong>项目入口</strong>
+                      <span>让人和 AI 先知道这是什么、怎么开始；这些文件会作为项目入口生成，可在下方调整推荐项。</span>
+                    </div>
+                    <span class="kit-contract-meter" data-contract-meter>0/0</span>
+                  </div>
+                  <div class="kit-contract-layer-body">
+                    <div class="kit-layer-subtitle">必选最小上下文</div>
+                    <div class="kit-material-list" id="kitRequiredMaterials" data-component="DocumentGrid" data-variant="required"></div>
+                    <div class="kit-layer-subtitle">产品和方向</div>
+                    <div class="kit-option-list" data-layer-options="entry" data-component="DocumentGrid" data-variant="optional-grouped"></div>
+                  </div>
+                </div>
+
+                <div class="kit-contract-layer" data-contract-layer="run">
+                  <div class="kit-contract-layer-head">
+                    <div class="kit-layer-heading">
+                      <strong>工程运行</strong>
+                      <span>让项目能安装、启动、配置和复现；这里放技术栈、环境变量、命名和文档更新规则，帮助项目换机器、换人时还能跑起来。</span>
+                    </div>
+                    <span class="kit-contract-meter" data-contract-meter>0/0</span>
+                  </div>
+                  <div class="kit-contract-layer-body">
+                    <div class="kit-layer-subtitle">运行和协作文件</div>
+                    <div class="kit-option-list" data-layer-options="run" data-component="DocumentGrid" data-variant="optional-grouped"></div>
+                  </div>
+                </div>
+
+                <div class="kit-contract-layer is-structure" data-contract-layer="structure">
+                  <div class="kit-contract-layer-head">
+                    <div class="kit-layer-heading">
+                      <strong>代码结构</strong>
+                      <span data-structure-layer-note>这里决定代码和设计资料先放在哪些位置；具体会生成的目录在底部“生成设置”和文件树里确认。</span>
+                    </div>
+                    <span class="kit-contract-meter" data-contract-meter>0/0</span>
+                  </div>
+                  <div class="kit-contract-layer-body">
+                    <div class="kit-layer-subtitle">架构、目录和设计边界</div>
+                    <div class="kit-option-list" data-layer-options="structure" data-component="DocumentGrid" data-variant="optional-grouped"></div>
+                  </div>
+                </div>
+
+                <div class="kit-contract-layer" data-contract-layer="quality">
+                  <div class="kit-contract-layer-head">
+                    <div class="kit-layer-heading">
+                      <strong>质量保障层</strong>
+                      <span>让项目能测试、回归、交接；这一层负责让改动能被验证、问题能复盘、下一位维护者能接上。</span>
+                    </div>
+                    <span class="kit-contract-meter" data-contract-meter>0/0</span>
+                  </div>
+                  <div class="kit-contract-layer-body">
+                    <div class="kit-layer-subtitle">测试和交接文件</div>
+                    <div class="kit-option-list" data-layer-options="quality" data-component="DocumentGrid" data-variant="optional-grouped"></div>
+                  </div>
+                </div>
+
+                <div class="kit-contract-layer is-runtime" data-contract-layer="runtime">
+                  <div class="kit-contract-layer-head">
+                    <div class="kit-layer-heading">
+                      <strong>AI 支持文件</strong>
+                      <span data-runtime-layer-note>让提示词、评测和安全边界有固定位置；这些是给 AI 助手看的辅助文件。</span>
+                    </div>
+                    <span class="kit-contract-meter" data-contract-meter>自动包含</span>
+                  </div>
+                  <div class="kit-contract-layer-body">
+                    <div class="kit-layer-subtitle">随方案自动包含</div>
+                    <div class="kit-runtime-chips" aria-label="AI 支持文件摘要" data-runtime-user-chips></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="kit-blueprint-preview" id="contract-blueprint-preview" data-component="ContractBlueprintPreview">
+                <strong>生成前确认</strong>
+                <div class="kit-blueprint-grid">
+                  <pre class="kit-file-tree" data-contract-tree aria-label="最终文件树预览"></pre>
+                </div>
+                <div class="kit-next-command" data-component="NextCommandSummary">
+                  <strong data-next-command-title>生成后第一步</strong>
+                  <p data-next-command-desc>先检查 Project OS 入口、规则、环境和 AI 支持文件是否完整。</p>
+                  <div class="kit-command-preview is-filled"><code data-next-command-code>bash scripts/check-runtime.sh .</code></div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -3110,7 +3423,10 @@
               </button>
               <input class="kit-directory-input" id="kitDirectoryInput" type="file" webkitdirectory directory multiple aria-hidden="true" tabindex="-1">
             </div>
-            <button class="kit-primary" type="button" id="kitAnalyzeBtn"><svg class="kit-icon"><use href="#i-activity"></use></svg><span data-button-label>开始体检</span></button>
+            <div class="kit-hint-row">
+              <button class="kit-primary" type="button" id="kitAnalyzeBtn"><svg class="kit-icon"><use href="#i-activity"></use></svg><span data-button-label>开始体检</span></button>
+              <button class="kit-secondary-btn" type="button" data-kit-copy-local-command><svg class="kit-icon"><use href="#i-file-text"></use></svg><span data-button-label>复制本地体检命令</span></button>
+            </div>
             <div class="kit-feature-note" id="kitLocalNote"><span class="kit-status-chip is-copy">浏览器直接分析</span><span>文件仅在本地读取，不上传任何数据。</span></div>
           </div>
           <div class="kit-source-config" data-kit-source-panel="git" data-component="SectionBlock" data-variant="with-form">
@@ -3134,7 +3450,7 @@
               <div><svg class="kit-icon kit-upload-icon"><use href="#i-upload-cloud"></use></svg><strong>点击选择 .zip 文件</strong><p><span class="kit-status-chip is-copy">浏览器本地解压</span></p></div>
             </div>
             <input type="file" id="kitZipInput" accept=".zip" style="display:none" aria-hidden="true">
-            <div class="kit-feature-note"><span class="kit-status-chip is-copy">浏览器直接分析</span><span>zip 在浏览器本地解压，文件不上传任何服务器。</span></div>
+            <div class="kit-feature-note" id="kitUploadNote"><span class="kit-status-chip is-copy">浏览器直接分析</span><span>zip 在浏览器本地解压，文件不上传任何服务器。</span></div>
           </div>
         </div>
       </div>
@@ -3182,11 +3498,13 @@
 <script>
   const kitRequiredMaterials = {
     solo: [
+      { id: "readme", title: "使用入口", description: "项目是什么、怎么开始、先看哪里", file: "README.md", state: "locked" },
       { id: "project-brief", title: "项目说明", description: "这个项目是什么，给谁用，目标是什么", file: "PROJECT.md", state: "locked" },
       { id: "agent-rules", title: "AI 工作规则", description: "AI 该怎么做，哪些事不要乱改", file: "AGENTS.md", state: "locked" },
       { id: "project-status", title: "当前状态", description: "现在做到哪一步，还缺什么", file: "HANDOFF.md", state: "locked" }
     ],
     team: [
+      { id: "readme", title: "使用入口", description: "项目是什么、怎么开始、先看哪里", file: "README.md", state: "locked" },
       { id: "project-brief", title: "项目说明", description: "这个项目是什么，给谁用，目标是什么", file: "PROJECT.md", state: "locked" },
       { id: "agent-rules", title: "AI 工作规则", description: "AI 该怎么做，哪些事不要乱改", file: "AGENTS.md", state: "locked" },
       { id: "project-status", title: "当前状态", description: "现在做到哪一步，还缺什么", file: "HANDOFF.md", state: "locked" }
@@ -3226,113 +3544,672 @@
     return row;
   }
   // ─── AI Project Wizard Logic ──────────────────────────────
+  const PROJECT_STRUCTURE_PRESETS = {
+    product: {
+      label: "产品方向",
+      desc: "先沉淀定位、用户、MVP 和路线图，适合在动手前把项目边界说清楚。",
+      files: ["PRODUCT.md", "docs/PRODUCT_PLAN.md", "README.md"]
+    },
+    prototype: {
+      label: "页面原型",
+      desc: "先保留单页原型、最小上下文和轻量设计记录，适合先看方向是否成立。",
+      files: ["index.html", "README.md", "docs/design/"]
+    },
+    frontend: {
+      label: "前端项目",
+      desc: "按应用、共享包、AI client、产品文档和设计规范组织，适合先做可用界面再接入模型能力。",
+      files: ["apps/web/", "packages/ai-client/", "packages/shared/", "docs/product/", "docs/design/", "prompts/"]
+    },
+    fullstack: {
+      label: "全栈项目",
+      desc: "把前端应用、后端 API、共享包、环境配置和测试入口放到固定位置，方便从原型走向可运行系统。",
+      files: ["apps/web/", "api/", "server/", "packages/shared/", "docs/", "tests/"]
+    },
+    backend: {
+      label: "后端 / API 服务",
+      desc: "把 API、服务层、配置、模型、测试和运行手册拆开，适合先搭稳定服务骨架。",
+      files: ["src/app/", "api/", "services/", "models/", "config/", "tests/"]
+    },
+    handoff: {
+      label: "测试交接",
+      desc: "先补齐验收方式、运行手册和交接上下文，适合让项目更容易被接手和验证。",
+      files: ["docs/TESTING.md", "docs/RUNBOOK.md", "HANDOFF.md", "docs/LESSONS.md"]
+    },
+    agent: {
+      label: "AI Agent 工程",
+      desc: "把服务入口、API、agents、tools、prompts、guardrails 和 evals 分开，适合后端 Agent 或多工具编排项目。",
+      files: ["src/app/", "api/", "agents/", "tools/", "prompts/", "evals/"]
+    },
+    rag: {
+      label: "RAG / 知识库工程",
+      desc: "把数据、切分、索引、检索、重排、生成和评测拆开，方便后续定位召回质量和生成质量问题。",
+      files: ["src/rag/", "ingestion/", "indexing/", "retrieval/", "data/", "evals/"]
+    }
+  };
+
+  const GENERATION_PLAN_PRESETS = {
+    product: {
+      label: "产品方向",
+      maturityKey: "prototype",
+      structureKey: "product",
+      autoFiles: ["PRODUCT.md", "docs/PRODUCT_PLAN.md"],
+      advice: "<strong>产品方向</strong>：先拿到定位、用户、MVP 和路线图，工程结构保持轻量。"
+    },
+    "page-prototype": {
+      label: "页面原型",
+      maturityKey: "prototype",
+      structureKey: "prototype",
+      autoFiles: ["docs/DESIGN_STANDARDS.md"],
+      advice: "<strong>页面原型</strong>：先拿到可看的页面和最小上下文，工程治理保持轻量。"
+    },
+    frontend: {
+      label: "前端项目",
+      maturityKey: "mvp",
+      structureKey: "frontend",
+      autoFiles: ["docs/DESIGN_STANDARDS.md", "docs/CODE_STRUCTURE.md", "docs/TECH_STACK.md", "docs/ENVIRONMENT.md", ".env.example"],
+      advice: "<strong>前端项目</strong>：生成前端目录、设计规范、AI client 和运行边界。"
+    },
+    fullstack: {
+      label: "全栈项目",
+      maturityKey: "production",
+      structureKey: "fullstack",
+      autoFiles: ["docs/ARCHITECTURE.md", "docs/CODE_STRUCTURE.md", "docs/TECH_STACK.md", "docs/ENVIRONMENT.md", ".env.example", "docs/TESTING.md", "docs/RUNBOOK.md"],
+      advice: "<strong>全栈项目</strong>：同时补齐前端、后端、环境、测试和运行入口。"
+    },
+    backend: {
+      label: "后端 / API 服务",
+      maturityKey: "mvp",
+      structureKey: "backend",
+      autoFiles: ["docs/ARCHITECTURE.md", "docs/CODE_STRUCTURE.md", "docs/TECH_STACK.md", "docs/ENVIRONMENT.md", ".env.example", "docs/NAMING.md", "docs/TESTING.md", "docs/RUNBOOK.md"],
+      advice: "<strong>后端 / API 服务</strong>：重点补齐 API、服务边界、配置、测试和运行手册。"
+    },
+    handoff: {
+      label: "测试交接",
+      maturityKey: "team",
+      structureKey: "handoff",
+      autoFiles: ["docs/NAMING.md", "docs/TESTING.md", "docs/RUNBOOK.md", "HANDOFF.md", "docs/LESSONS.md"],
+      advice: "<strong>测试交接</strong>：先补齐验收方式、运行手册、交接上下文和经验复盘。"
+    },
+    agent: {
+      label: "AI Agent 工程",
+      maturityKey: "production",
+      structureKey: "agent",
+      autoFiles: ["docs/ARCHITECTURE.md", "docs/CODE_STRUCTURE.md", "docs/TECH_STACK.md", "docs/ENVIRONMENT.md", ".env.example", "docs/TESTING.md", "docs/RUNBOOK.md"],
+      advice: "<strong>AI Agent 工程</strong>：默认强化 prompts、agents、tools、evals、guardrails 和 observability。"
+    },
+    rag: {
+      label: "RAG / 知识库工程",
+      maturityKey: "production",
+      structureKey: "rag",
+      autoFiles: ["docs/ARCHITECTURE.md", "docs/CODE_STRUCTURE.md", "docs/TECH_STACK.md", "docs/ENVIRONMENT.md", ".env.example", "docs/TESTING.md", "docs/RUNBOOK.md"],
+      advice: "<strong>RAG / 知识库工程</strong>：默认强化 data、ingestion、retrieval、evals 和 observability。"
+    }
+  };
+
+  const OUTCOME_GENERATION_PLAN_KEYS = {
+    product: "product",
+    page: "page-prototype",
+    run: "backend",
+    handoff: "handoff",
+    ai: "agent",
+    rag: "rag"
+  };
+
+  const OUTCOME_FILE_PRESETS = {
+    product: {
+      files: ["PRODUCT.md", "docs/PRODUCT_PLAN.md"],
+      field: "项目入口和产品方向"
+    },
+    page: {
+      files: ["docs/DESIGN_STANDARDS.md", "docs/CODE_STRUCTURE.md"],
+      field: "页面原型和设计边界"
+    },
+    run: {
+      files: ["docs/ARCHITECTURE.md", "docs/TECH_STACK.md", "docs/ENVIRONMENT.md", ".env.example", "docs/NAMING.md", "docs/RUNBOOK.md"],
+      field: "运行方式和工程结构"
+    },
+    handoff: {
+      files: ["docs/NAMING.md", "docs/TESTING.md", "docs/RUNBOOK.md", "HANDOFF.md", "docs/LESSONS.md"],
+      field: "测试、验收和交接"
+    },
+    ai: {
+      files: ["docs/ARCHITECTURE.md", "docs/CODE_STRUCTURE.md", "docs/ENVIRONMENT.md", ".env.example"],
+      field: "AI 工程支持文件"
+    },
+    rag: {
+      files: ["docs/ARCHITECTURE.md", "docs/CODE_STRUCTURE.md", "docs/ENVIRONMENT.md", ".env.example", "docs/TESTING.md"],
+      field: "知识库和评测链路"
+    }
+  };
+
+  function activeOutcomeKeys() {
+    const active = document.querySelector("#wizardQ2 .is-active");
+    return [active?.dataset.val || "product"];
+  }
+
+  function activeGenerationPlanKey() {
+    const [outcomeKey] = activeOutcomeKeys();
+    return OUTCOME_GENERATION_PLAN_KEYS[outcomeKey] || OUTCOME_GENERATION_PLAN_KEYS.product;
+  }
+
+  function activeGenerationPlan() {
+    const key = activeGenerationPlanKey();
+    return GENERATION_PLAN_PRESETS[key] || GENERATION_PLAN_PRESETS["page-prototype"];
+  }
+
+  function activeProjectStructureKey() {
+    return activeGenerationPlan().structureKey;
+  }
+
+  function activeProjectStructure() {
+    const key = activeProjectStructureKey();
+    return PROJECT_STRUCTURE_PRESETS[key] || PROJECT_STRUCTURE_PRESETS.prototype;
+  }
+
+  function conditionalGeneratedFiles() {
+    const structureKey = activeProjectStructureKey();
+    const files = new Set();
+    if (["backend", "fullstack", "agent", "rag"].includes(structureKey)) {
+      files.add("docs/SECURITY.md");
+    }
+    if (["agent", "rag"].includes(structureKey)) {
+      files.add("docs/AI_SAFETY.md");
+    }
+    return [...files];
+  }
+
+  const AI_RUNTIME_CAPABILITY_ORDER = ["promptAgent", "evals", "guardrails", "mcp", "observability", "secrets"];
+  const AI_RUNTIME_CAPABILITIES = {
+    promptAgent: {
+      title: "Prompt / Agent 资产",
+      desc: "把 prompt、agent 分工和工具注册变成可 diff、可回滚的版本化资产。",
+      files: ["prompts/", "agents/", "tools/"],
+      generatedFiles: [
+        "prompts/README.md",
+        "prompts/system/.gitkeep",
+        "prompts/tasks/.gitkeep",
+        "prompts/eval/.gitkeep",
+        "agents/README.md",
+        "agents/planner.md",
+        "agents/executor.md",
+        "agents/reviewer.md",
+        "tools/README.md",
+        "tools/registry.yaml",
+        "tools/schemas/.gitkeep"
+      ]
+    },
+    evals: {
+      title: "Evals 回归集",
+      desc: "用 golden、regression、safety cases 追踪 prompt、模型和检索链路的质量变化。",
+      files: ["evals/", "golden_cases.jsonl", "reports/"],
+      generatedFiles: [
+        "evals/README.md",
+        "evals/golden_cases.jsonl",
+        "evals/regression_cases.jsonl",
+        "evals/safety_cases.jsonl",
+        "evals/reports/.gitkeep"
+      ]
+    },
+    guardrails: {
+      title: "Guardrails / Human Review",
+      desc: "固定输入输出检查、工具权限和人工复核位置，让安全策略有默认落点。",
+      files: ["guardrails/", "tool_policies.yaml", "human_review.md"],
+      generatedFiles: [
+        "guardrails/README.md",
+        "guardrails/input_checks.md",
+        "guardrails/output_checks.md",
+        "guardrails/tool_policies.yaml",
+        "guardrails/human_review.md"
+      ]
+    },
+    mcp: {
+      title: "MCP 示例和权限边界",
+      desc: "只生成示例配置和权限说明，不生成可用密钥或默认连接到外部服务。",
+      files: ["mcp/", "mcp.example.json", "tool-permissions.yaml"],
+      generatedFiles: [
+        "mcp/README.md",
+        "mcp/mcp.example.json",
+        "mcp/servers/.gitkeep",
+        "mcp/tool-permissions.yaml"
+      ]
+    },
+    observability: {
+      title: "可观测性前置",
+      desc: "提前记录 trace、log、metrics、cost tracking 等 AI 调用与工具调用指标。",
+      files: ["observability/", "tracing.md", "cost_tracking.md"],
+      generatedFiles: [
+        "observability/README.md",
+        "observability/tracing.md",
+        "observability/logging.md",
+        "observability/metrics.md",
+        "observability/cost_tracking.md"
+      ]
+    },
+    secrets: {
+      title: "Secrets / 环境变量",
+      desc: "把变量名、默认值、敏感性和环境差异写清楚，避免 AI 猜配置。",
+      files: [".env.example", "docs/ENVIRONMENT.md", "config/"],
+      generatedFiles: [
+        ".env.example",
+        "docs/ENVIRONMENT.md",
+        "config/runtime.example.yaml"
+      ]
+    }
+  };
+  const PROJECT_RUNTIME_PRESETS = {
+    product: {
+      label: "产品方向 Runtime",
+      desc: "产品方向阶段只保留轻量 prompts 示例，先不打扰用户生成完整 AI Runtime 能力。",
+      levels: {
+        promptAgent: "示例",
+        evals: "按需",
+        guardrails: "按需",
+        mcp: "按需",
+        observability: "按需",
+        secrets: "按需"
+      },
+      layerFiles: ["prompts/"]
+    },
+    prototype: {
+      label: "原型 Runtime",
+      desc: "页面原型默认只保留轻量 prompts 示例，其他 AI Runtime 能力暂不打扰用户。",
+      levels: {
+        promptAgent: "示例",
+        evals: "按需",
+        guardrails: "按需",
+        mcp: "按需",
+        observability: "按需",
+        secrets: "按需"
+      },
+      layerFiles: ["prompts/"]
+    },
+    frontend: {
+      label: "前端 Runtime",
+      desc: "前端项目默认保留 prompts、轻量 guardrails、evals、observability 和 secrets，MCP 按需开启。",
+      levels: {
+        promptAgent: "默认",
+        evals: "默认",
+        guardrails: "轻量",
+        mcp: "按需",
+        observability: "默认",
+        secrets: "必备"
+      },
+      layerFiles: ["prompts/", "evals/", "observability/", ".env.example"]
+    },
+    fullstack: {
+      label: "全栈 Runtime",
+      desc: "全栈项目默认保留 prompts、evals、guardrails、observability 和 secrets，MCP 按需开启。",
+      levels: {
+        promptAgent: "默认",
+        evals: "默认",
+        guardrails: "默认",
+        mcp: "按需",
+        observability: "默认",
+        secrets: "必备"
+      },
+      layerFiles: ["prompts/", "evals/", "guardrails/", ".env.example"]
+    },
+    backend: {
+      label: "后端 Runtime",
+      desc: "后端 / API 服务默认补齐环境变量、轻量 evals、guardrails 和 observability。",
+      levels: {
+        promptAgent: "示例",
+        evals: "默认",
+        guardrails: "默认",
+        mcp: "按需",
+        observability: "默认",
+        secrets: "必备"
+      },
+      layerFiles: ["evals/", "guardrails/", "observability/", ".env.example"]
+    },
+    handoff: {
+      label: "交接 Runtime",
+      desc: "测试交接阶段默认保留 evals、observability 和轻量 prompts，方便后续验证和复盘。",
+      levels: {
+        promptAgent: "示例",
+        evals: "默认",
+        guardrails: "按需",
+        mcp: "按需",
+        observability: "默认",
+        secrets: "按需"
+      },
+      layerFiles: ["evals/", "observability/", "prompts/"]
+    },
+    agent: {
+      label: "Agent Runtime",
+      desc: "Agent 服务默认补齐 prompts、agents、tools、evals、guardrails、mcp、observability 和 secrets 边界。",
+      levels: {
+        promptAgent: "默认",
+        evals: "默认",
+        guardrails: "默认",
+        mcp: "默认",
+        observability: "默认",
+        secrets: "必备"
+      },
+      layerFiles: ["prompts/", "agents/", "tools/", "evals/"]
+    },
+    rag: {
+      label: "RAG Runtime",
+      desc: "RAG 项目默认强化 evals 和 observability，用来追踪 retrieval hit rate、eval score 和 fallback rate。",
+      levels: {
+        promptAgent: "默认",
+        evals: "强化",
+        guardrails: "默认",
+        mcp: "默认",
+        observability: "强化",
+        secrets: "必备"
+      },
+      layerFiles: ["evals/", "observability/", "prompts/", "guardrails/"]
+    },
+  };
+
+  function activeRuntimePreset() {
+    const key = activeProjectStructureKey();
+    return PROJECT_RUNTIME_PRESETS[key] || PROJECT_RUNTIME_PRESETS.prototype;
+  }
+
+  function runtimeEnabledCapabilityIds() {
+    const preset = activeRuntimePreset();
+    return AI_RUNTIME_CAPABILITY_ORDER.filter(id => preset.levels[id] !== "按需");
+  }
+
+  function runtimeCapabilityGeneratedFiles(id, level) {
+    const files = AI_RUNTIME_CAPABILITIES[id].generatedFiles || [];
+    if (id === "promptAgent" && level === "示例") {
+      return files.filter(file => file.startsWith("prompts/"));
+    }
+    return files;
+  }
+
+  function runtimeGeneratedFiles() {
+    const preset = activeRuntimePreset();
+    const files = new Set();
+    runtimeEnabledCapabilityIds().forEach(id => {
+      runtimeCapabilityGeneratedFiles(id, preset.levels[id]).forEach(file => files.add(file));
+    });
+    return [...files];
+  }
+
+  function runtimeLevelClass(level) {
+    if (level === "按需") return "is-planned";
+    if (level === "必备" || level === "默认" || level === "强化") return "is-live";
+    return "is-copy";
+  }
+
+  const PROJECT_MATURITY_PRESETS = {
+    prototype: {
+      label: "快速原型",
+      contract: "轻量工程契约",
+      advice: "<strong>快速原型</strong>：先证明核心功能能跑通，长期治理文档后面再补。",
+      files: []
+    },
+    mvp: {
+      label: "MVP",
+      contract: "MVP 工程契约",
+      advice: "<strong>MVP</strong>：建议补上测试和运行手册，让演示版能稳定迭代。",
+      files: ["docs/TESTING.md", "docs/RUNBOOK.md"]
+    },
+    production: {
+      label: "生产可用",
+      contract: "生产工程契约",
+      advice: "<strong>生产可用</strong>：需要环境、架构、测试、运行手册和变更记录支撑发布回滚。",
+      files: ["docs/ARCHITECTURE.md", "docs/ENVIRONMENT.md", "docs/TESTING.md", "docs/RUNBOOK.md", "docs/CHANGELOG.md"]
+    },
+    team: {
+      label: "可交接",
+      contract: "团队工程契约",
+      advice: "<strong>可交接</strong>：建议补齐命名、文档治理、决策记录和交接资料，降低后续接手成本。",
+      files: ["docs/NAMING.md", "docs/DOCUMENTATION.md", "docs/DECISIONS.md", "docs/RUNBOOK.md", "docs/CHANGELOG.md"]
+    },
+    compliance: {
+      label: "企业合规",
+      contract: "合规工程契约",
+      advice: "<strong>企业合规</strong>：需要强化测试、决策、经验复盘、运行手册和安全边界，避免隐式风险。",
+      files: ["docs/ARCHITECTURE.md", "docs/ENVIRONMENT.md", "docs/TESTING.md", "docs/RUNBOOK.md", "docs/CHANGELOG.md", "docs/DECISIONS.md", "docs/LESSONS.md", "docs/DOCUMENTATION.md", "docs/NAMING.md"]
+    }
+  };
+
+  function activeMaturityKey() {
+    return activeGenerationPlan().maturityKey;
+  }
+
+  function activeMaturityPreset() {
+    const key = activeMaturityKey();
+    return PROJECT_MATURITY_PRESETS[key] || PROJECT_MATURITY_PRESETS.prototype;
+  }
+
+  const ADVANCED_CONFIG_PRESETS = {
+    tech: {
+      product: { label: "产品方向优先", desc: "先沉淀产品边界和阶段路线，不强行引入框架和后端。", chips: ["PRODUCT.md", "docs/PRODUCT_PLAN.md"] },
+      prototype: { label: "静态页面 / 原型优先", desc: "先生成可看的页面和最小上下文，不强行引入框架和后端。", chips: ["index.html", "docs/design/"] },
+      frontend: { label: "Node / Next.js 优先", desc: "前端项目默认按 app、AI client、shared package 和 prompts 拆分。", chips: ["apps/web/", "packages/", "package.json"] },
+      fullstack: { label: "前端 + API 服务", desc: "全栈项目默认拆分 web、api、server、shared package 和测试入口。", chips: ["apps/web/", "api/", "server/", "tests/"] },
+      backend: { label: "API / Service 优先", desc: "后端服务默认按 API、services、models、config 和 tests 拆分。", chips: ["api/", "services/", "config/", "tests/"] },
+      handoff: { label: "验收交接优先", desc: "先统一测试、运行手册和交接上下文，方便别人接手验证。", chips: ["docs/TESTING.md", "docs/RUNBOOK.md", "HANDOFF.md"] },
+      agent: { label: "Python / FastAPI 优先", desc: "Agent 服务默认按 API、agents、tools、prompts、evals 拆分。", chips: ["src/app/", "agents/", "tools/", "pyproject.toml"] },
+      rag: { label: "Python / RAG workflow", desc: "RAG 项目默认按 ingestion、indexing、retrieval、evals 拆分。", chips: ["src/rag/", "data/", "evals/", "pyproject.toml"] }
+    },
+    data: {
+      product: { label: "默认不生成", desc: "产品方向阶段不主动生成数据或知识库目录。", chips: ["按需开启"] },
+      prototype: { label: "默认不生成", desc: "页面原型不主动生成知识库目录。", chips: ["按需开启"] },
+      frontend: { label: "按产品需要", desc: "前端项目只保留 prompts 和轻量数据接口说明。", chips: ["prompts/", "packages/ai-client/"] },
+      fullstack: { label: "按业务需要", desc: "全栈项目保留数据接口边界，但不默认假设必须 RAG。", chips: ["api/", "server/", "docs/"] },
+      backend: { label: "按接口需要", desc: "后端服务可保留数据模型位置，但不默认生成知识库链路。", chips: ["models/", "services/"] },
+      handoff: { label: "默认不生成", desc: "测试交接阶段不主动生成知识库链路，只保留验证和复盘入口。", chips: ["evals/", "observability/"] },
+      agent: { label: "按需知识库", desc: "Agent 可保留轻量 data 入口，但不默认假设必须 RAG。", chips: ["data/", "docs/"] },
+      rag: { label: "需要知识库", desc: "RAG 默认生成 data、ingestion、retrieval、citations 等位置。", chips: ["data/", "ingestion/", "retrieval/", "citations/"] }
+    },
+    deploy: {
+      prototype: { label: "暂不部署", desc: "快速原型先本地跑通，部署放到后续阶段。", chips: ["local"] },
+      mvp: { label: "本地 + 轻量部署", desc: "MVP 可保留 Docker / Serverless 的后续入口。", chips: ["Docker?", "Serverless?"] },
+      production: { label: "生产部署准备", desc: "生产可用需要部署说明、回滚边界和 CI 入口。", chips: ["Dockerfile", "compose.yaml", "deploy.yml"] },
+      team: { label: "交接准备", desc: "可交接项目需要统一本地启动、测试和交接命令。", chips: ["RUNBOOK.md", "compose.yaml", "ci.yml"] },
+      compliance: { label: "受控发布", desc: "企业合规需要审计、权限和发布审批边界。", chips: ["infra/", "audit", "approval"] }
+    }
+  };
+
+  function renderStructureSummary() {
+    const preset = activeProjectStructure();
+    const title = document.querySelector("[data-structure-title]");
+    const desc = document.querySelector("[data-structure-desc]");
+    const chips = document.querySelector("[data-structure-chips]");
+    const layerNote = document.querySelector("[data-structure-layer-note]");
+    if (title) title.textContent = `${preset.label}骨架`;
+    if (desc) desc.textContent = `本次会先准备「${preset.label}」需要的位置；完整目录在底部文件树里确认。`;
+    if (layerNote) layerNote.textContent = `本次先准备「${preset.label}」的位置；这里决定代码和设计资料先放在哪些位置，具体会生成的目录在底部“生成设置”和文件树里确认。`;
+    if (chips) {
+      chips.innerHTML = preset.files.map(file => `<span class="kit-status-chip is-copy">${esc(file)}</span>`).join("");
+    }
+  }
+
+  function runtimeUserLabel(id, level) {
+    const labels = {
+      promptAgent: level === "示例" ? "提示词示例" : "提示词和 Agent",
+      evals: "评测样例",
+      guardrails: "安全边界",
+      mcp: "MCP 示例",
+      observability: "日志和指标",
+      secrets: "环境变量示例"
+    };
+    return labels[id] || AI_RUNTIME_CAPABILITIES[id].title;
+  }
+
+  function runtimeSummaryLabel() {
+    const enabled = runtimeEnabledCapabilityIds().length;
+    if (enabled <= 1) return "AI 支持：轻量示例";
+    if (enabled >= AI_RUNTIME_CAPABILITY_ORDER.length) return "AI 支持：完整";
+    return `AI 支持：${enabled}/6 类`;
+  }
+
+  function renderRuntimeSummary() {
+    const preset = activeRuntimePreset();
+    const enabledIds = runtimeEnabledCapabilityIds();
+    const title = document.querySelector("[data-runtime-title]");
+    const desc = document.querySelector("[data-runtime-desc]");
+    const chips = document.querySelector("[data-runtime-chips]");
+    const list = document.querySelector("[data-runtime-capabilities]");
+    const userChips = document.querySelector("[data-runtime-user-chips]");
+    const layerNote = document.querySelector("[data-runtime-layer-note]");
+    const runtimeLayer = document.querySelector('[data-contract-layer="runtime"]');
+    const meter = runtimeLayer?.querySelector("[data-contract-meter]");
+    if (title) title.textContent = `${preset.label}：6 类 AI Runtime 能力`;
+    if (desc) desc.textContent = preset.desc;
+    if (chips) {
+      chips.innerHTML = enabledIds.map(id => {
+        const cap = AI_RUNTIME_CAPABILITIES[id];
+        return `<span class="kit-status-chip ${runtimeLevelClass(preset.levels[id])}">${esc(cap.files[0])}</span>`;
+      }).join("");
+    }
+    if (list) {
+      list.innerHTML = AI_RUNTIME_CAPABILITY_ORDER.map(id => {
+        const cap = AI_RUNTIME_CAPABILITIES[id];
+        const level = preset.levels[id] || "按需";
+        return `
+          <div class="kit-runtime-capability" data-runtime-capability="${esc(id)}" data-state="${esc(level)}">
+            <div class="kit-runtime-capability-head">
+              <strong>${esc(cap.title)}</strong>
+              <span class="kit-status-chip ${runtimeLevelClass(level)}">${esc(level)}</span>
+            </div>
+            <p>${esc(cap.desc)}</p>
+            <div class="kit-runtime-chips">
+              ${cap.files.map(file => `<span class="kit-status-chip is-copy">${esc(file)}</span>`).join("")}
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+    if (userChips) {
+      userChips.innerHTML = enabledIds.map(id => {
+        const level = preset.levels[id] || "按需";
+        return `<span class="kit-status-chip ${runtimeLevelClass(level)}">${esc(runtimeUserLabel(id, level))}</span>`;
+      }).join("");
+    }
+    if (layerNote) {
+      layerNote.textContent = enabledIds.length <= 1
+        ? "让提示词、评测和安全边界有固定位置；轻量项目只放提示词示例。"
+        : "让提示词、评测和安全边界有固定位置；自动补齐 AI 助手需要的支持文件。";
+    }
+    if (meter) meter.textContent = enabledIds.length ? "自动包含" : "按需生成";
+    if (runtimeLayer) runtimeLayer.classList.toggle("is-complete", enabledIds.length > 0);
+  }
+
+  function advancedSummaryItems() {
+    const structureKey = activeProjectStructureKey();
+    const maturityKey = activeMaturityKey();
+    return [
+      {
+        title: "技术基线",
+        data: ADVANCED_CONFIG_PRESETS.tech[structureKey] || ADVANCED_CONFIG_PRESETS.tech.prototype
+      },
+      {
+        title: "数据 / 知识库",
+        data: ADVANCED_CONFIG_PRESETS.data[structureKey] || ADVANCED_CONFIG_PRESETS.data.prototype
+      },
+      {
+        title: "部署方式",
+        data: ADVANCED_CONFIG_PRESETS.deploy[maturityKey] || ADVANCED_CONFIG_PRESETS.deploy.prototype
+      }
+    ];
+  }
+
+  function renderAdvancedSummary() {
+    const target = document.querySelector("[data-advanced-cards]");
+    const preview = document.querySelector("[data-preview-advanced]");
+    const items = advancedSummaryItems();
+    if (target) {
+      target.innerHTML = items.map(item => `
+        <div class="kit-advanced-item">
+          <strong>${esc(item.title)}：${esc(item.data.label)}</strong>
+          <p>${esc(item.data.desc)}</p>
+          <div class="kit-runtime-chips">
+            ${item.data.chips.map(chip => `<span class="kit-status-chip is-copy">${esc(chip)}</span>`).join("")}
+          </div>
+        </div>
+      `).join("");
+    }
+    if (preview) {
+      preview.innerHTML = items.map(item => `<span class="kit-status-chip is-copy">${esc(item.title)}：${esc(item.data.label)}</span>`).join("");
+    }
+  }
+
+  function renderContractRecommendation(advice, contractName, maturity, structure, generationPlan) {
+    const title = document.querySelector("[data-contract-summary-title]");
+    const desc = document.querySelector("[data-contract-summary-desc]");
+    if (title) title.textContent = `推荐：${contractName}`;
+    if (desc) {
+      const fields = advice.fields.length ? advice.fields.join("、") : "最小上下文";
+      desc.textContent = `${advice.reason} 当前会按「${generationPlan.label} / ${maturity.label}」准备 ${structure.label}骨架，并优先补齐${fields}。`;
+    }
+  }
+
   function updateWizardSelections() {
     const collab = document.querySelector("#wizardQ1 .is-active")?.dataset.val;
-    const focuses = Array.from(document.querySelectorAll("#wizardQ2 .is-active")).map(el => el.dataset.val);
-    const pType = document.querySelector("#wizardQ3 .is-active")?.dataset.val;
-    const summary = document.getElementById("wizardSummary");
+    const outcomes = activeOutcomeKeys();
+    const generationPlan = activeGenerationPlan();
+    const maturityKey = activeMaturityKey();
+    const maturity = activeMaturityPreset();
+    const structure = activeProjectStructure();
 
     const autoCheck = new Set();
-    let advice = { collab: "", fields: [], growth: "", template: "core-template", reason: "" };
+    let advice = { collab: "", fields: [], growth: "", structure: "", template: "core-template", reason: "" };
 
     // --- 维度 1: 协作关系 (Q1) -> 侧重交接与治理 ---
     if (collab === "team") {
+      autoCheck.add("docs/NAMING.md");
       autoCheck.add("docs/DOCUMENTATION.md");
       advice.collab = "<strong>有团队维护</strong>：会补上文档治理，减少交接时信息丢失。";
     } else {
       advice.collab = "<strong>一个人维护</strong>：先保持轻量，只保留必要文档，避免一开始负担太重。";
     }
 
-    // --- 维度 2: 核心战场 (Q2) -> 侧重技术与功能 (多选并集) ---
-    focuses.forEach(f => {
-      if (f === "product") {
-        autoCheck.add("PRODUCT.md");
-        autoCheck.add("docs/PRODUCT_PLAN.md");
-        advice.fields.push("产品方向");
-      } else if (f === "frontend") {
-        autoCheck.add("docs/DESIGN_STANDARDS.md");
-        autoCheck.add("docs/CODE_STRUCTURE.md");
-        advice.fields.push("页面和组件规范");
-      } else if (f === "backend") {
-        autoCheck.add("docs/ARCHITECTURE.md");
-        autoCheck.add("docs/ENVIRONMENT.md");
-        autoCheck.add("docs/RUNBOOK.md");
-        advice.fields.push("项目结构和运行方式");
-      } else if (f === "testing") {
-        autoCheck.add("docs/TESTING.md");
-        autoCheck.add("docs/RUNBOOK.md");
-        autoCheck.add("docs/LESSONS.md");
-        advice.fields.push("测试、验收和交接");
-      }
+    // --- 维度 2: 本次想先拿到什么 (Q2) -> 单选一一映射 ---
+    outcomes.forEach(outcomeKey => {
+      const outcomePreset = OUTCOME_FILE_PRESETS[outcomeKey];
+      if (!outcomePreset) return;
+      outcomePreset.files.forEach(file => autoCheck.add(file));
+      advice.fields.push(outcomePreset.field);
     });
 
-    // --- 维度 3: 发展预期 (Q3) -> 侧重架构、命名与生命周期 ---
-    if (pType === "longterm") {
-      autoCheck.add("docs/ARCHITECTURE.md");
-      autoCheck.add("docs/CODE_STRUCTURE.md");
-      autoCheck.add("docs/NAMING.md");
-      autoCheck.add("docs/CHANGELOG.md");
-      autoCheck.add("docs/DECISIONS.md");
-      autoCheck.add("docs/RUNBOOK.md");
-      advice.growth = "<strong>长期项目</strong>：建议补齐架构、命名、变更、决策和运行手册，后面接手更稳。";
-    } else {
-      advice.growth = "<strong>快速原型</strong>：先保证核心功能能跑通，长期治理文档可以后面再补。";
-    }
+    // --- Q2 单选推导生成方案 -> 同时推导成熟度、结构和 AI 支持文件 ---
+    generationPlan.autoFiles.forEach(file => autoCheck.add(file));
+    maturity.files.forEach(file => autoCheck.add(file));
+    advice.growth = maturity.advice;
+    advice.structure = generationPlan.advice;
 
     const optionalCount = autoCheck.size;
-    if (pType === "mvp" && collab === "solo" && optionalCount <= 2) {
+    if (activeGenerationPlanKey() === "page-prototype" && collab === "solo" && optionalCount <= 5) {
       advice.template = "core-template";
       advice.reason = "你现在更适合轻量启动，先让 AI 拿到最小上下文。";
-    } else if (pType === "longterm" || collab === "team" || optionalCount >= 3) {
+    } else if (maturityKey === "prototype") {
       advice.template = "product-template";
-      advice.reason = "你需要更多工程文档来支撑维护、测试和交接。";
+      advice.reason = "你已经选择了具体生成方案，推荐在轻量上下文之外补齐必要边界。";
     } else {
       advice.template = "product-template";
-      advice.reason = "你已经选择了具体项目关注点，推荐在 core 之外补几份工程文档。";
+      advice.reason = "你需要更多工程契约来支撑维护、测试、交接和上线。";
     }
 
-    if (summary) {
-      const fieldLabels = advice.fields.length ? `重点补齐：<strong>${advice.fields.join("、")}</strong>。` : "暂未选择具体关注点，只保留最小模板。";
-      summary.innerHTML = `
-        <p><strong>推荐：</strong>${advice.template}</p>
-        <p style="margin-top:var(--space-6)">${advice.reason}</p>
-        <p>${advice.collab}</p>
-        <p style="margin-top:var(--space-6)">${fieldLabels}</p>
-        <p style="margin-top:var(--space-10); border-top:1px dashed var(--color-border-subtle); padding-top:var(--space-10)">
-          ${advice.growth}
-        </p>
-      `;
-    }
+    const contractName = advice.template === "core-template" ? "轻量工程契约" : maturity.contract;
+    renderContractRecommendation(advice, contractName, maturity, structure, generationPlan);
 
     // 执行勾选同步
     document.querySelectorAll("[data-template-file]").forEach(input => {
       input.checked = autoCheck.has(input.dataset.templateFile);
     });
+    renderStructureSummary();
+    renderAdvancedSummary();
+    renderRuntimeSummary();
+    if (typeof updateContractMeters === "function") updateContractMeters();
   }
 
-  // 绑定向导按钮事件 (支持 Q2 多选)
+  // 绑定向导按钮事件 (Q1 / Q2 均为单选)
   document.querySelectorAll(".kit-wizard-card-sm").forEach(btn => {
     btn.addEventListener("click", () => {
       const parent = btn.parentElement;
-      const isMulti = parent.id === "wizardQ2";
-
-      if (!isMulti) {
-        parent.querySelectorAll(".kit-wizard-card-sm").forEach(b => b.classList.remove("is-active"));
-        btn.classList.add("is-active");
-      } else {
-        // 多选模式：Toggle 状态，但保持至少选中一个（可选，为了防止完全为空逻辑断档）
-        const activeCount = parent.querySelectorAll(".is-active").length;
-        if (btn.classList.contains("is-active") && activeCount <= 1) {
-          // 如果只剩一个且正准备取消，不予理会或提示，这里选择允许取消（灵活）
-        }
-        btn.classList.toggle("is-active");
-      }
+      parent.querySelectorAll(".kit-wizard-card-sm").forEach(b => b.classList.remove("is-active"));
+      btn.classList.add("is-active");
       updateWizardSelections();
     });
   });
-
-  // 初始运行一次
-  updateWizardSelections();
 
   document.querySelectorAll("[data-kit-project]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -3341,6 +4218,7 @@
       const newPanel = document.getElementById("kitNewPanel");
       const oldPanel = document.getElementById("kitOldPanel");
       switcher.dataset.project = project;
+      document.body.dataset.mode = project;
       document.querySelectorAll("[data-kit-project]").forEach((item) => {
         const isActive = item === button;
         item.classList.toggle("is-active", isActive);
@@ -3367,25 +4245,23 @@
   });
   // ─── Optional templates list ──────────────────────────────
   const OPTIONAL_TEMPLATES = [
-    { file: "PRODUCT.md", title: "产品定义", desc: "产品定位、用户画像、设计原则", group: "推荐文件：产品和结构" },
-    { file: "docs/PRODUCT_PLAN.md", title: "产品路线图", desc: "分阶段目标", group: "推荐文件：产品和结构" },
-    { file: "docs/ARCHITECTURE.md", title: "架构和模块职责", desc: "模块、目录、数据流和边界", group: "推荐文件：产品和结构" },
-    { file: "docs/ENVIRONMENT.md", title: "环境和启动方式", desc: "依赖、变量、怎么运行", group: "推荐文件：产品和结构" },
-    { file: "docs/CODE_STRUCTURE.md", title: "代码结构", desc: "代码分层规则", group: "推荐文件：产品和结构" },
-    { file: "docs/DESIGN_STANDARDS.md", title: "设计规范", desc: "界面、组件、视觉边界", group: "推荐文件：产品和结构" },
-    { file: "docs/TESTING.md", title: "测试和验收方式", desc: "怎么验证改动没坏", group: "推荐文件：流程和验收" },
-    { file: "docs/RUNBOOK.md", title: "运行手册", desc: "常见操作和故障处理", group: "推荐文件：流程和验收" },
-    { file: "docs/NAMING.md", title: "命名规范", desc: "文档和目录怎么命名", group: "推荐文件：流程和验收" },
-    { file: "docs/DOCUMENTATION.md", title: "文档治理", desc: "文档边界和更新时机", group: "推荐文件：流程和验收" },
-    { file: "docs/CHANGELOG.md", title: "变更记录", desc: "结构性改动留痕", group: "记录文件：变更和决策" },
-    { file: "docs/DECISIONS.md", title: "决策记录", desc: "重要取舍为什么这样定", group: "记录文件：变更和决策" },
-    { file: "docs/LESSONS.md", title: "经验教训", desc: "犯错后立即记录", group: "记录文件：变更和决策" },
-    { file: ".claude/CLAUDE.md", title: "Claude 项目配置", desc: "Claude 行为规则和状态速览", group: "高级配置：AI 工具" },
-    { file: ".claude/launch.json", title: "Claude 启动配置", desc: "dev server 启动方式", group: "高级配置：AI 工具" },
-    { file: ".cursorrules", title: "Cursor 规则", desc: "Cursor AI 的项目级指令", group: "高级配置：AI 工具" },
-    { file: ".github/copilot-instructions.md", title: "Copilot 指令", desc: "GitHub Copilot 项目级规则", group: "高级配置：AI 工具" }
+    { file: "PRODUCT.md", title: "产品定义", desc: "产品定位、用户画像、设计原则", group: "项目入口：产品和方向" },
+    { file: "docs/PRODUCT_PLAN.md", title: "产品路线图", desc: "分阶段目标", group: "项目入口：产品和方向" },
+    { file: "docs/TECH_STACK.md", title: "技术栈说明", desc: "框架、工具和版本边界", group: "工程运行：安装和协作" },
+    { file: "docs/ENVIRONMENT.md", title: "环境和启动方式", desc: "本地、测试、生产的依赖、变量和启动方式", group: "工程运行：安装和协作" },
+    { file: ".env.example", title: "环境变量样例", desc: "把配置边界显式写出来", group: "工程运行：安装和协作" },
+    { file: "docs/NAMING.md", title: "命名规范", desc: "文档和目录怎么命名", group: "工程运行：安装和协作" },
+    { file: "docs/DOCUMENTATION.md", title: "文档治理", desc: "文档边界和更新时机", group: "工程运行：安装和协作" },
+    { file: "docs/ARCHITECTURE.md", title: "架构和模块职责", desc: "模块、目录、数据流和边界", group: "代码结构：架构和目录" },
+    { file: "docs/CODE_STRUCTURE.md", title: "代码结构", desc: "代码分层规则", group: "代码结构：架构和目录" },
+    { file: "docs/DESIGN_STANDARDS.md", title: "设计规范", desc: "界面、组件、视觉边界", group: "代码结构：架构和目录" },
+    { file: "docs/TESTING.md", title: "测试和验收方式", desc: "怎么验证改动没坏", group: "质量保障层：测试和交接" },
+    { file: "docs/RUNBOOK.md", title: "运行手册", desc: "常见操作和故障处理", group: "质量保障层：测试和交接" },
+    { file: "docs/CHANGELOG.md", title: "变更记录", desc: "结构性改动留痕", group: "质量保障层：测试和交接" },
+    { file: "docs/DECISIONS.md", title: "决策记录", desc: "重要取舍为什么这样定", group: "质量保障层：测试和交接" },
+    { file: "docs/LESSONS.md", title: "经验教训", desc: "犯错后立即记录", group: "质量保障层：测试和交接" }
   ];
-  const REQUIRED_FILES = ["AGENTS.md", "PROJECT.md", "HANDOFF.md"];
+  const REQUIRED_FILES = ["README.md", "AGENTS.md", "PROJECT.md", "HANDOFF.md"];
   // Source for fetching templates (works on GitHub Pages and local server)
   const TEMPLATE_BASE_URLS = [
     "templates/project-docs/",   // optional docs
@@ -3398,20 +4274,22 @@
     return [...OPTIONAL_TEMPLATES, ...personalRules.extraTemplates.map(r => ({ ...r, isPersonal: true }))];
   }
 
+  function templateLayerForGroup(group) {
+    if (group.startsWith("项目入口")) return "entry";
+    if (group.startsWith("工程运行")) return "run";
+    if (group.startsWith("代码结构")) return "structure";
+    if (group.startsWith("质量保障层")) return "quality";
+    return "entry";
+  }
+
   function renderOptionalTemplates() {
-    const target = document.getElementById("kitOptionTemplates");
-    if (!target) return;
-    target.innerHTML = "";
-    let currentGroup = null;
+    const targets = Array.from(document.querySelectorAll("[data-layer-options]"));
+    if (!targets.length) return;
+    targets.forEach(target => target.innerHTML = "");
     effectiveOptionalTemplates().forEach((t) => {
       const group = t.group || '其他';
-      if (group !== currentGroup) {
-        currentGroup = group;
-        const header = document.createElement("div");
-        header.className = "kit-template-group-header";
-        header.textContent = group;
-        target.appendChild(header);
-      }
+      const target = document.querySelector(`[data-layer-options="${templateLayerForGroup(group)}"]`);
+      if (!target) return;
       const label = document.createElement("label");
       label.className = "kit-option";
       label.innerHTML = `
@@ -3427,7 +4305,10 @@
       `;
       target.appendChild(label);
     });
-    target.querySelectorAll('[data-preview-template]').forEach(btn => {
+    document.querySelectorAll("[data-template-file]").forEach(input => {
+      input.addEventListener("change", updateContractMeters);
+    });
+    document.querySelectorAll('[data-preview-template]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -3436,6 +4317,120 @@
     });
   }
   renderOptionalTemplates();
+
+  const CONTRACT_LAYER_FILES = {
+    entry: ["README.md", "AGENTS.md", "PROJECT.md", "HANDOFF.md", "PRODUCT.md", "docs/PRODUCT_PLAN.md"],
+    run: ["docs/TECH_STACK.md", "docs/ENVIRONMENT.md", ".env.example", "docs/NAMING.md", "docs/DOCUMENTATION.md"],
+    structure: ["docs/ARCHITECTURE.md", "docs/CODE_STRUCTURE.md", "docs/DESIGN_STANDARDS.md"],
+    quality: ["docs/TESTING.md", "docs/RUNBOOK.md", "docs/CHANGELOG.md", "docs/DECISIONS.md", "docs/LESSONS.md"]
+  };
+
+  function selectedContractFiles() {
+    const selected = new Set(REQUIRED_FILES);
+    document.querySelectorAll("[data-template-file]:checked").forEach(input => selected.add(input.dataset.templateFile));
+    conditionalGeneratedFiles().forEach(file => selected.add(file));
+    runtimeGeneratedFiles().forEach(file => selected.add(file));
+    return selected;
+  }
+
+  function updateContractMeters() {
+    renderStructureSummary();
+    renderRuntimeSummary();
+    const selected = selectedContractFiles();
+    Object.entries(CONTRACT_LAYER_FILES).forEach(([layer, files]) => {
+      const el = document.querySelector(`[data-contract-layer="${layer}"]`);
+      if (!el) return;
+      const count = files.filter(file => selected.has(file)).length;
+      const meter = el.querySelector("[data-contract-meter]");
+      if (meter) meter.textContent = `${count}/${files.length}`;
+      el.classList.toggle("is-complete", count === files.length);
+    });
+    renderContractBlueprintPreview();
+  }
+
+  function normalizedBlueprintPaths() {
+    const paths = new Set();
+    collectNewProjectFiles().forEach(file => {
+      if (!file) return;
+      if (file.endsWith(".gitkeep")) {
+        const dir = file.split("/").slice(0, -1).join("/");
+        if (dir) paths.add(dir + "/");
+      } else {
+        paths.add(file);
+      }
+    });
+    activeProjectStructure().files.forEach(file => paths.add(file));
+    return [...paths].sort((a, b) => a.localeCompare(b));
+  }
+
+  function buildFileTree(paths) {
+    const root = {};
+    paths.forEach(raw => {
+      const isDir = raw.endsWith("/");
+      const clean = raw.replace(/\/$/, "");
+      if (!clean) return;
+      const parts = clean.split("/").filter(Boolean);
+      let node = root;
+      parts.forEach((part, index) => {
+        if (!node[part]) node[part] = { __dir: index < parts.length - 1 || isDir, __children: {} };
+        if (index < parts.length - 1 || isDir) node[part].__dir = true;
+        node = node[part].__children;
+      });
+    });
+
+    const lines = [];
+    function walk(children, depth) {
+      Object.entries(children)
+        .sort(([a, av], [b, bv]) => {
+          if (av.__dir !== bv.__dir) return av.__dir ? -1 : 1;
+          return a.localeCompare(b);
+        })
+        .forEach(([name, value]) => {
+          lines.push(`${"  ".repeat(depth)}${name}${value.__dir ? "/" : ""}`);
+          walk(value.__children, depth + 1);
+        });
+    }
+    walk(root, 0);
+    return lines.slice(0, 72).join("\n") + (lines.length > 72 ? `\n... 还有 ${lines.length - 72} 项` : "");
+  }
+
+  function recommendedNextCommand() {
+    const structureKey = activeProjectStructureKey();
+    const maturityKey = activeMaturityKey();
+    const structure = activeProjectStructure();
+    const maturity = activeMaturityPreset();
+    const conditionalFiles = conditionalGeneratedFiles();
+    const lines = ["bash scripts/check-runtime.sh ."];
+    if (structureKey !== "prototype" || maturityKey !== "prototype") {
+      lines.push("bash scripts/check-ai-project.sh . --write-report");
+    }
+    if (["production", "team", "compliance"].includes(maturityKey) || conditionalFiles.includes("docs/SECURITY.md")) {
+      lines.push("bash scripts/check-secrets.sh .");
+    }
+    const securityHint = conditionalFiles.length ? "、安全边界" : "";
+    const desc = `按「${structure.label} / ${maturity.label}」生成后，先确认入口文档、技术栈、环境变量${securityHint}和 AI 支持文件都能被检查。`;
+    return {
+      title: "生成后第一步",
+      desc,
+      code: lines.join("\n")
+    };
+  }
+
+  function renderContractBlueprintPreview() {
+    const tree = document.querySelector("[data-contract-tree]");
+    const commandTitle = document.querySelector("[data-next-command-title]");
+    const commandDesc = document.querySelector("[data-next-command-desc]");
+    const commandCode = document.querySelector("[data-next-command-code]");
+    const paths = normalizedBlueprintPaths();
+    if (tree) tree.textContent = buildFileTree(paths);
+    const next = recommendedNextCommand();
+    if (commandTitle) commandTitle.textContent = next.title;
+    if (commandDesc) commandDesc.textContent = next.desc;
+    if (commandCode) commandCode.textContent = next.code;
+  }
+
+  updateWizardSelections();
+  updateContractMeters();
 
   // Tiny outer-scope HTML escape, shared by new-project and audit panels
   function esc(s) {
@@ -3664,6 +4659,10 @@
     'docs/TESTING.md', 'docs/RUNBOOK.md', 'docs/CHANGELOG.md',
     'docs/DECISIONS.md', 'docs/NAMING.md', 'docs/DOCUMENTATION.md',
     'docs/DESIGN_STANDARDS.md', 'docs/PRODUCT_PLAN.md', 'docs/LESSONS.md',
+    'docs/SECURITY.md', 'docs/AI_SAFETY.md',
+    'prompts/README.md', 'agents/README.md', 'tools/README.md',
+    'evals/README.md', 'guardrails/README.md', 'mcp/README.md',
+    'observability/README.md', 'guardrails/human_review.md',
   ]);
 
   function computeCrossProjectInsights(records) {
@@ -4059,6 +5058,25 @@
         ''
       ].join('\n');
     }
+    if (file === 'docs/SECURITY.md') {
+      return header + [
+        '> **安全检测**',
+        `> - 技术栈：${fmtList(info.techStack)}`,
+        `> - 环境变量样板：${fmtList(info.envFiles) || '<!-- 待补 -->'}`,
+        `> - 是否检测到 git：${info.hasGit ? '是' : '否'}`,
+        '',
+        ''
+      ].join('\n');
+    }
+    if (file === 'docs/AI_SAFETY.md') {
+      return header + [
+        '> **AI 安全检测**',
+        `> - 技术栈：${fmtList(info.techStack)}`,
+        `> - 顶层目录：${info.tree ? '已检测' : '<!-- 待补 -->'}`,
+        '',
+        ''
+      ].join('\n');
+    }
     // No prefix for other templates
     return null;
   }
@@ -4189,7 +5207,131 @@
     return { source: theirPath, written: template, existing: false, merged: true, prefixed: !!prefix, unfilled };
   }
 
+  const GENERATED_RUNTIME_TEMPLATES = {
+    "prompts/README.md": [
+      "# Prompts",
+      "",
+      "> 用途：版本化管理系统提示词、任务提示词和评测提示词。",
+      "",
+      "## 目录",
+      "",
+      "- `system/`：系统级 prompt",
+      "- `tasks/`：任务级 prompt",
+      "- `eval/`：用于评测的 prompt",
+      "",
+      "## Prompt 文件建议",
+      "",
+      "每个 prompt 建议配套：",
+      "",
+      "- `prompt.md`",
+      "- `metadata.yaml`",
+      "- `examples.jsonl`",
+      "- `eval_cases.jsonl`",
+      ""
+    ].join("\n"),
+    "agents/README.md": [
+      "# Agents",
+      "",
+      "> 用途：记录 agent 职责、输入输出、可调用工具和人工复核边界。",
+      "",
+      "## 建议角色",
+      "",
+      "- `planner.md`：规划者",
+      "- `executor.md`：执行者",
+      "- `reviewer.md`：审查者",
+      ""
+    ].join("\n"),
+    "agents/planner.md": "# Planner Agent\n\n- 职责：<!-- 待补 -->\n- 输入：<!-- 待补 -->\n- 输出：<!-- 待补 -->\n- 可调用工具：<!-- 待补 -->\n- 必须人工复核：<!-- 待补 -->\n",
+    "agents/executor.md": "# Executor Agent\n\n- 职责：<!-- 待补 -->\n- 输入：<!-- 待补 -->\n- 输出：<!-- 待补 -->\n- 可调用工具：<!-- 待补 -->\n- 必须人工复核：<!-- 待补 -->\n",
+    "agents/reviewer.md": "# Reviewer Agent\n\n- 职责：<!-- 待补 -->\n- 输入：<!-- 待补 -->\n- 输出：<!-- 待补 -->\n- 可调用工具：<!-- 待补 -->\n- 必须人工复核：<!-- 待补 -->\n",
+    "tools/README.md": [
+      "# Tools",
+      "",
+      "> 用途：登记 AI 可调用工具、权限边界、输入输出 schema 和失败处理方式。",
+      "",
+      "## 工具登记字段",
+      "",
+      "- 名称",
+      "- 用途",
+      "- 输入 schema",
+      "- 输出 schema",
+      "- 权限边界",
+      "- 失败回退",
+      ""
+    ].join("\n"),
+    "tools/registry.yaml": "tools:\n  - name: example_tool\n    description: \"<!-- 待补：工具用途 -->\"\n    input_schema: tools/schemas/example.input.json\n    output_schema: tools/schemas/example.output.json\n    permission: read_only\n    fallback: \"<!-- 待补：失败时怎么处理 -->\"\n",
+    "evals/README.md": [
+      "# Evals",
+      "",
+      "> 用途：为 prompt、agent、RAG 和模型输出建立回归测试集。",
+      "",
+      "## 文件",
+      "",
+      "- `golden_cases.jsonl`：黄金样例",
+      "- `regression_cases.jsonl`：回归样例",
+      "- `safety_cases.jsonl`：安全样例",
+      "- `reports/`：评测结果",
+      ""
+    ].join("\n"),
+    "evals/golden_cases.jsonl": "{\"id\":\"case-001\",\"input\":\"<!-- 待补 -->\",\"expected\":\"<!-- 待补 -->\",\"tags\":[\"golden\"]}\n",
+    "evals/regression_cases.jsonl": "{\"id\":\"regression-001\",\"input\":\"<!-- 待补 -->\",\"expected\":\"<!-- 待补 -->\",\"tags\":[\"regression\"]}\n",
+    "evals/safety_cases.jsonl": "{\"id\":\"safety-001\",\"input\":\"<!-- 待补 -->\",\"expected_behavior\":\"<!-- 待补 -->\",\"tags\":[\"safety\"]}\n",
+    "guardrails/README.md": [
+      "# Guardrails",
+      "",
+      "> 用途：定义输入检查、输出检查、工具权限和人工复核规则。",
+      "",
+      "## 默认边界",
+      "",
+      "- 高风险操作必须人工确认",
+      "- 不生成或保存可用密钥",
+      "- 外部工具调用必须有权限说明",
+      ""
+    ].join("\n"),
+    "guardrails/input_checks.md": "# Input Checks\n\n- 禁止输入：<!-- 待补 -->\n- 需要人工确认：<!-- 待补 -->\n- 允许自动处理：<!-- 待补 -->\n",
+    "guardrails/output_checks.md": "# Output Checks\n\n- 输出格式：<!-- 待补 -->\n- 事实核验：<!-- 待补 -->\n- 安全检查：<!-- 待补 -->\n",
+    "guardrails/tool_policies.yaml": "tool_policies:\n  default: confirm_before_write\n  allow:\n    - read_project_files\n  deny:\n    - expose_secrets\n",
+    "guardrails/human_review.md": "# Human Review\n\n## 必须人工复核\n\n- <!-- 待补 -->\n\n## 可以自动执行\n\n- <!-- 待补 -->\n",
+    "mcp/README.md": [
+      "# MCP",
+      "",
+      "> 用途：保存 MCP 示例配置、server 说明和工具权限边界。",
+      "",
+      "不要把真实 API key 或可用密钥写进本目录。",
+      ""
+    ].join("\n"),
+    "mcp/mcp.example.json": "{\n  \"mcpServers\": {\n    \"example\": {\n      \"command\": \"example-command\",\n      \"args\": [],\n      \"env\": {\n        \"EXAMPLE_API_KEY\": \"${EXAMPLE_API_KEY}\"\n      }\n    }\n  }\n}\n",
+    "mcp/tool-permissions.yaml": "permissions:\n  default: read_only\n  tools:\n    example:\n      allowed: false\n      reason: \"<!-- 待补：启用前说明数据边界和权限 -->\"\n",
+    "observability/README.md": [
+      "# Observability",
+      "",
+      "> 用途：提前定义 AI 调用、工具调用、成本和质量指标。",
+      "",
+      "建议至少追踪：token、latency、tool call、eval score、fallback rate。",
+      ""
+    ].join("\n"),
+    "observability/tracing.md": "# Tracing\n\n- Trace ID 规则：<!-- 待补 -->\n- 记录事件：LLM 调用、工具调用、handoff、guardrail 命中\n",
+    "observability/logging.md": "# Logging\n\n- 日志位置：<!-- 待补 -->\n- 脱敏规则：<!-- 待补 -->\n- 保留周期：<!-- 待补 -->\n",
+    "observability/metrics.md": "# Metrics\n\n- latency：<!-- 待补 -->\n- token：<!-- 待补 -->\n- retrieval hit rate：<!-- 待补 -->\n- eval score：<!-- 待补 -->\n- fallback rate：<!-- 待补 -->\n",
+    "observability/cost_tracking.md": "# Cost Tracking\n\n- 计费模型：<!-- 待补 -->\n- 成本维度：token、模型、工具、用户或任务\n- 告警阈值：<!-- 待补 -->\n",
+    "config/runtime.example.yaml": "runtime:\n  environment: local\n  log_level: info\n  secrets:\n    source: env\n    required:\n      - EXAMPLE_API_KEY\n",
+    "prompts/system/.gitkeep": "",
+    "prompts/tasks/.gitkeep": "",
+    "prompts/eval/.gitkeep": "",
+    "tools/schemas/.gitkeep": "",
+    "evals/reports/.gitkeep": "",
+    "mcp/servers/.gitkeep": ""
+  };
+
+  function generatedRuntimeTemplate(file) {
+    return Object.prototype.hasOwnProperty.call(GENERATED_RUNTIME_TEMPLATES, file)
+      ? GENERATED_RUNTIME_TEMPLATES[file]
+      : null;
+  }
+
   async function fetchTemplate(file) {
+    const generated = generatedRuntimeTemplate(file);
+    if (generated !== null) return generated;
     // Required files live under templates/project/
     // Optional files under templates/project-docs/
     const candidates = REQUIRED_FILES.includes(file)
@@ -4204,6 +5346,88 @@
     throw new Error("template not found: " + file);
   }
 
+  function makeCrcTable() {
+    const table = new Uint32Array(256);
+    for (let i = 0; i < 256; i += 1) {
+      let c = i;
+      for (let k = 0; k < 8; k += 1) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+      table[i] = c >>> 0;
+    }
+    return table;
+  }
+  const ZIP_CRC_TABLE = makeCrcTable();
+  function crc32(bytes) {
+    let c = 0xffffffff;
+    for (const b of bytes) c = ZIP_CRC_TABLE[(c ^ b) & 0xff] ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  }
+  function u16(value) {
+    return new Uint8Array([value & 0xff, (value >>> 8) & 0xff]);
+  }
+  function u32(value) {
+    return new Uint8Array([value & 0xff, (value >>> 8) & 0xff, (value >>> 16) & 0xff, (value >>> 24) & 0xff]);
+  }
+  function concatBytes(parts) {
+    const total = parts.reduce((sum, part) => sum + part.length, 0);
+    const out = new Uint8Array(total);
+    let offset = 0;
+    for (const part of parts) {
+      out.set(part, offset);
+      offset += part.length;
+    }
+    return out;
+  }
+  function zipDateParts(date) {
+    const time = (date.getHours() << 11) | (date.getMinutes() << 5) | Math.floor(date.getSeconds() / 2);
+    const day = date.getDate();
+    const month = date.getMonth() + 1;
+    const year = Math.max(date.getFullYear(), 1980) - 1980;
+    return { time, date: (year << 9) | (month << 5) | day };
+  }
+  function buildStoredZipBlob(entries) {
+    const encoder = new TextEncoder();
+    const now = zipDateParts(new Date());
+    const localParts = [];
+    const centralParts = [];
+    let offset = 0;
+
+    entries.forEach(({ file, text }) => {
+      const name = encoder.encode(file.replace(/^\/+/, ""));
+      const data = encoder.encode(text || "");
+      const crc = crc32(data);
+      const localHeader = concatBytes([
+        u32(0x04034b50), u16(20), u16(0x0800), u16(0), u16(now.time), u16(now.date),
+        u32(crc), u32(data.length), u32(data.length), u16(name.length), u16(0), name
+      ]);
+      const centralHeader = concatBytes([
+        u32(0x02014b50), u16(20), u16(20), u16(0x0800), u16(0), u16(now.time), u16(now.date),
+        u32(crc), u32(data.length), u32(data.length), u16(name.length), u16(0), u16(0),
+        u16(0), u16(0), u32(0), u32(offset), name
+      ]);
+      localParts.push(localHeader, data);
+      centralParts.push(centralHeader);
+      offset += localHeader.length + data.length;
+    });
+
+    const centralOffset = offset;
+    const central = concatBytes(centralParts);
+    const end = concatBytes([
+      u32(0x06054b50), u16(0), u16(0), u16(entries.length), u16(entries.length),
+      u32(central.length), u32(centralOffset), u16(0)
+    ]);
+    return new Blob([concatBytes([...localParts, central, end])], { type: "application/zip" });
+  }
+  function downloadBlob(blob, fileName) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   // Reusable: build a zip from given file list and trigger download
   async function buildAndDownloadZip(files, button) {
     const label = button && button.querySelector("[data-button-label]");
@@ -4212,9 +5436,7 @@
     if (button) button.disabled = true;
 
     try {
-      if (typeof JSZip === "undefined") throw new Error("JSZip 未加载");
       if (!files.length) throw new Error("没有选中任何模板");
-      const zip = new JSZip();
       const fetched = await Promise.all(files.map(async (f) => {
         try {
           const text = await fetchTemplate(f);
@@ -4224,8 +5446,9 @@
         }
       }));
       const knownInZip = new Set(files);
-      fetched.forEach(({ file, text }) => zip.file(file, trimRelatedFiles(text, knownInZip)));
-      zip.file("README-下载说明.md", [
+      const entries = fetched.map(({ file, text }) => ({ file, text: trimRelatedFiles(text, knownInZip) }));
+      const nextCommand = recommendedNextCommand();
+      entries.push({ file: "README-下载说明.md", text: [
         "# AI 工程文档包",
         "",
         "这个 zip 是从 https://lijinmei915.github.io/project-os-starter/ 生成的。",
@@ -4236,20 +5459,29 @@
         "2. 打开每个 .md 文件按照里面的注释填写",
         "3. 完成后丢给 AI 让它接手项目",
         "",
+        "## 生成后第一步",
+        "",
+        nextCommand.desc,
+        "",
+        "```bash",
+        nextCommand.code,
+        "```",
+        "",
         "## 包含的文件",
         "",
         ...files.map(f => "- " + f),
         ""
-      ].join("\n"));
-      const blob = await zip.generateAsync({ type: "blob" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "ai-project-docs.zip";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      ].join("\n") });
+
+      let blob;
+      if (typeof JSZip !== "undefined") {
+        const zip = new JSZip();
+        entries.forEach(({ file, text }) => zip.file(file, text));
+        blob = await zip.generateAsync({ type: "blob" });
+      } else {
+        blob = buildStoredZipBlob(entries);
+      }
+      downloadBlob(blob, "ai-project-docs.zip");
 
       if (label) label.textContent = "下载完成 ✓";
       setTimeout(() => { if (label) label.textContent = orig; }, 1800);
@@ -4266,7 +5498,9 @@
     const requiredItems = (kitRequiredMaterials[collab] || kitRequiredMaterials.solo).map(x => x.file);
     const required = [...new Set([...REQUIRED_FILES, ...requiredItems])];
     const optional = Array.from(document.querySelectorAll("[data-template-file]:checked")).map(i => i.dataset.templateFile);
-    return [...new Set([...required, ...optional])];
+    const conditional = conditionalGeneratedFiles();
+    const runtime = runtimeGeneratedFiles();
+    return [...new Set([...required, ...optional, ...conditional, ...runtime])];
   }
 
   // Check if a relative path exists in a directory handle (returns bool)
@@ -4316,6 +5550,14 @@
       aliases: ['SETUP.md', 'docs/SETUP.md', 'ENVIRONMENT.md', 'INSTALL.md', '环境.md'],
       keywords: ['setup', 'install', 'environment', 'env', '启动', '安装', '环境', '依赖']
     },
+    'docs/TECH_STACK.md': {
+      aliases: ['TECH_STACK.md', 'STACK.md', 'docs/STACK.md', '技术栈.md'],
+      keywords: ['tech stack', 'stack', 'framework', 'runtime', 'version', '技术栈', '框架', '版本']
+    },
+    '.env.example': {
+      aliases: ['.env.example', '.env.sample', '.env.template', 'env.example'],
+      keywords: ['env', 'environment', 'secret', 'config', '变量', '配置', '密钥']
+    },
     'docs/DESIGN_STANDARDS.md': {
       aliases: ['DESIGN.md', 'STYLEGUIDE.md', 'UI_GUIDE.md', '设计规范.md'],
       keywords: ['design', 'styleguide', 'ui', 'component', '视觉', '设计', '组件']
@@ -4323,6 +5565,14 @@
     'docs/TESTING.md': {
       aliases: ['TESTING.md', 'QA.md', '测试.md', '验收.md'],
       keywords: ['test', 'testing', 'qa', 'acceptance', '测试', '验收']
+    },
+    'docs/SECURITY.md': {
+      aliases: ['SECURITY.md', 'docs/SECURITY.md', '安全.md', '安全说明.md'],
+      keywords: ['security', 'secret', 'permission', 'auth', '安全', '密钥', '权限', '认证']
+    },
+    'docs/AI_SAFETY.md': {
+      aliases: ['AI_SAFETY.md', 'docs/AI_SAFETY.md', 'GUARDRAILS.md', 'AI安全.md', 'AI安全边界.md'],
+      keywords: ['ai safety', 'guardrail', 'prompt injection', 'eval', 'AI安全', '安全边界', '提示词注入', '评测']
     },
     'docs/RUNBOOK.md': {
       aliases: ['RUNBOOK.md', 'OPERATIONS.md', 'DEPLOYMENT.md', '运维.md', '运行手册.md'],
@@ -4356,6 +5606,7 @@
 
   function templateTitle(file) {
     const required = {
+      'README.md': '使用入口',
       'AGENTS.md': 'AI 工作规则',
       'PROJECT.md': '项目说明',
       'HANDOFF.md': '当前状态 / 交接记录'
@@ -4604,6 +5855,7 @@
     const { written, totalUnfilled, info, handleName, addedCount, refCount, prefixedCount } = params;
     const mergedCount = written.filter(w => w.merged).length;
     const subline = `${addedCount} 个新增直接可用${refCount ? ' · ' + refCount + ' 个已有同名写为 <code>.template.md</code>' : ''}${mergedCount ? ' · ' + mergedCount + ' 个合并自你已有文件' : ''}${info ? ' · 自动填了 ' + prefixedCount + ' 个文件的项目快照' : ''}`;
+    const nextCommand = recommendedNextCommand();
     container.innerHTML = `
       <div class="kit-result-success">
         <div class="kit-result-success-icon">✓</div>
@@ -4615,6 +5867,10 @@
       <ul class="kit-result-list">${written.map(w => `
         <li class="kit-result-item pass"><span class="kit-result-dot">✓</span><span><code>${esc(w.written)}</code>${w.existing ? '（参考模板）' : ''}${w.merged ? '（合并自 <code>' + esc(w.source) + '</code>，原文件保留）' : ''}${w.unfilled ? ' <span class="muted">· ' + w.unfilled + ' 处待补</span>' : ''}</span></li>
       `).join('')}</ul>
+      <div class="kit-result-note">
+        <strong>${esc(nextCommand.title)}：</strong>${esc(nextCommand.desc)}
+      </div>
+      <div class="kit-command-preview is-filled"><code>${esc(nextCommand.code)}</code></div>
       ${totalUnfilled > 0 ? `
         <div class="kit-result-note">
           🤖 还有 <strong>${totalUnfilled}</strong> 处 <code>&lt;!-- 待补 --&gt;</code> 需要人工或 AI 补完。
@@ -4677,6 +5933,32 @@
     }
   }
   renderNewProjectActions();
+  function updateRuntimeCapabilityHints() {
+    const canWriteDirectory = typeof window.showDirectoryPicker === 'function';
+    const canReadZip = typeof JSZip !== 'undefined';
+    const analyzeLabel = document.querySelector('#kitAnalyzeBtn [data-button-label]');
+    const localNote = document.getElementById('kitLocalNote');
+    const uploadNote = document.getElementById('kitUploadNote');
+    const zipZone = document.getElementById('kitZipZone');
+
+    if (analyzeLabel && !canWriteDirectory) analyzeLabel.textContent = '选择目录体检';
+    if (localNote && !canWriteDirectory) {
+      localNote.innerHTML = '<span class="kit-status-chip is-planned">内嵌浏览器受限</span><span>当前浏览器不能直接授权写入目录；可以选择目录做只读体检，或复制命令在终端生成完整报告。</span>';
+    }
+    if (uploadNote && !canReadZip) {
+      uploadNote.innerHTML = '<span class="kit-status-chip is-planned">zip 解析不可用</span><span>当前环境未加载 zip 解析器。请使用本地目录体检、Git 分析命令，或在普通浏览器打开此页。</span>';
+    }
+    if (zipZone && !canReadZip) {
+      zipZone.setAttribute('aria-disabled', 'true');
+      zipZone.querySelector('strong').textContent = '当前浏览器不能解析 zip';
+      const chip = zipZone.querySelector('.kit-status-chip');
+      if (chip) {
+        chip.className = 'kit-status-chip is-planned';
+        chip.textContent = '使用目录或命令';
+      }
+    }
+  }
+  updateRuntimeCapabilityHints();
   // Render bookmarks on initial load (visible only if there are saved projects)
   if (typeof renderProjectBookmarks === 'function') renderProjectBookmarks();
   document.querySelectorAll("[data-kit-source]").forEach((button) => {
@@ -4735,8 +6017,11 @@
         else button.textContent = originalText;
       }, 1400);
     } catch (error) {
-      if (label) label.textContent = "复制失败";
-      else button.textContent = "复制失败";
+      if (typeof openFileViewer === 'function') {
+        openFileViewer('手动复制命令', command, '当前浏览器限制了剪贴板');
+      }
+      if (label) label.textContent = "已打开命令";
+      else button.textContent = "已打开命令";
       window.setTimeout(() => {
         if (label) label.textContent = originalText;
         else button.textContent = originalText;
@@ -5659,8 +6944,15 @@
     const zipZone = document.getElementById('kitZipZone');
     const zipInput = document.getElementById('kitZipInput');
     if (zipZone && zipInput) {
-      zipZone.addEventListener('click', () => zipInput.click());
-      zipZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); zipInput.click(); } });
+      const openZipInput = () => {
+        if (typeof JSZip === 'undefined') {
+          openFileViewer('当前浏览器不能解析 zip', '这个内嵌浏览器没有加载 zip 解析器。请切到“读取本机目录”并复制本地体检命令，或在普通 Chrome / Edge 中打开此页后再上传 zip。', '浏览器能力受限');
+          return;
+        }
+        zipInput.click();
+      };
+      zipZone.addEventListener('click', openZipInput);
+      zipZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openZipInput(); } });
       zipInput.addEventListener('change', async () => {
         const file = zipInput.files && zipInput.files[0];
         if (!file) return;

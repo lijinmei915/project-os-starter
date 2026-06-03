@@ -71,6 +71,15 @@ assert_file "$root/.project-os/reports/ai-project-report.json"
 assert_contains "$root/.project-os/reports/ai-project-report.json" '"scores"'
 assert_file "$root/index.html"
 
+log "project graph"
+bash "$root/scripts/build-project-graph.sh" "$root" >/dev/null
+assert_file "$root/.project-os/graph/project-graph.json"
+assert_contains "$root/.project-os/graph/project-graph.json" '"schemaVersion": "project-graph.v0.1"'
+assert_contains "$root/.project-os/graph/project-graph.json" '"id":"AGENTS.md"'
+if command -v node >/dev/null 2>&1; then
+  node -e 'const fs=require("fs"); const g=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); if(!g.nodes || !g.nodes.length || !Array.isArray(g.edges)) process.exit(1)' "$root/.project-os/graph/project-graph.json"
+fi
+
 log "old project document quality"
 poor_docs="$tmp_dir/poor-docs"
 mkdir -p "$poor_docs/docs"
@@ -169,6 +178,7 @@ assert_file "$tmp_dir/core/scripts/check-secrets.sh"
 assert_file "$tmp_dir/core/scripts/check-ai-project.sh"
 assert_file "$tmp_dir/core/scripts/ai-project.sh"
 assert_file "$tmp_dir/core/scripts/add-project-docs.sh"
+assert_file "$tmp_dir/core/scripts/build-project-graph.sh"
 assert_file "$tmp_dir/core/schemas/ai-project-score.schema.json"
 assert_file "$tmp_dir/core/schemas/ai-project-score.v0.2.json"
 assert_file "$tmp_dir/core/schemas/ai-project-report.schema.json"
@@ -177,6 +187,8 @@ assert_file "$tmp_dir/core/index.html"
 assert_file "$tmp_dir/core/templates/project-docs/docs/ARCHITECTURE.md"
 assert_file "$tmp_dir/core/.project-os/reports/ai-project-report.json"
 assert_no_file "$tmp_dir/core/docs/ARCHITECTURE.md"
+bash "$tmp_dir/core/scripts/build-project-graph.sh" "$tmp_dir/core" >/dev/null
+assert_file "$tmp_dir/core/.project-os/graph/project-graph.json"
 bash "$tmp_dir/core/scripts/check-secrets.sh" "$tmp_dir/core" >/dev/null
 bash "$tmp_dir/core/scripts/add-project-docs.sh" "$tmp_dir/core" --profile product >/dev/null
 assert_file "$tmp_dir/core/docs/ARCHITECTURE.md"

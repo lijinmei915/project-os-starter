@@ -19,6 +19,7 @@ CLAUDE.md
 .codex/
 .claude/settings.local.json
 .project-os/reports/
+.project-os/graph/
 tests/screenshots/*.png
 tests/screenshots/current/
 tests/screenshots/diff/

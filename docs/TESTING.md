@@ -163,14 +163,17 @@ bash tests/run-tests.sh
 - `tests/check-report-model.mjs`
 - `scripts/check-ai-project.sh --write-report`
 - `scripts/add-project-docs.sh`
+- `scripts/build-project-graph.sh`
 - `tests/screenshot-regression.sh`
 - `tests/visual-diff.mjs --self-test`
 - `index.html`（standalone 可视化报告页）
 - `.project-os/reports/ai-project-report.json`
+- `.project-os/graph/project-graph.json`
 - `tests/cross-tool-matrix.md`
 - 老项目占位文档夹具，验证 `TODO` / `未记录` 不会被误判为可用文档
 - `core` / `product` / `full` 三种安装 profile
 - `core` 安装后的追加工程文档命令
+- `core` 安装后的项目关系图生成命令
 - 安装结果里的关键文件存在性和不该出现的文件
 - `claude` / `codex` / `cursor` / `gemini` adapter 安装和 `AGENTS.md` 引用检查
 

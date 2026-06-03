@@ -206,6 +206,24 @@
 
 ---
 
+#### D012 — 关系图先做本地静态生成物
+
+**决定**: 项目理解能力先由 `scripts/build-project-graph.sh` 生成 `.project-os/graph/project-graph.json`，记录文件节点、层级、SSOT 标记、模板标记、引用关系和 `.ai/rules` 映射。
+
+**放弃**: 暂不安装第三方 Understand Anything skill，不接 LLM 分析，不做实时 dashboard。
+
+**原因**:
+- 当前阶段仍是稳定内核，不能把项目带偏成外部可视化工具。
+- Project OS 更需要“工程规则和交接影响关系”，而不是通用代码图谱。
+- 先用 Bash 静态扫描生成机器可读 JSON，能保持 `core` profile 轻量且可测试。
+
+**影响**:
+- `core` profile 分发 `scripts/build-project-graph.sh`。
+- 生成物放在 `.project-os/graph/`，默认不提交。
+- 后续影响分析或报告页关系图入口可以读取该 JSON，但不得替代 `docs/ARCHITECTURE.md` 和人工 review。
+
+---
+
 ## 待记录
 
 暂无新的架构决策待补。

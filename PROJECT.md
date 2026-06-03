@@ -15,6 +15,7 @@
 - 检查层：`scripts/check-ai-project.sh`
 - 安装层：`scripts/install-project-os.sh`
 - 规则映射：`.ai/rules/` + `scripts/sync-ai-rules.sh` (SSOT 引擎)
+- 关系图谱：`scripts/build-project-graph.sh` 输出 `.project-os/graph/project-graph.json`
 - 自动成长：`scripts/auto-reflect.sh` (反思) + `scripts/optimize-rules.sh` (修剪)
 - 领域巡检：`scripts/check-frontend.sh`, `backend`, `testing`, `design`
 - 文档层：`AGENTS.md` / `PROJECT.md` / `HANDOFF.md` / `docs/*`
@@ -26,7 +27,7 @@
 
 ## 当前进度
 
-- 已完成：v1 路由契约、profile-based 安装脚本、adapter 写入、项目模板 / 全局模板、文档治理、统一 `.ai/` 目录结构、前后端与设计测试专属脚本、自动成长反思引擎、动态规则映射同步、**v0.3 多维工程健康评分模型**。
+- 已完成：v1 路由契约、profile-based 安装脚本、adapter 写入、项目模板 / 全局模板、文档治理、统一 `.ai/` 目录结构、前后端与设计测试专属脚本、自动成长反思引擎、动态规则映射同步、项目关系图谱生成、**v0.3 多维工程健康评分模型**。
 - 正在做：基于 v0.3 模型进行真实老项目样本的成熟度校准。
 - 暂不做：组件运行层 `ai-components`、组件库选型、工具原生 package 化。
 

@@ -19,6 +19,29 @@
 
 ### AI Engineering Kit / self engineering
 
+#### 增加本地项目关系图生成
+
+改动：
+- 新增 `scripts/build-project-graph.sh`，扫描核心文档、脚本、schema、模板、AI 资产和引用关系
+- 关系图输出到 `.project-os/graph/project-graph.json`，作为本地生成物
+- `core` profile 分发该脚本，并在 `tests/run-tests.sh` 中验证源仓库和 core 安装后的图谱生成
+- `.ai/skills/` 增加 `build-project-graph` 声明，供 AI 工具发现该动作
+
+影响：
+- Project OS 可以先拥有自己的轻量项目理解内核，不依赖第三方 skill
+- 生成物可作为后续影响分析和报告页关系图入口的数据源
+- 关系图只做静态结构分析，不替代 `docs/ARCHITECTURE.md` 或人工 review
+
+相关文件：
+- `scripts/build-project-graph.sh`
+- `.ai/skills/build-project-graph.json`
+- `scripts/install-project-os.sh`
+- `tests/run-tests.sh`
+- `docs/ARCHITECTURE.md`
+- `docs/DECISIONS.md`
+
+---
+
 #### 增加本地密钥占位和安全检查
 
 改动：

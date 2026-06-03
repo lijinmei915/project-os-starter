@@ -12,6 +12,7 @@
 bash tests/run-tests.sh
 bash scripts/check-runtime.sh .
 bash scripts/ai-project.sh report .
+bash scripts/build-project-graph.sh .
 bash scripts/check-template-sync.sh . --strict
 bash tests/screenshot-regression.sh
 ```
@@ -132,6 +133,27 @@ bash scripts/check-template-sync.sh . --strict
 - 还残留 `{{placeholder}}`
 
 这时不要新建同名文件，直接把现有文档补成可读内容。
+
+### 生成项目关系图
+
+运行：
+
+```bash
+bash scripts/build-project-graph.sh .
+```
+
+输出：
+
+```txt
+.project-os/graph/project-graph.json
+```
+
+用途：
+- 看核心文档、脚本、schema、模板和 AI 资产之间的静态关系
+- 判断一个文件是否是 SSOT、是否属于模板层、是否被其他文件引用
+- 为后续影响分析提供机器可读输入
+
+关系图是本地生成物，不替代 `docs/ARCHITECTURE.md`、`PROJECT.md` 或人工 review。
 
 工程成熟度低时，优先补：
 
