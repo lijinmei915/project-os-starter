@@ -919,7 +919,7 @@
       height: 100%;
       background: var(--color-surface-inverse);
       border-radius: var(--radius-md);
-      transition: transform var(--transition-normal, .3s) cubic-bezier(.4, 0, .2, 1);
+      transition: transform .3s cubic-bezier(.4, 0, .2, 1);
       z-index: 0;
     }
     .kit-switch button {
@@ -942,7 +942,7 @@
       transition: color var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
       user-select: none;
     }
-    .kit-switch button:hover {
+    .kit-switch button:not(.is-active):hover {
       color: var(--color-text-primary);
       background: rgba(255, 255, 255, .52);
     }
@@ -1183,9 +1183,8 @@
       background: var(--color-surface-control);
     }
     .kit-wizard-card-sm.is-active {
-      border-color: var(--color-brand-primary);
-      background: rgba(var(--color-brand-primary-rgb), 0.04);
-      box-shadow: 0 0 0 1px var(--color-brand-primary);
+      border-color: var(--color-surface-inverse);
+      background: var(--color-surface-panel);
     }
     .kit-choice-list {
       display: grid;
@@ -1246,10 +1245,9 @@
     .kit-choice.is-active,
     .kit-strategy.is-active,
     .kit-source.is-active {
-      border-color: var(--color-brand-primary);
-      background: rgba(var(--color-brand-primary-rgb), 0.04);
+      border-color: var(--color-surface-inverse);
+      background: var(--color-surface-panel);
       color: var(--color-text-primary);
-      box-shadow: 0 0 0 1px var(--color-brand-primary);
     }
     .kit-choice > .kit-icon,
     .kit-strategy > .kit-icon,

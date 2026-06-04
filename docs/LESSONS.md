@@ -14,6 +14,32 @@ last_verified: 2026-06-04
 
 ---
 
+## 设计 / 前端
+
+### 2026-06-04 抽 tokens.css 后 tab 滑块动画失效
+
+**犯的错**：把 `--transition-normal: .25s ease` 抽进 `tokens.css` 后，tab 滑块的平滑滑动消失了，点击瞬间硬跳。
+
+**根本原因**：滑块用了 `transition: transform var(--transition-normal, .3s) cubic-bezier(.4,0,.2,1)`。token 值自带 `ease` 关键字，展开后变成 `transform .25s ease cubic-bezier(...)` —— 一条 transition 里出现两个缓动函数（`ease` 和 `cubic-bezier`），整条声明非法被浏览器丢弃，退化成无动画。抽 token 前 token 未定义，走 `.3s` 兜底，反而合法。
+
+**加了什么规则**：
+- transition 速记里如果还要单独指定缓动曲线，时长 token 只放纯时长（如 `.25s`），不要把 `ease` 等缓动关键字塞进时长 token。
+- 改动共享 token 后，必须回归所有引用该 token 且自带缓动函数的动画。
+- 滑块改回 `transition: transform .3s cubic-bezier(.4,0,.2,1)`，不复用含缓动关键字的 token。
+
+### 2026-06-04 选中态样式多次漂移、与基准卡片不一致
+
+**犯的错**：Q1/Q2 向导卡片和代码来源卡片的选中态被反复改成 teal 绿边框 + box-shadow ring，和「生成工程契约」下的 kit-option 基准卡片（中性深色 1px 边框）不一致；滑动时被点击按钮还闪白底。
+
+**根本原因**：（1）没有把「选中态视觉」当成一套统一规范，每次单独调一个组件就漂移；（2）box-shadow ring 叠在 1px border 上视觉变粗；（3）`button:hover` 白底没排除 `.is-active`，滑动途中和滑块叠加闪白。
+
+**加了什么规则**：
+- 选中态以 kit-option 为基准：`border-color: --color-surface-inverse` + `background: --color-surface-panel`，1px 边框、无 box-shadow ring。
+- hover 反馈用 `:not(.is-active)` 限定，激活项不再叠 hover 背景。
+- 改任一卡片选中态时，对照基准卡片确认边框色/宽度/有无 ring 一致。
+
+---
+
 ## Project OS / 路由
 
 ### 2026-05-10 INSTALL / INIT 停在安装总结，没有继续进入启动方式选择
