@@ -1,3 +1,9 @@
+---
+layer: knowledge
+type: spec
+last_verified: 2026-06-04
+---
+
 # 产品规划
 
 > 本文件回答：这个项目接下来往哪走、这个阶段先做什么、哪些事暂时不做。

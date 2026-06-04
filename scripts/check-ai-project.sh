@@ -62,7 +62,7 @@ generated_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 report_file=".project-os/reports/ai-project-report.md"
 json_file=".project-os/reports/ai-project-report.json"
 report_modules_file="${AI_PROJECT_REPORT_MODULES:-schemas/ai-project-report.v0.1.json}"
-score_model_file="schemas/ai-project-score.v0.3.json"
+score_model_file="schemas/ai-project-score.v0.4.json"
 tmp_report="$(mktemp)"
 tmp_items="$(mktemp)"
 tmp_maturity="$(mktemp)"
@@ -151,6 +151,44 @@ is_substantive_doc() {
   [ -f "$file" ] || return 1
   meaningful_lines="$(doc_meaningful_lines "$file")"
   [ "$meaningful_lines" -ge "$min_lines" ]
+}
+
+# --- v0.4 知识结构化辅助函数 ---
+# 是否含 YAML frontmatter（首行为 ---）
+has_frontmatter() {
+  [ -f "$1" ] || return 1
+  [ "$(head -1 "$1" 2>/dev/null)" = "---" ]
+}
+
+# 元数据覆盖率：docs/*.md 中带 frontmatter 的占比（百分比整数）
+frontmatter_coverage() {
+  total=0
+  covered=0
+  for f in docs/*.md; do
+    [ -f "$f" ] || continue
+    total=$((total + 1))
+    if has_frontmatter "$f"; then covered=$((covered + 1)); fi
+  done
+  [ "$total" -eq 0 ] && { printf '0'; return 0; }
+  printf '%s' $(( covered * 100 / total ))
+}
+
+# 统计过期文档（last_verified 距今 > stale_days）。输出空格分隔文件名。
+stale_threshold_days=90
+stale_docs() {
+  now_epoch="$(date '+%s')"
+  for f in docs/*.md; do
+    [ -f "$f" ] || continue
+    has_frontmatter "$f" || continue
+    lv="$(awk 'NR==1&&$0=="---"{i=1;next} i&&$0=="---"{exit} i&&index($0,"last_verified:")==1{v=$0;sub(/^last_verified:[ \t]*/,"",v);print v;exit}' "$f" 2>/dev/null)"
+    [ -n "$lv" ] || continue
+    lv_epoch="$(date -j -f '%Y-%m-%d' "$lv" '+%s' 2>/dev/null || date -d "$lv" '+%s' 2>/dev/null || echo '')"
+    [ -n "$lv_epoch" ] || continue
+    diff_days=$(( (now_epoch - lv_epoch) / 86400 ))
+    if [ "$diff_days" -gt "$stale_threshold_days" ]; then
+      printf '%s ' "$f"
+    fi
+  done
 }
 
 has_quality_any() {
@@ -443,10 +481,10 @@ else
   maturity_gap "评分与状态源" 5 "PROJECT.md 与 .project-os/state.json 应保持当前阶段一致"
 fi
 
-if has_file "schemas/ai-project-score.schema.json" && has_file "schemas/ai-project-score.v0.3.json" && has_any "schemas/ai-project-score.v0.3.json" "ai-project-engineering-score" "\"version\": \"0.3\""; then
-  maturity_award "评分与状态源" 3 "存在评分模型 schema 和 v0.3 数据源"
+if has_file "schemas/ai-project-score.schema.json" && has_file "schemas/ai-project-score.v0.4.json" && has_any "schemas/ai-project-score.v0.4.json" "ai-project-engineering-score" "\"version\": \"0.4\""; then
+  maturity_award "评分与状态源" 3 "存在评分模型 schema 和 v0.4 数据源"
 else
-  maturity_gap "评分与状态源" 3 "建议补评分模型 schema 和 v0.3 数据源"
+  maturity_gap "评分与状态源" 3 "建议补评分模型 schema 和 v0.4 数据源"
 fi
 
 if has_any "docs/PRODUCT_PLAN.md" "100/100" "真实工程成熟" "工程闭环"; then
@@ -566,18 +604,37 @@ else
   maturity_gap "技术健康" 10 "检测到高危依赖漏洞，建议运行 npm audit fix"
 fi
 
-# --- v0.3 新增维度: 知识演进 (20/100 Maturity) ---
+# --- v0.4 维度: 知识演进 (20/100 Maturity) ---
+# 子项 1: 错题本活跃度 (6)
 lessons_lines=$(doc_meaningful_lines "docs/LESSONS.md")
 if [ "$lessons_lines" -ge 10 ]; then
-  maturity_award "知识演进" 10 "具备活跃的错题本 (LESSONS.md 积累丰富)"
+  maturity_award "知识演进" 6 "具备活跃的错题本 (LESSONS.md 积累丰富)"
 else
-  maturity_gap "知识演进" 10 "教训积累不足，建议增加自动反思频率"
+  maturity_gap "知识演进" 6 "教训积累不足，建议增加自动反思频率"
 fi
 
+# 子项 2: 自动成长引擎 (6)
 if [ -f "scripts/auto-reflect.sh" ] && [ -f ".ai/skills/auto-reflect.json" ]; then
-  maturity_award "知识演进" 10 "自动成长引擎已激活"
+  maturity_award "知识演进" 6 "自动成长引擎已激活"
 else
-  maturity_gap "知识演进" 10 "缺少 auto-reflect 机制，经验沉淀依赖人力"
+  maturity_gap "知识演进" 6 "缺少 auto-reflect 机制，经验沉淀依赖人力"
+fi
+
+# 子项 3: 元数据完整度 (4) — docs/*.md 的 frontmatter 覆盖率
+fm_cov="$(frontmatter_coverage)"
+if [ "$fm_cov" -ge 90 ]; then
+  maturity_award "知识演进" 4 "文档元数据覆盖率 ${fm_cov}%，知识已结构化"
+else
+  maturity_gap "知识演进" 4 "文档元数据覆盖率仅 ${fm_cov}%，建议给文档补 frontmatter"
+fi
+
+# 子项 4: 知识新鲜度 (4) — 无过期文档
+stale_list="$(stale_docs)"
+if [ -z "$stale_list" ]; then
+  maturity_award "知识演进" 4 "无过期文档，知识保持新鲜"
+else
+  stale_n="$(printf '%s' "$stale_list" | wc -w | tr -d ' ')"
+  maturity_gap "知识演进" 4 "有 ${stale_n} 个文档超过 ${stale_threshold_days} 天未核实：${stale_list}"
 fi
 
 {
@@ -603,7 +660,7 @@ fi
     fi
   done < "$tmp_items"
 
-  printf '\n## 工程成熟度与健康度 v0.3\n'
+  printf '\n## 工程成熟度与健康度 v0.4\n'
 
   current_section=""
   while IFS="$(printf '\t')" read -r section status earned max label; do
@@ -655,7 +712,7 @@ write_json_report() {
     printf '{\n'
     printf '  "generatedAt": "%s",\n' "$generated_at_json"
     printf '  "projectPath": "%s",\n' "$project_path_json"
-    printf '  "scoreModel": "v0.3",\n'
+    printf '  "scoreModel": "v0.4",\n'
     printf '  "scores": {\n'
     printf '    "context": {"score": %s, "max": %s, "status": "%s", "gapCount": %s},\n' "$score" "$max_score" "$context_status_json" "$context_gap_count"
     printf '    "maturity": {"score": %s, "max": %s, "status": "%s", "gapCount": %s}\n' "$maturity_score" "$maturity_max_score" "$maturity_status_json" "$maturity_gap_count"

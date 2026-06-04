@@ -1,3 +1,9 @@
+---
+layer: knowledge
+type: spec
+last_verified: 2026-06-04
+---
+
 # 环境说明
 
 > 用途：说明本地运行、依赖、环境变量和外部服务。

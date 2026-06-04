@@ -1,3 +1,9 @@
+---
+layer: knowledge
+type: spec
+last_verified: 2026-06-04
+---
+
 # 测试与偏离检查
 
 > 用途：定义测试方法、验收重点和偏离检查方式。

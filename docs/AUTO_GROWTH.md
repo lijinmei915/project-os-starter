@@ -1,3 +1,10 @@
+---
+layer: governance
+type: spec
+last_verified: 2026-06-04
+depends_on: [scripts/auto-reflect.sh, scripts/optimize-rules.sh]
+---
+
 # 自动成长与迭代机制 (Auto-Growth)
 
 > 用途：说明项目如何实现“越用越聪明”的自驱动迭代。

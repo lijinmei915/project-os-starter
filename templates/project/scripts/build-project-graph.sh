@@ -3,6 +3,7 @@ set -euo pipefail
 
 target="."
 stdout=0
+stale_days=90
 
 usage() {
   cat <<'USAGE'
@@ -131,6 +132,50 @@ is_ssot() {
   esac
 }
 
+# --- Frontmatter parsing ---
+# 从 .md 文件最顶部的 --- YAML --- 块提取一个字段的值。
+# 用法: fm_field <file> <field>
+fm_field() {
+  file="$1"
+  field="$2"
+  case "$file" in
+    *.md) ;;
+    *) return 0 ;;
+  esac
+  [ "$(head -1 "$file" 2>/dev/null)" = "---" ] || return 0
+  awk -v key="$field" '
+    NR==1 && $0=="---" { infm=1; next }
+    infm && $0=="---" { exit }
+    infm {
+      line=$0
+      sub(/^[ \t]+/, "", line)
+      if (index(line, key ":") == 1) {
+        val=substr(line, length(key)+2)
+        sub(/^[ \t]+/, "", val)
+        sub(/[ \t]+$/, "", val)
+        print val
+        exit
+      }
+    }
+  ' "$file" 2>/dev/null
+}
+
+# 计算 last_verified 距今天数；输出 stale 标记 true/false。
+# 用法: compute_stale <last_verified-date>
+compute_stale() {
+  lv="$1"
+  [ -n "$lv" ] || { printf 'false'; return 0; }
+  lv_epoch="$(date -j -f '%Y-%m-%d' "$lv" '+%s' 2>/dev/null || date -d "$lv" '+%s' 2>/dev/null || echo '')"
+  [ -n "$lv_epoch" ] || { printf 'false'; return 0; }
+  now_epoch="$(date '+%s')"
+  diff_days=$(( (now_epoch - lv_epoch) / 86400 ))
+  if [ "$diff_days" -gt "$stale_days" ]; then
+    printf 'true'
+  else
+    printf 'false'
+  fi
+}
+
 resolve_link() {
   link_path="$1"
   raw_target="$(readlink "$link_path" 2>/dev/null || true)"
@@ -199,7 +244,37 @@ while IFS= read -r file; do
     executable_flag="true"
   fi
 
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$file" "$kind" "$layer" "$template_flag" "$ssot_flag" "$executable_flag" >> "$nodes_file"
+  # --- Frontmatter 元数据 (机读) ---
+  arch_layer="$(fm_field "$file" "layer")"
+  doc_type="$(fm_field "$file" "type")"
+  last_verified="$(fm_field "$file" "last_verified")"
+  stale_flag="$(compute_stale "$last_verified")"
+
+  # 无 frontmatter 时按文件类型/路径派生架构层，让架构图能完整显示
+  if [ -z "$arch_layer" ]; then
+    case "$file" in
+      scripts/*|kit|.ai/skills/*) arch_layer="skills" ;;
+      README.md|INSTALL.md|adapters/*|index.html) arch_layer="entry" ;;
+      schemas/*) arch_layer="knowledge" ;;
+    esac
+  fi
+
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$file" "$kind" "$layer" "$template_flag" "$ssot_flag" "$executable_flag" \
+    "$arch_layer" "$doc_type" "$last_verified" "$stale_flag" >> "$nodes_file"
+
+  # --- depends_on 声明式依赖边 ---
+  deps_raw="$(fm_field "$file" "depends_on")"
+  if [ -n "$deps_raw" ]; then
+    deps_clean="$(printf '%s' "$deps_raw" | tr -d '[]' | tr ',' '\n')"
+    printf '%s\n' "$deps_clean" | while IFS= read -r dep; do
+      dep="$(printf '%s' "$dep" | sed 's/^[ \t]*//;s/[ \t]*$//')"
+      [ -n "$dep" ] || continue
+      if [ -e "$dep" ]; then
+        add_edge "$file" "$dep" "declares_dependency"
+      fi
+    done
+  fi
 
   if [ -L "$file" ]; then
     resolved="$(resolve_link "$file")"
@@ -224,34 +299,37 @@ sort -u "$edges_file" -o "$edges_file"
 
 node_count="$(wc -l < "$nodes_file" | tr -d ' ')"
 edge_count="$(wc -l < "$edges_file" | tr -d ' ')"
+stale_count="$(awk -F'\t' '$10=="true"' "$nodes_file" | wc -l | tr -d ' ')"
 generated_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 project_path="$(pwd)"
 tmp_json="$tmp_dir/project-graph.json"
 
 {
   printf '{\n'
-  printf '  "schemaVersion": "project-graph.v0.1",\n'
+  printf '  "schemaVersion": "project-graph.v0.2",\n'
   printf '  "generatedAt": "%s",\n' "$(json_escape "$generated_at")"
   printf '  "projectPath": "%s",\n' "$(json_escape "$project_path")"
+  printf '  "staleDays": %s,\n' "$stale_days"
   printf '  "summary": {\n'
   printf '    "nodeCount": %s,\n' "$node_count"
-  printf '    "edgeCount": %s\n' "$edge_count"
+  printf '    "edgeCount": %s,\n' "$edge_count"
+  printf '    "staleCount": %s\n' "$stale_count"
   printf '  },\n'
   printf '  "nodes": [\n'
   first=1
-  while IFS="$(printf '\t')" read -r id kind layer template_flag ssot_flag executable_flag; do
-    if [ "$first" -eq 0 ]; then
-      printf ',\n'
-    fi
-    first=0
-    printf '    {"id":"%s","kind":"%s","layer":"%s","template":%s,"ssot":%s,"executable":%s}' \
-      "$(json_escape "$id")" \
-      "$(json_escape "$kind")" \
-      "$(json_escape "$layer")" \
-      "$template_flag" \
-      "$ssot_flag" \
-      "$executable_flag"
-  done < "$nodes_file"
+  awk -F'\t' '
+    function esc(s) {
+      gsub(/\\/, "\\\\", s); gsub(/"/, "\\\"", s)
+      gsub(/\t/, "\\t", s); gsub(/\r/, "\\r", s)
+      return s
+    }
+    {
+      if (NR > 1) printf ",\n"
+      stale = ($10 == "true") ? "true" : "false"
+      printf "    {\"id\":\"%s\",\"kind\":\"%s\",\"layer\":\"%s\",\"template\":%s,\"ssot\":%s,\"executable\":%s,\"archLayer\":\"%s\",\"docType\":\"%s\",\"lastVerified\":\"%s\",\"stale\":%s}", \
+        esc($1), esc($2), esc($3), $4, $5, $6, esc($7), esc($8), esc($9), stale
+    }
+  ' "$nodes_file"
   printf '\n  ],\n'
   printf '  "edges": [\n'
   first=1
@@ -276,4 +354,10 @@ else
   echo "Project graph written: $graph_file"
   echo "Nodes: $node_count"
   echo "Edges: $edge_count"
+  # 额外输出一份给架构图页面读取（纳入 git，非 gitignore 的本地生成物）
+  if [ -d "docs" ]; then
+    mkdir -p "docs/data"
+    cp "$graph_file" "docs/data/project-graph.json"
+    echo "Page copy written: docs/data/project-graph.json"
+  fi
 fi

@@ -1,3 +1,10 @@
+---
+layer: knowledge
+type: status
+last_verified: 2026-06-04
+depends_on: [PROJECT.md]
+---
+
 # 当前交接
 
 > 用途：回答“上一轮做了什么、现在能不能继续、风险是什么、下一步具体干什么”。

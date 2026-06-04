@@ -21,8 +21,8 @@
 
 ## 当前状态速览（每次收尾更新，保持 5 行以内）
 
-- **上次做到**：新增 build-project-graph.sh 本地关系图生成，AI_SAFETY / SECURITY / TECH_STACK 文档模板，index.html 报告页大幅增强，模板层同步
-- **下一步**：push 验证线上；用真实老项目样本校准成熟度评分模型
+- **上次做到**：v3 知识结构化全部落地 — frontmatter 规范+全文档元数据，图谱升级 v0.2（archLayer/stale/declares_dependency），评分升级 v0.4（元数据/新鲜度维度），架构图改读图谱自动渲染，模板同步，修复 commit-guard hook
+- **下一步**：v4 Skill 契约化 — 现有脚本/向导抽成标准 I/O 契约，对齐 agent-skills 生态
 - **线上地址**：https://lijinmei915.github.io/project-os-starter/
 
 ---

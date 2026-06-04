@@ -1,3 +1,10 @@
+---
+layer: knowledge
+type: spec
+last_verified: 2026-06-04
+depends_on: [PRODUCT.md]
+---
+
 # Project OS 产品规划
 
 > 用途：回答“这个产品分几阶段演进、当前阶段做什么、下一阶段再做什么”。
@@ -205,33 +212,65 @@ AI Engineering Kit 自身工程化收口期
 - 不做 marketplace 级分发
 - 不追求所有平台一次打通
 
-### v3：可发现 skill / package + 外部系统集成
+### v3：知识结构化（架构演进第一步）
 
 目标：
 
-- 让 Project OS 逐步从”仓库 + 安装脚本”升级为”更容易被模型和工具发现的能力包”
-- 把 `adapters/` 扩展成两类：AI 工具 adapter（现有）+ 外部系统 adapter（新增）
-- 支持一条命令从读需求到部署的全流程：AI 读 Jira/Confluence US → 拆 task → 建分支 → 开发 → 自动化测试 → Sonar 安全扫描 → 合并部署
+- 让项目知识从「扁平 .md 文件」升级为「结构化可消费资产」
+- 建立 Source → Schema 的知识管线，AI 不再靠全文塞上下文
 
 核心交付物：
 
-- package / metadata 设计
-- 更正式的安装入口协议
-- 可发现的命令 / skill 注册机制
-- 外部系统 adapter 框架：Jira / Confluence（需求源）、GitHub Actions / Jenkins（执行层）、SonarQube（质量门禁）
-- INIT flow 支持接收 US 作为输入，自动拆解为 task 并进入开发流程
+- 每个模板文件加 frontmatter 元数据（类型、归属模块、过期时间、依赖关系）
+- `build-project-graph.sh` 升级为结构化知识图谱，输出 typed JSON
+- 知识过期检测：文档加 `last_verified` 时间戳，超期自动提醒
+- `check-ai-project.sh` 从「文件是否存在」升级为「元数据是否完整、是否过期」
 
 成功标准：
 
-- 纯空目录里也更容易通过短提示进入正确流程
-- 平台能先认识 Project OS，再执行安装或接管
-- `--with-ci` 安装选项可写入 GitHub Actions workflow 模板
+- 每个 .md 模板文件都有机器可读的 frontmatter
+- 知识图谱能回答「这个文件被谁引用、多久没更新」
+- 体检报告能标出过期文档，而不只是缺失文档
+
+### v4：Skill 层（架构演进第二步）
+
+目标：
+
+- 让 Project OS 从「文档工具包」升级为「AI 可调用的能力包」
+- 把现有脚本和向导逻辑抽成独立 Skill，每个 Skill 有标准输入输出契约
+
+核心交付物：
+
+- Skill 契约定义：输入 schema、输出 schema、前置条件、副作用声明
+- 核心 Skill：初始化、体检、补齐、反思、知识同步
+- Skill 注册机制：AI 工具可发现并调用
+- 外部系统 adapter 框架：Jira / Confluence（需求源）、GitHub Actions / Jenkins（执行层）
+
+成功标准：
+
+- AI 能通过标准接口调用 Skill，而不是靠提示词描述脚本路径
+- 新增 Skill 只需按契约注册，不用改路由逻辑
+- 至少一个外部系统 adapter 可用（如 GitHub Actions）
+
+### v5：治理自动化 + 全流程闭环（架构演进第三步）
+
+目标：
+
+- 建立知识治理闭环：过期清理、定时巡检、变更审批
+- 支持从需求到部署的 AI 辅助全流程
+
+核心交付物：
+
+- 定时巡检任务：知识过期扫描、规则冲突检测、模板漂移检查
+- 变更审批流：关键文档修改需人工确认
+- 全流程编排：AI 读需求 → 拆任务 → 建分支 → 开发 → 测试 → 合并
+- 可观测性：Skill 调用记录、知识更新频率、工程健康趋势
+
+成功标准：
+
+- 过期文档能自动被发现和提醒
 - AI 能根据 US 自主完成从建分支到提 PR 的完整开发闭环
-
-本阶段不做（留到 v4+）：
-
-- 不追求全平台一次打通
-- 不做完全无人值守的自动部署（需保留人工审批节点）
+- 有仪表盘展示项目工程健康趋势
 
 ---
 

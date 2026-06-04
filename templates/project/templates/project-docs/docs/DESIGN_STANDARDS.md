@@ -1,3 +1,9 @@
+---
+layer: knowledge
+type: spec
+last_verified: 2026-06-04
+---
+
 # 设计规范
 
 > 本文件回答：当前项目的 UI 规则、token 使用方式和设计边界。

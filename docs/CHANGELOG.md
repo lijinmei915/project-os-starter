@@ -1,3 +1,9 @@
+---
+layer: knowledge
+type: log
+last_verified: 2026-06-04
+---
+
 # 代码变更日志
 
 > 只记录高价值改动，用于回溯"改了什么 / 为什么改 / 影响到哪里"。
@@ -18,6 +24,30 @@
 ## 2026-05-20
 
 ### AI Engineering Kit / self engineering
+
+#### v3 知识结构化：文档 frontmatter + 图谱升级 + 评分升级 + 架构图自动化
+
+改动：
+- 新增 `docs/KNOWLEDGE_SCHEMA.md`，定义文档 YAML frontmatter 规范（layer / type / last_verified / depends_on）
+- 给根目录 + `docs/` 全部文档加 frontmatter，模板层（`templates/project*/`）镜像同步
+- `scripts/build-project-graph.sh` 升级：解析 frontmatter，节点增加 archLayer / docType / lastVerified / stale 字段，新增 `declares_dependency` 边，90 天过期检测，schemaVersion → v0.2，额外输出 `docs/data/project-graph.json` 供页面读取
+- 新增评分模型 `schemas/ai-project-score.v0.4.json`：知识演进维度拆成错题本 / 引擎 / 元数据完整度 / 知识新鲜度四子项；`scripts/check-ai-project.sh` 按 v0.4 评分并列出过期文档
+- `docs/architecture-diagram.html` 改为 fetch 图谱 JSON 动态渲染，按 archLayer 分四层，过期文档标橙，永远反映当前代码结构
+- `scripts/sync-templates.sh` 补上漏掉的 `build-project-graph.sh` 同步项
+- 修复 `.claude/settings.local.json` commit-guard hook：原 `if` 字段不生效导致拦截所有 bash，改为读 stdin 命令仅在 `git commit` 时检查
+
+影响：
+- 项目知识从「扁平文件」升级为「机器可读的结构化资产」，AI 不再靠全文塞上下文
+- 体检报告能标出过期文档，而不只是缺失文档
+- 架构图成为知识图谱的可视化出口，手画图过期问题消除
+- 为 v4 Skill 契约化和 v5 治理闭环打下数据地基
+
+相关文件：
+- `docs/KNOWLEDGE_SCHEMA.md`、`scripts/build-project-graph.sh`、`scripts/check-ai-project.sh`
+- `schemas/ai-project-score.v0.4.json`、`docs/architecture-diagram.html`、`docs/data/project-graph.json`
+- 根目录 + `docs/*.md`、`templates/project*/**`、`tests/run-tests.sh`、`.claude/settings.local.json`
+
+---
 
 #### 增加本地项目关系图生成
 

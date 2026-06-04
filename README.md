@@ -1,3 +1,10 @@
+---
+layer: entry
+type: guide
+last_verified: 2026-06-04
+depends_on: [INSTALL.md, AGENTS.md]
+---
+
 # AI Engineering Kit
 
 > 用途：回答"这个仓库是什么、怎么开始、关键入口在哪、怎么安装给别人用"。

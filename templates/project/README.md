@@ -1,3 +1,10 @@
+---
+layer: entry
+type: guide
+last_verified: 2026-06-04
+depends_on: [INSTALL.md]
+---
+
 # 项目说明
 
 > 本文件是安装 Project OS 后给目标项目的 README 模板。

@@ -1,3 +1,9 @@
+---
+layer: knowledge
+type: log
+last_verified: 2026-06-04
+---
+
 # 错误模式记录
 
 > 每次犯错后立即记录，防止同样的错误再犯。

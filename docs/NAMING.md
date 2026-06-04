@@ -1,3 +1,10 @@
+---
+layer: governance
+type: spec
+last_verified: 2026-06-04
+depends_on: [docs/DOCUMENTATION.md]
+---
+
 # 文档命名规范
 
 > 用途：定义 AI 工程文档的主流命名、放置位置和兼容规则。

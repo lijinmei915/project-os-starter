@@ -65,5 +65,6 @@ sync_file "scripts/check-ai-project.sh" "templates/project/scripts/check-ai-proj
 sync_file "scripts/ai-project.sh" "templates/project/scripts/ai-project.sh"
 sync_file "scripts/add-project-docs.sh" "templates/project/scripts/add-project-docs.sh"
 sync_file "scripts/install-adapter.sh" "templates/project/scripts/install-adapter.sh"
+sync_file "scripts/build-project-graph.sh" "templates/project/scripts/build-project-graph.sh"
 
 echo "template runtime sync complete"

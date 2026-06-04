@@ -1,3 +1,10 @@
+---
+layer: governance
+type: spec
+last_verified: 2026-06-04
+depends_on: [docs/DOCUMENTATION.md]
+---
+
 # 文档命名规范
 
 > 用途：定义文档命名和放置位置，让 AI 和人快速判断"这个文件该叫什么、放哪里"。

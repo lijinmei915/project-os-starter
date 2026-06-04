@@ -1,3 +1,9 @@
+---
+layer: governance
+type: spec
+last_verified: 2026-06-04
+---
+
 # 文档编写规范
 
 > 用途：定义 Project OS 的文档边界、编写规范、更新规则和校验约束。

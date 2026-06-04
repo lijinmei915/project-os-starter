@@ -6,137 +6,11 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <title>AI 项目工程完整度报告</title>
+  <link rel="stylesheet" href="tokens.css">
   <style>
     :root {
-      color-scheme: light;
-      /* ── Teal-tinted neutrals (chroma ~0.008, hue 180) ── */
-      --gray-50: #f8fafa;
-      --gray-100: #f2f5f5;
-      --gray-200: #e1e5e5;
-      --gray-300: #d1d5d6;
-      --gray-400: #9da4a5;
-      --gray-500: #6d7578;
-      --gray-600: #4f5658;
-      --gray-700: #3c4345;
-      --gray-800: #262c2d;
-      --gray-900: #171c1d;
-      --slate-50: #f6faf9;
-      --slate-100: #ebf0ef;
-      --slate-200: #d6dddc;
-      --slate-500: #627473;
-      --slate-900: #1a2524;
-      --teal-50: #dff7f3;
-      --teal-600: #087b73;
-      --teal-500: #13b7a6;
-      --emerald-50: #e8f7ef;
-      --emerald-100: #ecfdf5;
-      --emerald-200: #b7e7ca;
-      --emerald-300: #86efac;
-      --emerald-400: #34d399;
-      --emerald-500: #10b981;
-      --emerald-600: #059669;
-      --emerald-700: #087443;
-      --emerald-800: #047857;
-      --blue-50: #eef4ff;
-      --blue-600: #2563eb;
-      --blue-700: #175cd3;
-      --orange-50: #fff4e5;
-      --orange-700: #b54708;
-
-      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      --font-mono: "SFMono-Regular", Consolas, monospace;
-
-      /* ── Semantic type scale (rem) ── */
-      --text-xs:   0.75rem;    /* 12px — captions, footnotes */
-      --text-sm:   0.8125rem;  /* 13px — secondary UI, badges */
-      --text-base: 0.875rem;   /* 14px — body default */
-      --text-md:   1rem;       /* 16px — emphasized body */
-      --text-lg:   1.25rem;    /* 20px — subheadings */
-      --text-xl:   1.5rem;     /* 24px — section titles */
-      --text-2xl:  2.25rem;    /* 36px — page title */
-
-      /* ── Legacy aliases (px, keep for compat) ── */
-      --text-10: 0.625rem; --text-11: 0.6875rem; --text-12: var(--text-xs);
-      --text-13: var(--text-sm); --text-14: var(--text-base);
-      --text-16: var(--text-md); --text-18: 1.125rem;
-      --text-20: var(--text-lg); --text-22: 1.375rem;
-      --text-24: var(--text-xl); --text-26: 1.625rem;
-      --text-30: 1.875rem; --text-32: 2rem;
-      --text-34: 2.125rem; --text-40: 2.5rem; --text-44: 2.75rem;
-
-      /* ── Weight scale (3 stops) ── */
-      --font-regular: 400;
-      --font-semibold: 600;
-      --font-bold: 700;
-      /* Legacy aliases */
-      --font-medium: 600;
-      --font-strong: 700;
-      --font-heavy: 700;
-
-      --space-2: 2px;
-      --space-3: 3px;
-      --space-4: 4px;
-      --space-5: 5px;
-      --space-6: 6px;
-      --space-8: 8px;
-      --space-9: 9px;
-      --space-10: 10px;
-      --space-12: 12px;
-      --space-13: 13px;
-      --space-14: 14px;
-      --space-16: 16px;
-      --space-18: 18px;
-      --space-20: 20px;
-      --space-24: 24px;
-      --space-28: 28px;
-      --space-32: 32px;
-      --space-48: 48px;
-      --space-72: 72px;
-
-      --radius-xs: 4px;
-      --radius-sm: 8px;
-      --radius-md: 10px;
-      --radius-card: 12px;
-      --radius-lg: 14px;
-      --radius-xl: 18px;
-      --radius-full: 999px;
-
-      --color-surface-page: var(--gray-50);
-      --color-surface-panel: #ffffff;
-      --color-surface-muted: var(--slate-50);
-      --color-surface-control: var(--gray-100);
-      --color-surface-inverse: var(--gray-900);
-      --color-surface-inverse-hover: var(--gray-800);
-      --color-text-primary: var(--gray-900);
-      --color-text-secondary: var(--gray-500);
-      --color-text-muted: var(--gray-400);
-      --color-text-soft: var(--gray-600, #52525b);
-      --color-text-inverse: #ffffff;
-      --color-border-default: rgba(214, 221, 220, .9);
-      --color-border-subtle: rgba(214, 221, 220, .6);
-      --color-border-strong: var(--slate-200);
-      --color-brand: var(--teal-500);
-      --color-brand-text: var(--teal-600);
-      --color-action-primary: #0d5c56;
-      --color-action-primary-hover: #0a4a45;
-      --color-success-text: var(--emerald-700);
-      --color-success-bg: var(--emerald-50);
-      --color-success-strong: var(--emerald-500);
-      --color-success-icon: var(--emerald-400);
-      --color-warning-text: var(--orange-700);
-      --color-warning-bg: var(--orange-50);
-      --color-info-bg: var(--blue-50);
-      --color-info-text: var(--blue-700);
-      --color-focus: var(--teal-600);
+      /* ── Page-specific tokens (not in tokens.css) ── */
       --color-metric-panel: #0e1f22;
-
-      --shadow-sm: 0 1px 2px rgba(24, 24, 27, .04);
-      --shadow-control: 0 1px 2px rgba(24, 24, 27, .06);
-      --shadow-strong: 0 8px 22px rgba(24, 24, 27, .16);
-      --shadow-focus: 0 0 0 3px rgba(8, 123, 115, .28);
-      --shadow-focus-muted: 0 0 0 3px rgba(8, 123, 115, .16);
-      --shadow-success-ring: 0 0 0 3px rgba(52, 211, 153, .22);
-      --shadow-brand-ring: 0 0 0 3px rgba(19, 183, 166, .16);
 
       --layout-report-max: 1280px;
       --layout-workbench-max: 960px;
@@ -899,6 +773,21 @@
       height: var(--text-13);
       color: var(--color-success-icon);
     }
+    .kit-arch-link {
+      color: var(--color-text-inverse);
+      opacity: .55;
+      font-size: var(--text-10);
+      font-weight: var(--font-semibold);
+      text-decoration: none;
+      margin-left: var(--space-4);
+      padding: var(--space-2) var(--space-6);
+      border: 1px solid rgba(255,255,255,.25);
+      border-radius: var(--radius-xs);
+      transition: opacity var(--transition-fast);
+      text-transform: none;
+      letter-spacing: 0;
+    }
+    .kit-arch-link:hover { opacity: 1; }
     .kit-brand-mark {
       width: var(--space-8);
       height: var(--space-8);
@@ -1023,7 +912,15 @@
       align-items: stretch;
     }
     .kit-switch-slider {
-      display: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 50%;
+      height: 100%;
+      background: var(--color-surface-inverse);
+      border-radius: var(--radius-md);
+      transition: transform var(--transition-normal, .3s) cubic-bezier(.4, 0, .2, 1);
+      z-index: 0;
     }
     .kit-switch button {
       position: relative;
@@ -1064,7 +961,7 @@
       color: var(--color-success-icon);
     }
     .kit-switch button.is-active {
-      background: var(--color-surface-inverse);
+      background: transparent;
       color: var(--color-text-inverse);
     }
     .kit-panel {
@@ -1157,7 +1054,7 @@
       --section-heading-indent: calc(var(--component-step-size) + var(--space-8));
     }
     .kit-section-heading[data-variant="plain"] {
-      margin-left: var(--section-heading-indent);
+      margin-left: 0;
     }
     .kit-section-title {
       margin: 0;
@@ -1166,17 +1063,16 @@
       font-weight: var(--font-strong);
       letter-spacing: 0;
       line-height: 1.35;
-      display: grid;
+      display: flex;
       align-items: center;
       gap: var(--space-8);
-      grid-template-columns: var(--component-step-size) minmax(0, 1fr);
     }
     .kit-section-heading[data-variant="numbered"] .kit-section-title,
     .kit-section-heading[data-variant="numbered-with-description"] .kit-section-title {
-      grid-template-columns: var(--component-step-size) minmax(0, 1fr);
+      margin-left: calc(-1 * var(--section-heading-indent));
     }
     .kit-section-heading[data-variant="plain"] .kit-section-title {
-      grid-template-columns: minmax(0, 1fr);
+      margin-left: 0;
     }
     .kit-section-label {
       display: block;
@@ -1189,7 +1085,7 @@
       line-height: 1.55;
     }
     .kit-section-heading[data-variant="numbered-with-description"] .kit-section-subtitle {
-      margin-left: var(--section-heading-indent);
+      margin-left: 0;
     }
     .kit-question-label {
       color: var(--color-text-primary);
@@ -1319,15 +1215,14 @@
     .kit-strategy,
     .kit-source {
       width: 100%;
-      border: 1px solid var(--gray-200);
-      border-radius: var(--radius-lg);
+      border: 1px solid var(--color-border-subtle);
+      border-radius: var(--radius-md);
       background: var(--color-surface-panel);
-      padding: var(--space-16);
+      padding: var(--space-8) var(--space-12);
       text-align: left;
-      display: grid;
-      grid-template-columns: auto 1fr auto;
-      gap: var(--space-14);
-      align-items: start;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
       cursor: pointer;
       transition: border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
       user-select: none;
@@ -1351,10 +1246,10 @@
     .kit-choice.is-active,
     .kit-strategy.is-active,
     .kit-source.is-active {
-      border-color: var(--color-surface-inverse);
-      background: var(--color-surface-panel);
+      border-color: var(--color-brand-primary);
+      background: rgba(var(--color-brand-primary-rgb), 0.04);
       color: var(--color-text-primary);
-      box-shadow: 0 0 0 1px var(--color-surface-inverse);
+      box-shadow: 0 0 0 1px var(--color-brand-primary);
     }
     .kit-choice > .kit-icon,
     .kit-strategy > .kit-icon,
@@ -1373,8 +1268,8 @@
     .kit-strategy strong,
     .kit-source strong {
       display: block;
-      margin-bottom: var(--space-4);
-      font-size: var(--text-14);
+      margin-bottom: 0;
+      font-size: var(--text-12);
       font-weight: var(--font-strong);
       color: var(--color-text-primary);
     }
@@ -1382,9 +1277,9 @@
     .kit-strategy span,
     .kit-source span {
       display: block;
-      color: var(--color-text-secondary);
-      font-size: var(--text-12);
-      line-height: 1.55;
+      color: var(--color-text-muted);
+      font-size: var(--text-11);
+      line-height: 1.3;
     }
     .kit-choice.is-active span,
     .kit-strategy.is-active span,
@@ -1546,7 +1441,6 @@
       display: grid;
       gap: var(--space-12);
       padding: 0 var(--space-12) var(--space-12);
-      border-top: 1px solid var(--color-border-subtle);
     }
     .kit-layer-note,
     .kit-layer-subtitle {
@@ -1587,8 +1481,7 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-width: 72px;
-      padding: var(--space-4) var(--space-8);
+      padding: var(--space-4) var(--space-12);
       border-radius: var(--radius-full);
       background: var(--color-surface-control);
       color: var(--color-text-secondary);
@@ -3111,16 +3004,7 @@
         min-width: 0;
       }
       .kit-contract-layer-head {
-        grid-template-columns: 1fr;
-      }
-      .kit-layer-heading > strong,
-      .kit-layer-heading > span,
-      .kit-contract-meter {
-        grid-column: 1;
-        grid-row: auto;
-      }
-      .kit-contract-meter {
-        justify-self: start;
+        grid-template-columns: 1fr auto;
       }
       .kit-blueprint-grid {
         grid-template-columns: 1fr;
@@ -3191,7 +3075,7 @@
   <section class="kit-shell" aria-label="AI 项目工程助手">
     <header class="kit-header">
       <div>
-        <div class="kit-brand"><svg class="kit-icon"><use href="#i-sparkles"></use></svg>AI Engineering Kit</div>
+        <div class="kit-brand"><svg class="kit-icon"><use href="#i-sparkles"></use></svg>AI Engineering Kit <a href="docs/architecture-diagram.html" class="kit-arch-link" title="查看架构全景图">架构图</a></div>
         <h1>AI 项目工程助手</h1>
         <p>选择新项目走初始化向导，老项目看体检报告。</p>
       </div>
@@ -3229,7 +3113,7 @@
                     </div>
                   </div>
 
-                  <!-- 问题 2: 生成目标 -->
+                  <!-- 问题 2: 项目阶段 -->
                   <div class="kit-wizard-q">
                     <label class="kit-question-label">Q2：这次你想先拿到什么？</label>
                     <div class="kit-choice-list is-two-col" id="wizardQ2">
@@ -3249,6 +3133,17 @@
                         <strong>方便测试和交接</strong>
                         <span>验收方式、运行手册和经验教训。</span>
                       </button>
+                      <button class="kit-wizard-card-sm" type="button" data-val="full">
+                        <strong>完整工程治理</strong>
+                        <span>全套工程文档，适合补齐或接管。</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- 问题 3: 技术领域（多选，可跳过） -->
+                  <div class="kit-wizard-q">
+                    <label class="kit-question-label">Q3：需要 AI 工程能力吗？（可多选，可跳过）</label>
+                    <div class="kit-choice-list is-two-col" id="wizardQ3">
                       <button class="kit-wizard-card-sm" type="button" data-val="ai">
                         <strong>AI 工程支持</strong>
                         <span>agents、tools、prompts、evals 和 guardrails。</span>
@@ -3277,7 +3172,7 @@
             <div class="kit-section-content" data-slot="content">
               <div class="kit-contract-summary" data-component="ContractRecommendation">
                 <strong data-contract-summary-title>推荐：轻量工程契约</strong>
-                <p data-contract-summary-desc>根据左侧选择自动合并必选文件、推荐文件、代码骨架和 AI 支持文件。</p>
+                <p data-contract-summary-desc>根据左侧选择自动合并必选文件、推荐文件、代码骨架和 AI 协作规则。</p>
               </div>
 
               <div class="kit-contract-stack" data-component="ContractLayerStack" aria-label="工程契约配置器">
@@ -3342,14 +3237,13 @@
                 <div class="kit-contract-layer is-runtime" data-contract-layer="runtime">
                   <div class="kit-contract-layer-head">
                     <div class="kit-layer-heading">
-                      <strong>AI 支持文件</strong>
-                      <span data-runtime-layer-note>让提示词、评测和安全边界有固定位置；这些是给 AI 助手看的辅助文件。</span>
+                      <strong>AI 协作规则</strong>
+                      <span data-runtime-layer-note>告诉 AI 怎么配合你的项目、哪些事能做、哪些事别碰。</span>
                     </div>
                     <span class="kit-contract-meter" data-contract-meter>自动包含</span>
                   </div>
                   <div class="kit-contract-layer-body">
-                    <div class="kit-layer-subtitle">随方案自动包含</div>
-                    <div class="kit-runtime-chips" aria-label="AI 支持文件摘要" data-runtime-user-chips></div>
+                    <div class="kit-option-list" data-layer-options="runtime"></div>
                   </div>
                 </div>
               </div>
@@ -3361,7 +3255,7 @@
                 </div>
                 <div class="kit-next-command" data-component="NextCommandSummary">
                   <strong data-next-command-title>生成后第一步</strong>
-                  <p data-next-command-desc>先检查 Project OS 入口、规则、环境和 AI 支持文件是否完整。</p>
+                  <p data-next-command-desc>先检查 Project OS 入口、规则、环境和 AI 协作规则是否完整。</p>
                   <div class="kit-command-preview is-filled"><code data-next-command-code>bash scripts/check-runtime.sh .</code></div>
                 </div>
               </div>
@@ -3394,19 +3288,13 @@
           </div>
           <div class="kit-source-list" data-slot="content">
             <button class="kit-source is-active" type="button" data-kit-source="local" data-component="OptionCard" data-variant="source" data-state="selected" data-source="docs/design/ai-project-assistant/data.ts">
-              <svg class="kit-icon"><use href="#i-folder-git"></use></svg>
-              <span><strong>读取本机目录</strong><span>直接分析当前运行所在的路径，速度最快。</span></span>
-              <svg class="kit-icon kit-active-check"><use href="#i-check-circle"></use></svg>
+              <strong>读取本机目录</strong><span>直接分析当前运行所在的路径，速度最快。</span>
             </button>
             <button class="kit-source" type="button" data-kit-source="git" data-component="OptionCard" data-variant="source" data-state="default" data-source="docs/design/ai-project-assistant/data.ts">
-              <svg class="kit-icon"><use href="#i-github"></use></svg>
-              <span><strong>Git 仓库地址</strong><span>输入一段公开的或有权限的仓库链接。</span></span>
-              <svg class="kit-icon kit-active-check"><use href="#i-check-circle"></use></svg>
+              <strong>Git 仓库地址</strong><span>输入一段公开的或有权限的仓库链接。</span>
             </button>
             <button class="kit-source" type="button" data-kit-source="upload" data-component="OptionCard" data-variant="source" data-state="default" data-source="docs/design/ai-project-assistant/data.ts">
-              <svg class="kit-icon"><use href="#i-upload-cloud"></use></svg>
-              <span><strong>上传压缩包</strong><span>把源码打包传上来，不上传云端仅本地解析。</span></span>
-              <svg class="kit-icon kit-active-check"><use href="#i-check-circle"></use></svg>
+              <strong>上传压缩包</strong><span>把源码打包传上来，不上传云端仅本地解析。</span>
             </button>
           </div>
         </div>
@@ -3555,25 +3443,20 @@
       desc: "先保留单页原型、最小上下文和轻量设计记录，适合先看方向是否成立。",
       files: ["index.html", "README.md", "docs/design/"]
     },
-    frontend: {
-      label: "前端项目",
-      desc: "按应用、共享包、AI client、产品文档和设计规范组织，适合先做可用界面再接入模型能力。",
-      files: ["apps/web/", "packages/ai-client/", "packages/shared/", "docs/product/", "docs/design/", "prompts/"]
-    },
-    fullstack: {
-      label: "全栈项目",
-      desc: "把前端应用、后端 API、共享包、环境配置和测试入口放到固定位置，方便从原型走向可运行系统。",
-      files: ["apps/web/", "api/", "server/", "packages/shared/", "docs/", "tests/"]
-    },
-    backend: {
-      label: "后端 / API 服务",
-      desc: "把 API、服务层、配置、模型、测试和运行手册拆开，适合先搭稳定服务骨架。",
-      files: ["src/app/", "api/", "services/", "models/", "config/", "tests/"]
+    runnable: {
+      label: "可运行项目",
+      desc: "补齐架构、技术栈、环境和运行手册，让项目能安装、启动和复现，具体目录结构在下方配置。",
+      files: ["src/", "docs/", "tests/", "config/"]
     },
     handoff: {
       label: "测试交接",
       desc: "先补齐验收方式、运行手册和交接上下文，适合让项目更容易被接手和验证。",
       files: ["docs/TESTING.md", "docs/RUNBOOK.md", "HANDOFF.md", "docs/LESSONS.md"]
+    },
+    full: {
+      label: "完整工程治理",
+      desc: "全套工程文档和目录结构，覆盖产品、架构、运行、测试、交接和治理，适合补齐或接管已有项目。",
+      files: ["src/", "docs/", "tests/", "config/", "prompts/", "evals/"]
     },
     agent: {
       label: "AI Agent 工程",
@@ -3602,26 +3485,12 @@
       autoFiles: ["docs/DESIGN_STANDARDS.md"],
       advice: "<strong>页面原型</strong>：先拿到可看的页面和最小上下文，工程治理保持轻量。"
     },
-    frontend: {
-      label: "前端项目",
+    runnable: {
+      label: "可运行项目",
       maturityKey: "mvp",
-      structureKey: "frontend",
-      autoFiles: ["docs/DESIGN_STANDARDS.md", "docs/CODE_STRUCTURE.md", "docs/TECH_STACK.md", "docs/ENVIRONMENT.md", ".env.example"],
-      advice: "<strong>前端项目</strong>：生成前端目录、设计规范、AI client 和运行边界。"
-    },
-    fullstack: {
-      label: "全栈项目",
-      maturityKey: "production",
-      structureKey: "fullstack",
-      autoFiles: ["docs/ARCHITECTURE.md", "docs/CODE_STRUCTURE.md", "docs/TECH_STACK.md", "docs/ENVIRONMENT.md", ".env.example", "docs/TESTING.md", "docs/RUNBOOK.md"],
-      advice: "<strong>全栈项目</strong>：同时补齐前端、后端、环境、测试和运行入口。"
-    },
-    backend: {
-      label: "后端 / API 服务",
-      maturityKey: "mvp",
-      structureKey: "backend",
-      autoFiles: ["docs/ARCHITECTURE.md", "docs/CODE_STRUCTURE.md", "docs/TECH_STACK.md", "docs/ENVIRONMENT.md", ".env.example", "docs/NAMING.md", "docs/TESTING.md", "docs/RUNBOOK.md"],
-      advice: "<strong>后端 / API 服务</strong>：重点补齐 API、服务边界、配置、测试和运行手册。"
+      structureKey: "runnable",
+      autoFiles: ["docs/ARCHITECTURE.md", "docs/CODE_STRUCTURE.md", "docs/TECH_STACK.md", "docs/ENVIRONMENT.md", ".env.example", "docs/NAMING.md", "docs/RUNBOOK.md"],
+      advice: "<strong>可运行项目</strong>：补齐架构、代码结构、技术栈、环境和运行手册，让项目能跑起来。"
     },
     handoff: {
       label: "测试交接",
@@ -3629,6 +3498,13 @@
       structureKey: "handoff",
       autoFiles: ["docs/NAMING.md", "docs/TESTING.md", "docs/RUNBOOK.md", "HANDOFF.md", "docs/LESSONS.md"],
       advice: "<strong>测试交接</strong>：先补齐验收方式、运行手册、交接上下文和经验复盘。"
+    },
+    full: {
+      label: "完整工程治理",
+      maturityKey: "production",
+      structureKey: "full",
+      autoFiles: ["PRODUCT.md", "docs/PRODUCT_PLAN.md", "docs/ARCHITECTURE.md", "docs/CODE_STRUCTURE.md", "docs/TECH_STACK.md", "docs/ENVIRONMENT.md", ".env.example", "docs/DESIGN_STANDARDS.md", "docs/NAMING.md", "docs/DOCUMENTATION.md", "docs/TESTING.md", "docs/RUNBOOK.md", "docs/CHANGELOG.md", "docs/DECISIONS.md", "docs/LESSONS.md"],
+      advice: "<strong>完整工程治理</strong>：全套工程文档，覆盖产品、架构、运行、测试、交接和治理。"
     },
     agent: {
       label: "AI Agent 工程",
@@ -3649,10 +3525,11 @@
   const OUTCOME_GENERATION_PLAN_KEYS = {
     product: "product",
     page: "page-prototype",
-    run: "backend",
+    run: "runnable",
     handoff: "handoff",
     ai: "agent",
-    rag: "rag"
+    rag: "rag",
+    full: "full"
   };
 
   const OUTCOME_FILE_PRESETS = {
@@ -3669,27 +3546,36 @@
       field: "运行方式和工程结构"
     },
     handoff: {
-      files: ["docs/NAMING.md", "docs/TESTING.md", "docs/RUNBOOK.md", "HANDOFF.md", "docs/LESSONS.md"],
+      files: ["docs/TECH_STACK.md", "docs/NAMING.md", "docs/TESTING.md", "docs/RUNBOOK.md", "HANDOFF.md", "docs/LESSONS.md"],
       field: "测试、验收和交接"
     },
+    full: {
+      files: ["PRODUCT.md", "docs/PRODUCT_PLAN.md", "docs/TECH_STACK.md", "docs/ENVIRONMENT.md", ".env.example", "docs/NAMING.md", "docs/DOCUMENTATION.md", "docs/ARCHITECTURE.md", "docs/CODE_STRUCTURE.md", "docs/DESIGN_STANDARDS.md", "docs/TESTING.md", "docs/RUNBOOK.md", "docs/CHANGELOG.md", "docs/DECISIONS.md", "docs/LESSONS.md", "prompts/", "evals/", "guardrails/", "mcp/", "observability/", "config/"],
+      field: "全套工程文档和 AI 协作规则"
+    },
     ai: {
-      files: ["docs/ARCHITECTURE.md", "docs/CODE_STRUCTURE.md", "docs/ENVIRONMENT.md", ".env.example"],
-      field: "AI 工程支持文件"
+      files: ["docs/ARCHITECTURE.md", "docs/CODE_STRUCTURE.md", "docs/ENVIRONMENT.md", ".env.example", "prompts/", "guardrails/"],
+      field: "AI 协作规则"
     },
     rag: {
-      files: ["docs/ARCHITECTURE.md", "docs/CODE_STRUCTURE.md", "docs/ENVIRONMENT.md", ".env.example", "docs/TESTING.md"],
-      field: "知识库和评测链路"
+      files: ["docs/ARCHITECTURE.md", "docs/CODE_STRUCTURE.md", "docs/ENVIRONMENT.md", ".env.example", "docs/TESTING.md", "prompts/", "evals/"],
+      field: "AI 协作规则和质量检查"
     }
   };
 
   function activeOutcomeKeys() {
-    const active = document.querySelector("#wizardQ2 .is-active");
-    return [active?.dataset.val || "product"];
+    const stageActive = document.querySelector("#wizardQ2 .is-active");
+    const keys = [stageActive?.dataset.val || "product"];
+    document.querySelectorAll("#wizardQ3 .is-active").forEach(btn => {
+      keys.push(btn.dataset.val);
+    });
+    return keys;
   }
 
   function activeGenerationPlanKey() {
-    const [outcomeKey] = activeOutcomeKeys();
-    return OUTCOME_GENERATION_PLAN_KEYS[outcomeKey] || OUTCOME_GENERATION_PLAN_KEYS.product;
+    const stageActive = document.querySelector("#wizardQ2 .is-active");
+    const stageKey = stageActive?.dataset.val || "product";
+    return OUTCOME_GENERATION_PLAN_KEYS[stageKey] || OUTCOME_GENERATION_PLAN_KEYS.product;
   }
 
   function activeGenerationPlan() {
@@ -3709,7 +3595,7 @@
   function conditionalGeneratedFiles() {
     const structureKey = activeProjectStructureKey();
     const files = new Set();
-    if (["backend", "fullstack", "agent", "rag"].includes(structureKey)) {
+    if (["runnable", "full", "agent", "rag"].includes(structureKey)) {
       files.add("docs/SECURITY.md");
     }
     if (["agent", "rag"].includes(structureKey)) {
@@ -3982,20 +3868,18 @@
     tech: {
       product: { label: "产品方向优先", desc: "先沉淀产品边界和阶段路线，不强行引入框架和后端。", chips: ["PRODUCT.md", "docs/PRODUCT_PLAN.md"] },
       prototype: { label: "静态页面 / 原型优先", desc: "先生成可看的页面和最小上下文，不强行引入框架和后端。", chips: ["index.html", "docs/design/"] },
-      frontend: { label: "Node / Next.js 优先", desc: "前端项目默认按 app、AI client、shared package 和 prompts 拆分。", chips: ["apps/web/", "packages/", "package.json"] },
-      fullstack: { label: "前端 + API 服务", desc: "全栈项目默认拆分 web、api、server、shared package 和测试入口。", chips: ["apps/web/", "api/", "server/", "tests/"] },
-      backend: { label: "API / Service 优先", desc: "后端服务默认按 API、services、models、config 和 tests 拆分。", chips: ["api/", "services/", "config/", "tests/"] },
+      runnable: { label: "可运行项目", desc: "补齐架构、技术栈、环境和运行入口，具体目录结构按项目实际情况调整。", chips: ["src/", "docs/", "tests/", "config/"] },
       handoff: { label: "验收交接优先", desc: "先统一测试、运行手册和交接上下文，方便别人接手验证。", chips: ["docs/TESTING.md", "docs/RUNBOOK.md", "HANDOFF.md"] },
+      full: { label: "完整工程治理", desc: "全套工程文档和目录，覆盖产品、架构、运行、测试、交接和治理。", chips: ["src/", "docs/", "tests/", "config/", "prompts/"] },
       agent: { label: "Python / FastAPI 优先", desc: "Agent 服务默认按 API、agents、tools、prompts、evals 拆分。", chips: ["src/app/", "agents/", "tools/", "pyproject.toml"] },
       rag: { label: "Python / RAG workflow", desc: "RAG 项目默认按 ingestion、indexing、retrieval、evals 拆分。", chips: ["src/rag/", "data/", "evals/", "pyproject.toml"] }
     },
     data: {
       product: { label: "默认不生成", desc: "产品方向阶段不主动生成数据或知识库目录。", chips: ["按需开启"] },
       prototype: { label: "默认不生成", desc: "页面原型不主动生成知识库目录。", chips: ["按需开启"] },
-      frontend: { label: "按产品需要", desc: "前端项目只保留 prompts 和轻量数据接口说明。", chips: ["prompts/", "packages/ai-client/"] },
-      fullstack: { label: "按业务需要", desc: "全栈项目保留数据接口边界，但不默认假设必须 RAG。", chips: ["api/", "server/", "docs/"] },
-      backend: { label: "按接口需要", desc: "后端服务可保留数据模型位置，但不默认生成知识库链路。", chips: ["models/", "services/"] },
+      runnable: { label: "按项目需要", desc: "可运行项目按实际需要保留数据接口边界。", chips: ["按需开启"] },
       handoff: { label: "默认不生成", desc: "测试交接阶段不主动生成知识库链路，只保留验证和复盘入口。", chips: ["evals/", "observability/"] },
+      full: { label: "按需开启", desc: "完整治理模式下按实际需要保留数据和知识库入口。", chips: ["data/", "evals/"] },
       agent: { label: "按需知识库", desc: "Agent 可保留轻量 data 入口，但不默认假设必须 RAG。", chips: ["data/", "docs/"] },
       rag: { label: "需要知识库", desc: "RAG 默认生成 data、ingestion、retrieval、citations 等位置。", chips: ["data/", "ingestion/", "retrieval/", "citations/"] }
     },
@@ -4024,11 +3908,11 @@
 
   function runtimeUserLabel(id, level) {
     const labels = {
-      promptAgent: level === "示例" ? "提示词示例" : "提示词和 Agent",
-      evals: "评测样例",
-      guardrails: "安全边界",
-      mcp: "MCP 示例",
-      observability: "日志和指标",
+      promptAgent: level === "示例" ? "AI 对话模板" : "AI 对话模板和 Agent",
+      evals: "AI 质量检查",
+      guardrails: "AI 禁区",
+      mcp: "AI 工具接入",
+      observability: "AI 运行日志",
       secrets: "环境变量示例"
     };
     return labels[id] || AI_RUNTIME_CAPABILITIES[id].title;
@@ -4036,9 +3920,9 @@
 
   function runtimeSummaryLabel() {
     const enabled = runtimeEnabledCapabilityIds().length;
-    if (enabled <= 1) return "AI 支持：轻量示例";
-    if (enabled >= AI_RUNTIME_CAPABILITY_ORDER.length) return "AI 支持：完整";
-    return `AI 支持：${enabled}/6 类`;
+    if (enabled <= 1) return "AI 协作：基础配置";
+    if (enabled >= AI_RUNTIME_CAPABILITY_ORDER.length) return "AI 协作：完整";
+    return `AI 协作：${enabled}/6 项`;
   }
 
   function renderRuntimeSummary() {
@@ -4086,8 +3970,8 @@
     }
     if (layerNote) {
       layerNote.textContent = enabledIds.length <= 1
-        ? "让提示词、评测和安全边界有固定位置；轻量项目只放提示词示例。"
-        : "让提示词、评测和安全边界有固定位置；自动补齐 AI 助手需要的支持文件。";
+        ? "告诉 AI 怎么配合你的项目；轻量项目只放一个对话模板。"
+        : "告诉 AI 怎么配合你的项目、哪些事能做、哪些事别碰。";
     }
     if (meter) meter.textContent = enabledIds.length ? "自动包含" : "按需生成";
     if (runtimeLayer) runtimeLayer.classList.toggle("is-complete", enabledIds.length > 0);
@@ -4170,7 +4054,7 @@
       advice.fields.push(outcomePreset.field);
     });
 
-    // --- Q2 单选推导生成方案 -> 同时推导成熟度、结构和 AI 支持文件 ---
+    // --- Q2 单选推导生成方案 -> 同时推导成熟度、结构和 AI 协作规则 ---
     generationPlan.autoFiles.forEach(file => autoCheck.add(file));
     maturity.files.forEach(file => autoCheck.add(file));
     advice.growth = maturity.advice;
@@ -4188,7 +4072,8 @@
       advice.reason = "你需要更多工程契约来支撑维护、测试、交接和上线。";
     }
 
-    const contractName = advice.template === "core-template" ? "轻量工程契约" : maturity.contract;
+    let contractName = advice.template === "core-template" ? "轻量工程契约" : maturity.contract;
+    if (collab === "solo" && maturityKey === "team") contractName = "交接工程契约";
     renderContractRecommendation(advice, contractName, maturity, structure, generationPlan);
 
     // 执行勾选同步
@@ -4201,12 +4086,18 @@
     if (typeof updateContractMeters === "function") updateContractMeters();
   }
 
-  // 绑定向导按钮事件 (Q1 / Q2 均为单选)
-  document.querySelectorAll(".kit-wizard-card-sm").forEach(btn => {
+  // 绑定向导按钮事件：Q1 / Q2 单选，Q3 多选 toggle
+  document.querySelectorAll("#wizardQ1 .kit-wizard-card-sm, #wizardQ2 .kit-wizard-card-sm").forEach(btn => {
     btn.addEventListener("click", () => {
       const parent = btn.parentElement;
       parent.querySelectorAll(".kit-wizard-card-sm").forEach(b => b.classList.remove("is-active"));
       btn.classList.add("is-active");
+      updateWizardSelections();
+    });
+  });
+  document.querySelectorAll("#wizardQ3 .kit-wizard-card-sm").forEach(btn => {
+    btn.addEventListener("click", () => {
+      btn.classList.toggle("is-active");
       updateWizardSelections();
     });
   });
@@ -4219,8 +4110,12 @@
       const oldPanel = document.getElementById("kitOldPanel");
       switcher.dataset.project = project;
       document.body.dataset.mode = project;
-      document.querySelectorAll("[data-kit-project]").forEach((item) => {
-        const isActive = item === button;
+      const slider = switcher.querySelector(".kit-switch-slider");
+      const buttons = Array.from(switcher.querySelectorAll("[data-kit-project]"));
+      const idx = buttons.indexOf(button);
+      slider.style.transform = "translateX(" + (idx * 100) + "%)";
+      buttons.forEach((item, i) => {
+        const isActive = i === idx;
         item.classList.toggle("is-active", isActive);
         item.dataset.state = isActive ? "selected" : "default";
         item.setAttribute("aria-selected", isActive ? "true" : "false");
@@ -4259,7 +4154,13 @@
     { file: "docs/RUNBOOK.md", title: "运行手册", desc: "常见操作和故障处理", group: "质量保障层：测试和交接" },
     { file: "docs/CHANGELOG.md", title: "变更记录", desc: "结构性改动留痕", group: "质量保障层：测试和交接" },
     { file: "docs/DECISIONS.md", title: "决策记录", desc: "重要取舍为什么这样定", group: "质量保障层：测试和交接" },
-    { file: "docs/LESSONS.md", title: "经验教训", desc: "犯错后立即记录", group: "质量保障层：测试和交接" }
+    { file: "docs/LESSONS.md", title: "经验教训", desc: "犯错后立即记录", group: "质量保障层：测试和交接" },
+    { file: "prompts/", title: "AI 对话模板", desc: "告诉 AI 怎么帮你干活", group: "AI 协作规则" },
+    { file: "evals/", title: "AI 质量检查", desc: "验证 AI 的输出对不对", group: "AI 协作规则" },
+    { file: "guardrails/", title: "AI 禁区", desc: "哪些事不让 AI 碰", group: "AI 协作规则" },
+    { file: "mcp/", title: "AI 工具接入", desc: "让 AI 连接外部工具和服务", group: "AI 协作规则" },
+    { file: "observability/", title: "AI 运行日志", desc: "记录 AI 做了什么、花了多少", group: "AI 协作规则" },
+    { file: "config/", title: "环境变量配置", desc: "把 AI 需要的配置写清楚", group: "AI 协作规则" }
   ];
   const REQUIRED_FILES = ["README.md", "AGENTS.md", "PROJECT.md", "HANDOFF.md"];
   // Source for fetching templates (works on GitHub Pages and local server)
@@ -4279,6 +4180,7 @@
     if (group.startsWith("工程运行")) return "run";
     if (group.startsWith("代码结构")) return "structure";
     if (group.startsWith("质量保障层")) return "quality";
+    if (group.startsWith("AI 协作")) return "runtime";
     return "entry";
   }
 
@@ -4322,7 +4224,8 @@
     entry: ["README.md", "AGENTS.md", "PROJECT.md", "HANDOFF.md", "PRODUCT.md", "docs/PRODUCT_PLAN.md"],
     run: ["docs/TECH_STACK.md", "docs/ENVIRONMENT.md", ".env.example", "docs/NAMING.md", "docs/DOCUMENTATION.md"],
     structure: ["docs/ARCHITECTURE.md", "docs/CODE_STRUCTURE.md", "docs/DESIGN_STANDARDS.md"],
-    quality: ["docs/TESTING.md", "docs/RUNBOOK.md", "docs/CHANGELOG.md", "docs/DECISIONS.md", "docs/LESSONS.md"]
+    quality: ["docs/TESTING.md", "docs/RUNBOOK.md", "docs/CHANGELOG.md", "docs/DECISIONS.md", "docs/LESSONS.md"],
+    runtime: ["prompts/", "evals/", "guardrails/", "mcp/", "observability/", "config/"]
   };
 
   function selectedContractFiles() {
@@ -4408,7 +4311,7 @@
       lines.push("bash scripts/check-secrets.sh .");
     }
     const securityHint = conditionalFiles.length ? "、安全边界" : "";
-    const desc = `按「${structure.label} / ${maturity.label}」生成后，先确认入口文档、技术栈、环境变量${securityHint}和 AI 支持文件都能被检查。`;
+    const desc = `按「${structure.label} / ${maturity.label}」生成后，先确认入口文档、技术栈、环境变量${securityHint}和 AI 协作规则都能被检查。`;
     return {
       title: "生成后第一步",
       desc,

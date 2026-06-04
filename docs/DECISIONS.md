@@ -1,3 +1,9 @@
+---
+layer: knowledge
+type: log
+last_verified: 2026-06-04
+---
+
 # 架构决策记录
 
 > 用途：记录重要决策、放弃项、原因和影响，回答“为什么这么定”。
@@ -221,6 +227,25 @@
 - `core` profile 分发 `scripts/build-project-graph.sh`。
 - 生成物放在 `.project-os/graph/`，默认不提交。
 - 后续影响分析或报告页关系图入口可以读取该 JSON，但不得替代 `docs/ARCHITECTURE.md` 和人工 review。
+
+---
+
+#### D013 — 文档元数据用 YAML frontmatter，与人读引用块并存
+
+**决定**: 每个文档在文件最顶部加 YAML frontmatter（`layer` / `type` / `last_verified` / `depends_on`），作为机器可读元数据；原有 `> 用途 / 什么时候更新 / 不要写什么` 引用块保留，作为人读元数据。规范见 `docs/KNOWLEDGE_SCHEMA.md`。
+
+**放弃**: 不复用现有 `>` 引用块做机器解析（格式松散、不稳定）；不引入独立元数据文件（与文档分离易失同步）；不上 tree-sitter / AST 解析（我们是文档治理工具，知识载体是 .md，不是任意代码）。
+
+**原因**:
+- YAML frontmatter 是 AI 工具标准约定（Cursor `.mdc` 同款），AI 读 `.ai/rules/` 软链接时能正常识别并跳过。
+- frontmatter 与文档同文件，不会失同步。
+- 机读 / 人读两套元数据各管一摊，互不替代。
+
+**影响**:
+- `build-project-graph.sh` 解析 frontmatter，输出 archLayer / lastVerified / stale / declares_dependency。
+- `check-ai-project.sh` 按元数据完整度和新鲜度评分（v0.4）。
+- `architecture-diagram.html` 读图谱按 archLayer 自动渲染。
+- 新增文档必须按 `docs/KNOWLEDGE_SCHEMA.md` 补 frontmatter。
 
 ---
 

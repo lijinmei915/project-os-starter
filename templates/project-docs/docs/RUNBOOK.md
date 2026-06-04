@@ -1,3 +1,9 @@
+---
+layer: knowledge
+type: guide
+last_verified: 2026-06-04
+---
+
 # 运行手册
 
 > 用途：记录常见操作、发布流程和故障处理步骤。

@@ -1,3 +1,10 @@
+---
+layer: knowledge
+type: status
+last_verified: 2026-06-04
+depends_on: [AGENTS.md]
+---
+
 # 项目状态
 
 > 用途：回答“这个项目现在是什么阶段、架构怎样、进度到哪、下一步重点是什么”。

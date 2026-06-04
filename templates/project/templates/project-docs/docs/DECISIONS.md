@@ -1,3 +1,9 @@
+---
+layer: knowledge
+type: log
+last_verified: 2026-06-04
+---
+
 # 架构决策记录
 
 > 记录重要技术或协作决策，防止重复讨论。

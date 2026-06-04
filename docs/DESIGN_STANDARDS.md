@@ -1,3 +1,9 @@
+---
+layer: knowledge
+type: spec
+last_verified: 2026-06-04
+---
+
 # Project OS 设计规范总入口
 
 > 用途：定义当前设计边界、token 方向、布局规则和组件库策略。

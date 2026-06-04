@@ -1,3 +1,10 @@
+---
+layer: knowledge
+type: spec
+last_verified: 2026-06-04
+depends_on: [docs/PRODUCT_PLAN.md]
+---
+
 # 产品定义
 
 > 用途：回答"这个产品是什么、给谁用、什么调性、设计边界在哪"。

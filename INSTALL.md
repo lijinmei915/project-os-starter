@@ -1,3 +1,10 @@
+---
+layer: entry
+type: guide
+last_verified: 2026-06-04
+depends_on: [README.md]
+---
+
 # AI Engineering Kit 安装说明
 
 > 用途：回答“怎样把 Project OS 安装到当前项目、会装进什么、安装后怎么用”。

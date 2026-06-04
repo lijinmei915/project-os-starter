@@ -1,3 +1,10 @@
+---
+layer: knowledge
+type: spec
+last_verified: 2026-06-04
+depends_on: [docs/DESIGN_STANDARDS.md]
+---
+
 # 前端技术说明
 
 > 用途：说明前端技术栈选型、状态管理、组件库规范、路由策略及构建工具。

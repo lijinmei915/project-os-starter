@@ -1,3 +1,9 @@
+---
+layer: knowledge
+type: spec
+last_verified: 2026-06-04
+---
+
 # 测试与验收
 
 > 用途：定义测试分层、验收标准和收尾检查。

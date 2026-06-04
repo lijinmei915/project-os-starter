@@ -1,3 +1,9 @@
+---
+layer: knowledge
+type: spec
+last_verified: 2026-06-04
+---
+
 # 后端技术说明
 
 > 用途：说明后端技术栈选型、架构模式、数据库选型、API 契约及部署策略。

@@ -1,3 +1,10 @@
+---
+layer: knowledge
+type: spec
+last_verified: 2026-06-04
+depends_on: [docs/ARCHITECTURE.md]
+---
+
 # 代码结构说明
 
 > 本文件回答：代码怎么分层、各目录放什么、不该放什么。

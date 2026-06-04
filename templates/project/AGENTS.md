@@ -1,3 +1,10 @@
+---
+layer: governance
+type: spec
+last_verified: 2026-06-04
+depends_on: [docs/DOCUMENTATION.md]
+---
+
 # AGENTS
 
 > 用途：定义 AI 进入这个项目后的行为规则。

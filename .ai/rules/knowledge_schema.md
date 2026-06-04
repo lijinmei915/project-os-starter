@@ -1,0 +1,1 @@
+../../docs/KNOWLEDGE_SCHEMA.md

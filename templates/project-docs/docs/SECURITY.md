@@ -1,3 +1,9 @@
+---
+layer: governance
+type: spec
+last_verified: 2026-06-04
+---
+
 # 安全边界
 
 > 用途：记录项目的密钥、认证、权限、输入输出、依赖和发布安全边界。

@@ -1,3 +1,9 @@
+---
+layer: governance
+type: spec
+last_verified: 2026-06-04
+---
+
 # AI 安全边界
 
 > 用途：记录 AI 输出、提示词注入、工具调用、RAG 引用和人工复核边界。

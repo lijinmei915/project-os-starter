@@ -1,0 +1,133 @@
+/* ── AI Engineering Kit — Design Tokens ──
+   共享设计变量，所有页面引用此文件保持视觉一致。
+   不要写什么：组件专属变量、布局专属变量、页面专属样式。
+*/
+:root {
+  color-scheme: light;
+
+  /* ── Teal-tinted neutrals (chroma ~0.008, hue 180) ── */
+  --gray-50: #f8fafa;
+  --gray-100: #f2f5f5;
+  --gray-200: #e1e5e5;
+  --gray-300: #d1d5d6;
+  --gray-400: #9da4a5;
+  --gray-500: #6d7578;
+  --gray-600: #4f5658;
+  --gray-700: #3c4345;
+  --gray-800: #262c2d;
+  --gray-900: #171c1d;
+  --slate-50: #f6faf9;
+  --slate-100: #ebf0ef;
+  --slate-200: #d6dddc;
+  --slate-500: #627473;
+  --slate-900: #1a2524;
+  --teal-50: #dff7f3;
+  --teal-500: #13b7a6;
+  --teal-600: #087b73;
+  --emerald-50: #e8f7ef;
+  --emerald-100: #ecfdf5;
+  --emerald-200: #b7e7ca;
+  --emerald-300: #86efac;
+  --emerald-400: #34d399;
+  --emerald-500: #10b981;
+  --emerald-600: #059669;
+  --emerald-700: #087443;
+  --emerald-800: #047857;
+  --blue-50: #eef4ff;
+  --blue-600: #2563eb;
+  --blue-700: #175cd3;
+  --orange-50: #fff4e5;
+  --orange-700: #b54708;
+  --purple-600: #7c3aed;
+  --yellow-600: #ca8a04;
+
+  /* ── Font stacks ── */
+  --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", "Microsoft YaHei", sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, monospace;
+
+  /* ── Type scale (rem) ── */
+  --text-xs:   0.75rem;
+  --text-sm:   0.8125rem;
+  --text-base: 0.875rem;
+  --text-md:   1rem;
+  --text-lg:   1.25rem;
+  --text-xl:   1.5rem;
+  --text-2xl:  2.25rem;
+
+  /* Legacy aliases */
+  --text-10: 0.625rem; --text-11: 0.6875rem; --text-12: var(--text-xs);
+  --text-13: var(--text-sm); --text-14: var(--text-base);
+  --text-16: var(--text-md); --text-18: 1.125rem;
+  --text-20: var(--text-lg); --text-22: 1.375rem;
+  --text-24: var(--text-xl); --text-26: 1.625rem;
+  --text-30: 1.875rem; --text-32: 2rem;
+  --text-34: 2.125rem; --text-40: 2.5rem; --text-44: 2.75rem;
+
+  /* ── Weight scale ── */
+  --font-regular: 400;
+  --font-semibold: 600;
+  --font-bold: 700;
+  --font-medium: 600;
+  --font-strong: 700;
+  --font-heavy: 700;
+
+  /* ── Spacing ── */
+  --space-2: 2px; --space-3: 3px; --space-4: 4px; --space-5: 5px;
+  --space-6: 6px; --space-8: 8px; --space-9: 9px; --space-10: 10px;
+  --space-12: 12px; --space-13: 13px; --space-14: 14px; --space-16: 16px;
+  --space-18: 18px; --space-20: 20px; --space-24: 24px; --space-28: 28px;
+  --space-32: 32px; --space-48: 48px; --space-72: 72px;
+
+  /* ── Radius ── */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-card: 12px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-full: 999px;
+
+  /* ── Semantic colors ── */
+  --color-surface-page: var(--gray-50);
+  --color-surface-panel: #ffffff;
+  --color-surface-muted: var(--slate-50);
+  --color-surface-control: var(--gray-100);
+  --color-surface-inverse: var(--gray-900);
+  --color-surface-inverse-hover: var(--gray-800);
+  --color-text-primary: var(--gray-900);
+  --color-text-secondary: var(--gray-500);
+  --color-text-muted: var(--gray-400);
+  --color-text-soft: var(--gray-600, #52525b);
+  --color-text-inverse: #ffffff;
+  --color-border-default: rgba(214, 221, 220, .9);
+  --color-border-subtle: rgba(214, 221, 220, .6);
+  --color-border-strong: var(--slate-200);
+  --color-brand: var(--teal-500);
+  --color-brand-text: var(--teal-600);
+  --color-brand-primary: var(--teal-600);
+  --color-brand-primary-rgb: 8, 123, 115;
+  --color-action-primary: #0d5c56;
+  --color-action-primary-hover: #0a4a45;
+  --color-success-text: var(--emerald-700);
+  --color-success-bg: var(--emerald-50);
+  --color-success-strong: var(--emerald-500);
+  --color-success-icon: var(--emerald-400);
+  --color-warning-text: var(--orange-700);
+  --color-warning-bg: var(--orange-50);
+  --color-info-bg: var(--blue-50);
+  --color-info-text: var(--blue-700);
+  --color-focus: var(--teal-600);
+
+  /* ── Shadows ── */
+  --shadow-sm: 0 1px 2px rgba(24, 24, 27, .04);
+  --shadow-control: 0 1px 2px rgba(24, 24, 27, .06);
+  --shadow-strong: 0 8px 22px rgba(24, 24, 27, .16);
+  --shadow-focus: 0 0 0 3px rgba(8, 123, 115, .28);
+  --shadow-focus-muted: 0 0 0 3px rgba(8, 123, 115, .16);
+  --shadow-success-ring: 0 0 0 3px rgba(52, 211, 153, .22);
+  --shadow-brand-ring: 0 0 0 3px rgba(19, 183, 166, .16);
+
+  /* ── Transitions ── */
+  --transition-fast: .15s ease;
+  --transition-normal: .25s ease;
+}

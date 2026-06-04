@@ -74,10 +74,12 @@ assert_file "$root/index.html"
 log "project graph"
 bash "$root/scripts/build-project-graph.sh" "$root" >/dev/null
 assert_file "$root/.project-os/graph/project-graph.json"
-assert_contains "$root/.project-os/graph/project-graph.json" '"schemaVersion": "project-graph.v0.1"'
+assert_contains "$root/.project-os/graph/project-graph.json" '"schemaVersion": "project-graph.v0.2"'
 assert_contains "$root/.project-os/graph/project-graph.json" '"id":"AGENTS.md"'
+assert_contains "$root/.project-os/graph/project-graph.json" '"archLayer":"governance"'
+assert_contains "$root/.project-os/graph/project-graph.json" '"declares_dependency"'
 if command -v node >/dev/null 2>&1; then
-  node -e 'const fs=require("fs"); const g=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); if(!g.nodes || !g.nodes.length || !Array.isArray(g.edges)) process.exit(1)' "$root/.project-os/graph/project-graph.json"
+  node -e 'const fs=require("fs"); const g=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); if(!g.nodes || !g.nodes.length || !Array.isArray(g.edges)) process.exit(1); const a=g.nodes.find(n=>n.id==="AGENTS.md"); if(!a || a.archLayer!=="governance" || typeof a.stale!=="boolean") process.exit(1); if(typeof g.summary.staleCount!=="number") process.exit(1)' "$root/.project-os/graph/project-graph.json"
 fi
 
 log "old project document quality"

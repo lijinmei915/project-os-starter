@@ -1,3 +1,10 @@
+---
+layer: knowledge
+type: spec
+last_verified: 2026-06-04
+depends_on: [docs/PRODUCT_PLAN.md]
+---
+
 # Product
 
 ## Register

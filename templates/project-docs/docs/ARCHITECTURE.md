@@ -1,3 +1,10 @@
+---
+layer: knowledge
+type: spec
+last_verified: 2026-06-04
+depends_on: [AGENTS.md]
+---
+
 # 架构说明
 
 > 用途：说明当前项目的系统结构、核心模块、数据流和边界。

@@ -1,11 +1,18 @@
+---
+layer: knowledge
+type: status
+last_verified: 2026-06-04
+depends_on: [PROJECT.md, AGENTS.md]
+---
+
 # 当前交接 (Handoff to Next AI)
 
 > 用途：记录当前任务交接、下一步建议、风险和最近上下文。
 > 什么时候更新：每次完成一组连续任务、当前状态变化或下一位 AI 需要接手时。
 > 不要写什么：长期路线图、完整产品介绍、详细架构说明或变更流水账。
 
-> 上一轮任务：深度重构 Project OS 为全功能 AI Engineering Kit。
-> 下一轮重点：真实老项目校准与 Skill 鲁棒性验证。
+> 上一轮任务：v3 知识结构化全部落地（文档 frontmatter + 图谱升级 + 评分升级 + 架构图自动化）。
+> 下一轮重点：v4 Skill 契约化，对齐 agent-skills 生态。
 
 ## 🤖 AI 助手上手简报 (Copy & Paste)
 
@@ -19,12 +26,13 @@
 **你可以执行的技能**：
 - 输入 `自动反思`：我会抓取 Git 改动并沉淀教训到 `LESSONS.md`。
 - 输入 `优化规则`：我会帮你清理冲突和冗余的规则。
-- 输入 `做个体检`：执行 v0.3 动态评分模型（包含 Test/Lint 真实检测）。
+- 输入 `做个体检`：执行 v0.4 动态评分模型（含 Test/Lint 真实检测 + 元数据完整度 + 知识新鲜度）。
 
 ---
 
 ## 🏗️ 本次已完成 (核心成果)
 
+- **v3 知识结构化**：全部文档加 YAML frontmatter（`layer/type/last_verified/depends_on`，规范见 `docs/KNOWLEDGE_SCHEMA.md`）；`build-project-graph.sh` 解析 frontmatter 输出 archLayer/stale/declares_dependency（schema v0.2，额外出 `docs/data/project-graph.json`）；评分升级 v0.4（知识演进拆成错题本/引擎/元数据完整度/知识新鲜度，报告列出过期文档）；`architecture-diagram.html` 改读图谱 JSON 动态渲染、过期标橙；模板层镜像同步；修复 `.claude/settings.local.json` commit-guard hook（原拦截所有 bash，改为仅 git commit 时检查）。
 - **AI 统一枢纽**：建立 `.ai/` 目录，通过 `scripts/sync-ai-rules.sh` 实现 100% 动态软链接映射。
 - **v0.3 评分模型**：从静态文档检查升级为“技术健康 + AI 效率 + 知识演进”的多维评分。
 - **可视化向导**：在 `index.html` 实现“人格化访谈”UI，支持意图驱动的资产自动联动勾选。
@@ -47,15 +55,15 @@
 - **报告页交互降级**：`index.html` 和模板页已补齐内嵌浏览器 fallback；无 CDN / 无目录写入 / 无剪贴板权限时，下载模板、复制命令和受限能力提示都不会静默失败。
 - **一键中控台**：打造根目录 `./kit` 工具，实现所有脚本的一键交互。
 
-## 📊 当前仓库自检
+## 📊 当前仓库自检 (v0.4 模型)
 - **上下文完整度**：100/100
-- **工程成熟度**：70/100 (缺失真实的 npm 环境配置，符合脚本类项目预期)
+- **工程成熟度**：70/100 (缺失真实的 npm 环境配置，符合脚本类项目预期；知识演进已满分 20/20)
 
 ## ⚠️ 风险与阻塞
 - **模型敏感度**：自动反思脚本 (`auto-reflect.sh`) 在不同模型下的总结质量可能存在差异，需抽样微调 Prompt。
 - **测试提示**：`tests/run-tests.sh` 仍会提示 `.env.local` 的 `DEEPSEEK_API_KEY` 为空；截图回归在找不到浏览器时会跳过 bitmap capture，但 marker 检查已通过。
 
 ## 🎯 下一步建议
-1. **样本校准**：找一个真实的老项目运行 `./kit`，观察 v0.3 模型给出的“缺口建议”是否合理。
-2. **逻辑增强**：优化 `check-ai-project.sh` 对非 JS 项目的 Lint/Test 探测能力。
-3. **写入方案校准**：用已有 README / PRD / CLAUDE.md / 交接.md 的真实目录测试相似命名匹配是否准确。
+1. **v4 Skill 契约化**：把现有脚本/向导抽成标准输入输出 schema，对齐 awesome-agent-skills / OpenAgentSkill 生态，让 skill 可被市场发现安装。
+2. **样本校准**：找一个真实老项目运行 `./kit`，观察 v0.4 模型的「缺口建议」和过期文档识别是否合理。
+3. **build-project-graph 增强**：v4 时参考 Aider Repo Map，对被检查项目的代码上 tree-sitter 解析（当前只扫文件名/路径）。
