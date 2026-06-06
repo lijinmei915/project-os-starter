@@ -2,6 +2,8 @@
 layer: knowledge
 type: guide
 last_verified: 2026-06-04
+teaches: "常用操作命令、检查流程、发布步骤和故障处理手册"
+use_when: "AI 需要执行日常运维操作、排查故障、或指导用户完成发布流程时"
 ---
 
 # 运行手册

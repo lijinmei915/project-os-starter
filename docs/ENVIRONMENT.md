@@ -2,6 +2,8 @@
 layer: knowledge
 type: spec
 last_verified: 2026-06-04
+teaches: "本地开发环境配置、依赖安装、环境变量和外部服务对接"
+use_when: "AI 需要帮用户启动项目、排查环境问题、或配置新的外部依赖时"
 ---
 
 # 环境说明

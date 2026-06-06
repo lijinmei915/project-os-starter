@@ -3,6 +3,8 @@ layer: knowledge
 type: spec
 last_verified: 2026-06-04
 depends_on: [AGENTS.md]
+teaches: "系统的模块划分、核心数据流和各层之间的边界"
+use_when: "AI 需要理解整体系统结构、判断某个改动影响范围、或向用户解释架构时"
 ---
 
 # 架构说明

@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "skill.v0.1",
+  "name": "kb-multi-scan",
+  "description": "多项目扫描：读项目注册表，一次性扫描所有已登记的项目，给出横向对比和优先级建议。组织级入口。",
+  "trigger": ["扫描所有项目", "多项目体检", "组织扫描", "multi scan", "看看我的项目们"],
+  "phase": "P4",
+  "knowledge": {
+    "requires": ["Project OS 的安装方式"],
+    "optional": ["产品的阶段划分"]
+  },
+  "input": {
+    "args": [
+      {
+        "name": "--registry",
+        "description": "项目注册表路径（默认 .ai/registry/projects.json）",
+        "required": false
+      }
+    ]
+  },
+  "output": {
+    "stdout": "各项目扫描摘要 + 横向对比表 + AI 分析建议"
+  },
+  "sideEffects": [
+    { "type": "none", "description": "只读扫描，不修改任何项目" }
+  ],
+  "action": {
+    "type": "shell",
+    "command": "bash scripts/kb-multi-scan.sh"
+  }
+}

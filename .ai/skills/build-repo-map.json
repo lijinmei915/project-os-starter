@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "skill.v0.1",
+  "name": "build-repo-map",
+  "description": "Repo Map Lite：对项目代码文件做符号提取(函数/类/import)，输出 repo-map.json，让 AI 知道每个文件定义了什么、调用了什么。P3 代码理解基础。",
+  "trigger": ["生成 repo map", "符号提取", "代码地图", "build repo map", "更新代码索引"],
+  "phase": "P3",
+  "knowledge": {
+    "requires": [],
+    "optional": ["代码目录的分层规则"]
+  },
+  "input": {
+    "args": [
+      {
+        "name": "target",
+        "description": "要扫描的项目根目录（默认为当前目录）",
+        "required": false,
+        "example": "."
+      }
+    ]
+  },
+  "output": {
+    "stdout": "提取进度和统计（files with symbols / total）",
+    "files": [
+      ".project-os/graph/repo-map.json",
+      "docs/data/repo-map.json"
+    ]
+  },
+  "sideEffects": [
+    { "type": "writes-file", "description": "写入 .project-os/graph/repo-map.json 和 docs/data/repo-map.json" }
+  ],
+  "action": {
+    "type": "shell",
+    "command": "bash scripts/build-repo-map.sh ${args.0}"
+  }
+}

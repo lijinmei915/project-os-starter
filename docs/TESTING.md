@@ -2,6 +2,8 @@
 layer: knowledge
 type: spec
 last_verified: 2026-06-04
+teaches: "测试方法、验收标准、AI 生成代码的质量检查方式"
+use_when: "AI 要写测试、验收代码质量、或判断某个改动是否需要补测试时"
 ---
 
 # 测试与偏离检查

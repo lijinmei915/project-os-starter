@@ -2,6 +2,8 @@
 layer: knowledge
 type: spec
 last_verified: 2026-06-04
+teaches: "设计 token 体系、布局规则、组件库策略和视觉边界"
+use_when: "AI 要调整 UI 样式、选颜色/字号/间距、或判断设计方案是否合规时"
 ---
 
 # Project OS 设计规范总入口

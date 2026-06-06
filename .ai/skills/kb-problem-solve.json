@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "skill.v0.1",
+  "name": "kb-problem-solve",
+  "description": "排障专家：站在历史踩坑/架构/环境知识层之上排查工程问题，优先复用已知解，无解时给出排查路径。",
+  "trigger": ["排障", "解决问题", "报错了", "problem solve", "kb排查", "这个错误怎么解决"],
+  "phase": "P2",
+  "knowledge": {
+    "requires": ["历史踩坑记录", "本地开发环境配置"],
+    "optional": ["系统的模块划分", "项目当前所处阶段"]
+  },
+  "input": {
+    "args": [
+      {
+        "name": "problem",
+        "description": "问题描述（自然语言）",
+        "required": true,
+        "example": "启动时报 DEEPSEEK_API_KEY 缺失"
+      }
+    ]
+  },
+  "output": {
+    "stdout": "给 AI 的排障 prompt：含排障知识库 + LESSONS.md 历史模式，AI 给出排查步骤、修复方案和是否需要沉淀"
+  },
+  "sideEffects": [
+    { "type": "none", "description": "只读分析；修复动作由 AI 在用户确认后执行" }
+  ],
+  "action": {
+    "type": "shell",
+    "command": "bash scripts/kb-problem-solve.sh ${args.0}"
+  }
+}

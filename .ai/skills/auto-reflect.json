@@ -1,7 +1,21 @@
 {
+  "schemaVersion": "skill.v0.1",
   "name": "auto-reflect",
-  "description": "触发全自动反思机制：读取最近代码差异，提取工程教训，并自动追加到错题本 (LESSONS.md) 中",
-  "trigger": "自动反思, 沉淀经验, 总结刚才的工作, auto reflect",
+  "description": "自动成长引擎：读取最近代码差异，提取工程教训，追加到错题本 LESSONS.md，并同步为全局 AI 规则。",
+  "trigger": ["自动反思", "沉淀经验", "总结刚才的工作", "auto reflect"],
+  "phase": "P1",
+  "knowledge": {
+    "requires": ["历史踩坑记录"],
+    "optional": []
+  },
+  "input": {},
+  "output": {
+    "stdout": "给 AI 的反思 prompt：含 git diff/stat 上下文，AI 提炼 1~2 条工程约束写入 LESSONS.md"
+  },
+  "sideEffects": [
+    { "type": "appends-file", "description": "追加经验到 docs/LESSONS.md" },
+    { "type": "runs-command", "description": "执行 sync-ai-rules.sh 同步规则" }
+  ],
   "action": {
     "type": "shell",
     "command": "bash scripts/auto-reflect.sh"

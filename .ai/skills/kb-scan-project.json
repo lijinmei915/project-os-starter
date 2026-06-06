@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "skill.v0.1",
+  "name": "kb-scan-project",
+  "description": "外部项目扫描：把 Project OS 的体检和分析能力用到任意外部项目，输出 AI 工程化程度评估和补齐建议。",
+  "trigger": ["扫描项目", "分析外部项目", "帮我看看这个项目", "scan project", "项目体检"],
+  "phase": "P3",
+  "knowledge": {
+    "requires": ["Project OS 的安装方式"],
+    "optional": ["产品的阶段划分"]
+  },
+  "input": {
+    "args": [
+      {
+        "name": "target",
+        "description": "目标项目路径（必填）",
+        "required": true,
+        "example": "/Users/me/my-other-project"
+      }
+    ]
+  },
+  "output": {
+    "stdout": "给 AI 的项目扫描报告 prompt：含文件结构/Project OS 安装状态/知识层状态/Git 概览/体检分数，AI 给出补齐建议"
+  },
+  "sideEffects": [
+    { "type": "none", "description": "只读操作，不写目标项目任何文件" }
+  ],
+  "action": {
+    "type": "shell",
+    "command": "bash scripts/kb-scan-project.sh ${args.0}"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "skill.v0.1",
+  "name": "kb-sync-knowledge",
+  "description": "知识同步：把 AI 规则、安全契约和知识图谱同步到目标项目。当前实现本地同步，远程 Git 同步为下阶段 TODO。",
+  "trigger": ["同步知识", "知识同步", "sync knowledge", "把规则同步过去"],
+  "phase": "P4",
+  "knowledge": {
+    "requires": [],
+    "optional": []
+  },
+  "input": {
+    "args": [
+      {
+        "name": "target",
+        "description": "目标项目路径",
+        "required": true,
+        "example": "/Users/me/my-other-project"
+      }
+    ]
+  },
+  "output": {
+    "stdout": "同步结果：哪些文件新增、哪些跳过、知识图谱是否成功生成"
+  },
+  "sideEffects": [
+    { "type": "writes-file", "description": "在目标项目写入 .ai/ 目录下的规则和配置文件（不覆盖已有文件）" }
+  ],
+  "action": {
+    "type": "shell",
+    "command": "bash scripts/kb-sync-knowledge.sh ${args.0}"
+  }
+}

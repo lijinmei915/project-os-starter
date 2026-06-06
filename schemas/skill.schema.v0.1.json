@@ -1,0 +1,137 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "skill.schema.v0.1",
+  "title": "Project OS Skill Schema v0.1",
+  "description": "定义 Project OS 中一个 AI 可调用 skill 的标准 I/O 契约。v0.1 在原有三元组基础上增加 knowledge(知识依赖声明)、input、output、sideEffects，让知识层和能力层可以对接。",
+  "type": "object",
+  "required": ["schemaVersion", "name", "description", "trigger", "action"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "description": "skill schema 版本，当前固定为 skill.v0.1",
+      "const": "skill.v0.1"
+    },
+    "name": {
+      "type": "string",
+      "description": "skill 唯一标识，kebab-case，与文件名一致",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "description": {
+      "type": "string",
+      "description": "给人和 AI 看的一句话说明：这个 skill 做什么"
+    },
+    "trigger": {
+      "description": "自然语言触发词（字符串逗号分隔 或 数组，均可）",
+      "oneOf": [
+        { "type": "string" },
+        { "type": "array", "items": { "type": "string" } }
+      ]
+    },
+    "knowledge": {
+      "type": "object",
+      "description": "知识层依赖声明。框架根据此字段从 knowledge-registry.json 自动注入上下文。",
+      "properties": {
+        "requires": {
+          "type": "array",
+          "description": "必需的知识域关键词，与 registry 的 use_when 语义对齐（如 '前端规范', '测试方法'）",
+          "items": { "type": "string" }
+        },
+        "optional": {
+          "type": "array",
+          "description": "可选的知识域关键词，有则注入，无则跳过",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "input": {
+      "type": "object",
+      "description": "skill 的输入参数声明",
+      "properties": {
+        "args": {
+          "type": "array",
+          "description": "位置参数列表",
+          "items": {
+            "type": "object",
+            "required": ["name", "description"],
+            "properties": {
+              "name":        { "type": "string" },
+              "description": { "type": "string" },
+              "required":    { "type": "boolean", "default": false },
+              "example":     { "type": "string" }
+            }
+          }
+        },
+        "env": {
+          "type": "array",
+          "description": "依赖的环境变量",
+          "items": {
+            "type": "object",
+            "required": ["name", "description"],
+            "properties": {
+              "name":        { "type": "string" },
+              "description": { "type": "string" },
+              "required":    { "type": "boolean", "default": false }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "description": "skill 的输出声明",
+      "properties": {
+        "stdout": {
+          "type": "string",
+          "description": "标准输出内容描述（给 AI 读的 prompt 格式 或 纯结果）"
+        },
+        "files": {
+          "type": "array",
+          "description": "写入磁盘的文件路径（相对项目根）",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "sideEffects": {
+      "type": "array",
+      "description": "副作用声明。让调用方知道这个 skill 除了输出还会改什么。",
+      "items": {
+        "type": "object",
+        "required": ["type", "description"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["writes-file", "appends-file", "runs-command", "modifies-registry", "none"],
+            "description": "副作用类型"
+          },
+          "description": { "type": "string" }
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "description": "执行层：如何调用这个 skill",
+      "required": ["type", "command"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["shell"],
+          "description": "当前只支持 shell，P2 扩展为 mcp / agent-call"
+        },
+        "command": {
+          "type": "string",
+          "description": "执行命令，参数用 ${args.N} 引用"
+        }
+      },
+      "additionalProperties": false
+    },
+    "phase": {
+      "type": "string",
+      "enum": ["P1", "P2", "P3", "P4"],
+      "description": "归属演进阶段（对应北极星四级台阶）"
+    }
+  },
+  "additionalProperties": false
+}

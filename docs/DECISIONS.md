@@ -2,6 +2,8 @@
 layer: knowledge
 type: log
 last_verified: 2026-06-04
+teaches: "历史关键决策的原因、被放弃的备选方案和决策影响"
+use_when: "AI 需要理解某个架构选择的背景、或面临类似决策需要参考先例时"
 ---
 
 # 架构决策记录
@@ -246,6 +248,38 @@ last_verified: 2026-06-04
 - `check-ai-project.sh` 按元数据完整度和新鲜度评分（v0.4）。
 - `architecture-diagram.html` 读图谱按 archLayer 自动渲染。
 - 新增文档必须按 `docs/KNOWLEDGE_SCHEMA.md` 补 frontmatter。
+
+---
+
+#### D014 — 锁定北极星为组织级 AI 研发中台，按四级台阶演进
+
+**决定**: 终极目标锁定为对标 LLM-Wiki 知识库 + 专家技能包的组织级 AI 研发中台。演进按四级台阶按序推进：P1 知识驱动 → P2 主动专家 → P3 操作工程 → P4 编排成 Agent。路线图见 `docs/PRODUCT_PLAN.md` 北极星章节，可跟踪拆解在 goal 任务看板。
+
+**放弃**: 不一步跳到接代码仓/DB（跳级即塌）；不先做组织级分发（先单项目跑通 P1-P2）。
+
+**原因**:
+- 参考架构自下而上依赖：没有结构化知识地基，上层专家技能是空中楼阁。Project OS 现有知识地基正是中台底座，沿依赖顺序往上盖最稳。
+- 顺序反了会把风险从入口扩散到工具与安全。
+
+**影响**:
+- `docs/PRODUCT_PLAN.md` v3=地基(已完成)、v4≈P1+P2、v5≈P3+P4 收口为四级台阶。
+- P3 安全契约是估值分水岭与风险悬崖，其种子(#3)在 P1 就埋。
+
+---
+
+#### D015 — skill 消费知识用「脚本输出 prompt 让 AI 匹配」，不在脚本内做语义
+
+**决定**: `kb-just-ask` 等主动 skill 的脚本只负责读 `knowledge-registry.json`、整理成知识地图 prompt，由 AI 完成语义匹配、读文件、回答。脚本不自做语义判断。
+
+**放弃**: 不在 shell 里做中文分词/关键词匹配（脆弱且能力上限低）；不引入嵌入向量检索（registry 仅数十条，全量喂 AI 足够，过度工程）。
+
+**原因**:
+- 沿用 `auto-reflect.sh` 已验证的模式：脚本备料、AI 决策，职责清晰。
+- registry 体量小，全量知识地图喂 AI 既准又简单，无需检索层。
+
+**影响**:
+- `scripts/kb-just-ask.sh` + `.ai/skills/kb-just-ask.json` 为 P2 专家技能消费知识层提供参考实现。
+- 未来 registry 膨胀到一定规模再考虑加检索层（P2·M2.1 标准 I/O schema 时评估）。
 
 ---
 

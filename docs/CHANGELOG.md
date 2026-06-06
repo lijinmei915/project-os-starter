@@ -2,6 +2,8 @@
 layer: knowledge
 type: log
 last_verified: 2026-06-04
+teaches: "项目的结构性变更历史及其影响范围"
+use_when: "AI 需要回溯某个功能是什么时候改的、为什么改的、影响到哪些模块时"
 ---
 
 # 代码变更日志
@@ -18,6 +20,30 @@ last_verified: 2026-06-04
 - 纯样式微调、文案调整、无结构影响的小修不记录
 - 一次连续任务合并成一条，不拆碎
 - 组织方式优先按日期，再在日期内按主题分组
+
+---
+
+## 2026-06-05
+
+### AI Engineering Kit / self engineering
+
+#### 北极星锁定 + goal 模式拆解 + P1·M1.1 kb-just-ask 落地
+
+- **改动**：(1) 锁定北极星=组织级 AI 研发中台，`PRODUCT_PLAN.md` 新增北极星章节与四级台阶(P1-P4)，v3/v4/v5 收口对齐；(2) goal 模式拆出 10 个里程碑任务并串联依赖(会话任务看板)；(3) 实现 P1 第一砖 `scripts/kb-just-ask.sh` + `.ai/skills/kb-just-ask.json`——读 `knowledge-registry.json` 整理成知识地图 prompt，由 AI 按 use_when 匹配文件并溯源回答；(4) 决策记入 D014(北极星方向)/D015(skill 消费知识的 prompt 模式)。
+- **影响**：上一轮的 `knowledge-registry.json` 从孤岛变成可消费入口；为 P2 专家技能提供参考实现；产品路线图从「自身工程化」升级为「通往组织级中台」的四级台阶。
+- **相关文件**：`docs/PRODUCT_PLAN.md`, `scripts/kb-just-ask.sh`, `.ai/skills/kb-just-ask.json`, `docs/DECISIONS.md`, `HANDOFF.md`, `CLAUDE.md`。
+
+---
+
+## 2026-06-04
+
+### AI Engineering Kit / self engineering
+
+#### v4 知识语义索引：frontmatter teaches/useWhen + knowledge-registry.json
+
+- **改动**：frontmatter 新增 `teaches`（语义摘要）和 `use_when`（语义触发）两个可选字段；`build-project-graph.sh` 解析新字段并额外输出 `knowledge-registry.json`（语义索引文件）；全量 24 个带 frontmatter 的文档已补齐两个字段；`KNOWLEDGE_SCHEMA.md` 新增字段规范和写法指南。
+- **影响**：AI 可通过 `knowledge-registry.json` 按问题域快速定位该查哪个文件，不再只能按文件名猜；`project-graph.json` 的 node 新增 `teaches` / `useWhen` 属性。
+- **相关文件**：`docs/KNOWLEDGE_SCHEMA.md`, `scripts/build-project-graph.sh`, `.project-os/graph/knowledge-registry.json`, 全部 `docs/*.md` 和根 `*.md`。
 
 ---
 

@@ -3,6 +3,8 @@ layer: entry
 type: guide
 last_verified: 2026-06-04
 depends_on: [README.md]
+teaches: "Project OS 的安装方式、profile 选择、升级路径和安装后的使用方法"
+use_when: "用户要把 Project OS 安装到新项目或已有项目、或需要升级版本时"
 ---
 
 # AI Engineering Kit 安装说明

@@ -3,6 +3,8 @@ layer: governance
 type: spec
 last_verified: 2026-06-04
 depends_on: [docs/DOCUMENTATION.md]
+teaches: "AI 在本项目中的行为边界、路由契约、文档更新规则和禁止操作"
+use_when: "AI 首次进入项目、需要确认自己能做什么不能做什么、或处理路由分流时"
 ---
 
 # AGENTS

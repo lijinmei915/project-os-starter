@@ -3,6 +3,8 @@ layer: knowledge
 type: spec
 last_verified: 2026-06-04
 depends_on: [docs/DESIGN_STANDARDS.md]
+teaches: "前端技术栈选型、组件规范、状态管理、路由策略和构建工具"
+use_when: "AI 要写前端代码、选组件库、调整路由或排查构建问题时"
 ---
 
 # 前端技术说明

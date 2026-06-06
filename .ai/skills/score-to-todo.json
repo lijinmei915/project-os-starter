@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "skill.v0.1",
+  "name": "score-to-todo",
+  "description": "治理闭环：把体检评分的缺口(GAP)回流成可执行 todo 清单 + AI 修复 prompt，并提醒反思新鲜度。",
+  "trigger": ["评分回流", "缺口待办", "该补什么", "score to todo", "体检待办"],
+  "phase": "P1",
+  "knowledge": {
+    "requires": ["测试方法", "项目当前阶段"],
+    "optional": ["历史踩坑记录"]
+  },
+  "input": {
+    "env": [
+      {
+        "name": "AI_PROJECT_REPORT_MODULES",
+        "description": "自定义报告模块 schema 路径（可选，默认读 schemas/ai-project-report.v0.1.json）",
+        "required": false
+      }
+    ]
+  },
+  "output": {
+    "stdout": "给 AI 的缺口修复 prompt：列出 GAP 项(分值/分类/描述)，AI 逐条给出修复步骤或标注不适用",
+    "files": [".project-os/reports/gaps-todo.md"]
+  },
+  "sideEffects": [
+    { "type": "writes-file", "description": "写入 .project-os/reports/gaps-todo.md" }
+  ],
+  "action": {
+    "type": "shell",
+    "command": "bash scripts/score-to-todo.sh"
+  }
+}

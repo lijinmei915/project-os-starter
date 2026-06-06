@@ -3,6 +3,8 @@ layer: governance
 type: spec
 last_verified: 2026-06-04
 depends_on: [docs/DOCUMENTATION.md]
+teaches: "模板文件的归属层、自动勾选条件和新增模板的接入流程"
+use_when: "AI 要新增模板文件、修改向导自动勾选逻辑、或检查模板是否同步时"
 ---
 
 # 模板文件治理规则

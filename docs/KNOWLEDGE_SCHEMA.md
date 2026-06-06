@@ -3,6 +3,8 @@ layer: governance
 type: spec
 last_verified: 2026-06-04
 depends_on: [docs/DOCUMENTATION.md, scripts/build-project-graph.sh]
+teaches: "文档 frontmatter 元数据的字段定义、取值规则和新文件接入流程"
+use_when: "AI 要给新文件加 frontmatter、检查元数据是否合规、或理解图谱数据来源时"
 ---
 
 # 知识结构化规范
@@ -32,6 +34,8 @@ layer: knowledge        # 架构归属层（必填）
 type: spec              # 文档类型（必填）
 last_verified: 2026-06-04   # 最后人工核实日期 ISO（必填）
 depends_on: [AGENTS.md, docs/DOCUMENTATION.md]  # 声明式依赖（可选，无则省略）
+teaches: "项目的技术栈选型与运行环境约定"  # 语义摘要：这个文件教会 AI 什么（可选）
+use_when: "AI 需要了解项目用了什么框架、怎么启动时"  # 语义触发：什么场景下该查这个文件（可选）
 ---
 ```
 
@@ -64,6 +68,28 @@ ISO 日期（`YYYY-MM-DD`）。每次人工确认该文档内容仍准确时更�
 
 该文档逻辑上依赖/必须配合阅读的其他文件路径数组。区别于 `build-project-graph.sh` 自动 grep 出的 `references` 边，`depends_on` 是**人工声明的强依赖**，生成 `declares_dependency` 边。无依赖时省略此字段。
 
+### teaches — 语义摘要（v0.3 新增）
+
+一句话描述这个文件**教会 AI 什么知识**。不是文件标题的复述，而是它对 AI 的价值。好的写法回答"读完这个文件，AI 能做到什么？"
+
+| 写法 | 评价 |
+|------|------|
+| `teaches: "前端规范"` | ❌ 太笼统，和标题重复 |
+| `teaches: "项目的组件目录结构、命名约定和样式隔离规则"` | ✅ AI 读完知道怎么写组件 |
+
+可选字段，无则省略。`build-project-graph.sh` 会解析此字段并输出到 `knowledge-registry.json`。
+
+### use_when — 语义触发（v0.3 新增）
+
+一句话描述**什么场景下 AI 应该来查这个文件**。好的写法描述触发条件，不是文件内容。
+
+| 写法 | 评价 |
+|------|------|
+| `use_when: "需要时"` | ❌ 等于没说 |
+| `use_when: "AI 要新建组件、调整目录结构或排查样式冲突时"` | ✅ 明确触发场景 |
+
+可选字段，无则省略。与 `teaches` 搭配，构成知识注册表的语义索引。
+
 ## 新增文件接入规则
 
 新增一个文档时：
@@ -79,7 +105,9 @@ ISO 日期（`YYYY-MM-DD`）。每次人工确认该文档内容仍准确时更�
 
 | 文件 | 说明 |
 |------|------|
-| `scripts/build-project-graph.sh` | 解析 frontmatter，输出结构化图谱 |
+| `scripts/build-project-graph.sh` | 解析 frontmatter，输出结构化图谱和知识注册表 |
+| `.project-os/graph/knowledge-registry.json` | 语义索引：teaches + useWhen，供 AI 按问题域查文件 |
+| `.project-os/graph/project-graph.json` | 完整文件图谱（含 teaches/useWhen 属性） |
 | `scripts/check-ai-project.sh` | 按元数据完整度和新鲜度评分 |
 | `docs/architecture-diagram.html` | 读图谱 JSON 自动渲染架构层 |
 | `docs/DOCUMENTATION.md` | 文档编写规范和更新边界 |

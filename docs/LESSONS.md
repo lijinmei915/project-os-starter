@@ -2,6 +2,8 @@
 layer: knowledge
 type: log
 last_verified: 2026-06-04
+teaches: "历史踩坑记录、错误模式和已确立的避坑约束"
+use_when: "AI 即将做类似操作前检查是否有已知的坑、或犯错后需要记录新教训时"
 ---
 
 # 错误模式记录
@@ -11,6 +13,21 @@ last_verified: 2026-06-04
 > 不要写什么：成功经验、普通进展、重复的 changelog 内容、当前状态摘要。
 > 每次犯错后立即记录。
 > 格式：犯的错 / 根本原因 / 加了什么规则。
+
+---
+
+## Project OS / 给新项目赋能
+
+### 2026-06-06 用 Project OS 赋能新项目时，没有生成 CLAUDE.md，导致全局 skill 抢先
+
+**犯的错**：用 `kb-generate-docs` 给 fx-ui 新项目建了 AGENTS/PROJECT/HANDOFF 知识层，但没有生成 `CLAUDE.md`（Claude Code 适配文件）。用户在新会话里说"生成一个列表页"，`intent-clarifier` 全局 skill 按词语模式抢先触发，问了一堆 fx-ui 里早就有答案的问题（技术栈、功能范围），完全绕过了我们建的知识层。
+
+**根本原因**：`AGENTS.md` 的护栏在 AI **读文件之后**才生效；`intent-clarifier` 等全局 skill 按**词语模式匹配**，发生在读文件**之前**。没有 `CLAUDE.md` 就没有"进门先读项目规则"的显式指令，Claude Code 不知道该抑制全局 skill。
+
+**加了什么规则**：
+- `kb-generate-docs` 给新项目赋能时，必须同时生成 `CLAUDE.md`（Claude Code 适配），不只是 AGENTS/PROJECT/HANDOFF。
+- `CLAUDE.md` 里要明确两件事：①进入项目必读哪三个文件；②技术栈/规则已锁定的情况下，不要触发通用澄清流程。
+- 验收赋能是否成功的标准之一：**在新会话里说一个具体任务，看 AI 是直接干还是触发了通用澄清**。触发了通用澄清 = 赋能不完整。
 
 ---
 

@@ -2,6 +2,8 @@
 layer: knowledge
 type: status
 last_verified: 2026-06-04
+teaches: "上一轮任务的交接上下文、风险点和下一步建议"
+use_when: "新的 AI 会话接手工作、需要了解最近做了什么和接下来该做什么时"
 depends_on: [PROJECT.md, AGENTS.md]
 ---
 
@@ -11,8 +13,8 @@ depends_on: [PROJECT.md, AGENTS.md]
 > 什么时候更新：每次完成一组连续任务、当前状态变化或下一位 AI 需要接手时。
 > 不要写什么：长期路线图、完整产品介绍、详细架构说明或变更流水账。
 
-> 上一轮任务：v3 知识结构化全部落地（文档 frontmatter + 图谱升级 + 评分升级 + 架构图自动化）。
-> 下一轮重点：v4 Skill 契约化，对齐 agent-skills 生态。
+> 上一轮任务：锁定北极星方向 + goal 模式四级台阶拆解 + PRODUCT_PLAN 路线图落盘 + P1·M1.1 kb-just-ask 跑通。
+> 下一轮重点：P1 剩余两砖 — #2 治理闭环、#3 安全契约种子（见 goal 任务看板 #1-#10）。
 
 ## 🤖 AI 助手上手简报 (Copy & Paste)
 
@@ -32,7 +34,10 @@ depends_on: [PROJECT.md, AGENTS.md]
 
 ## 🏗️ 本次已完成 (核心成果)
 
-- **v3 知识结构化**：全部文档加 YAML frontmatter（`layer/type/last_verified/depends_on`，规范见 `docs/KNOWLEDGE_SCHEMA.md`）；`build-project-graph.sh` 解析 frontmatter 输出 archLayer/stale/declares_dependency（schema v0.2，额外出 `docs/data/project-graph.json`）；评分升级 v0.4（知识演进拆成错题本/引擎/元数据完整度/知识新鲜度，报告列出过期文档）；`architecture-diagram.html` 改读图谱 JSON 动态渲染、过期标橙；模板层镜像同步；修复 `.claude/settings.local.json` commit-guard hook（原拦截所有 bash，改为仅 git commit 时检查）。
+- **北极星锁定 + goal 模式**：终极目标锁定为对标 LLM-Wiki 的组织级 AI 研发中台；拆成四级台阶 P1-P4 共 10 个里程碑任务(会话任务看板，依赖已串联)；`PRODUCT_PLAN.md` 新增北极星章节，v3/v4/v5 收口对齐。决策见 D014/D015。
+- **P1·M1.1 kb-just-ask 落地**：第一个主动消费知识的 skill。`scripts/kb-just-ask.sh` 读 `knowledge-registry.json` 整理成知识地图 prompt，由 AI 按 `use_when` 匹配文件、读取、溯源回答；已注册 `.ai/skills/kb-just-ask.json`；真实问题验证闭环通过(registry 从孤岛变入口)。设计沿用 auto-reflect 的「脚本备料 + AI 决策」模式。
+- **v4 知识语义索引**：frontmatter 新增 `teaches`（语义摘要：这个文件教会 AI 什么）和 `use_when`（语义触发：什么场景下该查这个文件）两个可选字段；`build-project-graph.sh` 解析新字段，`project-graph.json` node 新增 `teaches`/`useWhen` 属性，额外自动输出 `knowledge-registry.json`（42 条语义索引）；全量 24 个带 frontmatter 的文档已补齐；`KNOWLEDGE_SCHEMA.md` 新增字段规范和写法指南。
+- **v3 知识结构化**（上轮）：全部文档加 YAML frontmatter（`layer/type/last_verified/depends_on`，规范见 `docs/KNOWLEDGE_SCHEMA.md`）；`build-project-graph.sh` 解析 frontmatter 输出 archLayer/stale/declares_dependency（schema v0.2，额外出 `docs/data/project-graph.json`）；评分升级 v0.4（知识演进拆成错题本/引擎/元数据完整度/知识新鲜度，报告列出过期文档）；`architecture-diagram.html` 改读图谱 JSON 动态渲染、过期标橙；模板层镜像同步；修复 `.claude/settings.local.json` commit-guard hook（原拦截所有 bash，改为仅 git commit 时检查）。
 - **AI 统一枢纽**：建立 `.ai/` 目录，通过 `scripts/sync-ai-rules.sh` 实现 100% 动态软链接映射。
 - **v0.3 评分模型**：从静态文档检查升级为“技术健康 + AI 效率 + 知识演进”的多维评分。
 - **可视化向导**：在 `index.html` 实现“人格化访谈”UI，支持意图驱动的资产自动联动勾选。
@@ -63,7 +68,7 @@ depends_on: [PROJECT.md, AGENTS.md]
 - **模型敏感度**：自动反思脚本 (`auto-reflect.sh`) 在不同模型下的总结质量可能存在差异，需抽样微调 Prompt。
 - **测试提示**：`tests/run-tests.sh` 仍会提示 `.env.local` 的 `DEEPSEEK_API_KEY` 为空；截图回归在找不到浏览器时会跳过 bitmap capture，但 marker 检查已通过。
 
-## 🎯 下一步建议
-1. **v4 Skill 契约化**：把现有脚本/向导抽成标准输入输出 schema，对齐 awesome-agent-skills / OpenAgentSkill 生态，让 skill 可被市场发现安装。
-2. **样本校准**：找一个真实老项目运行 `./kit`，观察 v0.4 模型的「缺口建议」和过期文档识别是否合理。
-3. **build-project-graph 增强**：v4 时参考 Aider Repo Map，对被检查项目的代码上 tree-sitter 解析（当前只扫文件名/路径）。
+## 🎯 下一步建议（P1 剩余，见 goal 任务看板）
+1. **#2 治理闭环**：`check-ai-project.sh` 的缺口建议落成可执行 todo（不止打分）；`auto-reflect.sh` 从手动改为可定时触发。让治理从「测了不改」变「越用越聪明」。
+2. **#3 安全契约种子**：在 `.claude/hooks` 机制上声明「AI 可写/只读/禁区」文件边界雏形，为 P3 生死线(#7 正式安全契约)提前埋种子。
+3. **真实项目校准**：找 1-2 个真实老项目跑 `kb-just-ask`，验证知识地图匹配是否实际有用。

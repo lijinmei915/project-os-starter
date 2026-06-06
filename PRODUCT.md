@@ -3,6 +3,8 @@ layer: knowledge
 type: spec
 last_verified: 2026-06-04
 depends_on: [docs/PRODUCT_PLAN.md]
+teaches: "产品的定位、核心价值主张和目标用户画像"
+use_when: "AI 需要理解产品是什么、为谁服务、核心价值在哪时"
 ---
 
 # Product

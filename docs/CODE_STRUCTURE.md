@@ -3,6 +3,8 @@ layer: knowledge
 type: spec
 last_verified: 2026-06-04
 depends_on: [docs/ARCHITECTURE.md]
+teaches: "代码目录的分层规则、各目录职责和禁止放置的内容"
+use_when: "AI 要新建文件、移动代码、或判断某段逻辑该放在哪个目录时"
 ---
 
 # 代码结构说明

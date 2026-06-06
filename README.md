@@ -3,6 +3,8 @@ layer: entry
 type: guide
 last_verified: 2026-06-04
 depends_on: [INSTALL.md, AGENTS.md]
+teaches: "仓库的整体定位、快速上手路径和关键入口文件导航"
+use_when: "AI 或用户首次接触本仓库、需要知道从哪里开始时"
 ---
 
 # AI Engineering Kit

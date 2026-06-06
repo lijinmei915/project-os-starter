@@ -67,4 +67,25 @@ if [ -d "docs" ]; then
 fi
 
 echo "✅ 动态映射完成，唯一真相源 (SSOT) 已强制同步至 $RULES_DIR/"
+
+# --- 原生配置同步：把 adapter 写到各工具实际读取的位置 ---
+echo ""
+echo "🔄 同步原生工具配置..."
+
+# Claude Code → 根目录 CLAUDE.md
+if [ -f "adapters/CLAUDE.md" ]; then
+  cp "adapters/CLAUDE.md" "CLAUDE.md"
+  echo "  📄 Claude Code: adapters/CLAUDE.md → CLAUDE.md"
+fi
+
+# Gemini CLI → 根目录 GEMINI.md
+if [ -f "adapters/GEMINI.md" ]; then
+  cp "adapters/GEMINI.md" "GEMINI.md"
+  echo "  📄 Gemini CLI:  adapters/GEMINI.md → GEMINI.md"
+fi
+
+# Codex → 根目录 AGENTS.md 本身就是（已有，无需额外同步）
+echo "  📄 Codex:       AGENTS.md 已是原生位置，无需同步"
+
+echo "✅ 原生工具配置同步完成"
 exit 0

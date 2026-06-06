@@ -3,6 +3,8 @@ layer: governance
 type: spec
 last_verified: 2026-06-04
 depends_on: [docs/DOCUMENTATION.md]
+teaches: "文档和文件的命名规则、放置位置和跨工具兼容约定"
+use_when: "AI 要新建文件、重命名已有文件、或检查命名是否符合规范时"
 ---
 
 # 文档命名规范

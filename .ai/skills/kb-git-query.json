@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "skill.v0.1",
+  "name": "kb-git-query",
+  "description": "Git 仓库快照：查询任意 Git 项目的分支、提交历史、近期改动和文件结构，让 AI 能看懂一个真实项目发生了什么。",
+  "trigger": ["查git", "看提交记录", "最近改了什么", "git query", "仓库快照"],
+  "phase": "P3",
+  "knowledge": {
+    "requires": [],
+    "optional": ["项目当前所处阶段"]
+  },
+  "input": {
+    "args": [
+      {
+        "name": "target",
+        "description": "目标 Git 仓库路径（默认当前目录）",
+        "required": false,
+        "example": "/Users/me/my-project"
+      },
+      {
+        "name": "--depth N",
+        "description": "查看最近 N 条提交，默认 20",
+        "required": false,
+        "example": "--depth 10"
+      }
+    ]
+  },
+  "output": {
+    "stdout": "给 AI 的仓库快照 prompt：含分支/提交历史/文件结构/近期改动，AI 基于此分析项目状态"
+  },
+  "sideEffects": [
+    { "type": "none", "description": "只读操作，不写文件" }
+  ],
+  "action": {
+    "type": "shell",
+    "command": "bash scripts/kb-git-query.sh ${args.0}"
+  }
+}

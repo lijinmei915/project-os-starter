@@ -939,12 +939,11 @@
       align-items: center;
       justify-content: center;
       gap: var(--space-8);
-      transition: color var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+      transition: color .3s cubic-bezier(.4, 0, .2, 1), background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
       user-select: none;
     }
     .kit-switch button:not(.is-active):hover {
       color: var(--color-text-primary);
-      background: rgba(255, 255, 255, .52);
     }
     .kit-switch button:active {
       transform: none;
@@ -3131,6 +3130,10 @@
                         <strong>方便测试和交接</strong>
                         <span>验收方式、运行手册和经验教训。</span>
                       </button>
+                      <button class="kit-wizard-card-sm" type="button" data-val="design-system">
+                        <strong>组件库 / 设计系统</strong>
+                        <span>设计规范、token、组件目录和技术栈。</span>
+                      </button>
                       <button class="kit-wizard-card-sm" type="button" data-val="full">
                         <strong>完整工程治理</strong>
                         <span>全套工程文档，适合补齐或接管。</span>
@@ -3497,6 +3500,13 @@
       autoFiles: ["docs/NAMING.md", "docs/TESTING.md", "docs/RUNBOOK.md", "HANDOFF.md", "docs/LESSONS.md"],
       advice: "<strong>测试交接</strong>：先补齐验收方式、运行手册、交接上下文和经验复盘。"
     },
+    "design-system": {
+      label: "组件库 / 设计系统",
+      maturityKey: "mvp",
+      structureKey: "runnable",
+      autoFiles: ["docs/DESIGN_STANDARDS.md", "docs/CODE_STRUCTURE.md", "docs/TECH_STACK.md", "docs/NAMING.md"],
+      advice: "<strong>组件库 / 设计系统</strong>：先拿到设计规范、token 边界、组件目录和技术栈。"
+    },
     full: {
       label: "完整工程治理",
       maturityKey: "production",
@@ -3525,6 +3535,7 @@
     page: "page-prototype",
     run: "runnable",
     handoff: "handoff",
+    "design-system": "design-system",
     ai: "agent",
     rag: "rag",
     full: "full"
@@ -3546,6 +3557,10 @@
     handoff: {
       files: ["docs/TECH_STACK.md", "docs/NAMING.md", "docs/TESTING.md", "docs/RUNBOOK.md", "HANDOFF.md", "docs/LESSONS.md"],
       field: "测试、验收和交接"
+    },
+    "design-system": {
+      files: ["docs/DESIGN_STANDARDS.md", "docs/CODE_STRUCTURE.md", "docs/TECH_STACK.md", "docs/NAMING.md"],
+      field: "设计规范、token 和组件结构"
     },
     full: {
       files: ["PRODUCT.md", "docs/PRODUCT_PLAN.md", "docs/TECH_STACK.md", "docs/ENVIRONMENT.md", ".env.example", "docs/NAMING.md", "docs/DOCUMENTATION.md", "docs/ARCHITECTURE.md", "docs/CODE_STRUCTURE.md", "docs/DESIGN_STANDARDS.md", "docs/TESTING.md", "docs/RUNBOOK.md", "docs/CHANGELOG.md", "docs/DECISIONS.md", "docs/LESSONS.md", "prompts/", "evals/", "guardrails/", "mcp/", "observability/", "config/"],
@@ -5048,25 +5063,31 @@
         if (entry.kind === 'file' && entry.name.endsWith('.md')) knownFiles.add(entry.name);
       }
     } catch(e) { /* ignore */ }
-    const written = [];
-    let totalUnfilled = 0;
+
+    // Phase 1: fetch all templates first (network I/O, no file system writes)
+    const prepared = [];
     for (const filePath of files) {
       const isExisting = existingFiles.has(filePath);
       const targetPath = isExisting ? filePath.replace(/\.md$/i, '.template.md') : filePath;
       let content;
       try { content = await fetchTemplate(filePath); }
       catch (e) { content = '# ' + filePath + '\n\n> 模板下载失败\n'; }
-      // Prepend smart snapshot prefix if info is available
       let prefixApplied = false;
       if (info) {
         const prefix = buildSnapshotPrefix(filePath, info);
         if (prefix) { content = prefix + content; prefixApplied = true; }
       }
-      // Trim "相关文件" references to only include files that exist
       content = trimRelatedFiles(content, knownFiles);
       const unfilled = countUnfilledMarkers(content);
-      totalUnfilled += unfilled;
-      const parts = targetPath.split('/');
+      prepared.push({ filePath, targetPath, content, isExisting, prefixApplied, unfilled });
+    }
+
+    // Phase 2: write all files to the handle (no more network calls)
+    const written = [];
+    let totalUnfilled = 0;
+    for (const item of prepared) {
+      totalUnfilled += item.unfilled;
+      const parts = item.targetPath.split('/');
       const fileName = parts.pop();
       let dir = handle;
       for (const part of parts) {
@@ -5074,9 +5095,9 @@
       }
       const fh = await dir.getFileHandle(fileName, { create: true });
       const w = await fh.createWritable();
-      await w.write(content);
+      await w.write(item.content);
       await w.close();
-      written.push({ source: filePath, written: targetPath, existing: isExisting, prefixed: prefixApplied, unfilled });
+      written.push({ source: item.filePath, written: item.targetPath, existing: item.isExisting, prefixed: item.prefixApplied, unfilled: item.unfilled });
     }
     return { written, totalUnfilled };
   }
@@ -5571,7 +5592,7 @@
   }
 
   function renderNewProjectWritePlan(container, params) {
-    const { handle, files, map, info, plan } = params;
+    let { handle, files, map, info, plan } = params;
     const exactText = plan.exact.length
       ? `发现 ${plan.exact.length} 个标准文件已存在。默认不覆盖原文件，只生成 <code>.template.md</code> 参考版本。`
       : '没有发现同名标准文件。';

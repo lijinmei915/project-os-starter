@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "write-policy.v1.0",
+  "note": "AI 文件操作边界契约【正式版】。check-protected-write.sh 直接读本文件执行拦截。三类边界：protected(需确认)/readonly(软提醒)/forbidden(硬拦截)。",
+  "policies": {
+    "protected": {
+      "desc": "写入需用户确认。AI 写这类文件前必须先告诉用户要改什么，得到明确同意才能动。",
+      "unlock": "用户确认后执行 touch /tmp/project_write_confirmed，有效期到本次会话结束",
+      "patterns": [
+        "**/memory/**",
+        "docs/**",
+        "*.md",
+        "AGENTS.md",
+        "CLAUDE.md",
+        "PROJECT.md",
+        "HANDOFF.md",
+        "COLLABORATION.md"
+      ]
+    },
+    "readonly": {
+      "desc": "系统生成物，AI 不应直接手写修改，只能通过对应脚本生成。软提醒，不硬拦截。",
+      "patterns": [
+        ".project-os/graph/**",
+        ".project-os/reports/**",
+        "schemas/**",
+        "docs/data/**"
+      ]
+    },
+    "forbidden": {
+      "desc": "禁区，任何情况不得写入。包括密钥、凭证和备份目录。",
+      "patterns": [
+        ".env",
+        ".env.*",
+        ".env.local",
+        "**/secrets/**",
+        ".project-os/backups/**"
+      ]
+    }
+  },
+  "rollback": {
+    "desc": "AI 写入 protected 类文件前，check-protected-write.sh 自动备份原文件到 .project-os/backups/，出问题可用 scripts/rollback-file.sh 还原。",
+    "backup_dir": ".project-os/backups",
+    "strategy": "timestamp-snapshot"
+  },
+  "consumers": [
+    ".claude/hooks/check-protected-write.sh",
+    "scripts/rollback-file.sh"
+  ]
+}

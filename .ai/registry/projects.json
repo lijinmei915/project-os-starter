@@ -1,0 +1,96 @@
+{
+  "schemaVersion": "projects-registry.v0.1",
+  "_note": "组织级项目注册表。登记你管理的所有项目，让 AI 能跨项目扫描、对比和同步知识。用 kb-multi-scan 对所有项目体检。",
+  "projects": [
+    {
+      "id": "project-os",
+      "name": "Project OS",
+      "path": "../..",
+      "type": "local",
+      "description": "AI 工程化套件本身，北极星演进的源头项目",
+      "phase": "P4",
+      "tags": ["meta", "tooling", "ai-engineering"]
+    },
+    {
+      "id": "pocket-brain",
+      "name": "项目1-pocket-brain",
+      "path": "/Users/heqiao/Desktop/Claude练习/项目1-pocket-brain",
+      "type": "local",
+      "description": "pocket-brain 项目",
+      "tags": []
+    },
+    {
+      "id": "company-cli",
+      "name": "项目2-公司CLI",
+      "path": "/Users/heqiao/Desktop/Claude练习/项目2-公司CLI",
+      "type": "local",
+      "description": "公司 CLI 工具项目",
+      "tags": ["cli", "tooling"]
+    },
+    {
+      "id": "fmcg-ai-platform",
+      "name": "项目3-快消AI中台",
+      "path": "/Users/heqiao/Desktop/Claude练习/项目3-快消AI中台",
+      "type": "local",
+      "description": "快消行业 AI 中台项目",
+      "tags": ["ai", "platform"]
+    },
+    {
+      "id": "similar-company-spec",
+      "name": "项目4-相似公司规范",
+      "path": "/Users/heqiao/Desktop/Claude练习/项目4-相似公司规范",
+      "type": "local",
+      "description": "相似公司规范研究项目",
+      "tags": ["spec"]
+    },
+    {
+      "id": "share-ppt",
+      "name": "项目5-分享PPT",
+      "path": "/Users/heqiao/Desktop/Claude练习/项目5-分享PPT",
+      "type": "local",
+      "description": "分享用 PPT 项目",
+      "tags": ["ppt"]
+    },
+    {
+      "id": "ppt-agent-workbench",
+      "name": "项目6-PPT-Agent可视化工作台",
+      "path": "/Users/heqiao/Desktop/Claude练习/项目6-PPT-Agent可视化工作台",
+      "type": "local",
+      "description": "PPT Agent 可视化工作台",
+      "tags": ["agent", "ppt", "ui"]
+    },
+    {
+      "id": "ultimate-ppt",
+      "name": "项目6-终极PPT",
+      "path": "/Users/heqiao/Desktop/Claude练习/项目6-终极PPT",
+      "type": "local",
+      "description": "终极 PPT 生成项目",
+      "tags": ["ppt"]
+    },
+    {
+      "id": "codex-vpn",
+      "name": "项目7-Codex-VPN网络配置",
+      "path": "/Users/heqiao/Desktop/Claude练习/项目7-Codex-VPN网络配置",
+      "type": "local",
+      "description": "Codex VPN 网络配置项目",
+      "tags": ["devops", "network"]
+    },
+    {
+      "id": "interaction-docs",
+      "name": "项目8-交互说明",
+      "path": "/Users/heqiao/Desktop/Claude练习/项目8-交互说明",
+      "type": "local",
+      "description": "交互说明文档项目",
+      "tags": ["docs", "ux"]
+    },
+    {
+      "id": "dev-inspector",
+      "name": "dev-inspector",
+      "path": "/Users/heqiao/Desktop/Claude练习/dev-inspector",
+      "type": "local",
+      "description": "开发调试检查工具",
+      "tags": ["tooling", "debug"]
+    }
+  ],
+  "howToAdd": "在 projects 数组里加一条记录：{ id, name, path(绝对路径或相对于本文件), type(local/remote), description }。然后运行 bash scripts/kb-multi-scan.sh 就能一次性扫描所有项目。"
+}

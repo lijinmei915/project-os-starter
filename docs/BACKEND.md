@@ -2,6 +2,8 @@
 layer: knowledge
 type: spec
 last_verified: 2026-06-04
+teaches: "后端技术栈选型、架构模式、API 契约和部署策略"
+use_when: "AI 需要写后端代码、选数据库、定义 API 接口或配置部署时"
 ---
 
 # 后端技术说明

@@ -2,6 +2,8 @@
 layer: governance
 type: spec
 last_verified: 2026-06-04
+teaches: "文档的编写边界、格式规范、更新规则和校验约束"
+use_when: "AI 要新建或大改文档、需要确认文档该怎么写、该写多少时"
 ---
 
 # 文档编写规范

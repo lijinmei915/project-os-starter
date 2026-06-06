@@ -3,6 +3,8 @@ layer: knowledge
 type: spec
 last_verified: 2026-06-04
 depends_on: [index.html]
+teaches: "向导问题与可选文件之间的映射关系及新增文件的接入规则"
+use_when: "AI 需要修改向导预设、新增可选文件、或理解某个文件为什么被自动推荐时"
 ---
 
 # 向导预设映射规则

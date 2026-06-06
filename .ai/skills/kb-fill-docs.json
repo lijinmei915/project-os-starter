@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "skill.v0.1",
+  "name": "kb-fill-docs",
+  "description": "引导填充 + 文档串联：装完工程文件后，扫描还是空模板的文档，按依赖顺序引导用户填充，并让文档之间内容互相引用、保持一致。解决「向导只发空表格」的痛点。",
+  "trigger": ["填充文档", "引导填写", "把文档填起来", "fill docs", "装完了下一步", "串联文档"],
+  "phase": "P4",
+  "knowledge": {
+    "requires": ["文档的编写边界、格式规范、更新规则和校验约束"],
+    "optional": ["代码目录的分层规则", "前端技术栈选型", "后端技术栈选型"]
+  },
+  "input": {
+    "args": [
+      {
+        "name": "target",
+        "description": "目标项目路径（默认当前目录）",
+        "required": false,
+        "example": "/Users/me/my-project"
+      }
+    ]
+  },
+  "output": {
+    "stdout": "给 AI 的引导填充 prompt：含待填文档（按依赖顺序）+ 可引用的已有真相源 + 串联填充要求，AI 按序问用户、填充、串联"
+  },
+  "sideEffects": [
+    { "type": "none", "description": "只读扫描备料；文档填充由 AI 在与用户交互后逐个写入并确认" }
+  ],
+  "action": {
+    "type": "shell",
+    "command": "bash scripts/kb-fill-docs.sh ${args.0}"
+  }
+}

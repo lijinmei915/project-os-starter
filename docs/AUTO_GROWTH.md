@@ -3,6 +3,8 @@ layer: governance
 type: spec
 last_verified: 2026-06-04
 depends_on: [scripts/auto-reflect.sh, scripts/optimize-rules.sh]
+teaches: "自动反思、规则修剪和知识沉淀的触发机制与执行流程"
+use_when: "AI 需要触发自动反思、理解错题本沉淀机制、或优化冗余规则时"
 ---
 
 # 自动成长与迭代机制 (Auto-Growth)

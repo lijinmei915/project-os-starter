@@ -2,6 +2,8 @@
 layer: knowledge
 type: status
 last_verified: 2026-06-04
+teaches: "项目当前所处阶段、架构全貌、进度和下一步重点"
+use_when: "AI 需要判断当前该做什么、项目处于什么状态、或向用户汇报进度时"
 depends_on: [AGENTS.md, docs/PRODUCT_PLAN.md]
 ---
 
