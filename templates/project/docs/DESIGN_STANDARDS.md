@@ -1,3 +1,9 @@
+---
+layer: knowledge
+type: spec
+last_verified: 2026-06-04
+---
+
 # 设计规范
 
 > 本文件回答：当前项目的 UI 规则、token 使用方式和设计边界。
@@ -19,10 +25,16 @@
 - token 表见 `docs/design/tokens.md`
 - 布局规则见 `docs/design/layout.md`
 - 页面需要说明默认态、空态、错态、加载态
-- 产品定位和体验原则见 `PRODUCT.md`
 
 ## 参考文档
 
 - `docs/design/tokens.md`
 - `docs/design/layout.md`
 - `docs/design/component-index.md`
+
+## 相关文件
+
+| 文件 | 关系 |
+|------|------|
+| `PRODUCT.md` | 产品定位和品牌调性（设计方向的源头） |
+| `docs/NAMING.md` | 组件和文件命名规范 |

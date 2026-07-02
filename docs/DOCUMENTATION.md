@@ -28,6 +28,26 @@ use_when: "AI 要新建或大改文档、需要确认文档该怎么写、该写
 这份文档是干嘛的、什么时候该改、什么不该写进来。
 ```
 
+语言原则：
+
+```txt
+English for scheduling, Chinese for cognition.
+```
+
+中文说明：
+调度名、模式名、目录名和硬规则使用稳定英文，降低跨工具歧义；项目说明、交接、认知型文档以中文为主；面向用户的产品文案跟随用户语言。
+
+语言分层：
+
+| 文件 / 区域 | 语言策略 |
+|-------------|----------|
+| `SKILL.md` | English hard rules + 中文解释 |
+| `AGENTS.md` | 短规则可中英混合，调度名保留英文 |
+| `README.md` | 中文为主 |
+| `PROJECT.md` | 中文为主 |
+| `HANDOFF.md` | 中文为主 |
+| `references/` | 中文为主，关键约束可用英文 |
+
 ---
 
 ## SSOT 原则
@@ -42,6 +62,9 @@ use_when: "AI 要新建或大改文档、需要确认文档该怎么写、该写
 |------|------|
 | 这个项目怎么开始用 | `README.md` |
 | AI 应该怎么行动 | `AGENTS.md` |
+| AI 请求应该怎么分流 | `docs/ROUTING.md` |
+| 推荐引擎如何用证据推导文件和动作 | `docs/RECOMMENDATION_ENGINE.md` |
+| 项目状态识别和补齐策略怎么映射文件 | `docs/WIZARD_PRESETS.md` |
 | 现在项目是什么状态 | `PROJECT.md` |
 | 下一个人或 AI 怎么接手 | `HANDOFF.md` |
 | 为什么做过某个架构决定 | `docs/DECISIONS.md` |
@@ -49,6 +72,7 @@ use_when: "AI 要新建或大改文档、需要确认文档该怎么写、该写
 | 犯过什么错，新增了什么约束 | `docs/LESSONS.md` |
 | 文档应该怎么命名 | `docs/NAMING.md` |
 | 架构和模块职责是什么 | `docs/ARCHITECTURE.md` |
+| Skill 工程怎么生成 | `docs/SKILL_ENGINEERING.md` |
 | 环境变量和启动方式是什么 | `docs/ENVIRONMENT.md` |
 | 怎么测试和验收 | `docs/TESTING.md`、`tests/` |
 | 常见操作和故障怎么处理 | `docs/RUNBOOK.md` |
@@ -67,6 +91,31 @@ Project OS 不在文档里维护完整目录树。
 完整目录树容易漂移。
 结构契约更稳定。
 ```
+
+### 文档治理机器校验
+
+Project OS 的文档治理采用三件套：
+
+| 层 | 文件 | 作用 |
+|----|------|------|
+| 文字规范 | `docs/DOCUMENTATION.md` | 说明 SSOT、文档边界和写作规则 |
+| 机器事实 | `docs/data/doc-structure.manifest.json` | 登记每个文档的责任、SSOT 范围、必备章节和禁止重叠 |
+| 可执行检查 | `scripts/check-doc-structure.sh` | 检查文档是否登记、责任是否重复、必备章节是否缺失 |
+
+新增或改变根核心文档、`docs/*.md` 的职责时，必须同步更新 `docs/data/doc-structure.manifest.json`。
+
+检查命令：
+
+```bash
+bash scripts/check-doc-structure.sh .
+```
+
+规则：
+
+- `docs/DOCUMENTATION.md` 负责解释“为什么这样分”和“怎么判断归属”。
+- `docs/data/doc-structure.manifest.json` 负责给机器读取，不写长篇正文。
+- `scripts/check-doc-structure.sh` 负责在提交前拦截未登记、重复职责和章节缺失。
+- 其他文档发现已有 SSOT 时，只引用或摘要，不复制正文。
 
 文档结构分为七个区域：
 
@@ -129,6 +178,8 @@ Project OS 维护时必须区分三条线：
 本地增强不能伪装成通用规则。
 ```
 
+可分发内容指会进入 `templates/project/`、`templates/project-docs/`、安装 profile 或目标项目 runtime 的文件。改这类内容后，需要同步模板并检查漂移；它不只包括 UI，也包括脚本、schema、adapter、模板文档和 runtime 入口。
+
 ### Required
 
 Project OS 最小可用结构必须包含：
@@ -141,6 +192,7 @@ scripts/check-runtime.sh
 scripts/check-secrets.sh
 scripts/check-ai-project.sh
 scripts/ai-project.sh
+scripts/recommend-next.sh
 scripts/add-project-docs.sh
 scripts/build-project-graph.sh
 schemas/ai-project-score.schema.json
@@ -166,6 +218,7 @@ README.md
 INSTALL.md
 docs/DOCUMENTATION.md
 docs/NAMING.md
+docs/ROUTING.md
 docs/ARCHITECTURE.md
 docs/ENVIRONMENT.md
 docs/TESTING.md
@@ -177,6 +230,7 @@ scripts/check-runtime.sh
 scripts/check-secrets.sh
 scripts/check-ai-project.sh
 scripts/ai-project.sh
+scripts/recommend-next.sh
 scripts/add-project-docs.sh
 scripts/build-project-graph.sh
 schemas/ai-project-score.schema.json
@@ -190,6 +244,7 @@ templates/project-docs/
 
 ```txt
 docs/DESIGN_STANDARDS.md
+docs/SKILL_ENGINEERING.md
 docs/design/
 .claude/skills/
 .claude/commands/
@@ -204,8 +259,8 @@ scripts/install-adapter.sh
 
 | profile | 目标 | 内容 |
 |---------|------|------|
-| `core` | 最小 AI 协作规则和体检入口 | `AGENTS.md` / `PROJECT.md` / `HANDOFF.md` / `scripts/check-runtime.sh` / `scripts/check-secrets.sh` / `scripts/check-ai-project.sh` / `scripts/ai-project.sh` / `scripts/add-project-docs.sh` / `scripts/build-project-graph.sh` / `schemas/ai-project-score.*.json` / `schemas/ai-project-report.*.json` / `templates/report/ai-project-report.html` / `templates/project-docs/` |
-| `product` | 基础 AI 工程治理 | `core` + README / INSTALL / DOCUMENTATION / NAMING / ARCHITECTURE / ENVIRONMENT / TESTING / RUNBOOK / CHANGELOG / DECISIONS / LESSONS |
+| `core` | 最小 AI 协作规则和体检入口 | `AGENTS.md` / `PROJECT.md` / `HANDOFF.md` / `scripts/check-runtime.sh` / `scripts/check-secrets.sh` / `scripts/check-ai-project.sh` / `scripts/ai-project.sh` / `scripts/recommend-next.sh` / `scripts/add-project-docs.sh` / `scripts/build-project-graph.sh` / `schemas/ai-project-score.*.json` / `schemas/ai-project-report.*.json` / `templates/report/ai-project-report.html` / `templates/project-docs/` |
+| `product` | 基础 AI 工程治理 | `core` + README / INSTALL / DOCUMENTATION / NAMING / ROUTING / ARCHITECTURE / ENVIRONMENT / TESTING / RUNBOOK / CHANGELOG / DECISIONS / LESSONS |
 | `full` | 完整 Project OS runtime | `product` + 设计文档 + `.claude` runtime + adapters |
 
 ### Reference Implementation
@@ -266,6 +321,30 @@ templates/project-docs/
 ```
 
 这样即使不回看总规则，AI 和人也知道该怎么填。
+
+素材库原则：
+
+```txt
+文档模板定义结构和填写槽位。
+技术模板定义记录方式和证据来源。
+具体技术选择由项目证据或用户已确认目标推导。
+```
+
+模板不应该默认写死当前流行技术栈，例如某个框架、数据库、ORM、部署平台或 AI 服务商。
+
+允许出现的内容：
+
+- `未确定` / `待定` / `已确定` 等状态
+- “证据来源”字段，例如依赖文件、锁文件、配置文件、用户确认的决策
+- 稳定文档结构、检查命令和填写边界
+- schema、脚本、检查规则这类可执行工程机制
+
+不应该出现的内容：
+
+- 把示例技术栈写成默认推荐
+- 未检测项目证据就假设有数据库、RAG、MCP、部署流程或组件库
+- 为了显得专业而生成完整企业级治理内容
+- 将 `latest` 版本、潮流框架或服务商名称作为模板默认值
 
 ### AI 友好 Markdown 规范
 
@@ -707,7 +786,7 @@ AI 规则层 = 告诉 AI 怎么干活
 回答：
 
 - AI 进入项目后先读什么
-- 请求如何路由
+- 请求分流摘要；详细细则指向 `docs/ROUTING.md`
 - 哪些行为禁止
 - 文档之间冲突时谁优先
 - 不同工具如何理解 Project OS
@@ -718,6 +797,14 @@ AI 规则层 = 告诉 AI 怎么干活
 - 当前进度流水账
 - 交接细节
 - 每次改动的历史记录
+- 已经能沉到 `docs/*`、`PROJECT.md`、`HANDOFF.md` 或 adapter 的细则
+
+体量约束：
+
+- 根 `AGENTS.md` 应保持短入口，优先写可执行规则和分流摘要。
+- 当某段规则超过一个短小节，或包含多组示例 / 表格 / 测试 case，优先下沉到专门文档。
+- 下沉后在 `AGENTS.md` 保留一行摘要和链接，不重复维护两份细则。
+- 路由细则放 `docs/ROUTING.md`；文档治理细则放 `docs/DOCUMENTATION.md`；命名规则放 `docs/NAMING.md`。
 
 什么时候更新：
 
@@ -725,6 +812,106 @@ AI 规则层 = 告诉 AI 怎么干活
 - AI 行为边界变了
 - 文档 SSOT 规则变了
 - 跨工具入口约定变了
+
+---
+
+### docs/ROUTING.md
+
+Project OS 的路由细则。
+
+回答：
+
+- 安装、初始化、审计、接管等请求怎么分流
+- v1 固定第一响应是什么
+- `/os` 和自然语言安装入口如何等价
+- 领域 skill 如 `design-system` / `frontend` 什么时候接管
+
+不要写：
+
+- AI 通用行为边界
+- 产品介绍
+- 当前项目状态
+- 与分流无关的实现细节
+
+什么时候更新：
+
+- 路由模式变了
+- 固定第一响应变了
+- v1 验收输入变了
+- 安装入口判断规则变了
+
+---
+
+### docs/SKILL_ENGINEERING.md
+
+Agent Skill 工程结构和生成边界。
+
+回答：
+
+- 一个 skill 应该有哪些最小文件
+- 参考资料型、资产型、工具脚本型和分发型 skill 怎么区分
+- 哪些文件不应该默认生成
+- `SKILL.md` 和 `.ai/skills/*.json` 的职责怎么分
+
+不要写：
+
+- 某个具体业务 skill 的全部规则
+- 一次性调研流水
+- 长期产品路线图
+
+什么时候更新：
+
+- Agent Skill 工程模板变化
+- Skill schema 或分发策略变化
+- UI 向导的 Skill 工程选项变化
+
+---
+
+### docs/WIZARD_PRESETS.md
+
+项目状态识别和补齐策略映射。
+
+回答：
+
+- Q1 / Q2 / Q3 如何映射到推荐文件
+- 哪些文件属于项目入口、工程运行、代码结构、质量保障或 AI 协作规则
+- 新增可选文件时应该接入哪些预设
+
+不要写：
+
+- 向导 UI 样式细节
+- JS 具体实现逻辑
+- 用户教程或营销说明
+
+什么时候更新：
+
+- 新增、删除或调整可选文件
+- Q1 / Q2 / Q3 映射关系变化
+- 补齐策略或分层规则变化
+
+---
+
+### docs/RECOMMENDATION_ENGINE.md
+
+推荐引擎如何用证据推导文件和动作。
+
+回答：
+
+- 推荐项需要哪些 evidence、signal、gap、reason、confidence 和 check
+- 什么情况下默认勾选、推荐但不勾选、或只放入可展开建议
+- UI 应该如何解释“为什么推荐这些文件”
+
+不要写：
+
+- UI 视觉细节
+- 某个具体项目的一次性推荐结论
+- 业务项目的完整体检报告
+
+什么时候更新：
+
+- 推荐算法、证据扫描、缺口判断变化
+- 推荐项结构或置信度规则变化
+- UI 从静态 preset 映射升级为证据驱动推荐
 
 ---
 

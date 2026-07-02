@@ -40,6 +40,8 @@ link_file() {
 # --- 映射根目录核心文件 ---
 link_file "AGENTS.md" "system-agents.md"
 link_file "PROJECT.md" "project-status.md"
+link_file "HANDOFF.md" "handoff.md"
+link_file "PRODUCT.md" "product.md"
 
 # --- 映射 docs/ 下所有符合条件的规范文件 ---
 if [ -d "docs" ]; then
@@ -64,6 +66,8 @@ if [ -d "docs" ]; then
   # 特定深层文件单独映射 (如设计 token)
   link_file "docs/design/tokens.md" "design-tokens.md"
   link_file "docs/design/layout.md" "design-layout.md"
+  link_file "docs/design/ai-project-assistant/data.ts" "design-assistant-data.ts.md"
+  link_file "docs/design/ai-project-assistant/components.ts" "design-assistant-components.ts.md"
 fi
 
 echo "✅ 动态映射完成，唯一真相源 (SSOT) 已强制同步至 $RULES_DIR/"

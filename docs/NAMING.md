@@ -56,11 +56,13 @@ docs/ 放工程治理。
 | Cursor | `.cursor/rules/*.mdc` | Cursor 项目规则 |
 | Gemini CLI | `GEMINI.md` | Gemini 项目指令入口 |
 | GitHub Copilot | `.github/copilot-instructions.md` | Copilot 项目指令 |
+| Hermes Agent | `AGENTS.md`，可选 `HERMES.md` | Hermes 会读取项目 `AGENTS.md`，`HERMES.md` 只放 Project OS 接手提示 |
 
 规则：
 - 这些文件是 adapter，不是新的规则源头。
 - 通用规则优先写在 `AGENTS.md`。
 - adapter 只翻译工具读取方式，不重复发明项目规则。
+- Hermes 已经支持项目 `AGENTS.md`，因此 `HERMES.md` 只作为可选接手说明，不复制完整规则。
 
 ## docs/ 工程文档
 
@@ -70,6 +72,10 @@ docs/ 放工程治理。
 |------|------------|
 | `docs/DOCUMENTATION.md` | 文档边界和更新规则是什么 |
 | `docs/NAMING.md` | 文档应该怎么命名 |
+| `docs/ROUTING.md` | AI 请求应该怎么分流 |
+| `docs/RECOMMENDATION_ENGINE.md` | 推荐引擎如何用证据推导文件和动作 |
+| `docs/PROJECT_MEMORY_AND_RUNNER.md` | 项目记忆和后台执行器怎么工作 |
+| `docs/WIZARD_PRESETS.md` | 项目状态识别和补齐策略怎么映射文件 |
 | `docs/ARCHITECTURE.md` | 系统结构和模块职责是什么 |
 | `docs/ENVIRONMENT.md` | 本地环境、依赖、环境变量怎么准备 |
 | `docs/TESTING.md` | 怎么验证、测试、验收 |
@@ -78,8 +84,10 @@ docs/ 放工程治理。
 | `docs/CHANGELOG.md` | 结构性变更记录 |
 | `docs/LESSONS.md` | 踩坑复盘和新增约束 |
 | `docs/DESIGN_STANDARDS.md` | UI / 设计系统规范 |
+| `docs/DESKTOP_APP.md` | 桌面端方向、本地 Agent Core 和 coding 工作台边界 |
 | `docs/SECURITY.md` | 工程安全边界、密钥和权限规则 |
 | `docs/AI_SAFETY.md` | AI 输出、工具调用和 RAG 安全边界 |
+| `docs/SKILL_ENGINEERING.md` | Agent Skill 工程结构和生成边界 |
 
 兼容规则：
 - 旧项目已有 `docs/CODE_STRUCTURE.md` 时可以保留。
@@ -124,6 +132,8 @@ schemas/ai-project-score.schema.json
 schemas/ai-project-score.v0.2.json
 schemas/ai-project-report.schema.json
 schemas/ai-project-report.v0.1.json
+schemas/project-run.schema.json
+scripts/recommend-next.sh
 ```
 
 规则：

@@ -1,17 +1,27 @@
 ---
 layer: knowledge
 type: spec
-last_verified: 2026-06-04
-depends_on: [index.html]
-teaches: "向导问题与可选文件之间的映射关系及新增文件的接入规则"
-use_when: "AI 需要修改向导预设、新增可选文件、或理解某个文件为什么被自动推荐时"
+last_verified: 2026-06-13
+depends_on: [index.html, docs/RECOMMENDATION_ENGINE.md]
+teaches: "项目状态识别、下一步动作与可选文件之间的映射关系及新增文件接入规则"
+use_when: "AI 需要修改补齐策略、新增可选文件、或理解某个文件为什么被自动推荐时"
 ---
 
-# 向导预设映射规则
+# 状态识别与补齐策略映射规则
 
-> 用途：定义模板选择向导（Q1/Q2/Q3）与可选文件之间的映射关系，以及新增文件的接入规则。
+> 用途：定义项目状态识别（Q1/Q2/Q3）与可选文件之间的映射关系，以及新增文件的接入规则。
 > 什么时候更新：新增可选文件、调整向导选项、修改文件分层时。
 > 不要写什么：向导 UI 样式细节、JS 实现逻辑、用户教程。
+
+这些预设不是用户要理解的“工程包”。它们是 Project OS 的内部补齐策略。
+
+当前实现仍是轻量规则映射：根据 Q1 / Q2 / Q3 和少量状态信号自动勾选文件。真正的证据驱动推荐应遵守 `docs/RECOMMENDATION_ENGINE.md`：每个默认推荐项都要有 evidence、reason、confidence、check，并允许用户跳过。
+
+原则：
+
+- 不把“用户点了某张卡片”当成唯一推荐依据。
+- 不把固定 preset 伪装成完整智能识别。
+- 后续推荐引擎成熟后，Q1 / Q2 / Q3 只作为额外 signal，而不是唯一决策源。
 
 ## 文件分层
 
@@ -27,7 +37,7 @@ use_when: "AI 需要修改向导预设、新增可选文件、或理解某个文
 
 必选文件（不受向导控制，始终勾选）：`README.md`、`PROJECT.md`、`AGENTS.md`、`HANDOFF.md`
 
-## 向导结构
+## 状态识别结构
 
 ### Q1：维护模式（单选）
 
@@ -36,15 +46,15 @@ use_when: "AI 需要修改向导预设、新增可选文件、或理解某个文
 | 我一个人 | `solo` | 无额外文件 |
 | 有团队一起做 | `team` | `docs/NAMING.md`、`docs/DOCUMENTATION.md` |
 
-### Q2：项目阶段（单选）
+### Q2：下一步动作（单选）
 
-| 选项 | 值 | 自动勾选文件 |
-|------|---|------------|
-| 看清方向 | `product` | `PRODUCT.md`、`docs/PRODUCT_PLAN.md` |
-| 先有页面 | `page` | `docs/DESIGN_STANDARDS.md`、`docs/CODE_STRUCTURE.md` |
-| 能运行起来 | `run` | `docs/ARCHITECTURE.md`、`docs/TECH_STACK.md`、`docs/ENVIRONMENT.md`、`.env.example`、`docs/NAMING.md`、`docs/RUNBOOK.md` |
-| 方便测试和交接 | `handoff` | `docs/TECH_STACK.md`、`docs/NAMING.md`、`docs/TESTING.md`、`docs/RUNBOOK.md`、`HANDOFF.md`、`docs/LESSONS.md` |
-| 完整工程治理 | `full` | 全部 15 个文档 + 6 个 AI 协作规则 |
+| 选项 | 值 | 内部补齐策略 | 自动勾选文件 |
+|------|---|------------|--------------|
+| 补产品方向 | `product` | 产品方向补齐 | `PRODUCT.md`、`docs/PRODUCT_PLAN.md` |
+| 生成页面原型 | `page` | 页面原型补齐 | `docs/DESIGN_STANDARDS.md`、`docs/CODE_STRUCTURE.md` |
+| 跑通工程运行 | `run` | 工程运行补齐 | `docs/ARCHITECTURE.md`、`docs/TECH_STACK.md`、`docs/ENVIRONMENT.md`、`.env.example`、`docs/NAMING.md`、`docs/RUNBOOK.md` |
+| 准备交接验收 | `handoff` | 交接验收补齐 | `docs/TECH_STACK.md`、`docs/NAMING.md`、`docs/TESTING.md`、`docs/RUNBOOK.md`、`HANDOFF.md`、`docs/LESSONS.md` |
+| 补齐治理底座 | `full` | 治理底座补齐 | 全部 15 个文档 + 6 个 AI 协作规则 |
 
 ### Q3：技术领域（多选，可跳过）
 
@@ -55,7 +65,7 @@ use_when: "AI 需要修改向导预设、新增可选文件、或理解某个文
 
 ## 完整覆盖矩阵
 
-| 文件 | 看清方向 | 先有页面 | 能运行 | 交接 | 完整治理 | AI (Q3) | RAG (Q3) | 团队 (Q1) |
+| 文件 | 补产品方向 | 生成页面原型 | 跑通工程运行 | 准备交接验收 | 补齐治理底座 | AI (Q3) | RAG (Q3) | 团队 (Q1) |
 |------|:------:|:------:|:-----:|:----:|:------:|:------:|:------:|:------:|
 | `PRODUCT.md` | ✅ | | | | ✅ | | | |
 | `docs/PRODUCT_PLAN.md` | ✅ | | | | ✅ | | | |
@@ -89,14 +99,14 @@ use_when: "AI 需要修改向导预设、新增可选文件、或理解某个文
 
 ### 2. 确定触发条件
 
-回答这个问题：「用户在什么意图下，这个文件应该自动勾选？」
+回答这个问题：「哪些项目状态信号或下一步动作表明这个文件应该自动推荐？」
 
-- 如果是产品/方向类 → 加到 `product` 预设
-- 如果是页面/设计类 → 加到 `page` 预设
-- 如果是运行/配置类 → 加到 `run` 预设
-- 如果是交接/质量类 → 加到 `handoff` 预设
-- 如果是 AI 领域专属 → 加到 `ai` 预设（Q3）
-- 如果是 RAG 领域专属 → 加到 `rag` 预设（Q3）
+- 如果状态缺产品/方向边界 → 加到 `product` 补齐策略
+- 如果下一步是页面/设计验证 → 加到 `page` 补齐策略
+- 如果下一步是安装、启动、复现 → 加到 `run` 补齐策略
+- 如果下一步是交接、验收、复盘 → 加到 `handoff` 补齐策略
+- 如果工程证据显示 AI 运行能力不足 → 加到 `ai` 预设（Q3）
+- 如果工程证据显示知识库 / RAG 能力不足 → 加到 `rag` 预设（Q3）
 
 一个文件可以出现在多个预设中。
 

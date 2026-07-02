@@ -30,9 +30,60 @@ Project OS 自己完成最小澄清。
 
 ---
 
+## Trigger Conditions
+
+Use CLARIFICATION only when at least one condition is true:
+
+- no meaningful current intent can be extracted, such as `1234567`
+- multiple current actions conflict and priority is unclear
+- the message contains only future possibilities but no current action
+- constraints conflict with the requested action
+- confidence is low after combining user language and directory evidence
+
+Do not clarify again when the user already provided a clear current action such as:
+
+- 先做登录页
+- 帮我把项目跑起来
+- 帮我看看，不要改
+- 做一个最小 Skill
+
+中文说明：
+澄清是低置信度兜底，不是每个项目请求的固定表单。
+用户已经说清当前动作时，直接路由并推荐最小下一步。
+
+## Clarification Output Contract
+
+Before asking, internally summarize:
+
+```json
+{
+  "understood": [],
+  "conflicts": [],
+  "missing": [],
+  "question": "",
+  "confidence": "low"
+}
+```
+
+Ask exactly one question that resolves the highest-impact missing field.
+
+Examples:
+
+```txt
+输入：1234567
+输出：我还没识别出你想推进的目标。你现在是想创建新项目、接手已有项目，还是只讨论产品方案？
+```
+
+```txt
+输入：以后想接 AI，现在先把页面和部署都做了
+输出：我识别到页面和部署两个当前目标。你希望先完成可见页面，还是先跑通部署？
+```
+
+---
+
 ## Required Question
 
-For vague product requests, the first response MUST identify this as CLARIFICATION and ask one short clarification:
+For the v1 compatibility case “我想做一个产品”, the first response MUST identify this as CLARIFICATION and ask one short clarification:
 
 ```txt
 这是一个模糊产品请求。我先确认一下：
@@ -67,11 +118,13 @@ This is a broad product request. Let me clarify:
 
 ## Hard Rules
 
-- MUST ask at most one clarification question.
+- MUST ask exactly one clarification question per clarification turn.
 - MUST include `CLARIFICATION` intent in the response when possible.
 - MUST NOT generate files before intent is clear.
 - MUST NOT route to frontend before software intent is confirmed.
 - MUST NOT assume every product request is software.
+- MUST summarize what is already understood before asking when meaningful evidence exists.
+- MUST NOT ask the fixed compatibility question when a more specific missing field is known.
 
 ## Anti-Patterns
 

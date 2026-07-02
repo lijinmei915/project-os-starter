@@ -162,8 +162,10 @@ fi
 
 log "check report markers"
 assert_contains "$html_file" "AI 项目工程助手"
-assert_contains "$html_file" "模板选择向导"
-assert_contains "$html_file" "生成工程契约"
+assert_contains "$html_file" "选择项目类型"
+assert_contains "$html_file" "你准备创建什么"
+assert_contains "$html_file" "最小可信骨架"
+assert_contains "$html_file" "推荐补齐方案"
 assert_contains "$html_file" "体检结果"
 assert_not_contains "$html_file" "kitReportTime"
 assert_not_contains "$html_file" "kitContextScorePill"

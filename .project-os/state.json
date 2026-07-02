@@ -1,8 +1,8 @@
 {
   "name": "project-os-starter",
-  "description": "AI Engineering Kit：检查并补齐通用 AI 工程文件，让项目能被 AI 和下一位开发者稳定接住",
+  "description": "Project OS Desktop / Console：检查并补齐通用 AI 工程文件，并逐步演进为本地 AI 项目工作台",
   "phase": "stabilizing",
-  "stage": "AI Engineering Kit 自身工程化收口期",
+  "stage": "Project OS Console 内核收口期 / Desktop v0.1 方向确认期",
   "status": {
     "done": [
       "v1 路由契约",
@@ -28,23 +28,63 @@
       "跨工具 adapter 验收矩阵",
       "老项目空模板文档识别",
       "Standalone 浏览器体检页（index.html，本地分析项目目录 / zip）",
-      "去除 HTML 双副本：唯一 HTML 在根目录 index.html，shell 只输出 .md / .json"
+      "去除 HTML 双副本：唯一 HTML 在根目录 index.html，shell 只输出 .md / .json",
+      "桌面端方向确认：Tauri + Local Agent Core + Workbench UI",
+      "desktop/ Tauri v0.1 壳",
+      "desktop/ Vite + React 组件化工作台 UI",
+      "desktop/ Local Agent Core 项目快照读取",
+      "desktop/ 本地项目 registry v0.1",
+      "desktop/ 路径添加项目和 registry 切换",
+      "desktop/ Tauri 系统目录选择器",
+      "desktop/ 只读计划生成链路骨架",
+      "desktop/ 模型 provider 本地配置层",
+      "desktop/ OpenAI-compatible 只读计划调用",
+      "desktop/ macOS .app 打包和桌面图标",
+      "desktop/ 紧凑工作台 UI 重排",
+      "desktop/ 本地任务队列 v0.1",
+      "desktop/ 受控 runner v0.1",
+      "desktop/ provider 小白式配置和 profiles v0.1",
+      "desktop/ model catalog 配置文件 v0.1",
+      "desktop/ 网关模型列表刷新和当前模型可用性测试",
+      "desktop/ 本地任务记录持久化 v0.1",
+      "desktop/ patch draft 生成和 Diff 草案审阅 v0.1",
+      "desktop/ 受控 Apply Patch v0.1",
+      "desktop/ Apply 后自动验证 v0.1",
+      "desktop/ 本地 run summary 写入 v0.1",
+      "desktop/ token layer 和组件索引登记",
+      "desktop/ Headless 组件库接入起点",
+      "desktop/ Button primitive 组件化和交互态 token 化",
+      "desktop/ Input 和 Select primitives 组件化",
+      "desktop/ Badge 和 Panel primitives 组件化",
+      "desktop/ Radix Label + Field / Notice / SectionTitle 组件化",
+      "desktop/ Radix Tabs 和 Tooltip primitives 组件化",
+      "desktop/ Radix Dialog 和 DropdownMenu primitives 组件化",
+      "desktop/ Radix Switch primitive 组件化",
+      "desktop/ workbench pattern 层起点",
+      "desktop/ 可配置主题色 token 架构",
+      "desktop/ 顶部主题菜单和本地主题偏好",
+      "desktop/ 主题设置 Rust 本地配置持久化",
+      "desktop/ 自定义主题色新增和删除"
     ],
     "doing": [
       "AI Engineering Kit 自身工程化补齐",
       "工程成熟度 v0.2 校准",
-      "真实老项目质量识别校准"
+      "真实老项目质量识别校准",
+      "Desktop v0.1 diff review 设计"
     ],
     "blocked": [],
     "next": [
       "真实老项目样本文档质量校准",
       "报告数据层和评分模型对应关系校准",
-      "真实工具会话抽样复查"
+      "真实工具会话抽样复查",
+      "接入交接状态合并确认",
+      "将主题设置继续打磨为更小白的品牌色入口，例如支持粘贴 HEX、命名品牌色和重置默认"
     ]
   },
   "architecture": {
     "entry": "project-setup",
     "rules": "design-system",
-    "execution": "frontend"
+    "execution": "frontend",
+    "desktop": "Tauri + Local Agent Core"
   }
 }

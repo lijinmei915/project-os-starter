@@ -25,17 +25,18 @@ Project OS 正在收敛为通用的 AI Engineering Kit：
 保留跨工具 AI 规则适配
 ```
 
-它不是业务 UI 框架，也不是某个平台专属插件。
+它不是业务 UI 框架，也不是某个平台专属插件。下一阶段桌面端方向已确定为 `Tauri + Local Agent Core + Workbench UI`，详见 `docs/DESKTOP_APP.md`。
 
 ## 核心层次
 
 ```txt
-1. 规则入口层：AGENTS.md / adapters
+1. 规则入口层：AGENTS.md / docs/ROUTING.md / adapters
 2. 项目状态层：PROJECT.md / HANDOFF.md / .project-os/state.json
 3. 工程文档层：docs/*
 4. 工具脚本层：scripts/*
 5. 模板分发层：templates/project/*
 6. 本地生成物层：.project-os/reports/* / .project-os/graph/*
+7. 桌面工作台层：desktop/* / Local Agent Core / Workbench UI
 ```
 
 ## 运行路径
@@ -80,11 +81,24 @@ scripts/check-template-sync.sh
 -> 检查源 runtime 与模板是否漂移
 ```
 
+### 桌面端路径
+
+```txt
+desktop/*
+-> Tauri shell 加载 Workbench UI
+-> Local Agent Core 读取项目 registry / .project-os / 本地文件
+-> 受控调用模型 provider、Project OS 脚本、git diff 和记忆写回
+-> UI 展示计划、日志、diff、检查结果和交接状态
+```
+
+桌面端不绕过 Project OS 现有脚本和文档治理。模型接入、文件写入和命令执行必须经过 Local Agent Core 的权限边界。
+
 ## 模块职责
 
 | 区域 | 职责 |
 |------|------|
 | `AGENTS.md` | AI 行为规则和文档边界 |
+| `docs/ROUTING.md` | Project OS 路由细则和固定第一响应 |
 | `PROJECT.md` | 当前项目状态 |
 | `HANDOFF.md` | 当前交接摘要 |
 | `docs/` | 工程规范、架构、测试、命名、决策 |
@@ -93,6 +107,7 @@ scripts/check-template-sync.sh
 | `adapters/` | Claude / Codex / Cursor / Gemini 适配 |
 | `.claude/` | Claude Code 参考实现 |
 | `.project-os/graph/` | 本地生成的项目关系图 |
+| `desktop/` | 后续 Tauri 桌面端壳和 Local Agent Core |
 
 ## 边界
 
@@ -100,6 +115,7 @@ scripts/check-template-sync.sh
 - 目标项目默认只安装必要文档。
 - 已有文档默认不覆盖；需要更新时先备份或生成建议。
 - AI 规则不依赖单一平台自动触发。
+- 桌面端可以读写本地项目，但必须通过受控工具、diff review 和检查闭环。
 
 ## 兼容说明
 

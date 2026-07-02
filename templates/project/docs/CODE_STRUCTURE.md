@@ -1,3 +1,10 @@
+---
+layer: knowledge
+type: spec
+last_verified: 2026-06-04
+depends_on: [docs/ARCHITECTURE.md]
+---
+
 # 代码结构说明
 
 > 本文件回答：代码怎么分层、各目录放什么、不该放什么。
@@ -22,3 +29,11 @@
 ## 待补充
 
 - `TODO`
+
+## 相关文件
+
+| 文件 | 关系 |
+|------|------|
+| `docs/ARCHITECTURE.md` | 系统级结构（本文件偏目录和代码分层） |
+| `docs/NAMING.md` | 文件和目录命名规范 |
+| `docs/DOCUMENTATION.md` | 文档编写边界 |

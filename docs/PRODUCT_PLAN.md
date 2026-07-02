@@ -1,7 +1,7 @@
 ---
 layer: knowledge
 type: spec
-last_verified: 2026-06-05
+last_verified: 2026-06-13
 depends_on: [PRODUCT.md]
 teaches: "产品的阶段划分、各阶段目标、成功标准和演进路线"
 use_when: "AI 需要判断当前该做哪个阶段的事、或评估某个需求是否在当前阶段范围内时"
@@ -15,9 +15,15 @@ use_when: "AI 需要判断当前该做哪个阶段的事、或评估某个需求
 
 ## 产品愿景
 
-把 AI 驱动开发流程收口成一个可复制、可验证、可交接的 Project OS。
+把 AI 驱动开发流程收口成一个可复制、可验证、可交接的 Project OS Console，并逐步演进为本地优先的 Project OS Desktop 工作台。
 
-它的目标不是直接生成某个业务产品，而是先稳定 AI 如何理解项目、分流任务、遵守规则、记录状态和接受测试。
+它的目标不是复制 Hermes Studio 这类通用 Agent runtime 工作台，而是先稳定一个更靠近项目治理的控制台：
+
+```txt
+理解项目 -> 推荐补齐 -> 生成文件 -> 跑检查 -> 维护交接状态 -> 后续再接 Agent 自动执行
+```
+
+当前优先级是 Project OS Console 内核，同时桌面端方向已确定为 `Tauri + Local Agent Core + Workbench UI`。桌面端路线见 `docs/DESKTOP_APP.md`，但多 Agent 编排、远程执行和完整 IDE 仍不进入当前阶段。
 
 ---
 
@@ -26,16 +32,23 @@ use_when: "AI 需要判断当前该做哪个阶段的事、或评估某个需求
 当前处于：
 
 ```txt
-北极星演进期 · Phase 1(知识驱动)启动
+Project OS Console 内核收口期 / Desktop v0.1 方向确认期
 ```
 
 当前策略：
 
 ```txt
-先把“文件完整”升级为“工程闭环完整”，
-再继续优化分发体验，
-最后再考虑工具原生 package / skill。
+先把“固定模板选择”升级为“证据驱动推荐”，
+再把推荐接到 UI 和生成动作，
+最后再把推荐、检查、记忆和 coding 执行接入桌面端 Local Agent Core。
 ```
+
+当前阶段成功标准：
+
+- 能扫描项目并输出 evidence / signals / gaps / recommendations / checks
+- 推荐项能解释 reason、evidence、confidence、riskIfSkipped 和 check
+- 用户能看懂为什么推荐、可以跳过、可以确认生成
+- 生成后能跑检查，并把结果写回交接状态
 
 ---
 
@@ -181,9 +194,9 @@ Project OS 现有的知识地基与治理内核,正是这座中台自下而上�
 - 安装后 Claude / Codex / Cursor / Gemini 都能读取规则
 - `check-runtime.sh` 在源仓库和目标项目里都通过
 
-本阶段不做：
+本阶段当时不做：
 
-- 不接 Radix / shadcn / ai-components
+- 不接 Radix / shadcn / ai-components（历史约束；Desktop 真实产品阶段已改为接 Headless / shadcn-style 本地组件层）
 - 不做平台原生 skill 发布
 - 不做自动自进化
 - 不追求空目录一句话让所有模型天然认识 `Project OS`
@@ -212,10 +225,10 @@ Project OS 现有的知识地基与治理内核,正是这座中台自下而上�
 - AI 填写状态文档时有字段范围约束，不自由发挥
 - `check-runtime.sh` 能从 grep 升级为 schema 验证关键字段
 
-本阶段不做：
+本阶段当时不做：
 
 - 不改核心路由模型
-- 不引入组件库
+- 不引入组件库（历史约束；Desktop 真实产品阶段已废弃）
 - 不扩更多 skill
 - 不替换 markdown（schema 与 markdown 并存，不是替代关系）
 

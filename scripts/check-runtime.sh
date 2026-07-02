@@ -56,7 +56,7 @@ contains() {
 check_guidance_header() {
   file="$1"
   [ -f "$file" ] || return 0
-  header_preview="$(head -n 12 "$file" 2>/dev/null || true)"
+  header_preview="$(head -n 24 "$file" 2>/dev/null || true)"
   for pattern in "用途：" "什么时候更新：" "不要写什么："; do
     if ! printf '%s\n' "$header_preview" | grep -q "$pattern"; then
       warn "document should include guidance header ($pattern): $file"
@@ -122,7 +122,7 @@ for file in README.md AGENTS.md PROJECT.md HANDOFF.md INSTALL.md CLAUDE.md docs/
   check_guidance_header "$file"
 done
 
-for file in scripts/check-runtime.sh scripts/check-secrets.sh scripts/check-ai-project.sh scripts/ai-project.sh scripts/add-project-docs.sh scripts/build-project-graph.sh; do
+for file in scripts/check-runtime.sh scripts/check-all.sh scripts/check-frontmatter.sh scripts/check-file-contracts.sh scripts/check-doc-structure.sh scripts/check-secrets.sh scripts/check-ai-project.sh scripts/project-runner.sh scripts/ai-project.sh scripts/add-project-docs.sh scripts/build-project-graph.sh; do
   if ! has_file "$file"; then
     warn "missing Project OS runtime helper: $file"
   fi
@@ -173,8 +173,16 @@ if [ "$is_source_repo" -eq 1 ]; then
   done
 fi
 
+if [ "$is_source_repo" -eq 1 ]; then
+  for file in schemas/project-run.schema.json scripts/project-runner.sh docs/PROJECT_MEMORY_AND_RUNNER.md; do
+    if ! has_file "$file"; then
+      warn "missing Project Runner contract file: $file"
+    fi
+  done
+fi
+
 if [ "$is_source_repo" -eq 1 ] || [ "$has_adapters" -eq 1 ]; then
-  for file in adapters/CLAUDE.md adapters/CODEX.md adapters/CURSOR.md adapters/GEMINI.md; do
+  for file in adapters/CLAUDE.md adapters/CODEX.md adapters/CURSOR.md adapters/GEMINI.md adapters/HERMES.md; do
     if ! has_file "$file"; then
       warn "missing Project OS adapter template: $file"
     fi
@@ -292,9 +300,14 @@ if has_file "docs/DOCUMENTATION.md"; then
       warn "docs/DOCUMENTATION.md should define template guidance fields: $pattern"
     fi
   done
+  for pattern in "doc-structure.manifest.json" "check-doc-structure.sh" "文档治理机器校验"; do
+    if ! contains "docs/DOCUMENTATION.md" "$pattern"; then
+      warn "docs/DOCUMENTATION.md should define machine-checkable documentation governance: $pattern"
+    fi
+  done
 fi
 
-for file in templates/project/README.md templates/project/AGENTS.md templates/project/PROJECT.md templates/project/HANDOFF.md templates/project/docs/ARCHITECTURE.md templates/project/docs/CHANGELOG.md templates/project/docs/DECISIONS.md templates/project/docs/ENVIRONMENT.md templates/project/docs/LESSONS.md templates/project/docs/NAMING.md templates/project/docs/RUNBOOK.md templates/project/docs/TESTING.md templates/project/docs/PRODUCT_PLAN.md templates/project/docs/CODE_STRUCTURE.md templates/project/docs/DESIGN_STANDARDS.md templates/global/GLOBAL_USER_PREFERENCES_TEMPLATE.md templates/global/GLOBAL_USER_PROFILE_TEMPLATE.md templates/global/MEMORY_RULES.md; do
+for file in templates/project/README.md templates/project/AGENTS.md templates/project/PROJECT.md templates/project/HANDOFF.md templates/project/docs/ARCHITECTURE.md templates/project/docs/CHANGELOG.md templates/project/docs/DECISIONS.md templates/project/docs/ENVIRONMENT.md templates/project/docs/LESSONS.md templates/project/docs/NAMING.md templates/project/docs/ROUTING.md templates/project/docs/RUNBOOK.md templates/project/docs/TESTING.md templates/project/docs/PRODUCT_PLAN.md templates/project/docs/CODE_STRUCTURE.md templates/project/docs/DESIGN_STANDARDS.md templates/global/GLOBAL_USER_PREFERENCES_TEMPLATE.md templates/global/GLOBAL_USER_PROFILE_TEMPLATE.md templates/global/MEMORY_RULES.md; do
   check_guidance_header "$file"
 done
 

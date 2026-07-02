@@ -1,7 +1,7 @@
 ---
 layer: knowledge
 type: status
-last_verified: 2026-06-04
+last_verified: 2026-07-02
 teaches: "项目当前所处阶段、架构全貌、进度和下一步重点"
 use_when: "AI 需要判断当前该做什么、项目处于什么状态、或向用户汇报进度时"
 depends_on: [AGENTS.md, docs/PRODUCT_PLAN.md]
@@ -16,12 +16,13 @@ depends_on: [AGENTS.md, docs/PRODUCT_PLAN.md]
 ## 项目定位
 
 - 项目名：`Project OS`
-- 一句话定位：检查并补齐通用 AI 工程文件，让项目能被 AI 和下一位开发者稳定接住
-- 当前阶段：`AI Engineering Kit 自身工程化收口期`
+- 一句话定位：`Project OS Desktop / Console`，先理解项目、推荐补齐、跑检查和维护交接状态，再通过本地桌面端接入 Agent coding
+- 当前阶段：`Project OS Console 内核收口期 / Desktop v0.1 方向确认期`
 
 ## 当前架构
 
 - 检查层：`scripts/check-ai-project.sh`
+- 推荐层：`scripts/recommend-next.sh`
 - 安装层：`scripts/install-project-os.sh`
 - 规则映射：`.ai/rules/` + `scripts/sync-ai-rules.sh` (SSOT 引擎)
 - 关系图谱：`scripts/build-project-graph.sh` 输出 `.project-os/graph/project-graph.json`
@@ -30,15 +31,18 @@ depends_on: [AGENTS.md, docs/PRODUCT_PLAN.md]
 - 文档层：`AGENTS.md` / `PROJECT.md` / `HANDOFF.md` / `docs/*`
 - 报告层：`scripts/check-ai-project.sh` 准备评分数据，`schemas/ai-project-report.v0.1.json` 定义模块分组，`templates/report/ai-project-report.html` 渲染 HTML 报告
 - 组件契约：`docs/design/ai-project-assistant/*`
+- 桌面端方向：`docs/DESKTOP_APP.md` 定义 `Tauri + Local Agent Core + Workbench UI`
+- 桌面端骨架：`desktop/` Tauri v0.1 壳，使用 Vite + React 组件工程加载紧凑工作台 UI，并通过 Rust command 读取本地 `.project-os` 快照、桌面项目 registry、模型 provider 配置、model catalog 和 theme 配置；已支持系统目录选择、路径备用添加、registry 内切换当前项目、只读计划生成、本地任务队列、任务记录持久化、patch draft 生成、Diff 草案审阅、受控 Apply Patch、Apply 后自动验证、本地 run summary 写入、受控 runner、provider 小白式配置、多 profile、管理员维护模型列表、桌面端 token layer、可配置主题色 token、顶部主题菜单、自定义主题色新增和删除、主题偏好写入 `.project-os/desktop-theme.json`、Headless / shadcn-style 本地组件层、Button / Input / Select / Badge / Panel / Field / Notice / SectionTitle / Tabs / Tooltip / Dialog / DropdownMenu / Switch primitives 和交互态 token 化、Radix Label / Tabs / Tooltip / Dialog / DropdownMenu / Switch 官方 primitives、workbench pattern 起点、网关 `/models` 刷新模型池和当前模型 `/chat/completions` 可用性测试；provider 启用且环境变量 key 存在时会调用 OpenAI-compatible `/chat/completions`；已可打包为 macOS `.app` 双击启动
 - 规则源头：`AGENTS.md`
 - 参考实现：`.claude/`
 - 工具适配：`adapters/`
 
 ## 当前进度
 
-- 已完成：v1 路由契约、profile-based 安装脚本、adapter 写入、项目模板 / 全局模板、文档治理、统一 `.ai/` 目录结构、前后端与设计测试专属脚本、自动成长反思引擎、动态规则映射同步、项目关系图谱生成、**v3 知识结构化（文档 frontmatter 元数据 + 图谱解析升级 v0.2 + v0.4 评分含元数据/新鲜度维度 + 架构图读图谱自动渲染）**。
-- 正在做：v4 Skill 契约化方向调研（对齐 awesome-agent-skills / OpenAgentSkill 生态）。
-- 暂不做：组件运行层 `ai-components`、组件库选型、工具原生 package 化。
+- 已完成：v1 路由契约、profile-based 安装脚本、adapter 写入、项目模板 / 全局模板、文档治理、统一 `.ai/` 目录结构、前后端与设计测试专属脚本、自动成长反思引擎、动态规则映射同步、项目关系图谱生成、知识结构化（文档 frontmatter 元数据、图谱解析、评分元数据 / 新鲜度维度、架构图读图谱自动渲染）。
+- 正在做：Project OS Console 内核 + Desktop v0.1：项目理解、推荐补齐、可解释置信度、生成前检查、交接状态和桌面端 Local Agent Core 边界。
+- 暂不做：完整 IDE、开放插件市场、多 Agent 编排、远程执行、`ai-components` 运行层、工具原生 package 化。
+- 后续再做：交接状态合并确认和 coding 闭环打磨。
 
 ## 已知问题
 
@@ -48,6 +52,6 @@ depends_on: [AGENTS.md, docs/PRODUCT_PLAN.md]
 
 ## 下一步重点
 
-1. v4 Skill 层：把现有脚本/向导抽成标准输入输出契约，对齐 agent-skills 生态
-2. 用真实老项目样本继续校准文档质量阈值和评分模型
-3. 抽样复查不同模型（如 Gemini 3 Pro）在自动反思时的总结质量
+1. 接入交接状态合并确认
+2. 将主题设置继续打磨为更小白的品牌色入口，例如支持粘贴 HEX、命名品牌色和重置默认
+3. 打磨任务执行记录和模型调用反馈

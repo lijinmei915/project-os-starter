@@ -17,6 +17,72 @@ use_when: "AI 首次进入项目、需要确认自己能做什么不能做什么
 
 本项目定位为 AI Runtime / Project OS。所有助手在本仓库内工作时，优先遵守本文，再按任务需要加载其他文档。
 
+## Quick Start For Agents
+
+1. 先读 `PROJECT.md` 和 `HANDOFF.md`，必要时参考 `.project-os/state.json`。
+2. 判断用户请求属于 `INSTALL` / `INIT` / `AUDIT` / `HYBRID` / 领域 skill，不确定时默认 `HYBRID`。
+3. 改文档前先看 `docs/DOCUMENTATION.md`；新增或命名文件前看 `docs/NAMING.md`。
+4. 改可分发内容后，同步模板并跑对应检查。
+5. 收尾时说明改了什么、为什么这样改、还有什么风险或待确认。
+
+中文说明：
+这是给 AI 的快速入口。详细路由规则见 `docs/ROUTING.md`；这里先保证任何 agent 进入仓库后知道先读什么、怎么判断、怎么验证。
+
+## Commands
+
+常用检查命令：
+
+```bash
+bash scripts/check-runtime.sh .
+bash scripts/check-ai-project.sh . --write-report
+bash scripts/check-template-sync.sh .
+bash tests/run-tests.sh
+```
+
+模板同步命令：
+
+```bash
+bash scripts/sync-templates.sh .
+```
+
+安全检查命令：
+
+```bash
+bash scripts/check-secrets.sh .
+```
+
+使用规则：
+
+- 普通文档或规则改动：至少运行 `bash scripts/check-runtime.sh .`。
+- UI、模板或生成器改动：运行 `bash scripts/sync-templates.sh .` 后，再运行 `bash scripts/check-template-sync.sh .`。
+- 路由、安装、适配、评分或跨工具行为改动：运行 `bash tests/run-tests.sh`。
+- 涉及 AI 工程完整度报告：运行 `bash scripts/check-ai-project.sh . --write-report`。
+
+## Working Boundaries
+
+可以做：
+
+- 读取项目文件并判断当前状态。
+- 更新必要的 Project OS 文档和模板。
+- 运行本仓库检查脚本。
+- 在用户确认后实现明确范围内的 UI / 文档 / 规则改动。
+
+不要做：
+
+- 不要把 `README.md` 当 AI 运行规则。
+- 不要把 `AGENTS.md` 写成产品介绍或长期路线图。
+- 不要默认生成空壳 runtime 产物、task DB、memory、skill 包或发布包。
+- 不要默认四个核心文档一起改。
+- 不要在收口期无故扩功能。
+
+## Key References
+
+- `docs/ROUTING.md`：Project OS 路由细则和固定第一响应
+- `docs/DOCUMENTATION.md`：文档边界、更新规则和根文件体量约束
+- `docs/NAMING.md`：文件命名和放置规则
+- `docs/DESIGN_STANDARDS.md`：UI / tokens / 布局规则
+- `docs/TESTING.md`：测试和验收方式
+
 ## 系统结构
 
 本项目分为三层：
@@ -48,305 +114,54 @@ use_when: "AI 首次进入项目、需要确认自己能做什么不能做什么
 
 冲突处理：越靠近当前任务、越具体的规则优先。
 
-## 入口控制
+## Routing Summary
 
-- 所有项目相关请求优先进入 `project-setup`
-- 其他领域能力不能直接抢入口
-- Project OS 安装 / 接入 / 检查请求进入 `INSTALL FLOW`
-- 如果请求涉及新项目、接管项目、结构整理、协作规则、文档收口，必须先按 `project-setup` 判断
-- 模糊产品请求先走 `project-setup / CLARIFICATION`
-- 不确定当前项目状态时，默认按 `HYBRID` 处理
+完整路由契约见 `docs/ROUTING.md`。根文件只保留分流摘要。
 
-中文说明：
-`project-setup`、`design-system`、`frontend` 是 Project OS 的逻辑分层。
-当前仓库把它们实现为 `.claude/skills/*`，但这是参考实现，不等于只能给 Claude 用。
+入口原则：
 
-## Project OS Installation Entry
+- 所有项目相关请求优先进入 `project-setup`。
+- Project OS 安装、接入、检查、升级进入 `INSTALL`。
+- 模糊产品、想法、东西请求进入 `CLARIFICATION`。
+- 每条用户消息先作为增量 evidence，提取当前动作、未来需求、限制和缺口；只有低置信度、冲突或缺少当前动作时才进入 `CLARIFICATION`。
+- 新软件、系统、应用、网站、看板、仓库进入 `INIT`。
+- 只看不改、架构分析、现状分析进入 `AUDIT`。
+- 接管项目、继续做、整理老项目默认进入 `HYBRID`。
+- 设计 tokens / UI 规范进入 `design-system`。
+- 页面、组件、表单、表格实现进入 `frontend`。
 
-Project OS 支持两种安装 / 接入入口：
+常见分流：
 
-```txt
-自然语言识别意图 = 默认入口
-/os = 显式入口 / 高级入口 / 兜底入口
-```
-
-当用户表达以下意图时，自动进入 `INSTALL FLOW`，不要要求用户必须输入 `/os`：
-
-- 帮我初始化这个项目
-- 帮我把 Project OS 装进这个项目
-- 帮我接管这个老项目
-- 这个项目有点乱，帮我规范一下
-- 帮我检查 Project OS 有没有缺文件
-- 帮我升级一下 Project OS
-- 这是空目录，帮我开始
-- 这是已有项目，帮我接入规范
-
-当用户输入：
-
-```txt
-/os
-```
-
-也直接进入 `INSTALL FLOW`。
-
-`INSTALL FLOW` 只负责判断 Project OS 如何进入当前目录，不做业务 UI，不接组件库。
-
-中文说明：
-`/os` 是当前参考实现里的显式命令入口。
-如果某个工具不支持 slash commands，仍然应通过自然语言意图进入同一条 INSTALL 路由。
-
-INSTALL 路由必须同时看用户意图和目录状态：
-
-```txt
-安装 / 初始化 / 检查 / 升级 Project OS：
-- 空目录 / 近似空目录 -> INSTALL / INIT
-- 已安装 Project OS -> INSTALL / CHECK-UPGRADE
-- 已有代码但未安装 Project OS -> INSTALL / HYBRID
-
-接管 / 继续 / 整理项目：
-- 已有项目或已安装 Project OS -> INSTALL / HYBRID
-
-只看不改：
-- AUDIT
-```
-
-中文说明：
-“帮我初始化这个项目”在已安装 Project OS 的目录里，不要误判成 HYBRID；应该先检查当前 Project OS 结构和缺口。
-“帮我接管这个老项目 / 整理继续做”才进入 HYBRID。
-
-## 路由规则
-
-`project-setup` 负责这些模式：
-
-- `INSTALL`：Project OS 安装 / 接入 / 检查 / 升级
-- `CLARIFICATION`：模糊产品 / 想法 / 东西请求
-- `INIT`：启动新软件产品、系统、应用、网站、看板、仓库
-- `AUDIT`：分析项目现状，包括职责承接和缺口
-- `HYBRID`：接管项目，默认模式
-
-当前参考实现的内部流程材料放在：
-
-- `.claude/skills/project-setup/references/install.md`
-- `.claude/skills/project-setup/references/init.md`
-- `.claude/skills/project-setup/references/audit.md`
-- `.claude/skills/project-setup/references/hybrid.md`
-- `.claude/skills/project-setup/references/clarification.md`
-
-这些文件是内部流程材料，不是独立产品功能，也不是新的规则源头。
-对非 Claude 工具，等价行为应通过 `AGENTS.md` 和 `adapters/` 适配得到。
-
-## v1 路由契约
-
-以下输入必须稳定分流：
-
-| 用户输入 | 目标 |
-|----------|------|
-| 我想做一个产品 | `project-setup / CLARIFICATION` |
-| 我想做一个后台管理系统 | `project-setup / INIT` |
-| 我想快速做一个后台管理系统原型 | `project-setup / INIT / Prototype-first` |
-| 帮我看看这个项目架构怎么样 | `project-setup / AUDIT` |
-| 这个项目有点乱，帮我整理一下继续做 | `project-setup / HYBRID` |
+| 用户意图 | Route |
+|----------|-------|
+| 初始化 / 接入 / 检查 Project OS | `INSTALL` |
+| 我想做一个产品 | `CLARIFICATION` |
+| 我想做一个后台管理系统 | `INIT` |
+| 我想快速做一个后台管理系统原型 | `INIT / Prototype-first` |
+| 帮我看看这个项目架构怎么样 | `AUDIT` |
+| 这个项目有点乱，帮我整理一下继续做 | `HYBRID` |
 | 帮我设计 tokens 规范 | `design-system` |
 | 帮我写一个登录页 | `frontend` |
 
-v1 测试输出必须先打路由前缀，再进入正文。
+规则：
 
-```txt
-帮我写一个登录页
--> 第一行：Skill: frontend
-```
+- `/os` 是显式安装入口；自然语言安装意图也进入同一条 `INSTALL` 路由。
+- v1 固定第一响应、验收输入和边界条件维护在 `docs/ROUTING.md`。
+- `.claude/skills/project-setup/references/*` 是参考实现的内部流程材料，不是新的规则源头。
+- 用户话语不明确但目录证据也不足时进入 `CLARIFICATION`，不要盲目默认 `HYBRID`。
+- 对非 Claude 工具，等价行为应通过 `AGENTS.md`、`docs/ROUTING.md` 和 `adapters/` 适配得到。
 
-INSTALL / AUDIT 测试同样必须先打路由前缀：
+## UI And Frontend
 
-```txt
-帮我检查一下 Project OS 有没有缺文件
--> INSTALL / CHECK-UPGRADE
-```
+- 涉及 UI 时先走 `design-system`，具体规则见 `docs/DESIGN_STANDARDS.md`。
+- `frontend` 只负责实现，不重新决定视觉规则。
+- UI 实现必须使用 tokens、清楚组件边界，并覆盖基础交互状态。
 
-```txt
-只帮我看看，不要改
--> AUDIT
-```
+## Language
 
-安装相关第一响应也必须稳定：
-
-```txt
-输入：帮我初始化这个项目，接入 Project OS
-第一行：INSTALL / INIT
-```
-
-如果同一轮里已经完成安装，不能停在“已安装完成”。
-必须继续进入 INIT，并在启动方式不明确时立刻输出：
-
-```txt
-这是一个 INIT 请求。你希望我按哪种方式开始？
-
-1. 快速原型：先生成一个能看的页面
-2. 项目治理：先建立项目结构、文档、规范
-3. 完整项目：先建基础，再生成页面
-```
-
-本轮结束条件：
-
-```txt
-INIT 启动方式已经明确
-```
-
-如果 `Prototype-first / Foundation-first / Full setup` 还没明确，本轮不能结束在安装总结。
-
-### CLARIFICATION 第一响应
-
-用户只说“我想做一个产品 / 我有个想法 / 想做个东西”时，不要泛问“什么产品”。
-
-必须先走内部澄清，且只问下面这一组问题，不要扩展成目标用户、平台、技术栈、已有代码：
-
-```txt
-这是一个 CLARIFICATION 请求。我先确认一下：
-
-1. 你是想做软件系统，还是产品方案？
-2. 如果是软件系统，是想快速出原型，还是先建项目基础？
-```
-
-### INIT 第一响应
-
-用户想做新的软件、系统、应用、网站、看板时，如果没有明确启动方式，先问启动模式。
-
-不要先问技术栈、功能范围、数据库、部署、权限、模块、用户角色或组件库。
-
-```txt
-这是一个 INIT 请求。你希望我按哪种方式开始？
-
-1. 快速原型：先生成一个能看的页面
-2. 项目治理：先建立项目结构、文档、规范
-3. 完整项目：先建基础，再生成页面
-```
-
-如果用户明确说“快速 / 原型 / prototype”，直接判定：
-
-```txt
-Start mode: Prototype-first
-本次目标：先生成一个可见原型。
-```
-
-之后最多问一个范围问题，不要先问技术栈、数据库、组件库。
-
-### v1 验收输入的固定处理
-
-这几条是 v1 收口测试用例，必须稳定输出：
-
-```txt
-输入：我想做一个产品
-输出：这是一个 CLARIFICATION 请求。我先确认一下：
-1. 你是想做软件系统，还是产品方案？
-2. 如果是软件系统，是想快速出原型，还是先建项目基础？
-```
-
-```txt
-输入：我想做一个后台管理系统
-输出：这是一个 INIT 请求。你希望我按哪种方式开始？
-1. 快速原型：先生成一个能看的页面
-2. 项目治理：先建立项目结构、文档、规范
-3. 完整项目：先建基础，再生成页面
-```
-
-```txt
-输入：帮我初始化这个项目，接入 Project OS
-输出第一行：INSTALL / INIT
-如果已完成安装且启动方式不明确，继续输出 INIT 启动方式选择；不要停在安装总结。
-```
-
-```txt
-输入：我想快速做一个后台管理系统原型
-输出：Start mode: Prototype-first
-本次目标：先生成一个可见原型。
-```
-
-```txt
-输入：帮我写一个登录页
-输出：Skill: frontend
-```
-
-### HYBRID 第一响应
-
-用户说“这个项目 / 当前项目 / 继续做 / 整理一下”时，在项目目录里默认指当前 workspace。
-
-不要先问这是本地项目、Supabase、Vercel、GitHub 还是其他平台。
-
-如果没有文件读取工具：
-
-```txt
-这是一个 HYBRID 请求，但当前没有可用的文件读取工具。
-请提供文件访问权限，或先贴 README.md / PROJECT.md / AGENTS.md 的内容。
-```
-
-### 领域 skill 第一响应
-
-- “设计 tokens / tokens 规范 / UI 规范”默认是 `design-system`，不要先解释 Auth Token 或 LLM Token。
-- “登录页 / 页面 / 组件 / 表单 / 表格”默认是 `frontend`，不要当成新项目初始化。
-- 具体页面 / 组件请求的第一行应输出 `Skill: frontend`，方便测试和交接判断。
-
-## 设计约束
-
-涉及 UI 时必须经过 `design-system`。
-
-UI 必须：
-
-- 使用 tokens，不写死样式
-- 使用布局原语，如 Page、Stack、Grid
-- 使用标准组件
-- 遵守已有设计规范
-
-禁止：
-
-- 随意设计 UI
-- 跳过 tokens
-- 自由发挥组件风格
-
-## 前端约束
-
-`frontend` 只负责实现，不负责重新设计。
-
-实现前必须确认：
-
-- 设计规则来自 `design-system`
-- 组件边界清楚
-- 交互状态完整
-- 可点击元素有 hover 和 focus-visible 状态
-
-## 语言规则
-
-- 自动识别用户语言
-- 用用户语言回答
-- Scheduling / hard rules: English first, with Chinese explanation when needed
-- 日常说明 / 项目文档：中文为主
-- 用户交互文案：跟随用户语言
-- 内部调度名、目录名、模式名使用稳定英文
-
-原则：
-
-```txt
-English for scheduling, Chinese for cognition.
-```
-
-中文解释：调度名、模式名、硬规则用英文优先，降低歧义；项目说明和认知文档用中文为主；面向用户的产品文案跟随用户语言。
-
-语言分层：
-
-| 文件 / 区域 | 语言策略 |
-|-------------|----------|
-| `SKILL.md` | English hard rules + 中文解释 |
-| `AGENTS.md` | 中英混合 |
-| `README.md` | 中文 |
-| `PROJECT.md` | 中文 |
-| `HANDOFF.md` | 中文 |
-| `references/` | 中文为主，关键约束可用英文 |
-
-总规则：
-
-```txt
-The closer to scheduling and execution, the more English.
-The closer to understanding and handoff, the more Chinese.
-```
+- 跟随用户语言回答。
+- 调度名、目录名、模式名使用稳定英文，如 `INSTALL` / `HYBRID`。
+- 项目说明和交接文档中文为主；更细语言分层见 `docs/DOCUMENTATION.md`。
 
 ## 协作规则
 
@@ -359,54 +174,27 @@ The closer to understanding and handoff, the more Chinese.
 - 改完按“改了什么 / 为什么这样改 / 还有什么风险或待确认”汇报
 - commit 后主动问“要推上去吗？”，未确认前不 push
 
-## 文档分层
+## Documentation Governance
 
-- `README.md`：给人看的入口说明
-- `AGENTS.md`：给 AI 用的运行规则
-- `PROJECT.md`：当前项目状态
-- `HANDOFF.md`：当前交接上下文
-- `docs/DOCUMENTATION.md`：文档编写规范和更新边界
-- `docs/NAMING.md`：文档命名规范
-- `docs/ARCHITECTURE.md`：系统结构和模块职责
-- `docs/ENVIRONMENT.md`：环境变量、依赖和启动方式
-- `docs/TESTING.md`：测试和验收方式
-- `docs/RUNBOOK.md`：常见操作、发布和故障处理
-- `docs/CHANGELOG.md`：结构性变更记录
-- `docs/DECISIONS.md`：架构决策原因
-- `docs/LESSONS.md`：错误模式和新增约束
+- 写文档前先看 `docs/DOCUMENTATION.md`，新增或命名文件前看 `docs/NAMING.md`。
+- 新增或改变 `docs/*.md` / 根核心文档职责时，同步 `docs/data/doc-structure.manifest.json`，并运行 `bash scripts/check-doc-structure.sh .`。
+- 只把信息写在最该负责的文档里，不要默认同步四个核心文档。
+- 小型任务或普通交接通常只更新 `HANDOFF.md`。
+- AI 行为或路由规则变化时，更新对应规则文档、测试和 `HANDOFF.md`。
+- 犯错、误改、误判后新增约束，写入 `docs/LESSONS.md`。
 
-README 不写运行规则。
+治理自检清单：
 
-AGENTS 不写产品介绍。
-
-PROJECT 不写交接细节。
-
-HANDOFF 不写长期路线。
-
-CHANGELOG 不写当前状态。
-
-adapters 不写新的规则源头。
-
-详细文档边界和更新决策表见 `docs/DOCUMENTATION.md`。
-
-在新建或更新任何项目文档前：
-
-1. 先看 `docs/DOCUMENTATION.md`
-2. 需要命名或新增文件时看 `docs/NAMING.md`
-3. 判断这是“当前状态 / 当前交接 / 环境说明 / 架构说明 / 测试验收 / 运行手册 / 中长期路线 / 结构变更 / 决策原因 / 错误复盘”里的哪一类
-4. 如果有对应模板，优先沿用模板结构，不自己发明新格式
-5. 改完后运行 `bash scripts/check-runtime.sh .`
-6. 如涉及 AI 工程完整度，运行 `bash scripts/check-ai-project.sh . --write-report`
-
-### 文档更新规则
-
-- 小型任务或普通交接：只更新 `HANDOFF.md`
-- 当前阶段、进度、已知问题改变：更新 `PROJECT.md` + `HANDOFF.md`
-- 中长期阶段路线改变：更新 `docs/PRODUCT_PLAN.md`，必要时只在 `PROJECT.md` 留短摘要
-- AI 行为或路由规则改变：更新 `AGENTS.md` + tests + `HANDOFF.md`
-- 安装、分发、适配层、SSOT 结构改变：更新 `docs/CHANGELOG.md`，必要时同步 `README.md` / `INSTALL.md`
-- 犯错、误改、误判后新增约束：更新 `docs/LESSONS.md`
-- 不要默认四个核心文档一起改
+1. 这条信息的 SSOT 是否已经在 `docs/DOCUMENTATION.md` 或 manifest 里有归属？
+2. 如果已有归属，是否只引用或摘要，没有复制正文？
+3. 新增文档是否登记到 `docs/data/doc-structure.manifest.json`？
+4. 新增文档是否有用途、更新时机和不要写什么？
+5. 必备章节是否与 manifest 的 `requiredSections` 对齐？
+6. 改模板或分发文件后是否运行模板同步检查？
+7. 改 AI 行为或路由后是否更新规则文档和测试？
+8. 是否避免把当前交接、长期路线和产品介绍写进错误文件？
+9. 是否运行 `bash scripts/check-all.sh .` 或说明未运行原因？
+10. 收尾是否说明改了什么、为什么这样改、还有什么风险？
 
 ## 冲突处理
 

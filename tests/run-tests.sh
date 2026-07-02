@@ -41,6 +41,18 @@ assert_contains() {
 log "runtime check"
 bash "$root/scripts/check-runtime.sh" "$root"
 
+log "frontmatter check"
+bash "$root/scripts/check-frontmatter.sh" "$root"
+
+log "file contracts"
+bash "$root/scripts/check-file-contracts.sh" "$root"
+
+log "documentation structure"
+bash "$root/scripts/check-doc-structure.sh" "$root"
+
+log "check all"
+bash "$root/scripts/check-all.sh" "$root"
+
 log "template sync strict"
 bash "$root/scripts/check-template-sync.sh" "$root" --strict
 
@@ -54,6 +66,7 @@ grep -q '"modelId": "ai-project-engineering-score"' "$root/schemas/ai-project-sc
 grep -q '"version": "0.2"' "$root/schemas/ai-project-score.v0.2.json"
 assert_file "$root/schemas/ai-project-report.schema.json"
 assert_file "$root/schemas/ai-project-report.v0.1.json"
+assert_file "$root/schemas/project-run.schema.json"
 grep -q '"modelId": "ai-project-engineering-report"' "$root/schemas/ai-project-report.v0.1.json"
 grep -q '"version": "0.1"' "$root/schemas/ai-project-report.v0.1.json"
 
@@ -70,6 +83,51 @@ grep -q "AI 工程成熟度" "$root/.project-os/reports/ai-project-report.md"
 assert_file "$root/.project-os/reports/ai-project-report.json"
 assert_contains "$root/.project-os/reports/ai-project-report.json" '"scores"'
 assert_file "$root/index.html"
+
+log "project runner"
+runner_fixture="$tmp_dir/runner-fixture"
+mkdir -p "$runner_fixture"
+cat > "$runner_fixture/README.md" <<'EOF'
+# Runner Fixture
+
+Small fixture for Project OS runner tests.
+EOF
+bash "$root/scripts/project-runner.sh" "$runner_fixture" --source local >/tmp/project-runner-test.log
+runner_record="$(find "$runner_fixture/.project-os/runs" -maxdepth 1 -name '*.json' -print -quit)"
+assert_file "$runner_record"
+assert_file "$runner_fixture/.project-os/reports/ai-project-report.json"
+assert_file "$runner_fixture/.project-os/recommendations/recommend-next.json"
+if command -v node >/dev/null 2>&1; then
+  node -e 'const fs=require("fs"); const r=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); if(r.schemaVersion!=="project-os.project-run.v0.1") process.exit(1); if(!Array.isArray(r.commands) || r.commands.length < 3) process.exit(1); if(!r.outputs?.runRecord || !r.next?.requiresHumanConfirmation) process.exit(1);' "$runner_record"
+fi
+
+log "recommendation engine"
+recommend_fixture="$tmp_dir/recommend-fixture"
+mkdir -p "$recommend_fixture/src" "$recommend_fixture/tests"
+cat > "$recommend_fixture/package.json" <<'EOF'
+{
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "vitest"
+  },
+  "dependencies": {}
+}
+EOF
+cat > "$recommend_fixture/src/App.tsx" <<'EOF'
+export function App() {
+  return null;
+}
+EOF
+recommend_json="$tmp_dir/recommend.json"
+bash "$root/scripts/recommend-next.sh" "$recommend_fixture" > "$recommend_json"
+assert_contains "$recommend_json" '"schemaVersion":"project-os.recommendation.v0.1"'
+assert_contains "$recommend_json" '"file":"docs/ENVIRONMENT.md"'
+assert_contains "$recommend_json" '"file":"docs/TESTING.md"'
+assert_contains "$recommend_json" '"file":"docs/TECH_STACK.md"'
+if command -v node >/dev/null 2>&1; then
+  node -e 'const fs=require("fs"); const data=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); if(!Array.isArray(data.recommendations) || data.recommendations.length < 3) process.exit(1); for (const rec of data.recommendations) { if (!rec.reason || !Array.isArray(rec.evidence) || !rec.confidence || !rec.evidenceStrength || !rec.gapClarity || !rec.riskIfSkipped || !rec.confidenceReason || !rec.check || !("contract" in rec)) process.exit(1); } const env=data.recommendations.find(r=>r.file==="docs/ENVIRONMENT.md"); const testing=data.recommendations.find(r=>r.file==="docs/TESTING.md"); if(!env?.contract || env.contract.updatePolicy!=="merge" || !Array.isArray(env.contract.requiredSections) || !testing?.contract) process.exit(1);' "$recommend_json"
+fi
 
 log "project graph"
 bash "$root/scripts/build-project-graph.sh" "$root" >/dev/null
@@ -179,6 +237,7 @@ assert_file "$tmp_dir/core/scripts/check-runtime.sh"
 assert_file "$tmp_dir/core/scripts/check-secrets.sh"
 assert_file "$tmp_dir/core/scripts/check-ai-project.sh"
 assert_file "$tmp_dir/core/scripts/ai-project.sh"
+assert_file "$tmp_dir/core/scripts/recommend-next.sh"
 assert_file "$tmp_dir/core/scripts/add-project-docs.sh"
 assert_file "$tmp_dir/core/scripts/build-project-graph.sh"
 assert_file "$tmp_dir/core/schemas/ai-project-score.schema.json"
@@ -192,6 +251,7 @@ assert_no_file "$tmp_dir/core/docs/ARCHITECTURE.md"
 bash "$tmp_dir/core/scripts/build-project-graph.sh" "$tmp_dir/core" >/dev/null
 assert_file "$tmp_dir/core/.project-os/graph/project-graph.json"
 bash "$tmp_dir/core/scripts/check-secrets.sh" "$tmp_dir/core" >/dev/null
+bash "$tmp_dir/core/scripts/recommend-next.sh" "$tmp_dir/core" >/dev/null
 bash "$tmp_dir/core/scripts/add-project-docs.sh" "$tmp_dir/core" --profile product >/dev/null
 assert_file "$tmp_dir/core/docs/ARCHITECTURE.md"
 assert_file "$tmp_dir/core/docs/ENVIRONMENT.md"
@@ -209,6 +269,7 @@ bash "$root/scripts/install-project-os.sh" "$tmp_dir/full" --profile full >/dev/
 bash "$tmp_dir/full/scripts/check-runtime.sh" "$tmp_dir/full" >/dev/null
 assert_file "$tmp_dir/full/.claude/skills/project-setup/SKILL.md"
 assert_file "$tmp_dir/full/adapters/CODEX.md"
+assert_file "$tmp_dir/full/adapters/HERMES.md"
 assert_file "$tmp_dir/full/docs/DESIGN_STANDARDS.md"
 
 log "adapter install"
@@ -216,13 +277,16 @@ bash "$tmp_dir/full/scripts/install-adapter.sh" claude "$tmp_dir/full" >/dev/nul
 bash "$tmp_dir/full/scripts/install-adapter.sh" codex "$tmp_dir/full" >/dev/null
 bash "$tmp_dir/full/scripts/install-adapter.sh" cursor "$tmp_dir/full" >/dev/null
 bash "$tmp_dir/full/scripts/install-adapter.sh" gemini "$tmp_dir/full" >/dev/null
+bash "$tmp_dir/full/scripts/install-adapter.sh" hermes "$tmp_dir/full" >/dev/null
 assert_file "$tmp_dir/full/CLAUDE.md"
 assert_file "$tmp_dir/full/CODEX.md"
 assert_file "$tmp_dir/full/.cursor/rules/project-os.md"
 assert_file "$tmp_dir/full/GEMINI.md"
+assert_file "$tmp_dir/full/HERMES.md"
 assert_contains "$tmp_dir/full/CLAUDE.md" "AGENTS.md"
 assert_contains "$tmp_dir/full/CODEX.md" "AGENTS.md"
 assert_contains "$tmp_dir/full/.cursor/rules/project-os.md" "AGENTS.md"
 assert_contains "$tmp_dir/full/GEMINI.md" "AGENTS.md"
+assert_contains "$tmp_dir/full/HERMES.md" "AGENTS.md"
 
 log "all tests passed"

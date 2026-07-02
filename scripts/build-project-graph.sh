@@ -127,7 +127,7 @@ is_template() {
 
 is_ssot() {
   case "$1" in
-    AGENTS.md|PROJECT.md|HANDOFF.md|docs/DOCUMENTATION.md|docs/NAMING.md|docs/ARCHITECTURE.md|docs/ENVIRONMENT.md|docs/TESTING.md|docs/RUNBOOK.md|docs/DECISIONS.md|docs/LESSONS.md|schemas/*.json) printf 'true' ;;
+    AGENTS.md|PROJECT.md|HANDOFF.md|docs/DOCUMENTATION.md|docs/NAMING.md|docs/ROUTING.md|docs/ARCHITECTURE.md|docs/ENVIRONMENT.md|docs/TESTING.md|docs/RUNBOOK.md|docs/DECISIONS.md|docs/LESSONS.md|schemas/*.json) printf 'true' ;;
     *) printf 'false' ;;
   esac
 }

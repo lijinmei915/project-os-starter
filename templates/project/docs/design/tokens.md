@@ -8,6 +8,7 @@
 
 当前落地状态：
 - `templates/report/ai-project-report.html` 已建立 `:root` token / alias 层
+- `desktop/src/styles.css` 已建立桌面端 `--desktop-*` token / alias 层
 - 当前工作台核心组件已优先使用 semantic token 和 component token
 - 早期兼容报告区通过 `--bg` / `--panel` / `--text` 等 alias 继续工作
 
@@ -43,6 +44,60 @@
 ---
 
 ## Color Tokens
+
+### Desktop Runtime Tokens
+
+桌面端当前接入 Headless / shadcn-style 本地组件层，但不直接使用第三方默认主题。组件视觉必须映射到 Project OS 自己的 Desktop token layer。
+
+桌面端 token 分四层：
+
+- Foundation：`--desktop-gray-*`、`--desktop-info`、`--desktop-danger`
+- Theme accent：`--desktop-theme-h`、`--desktop-theme-s`、`--desktop-theme-l` 派生 `--desktop-accent-*`
+- Semantic：`--desktop-surface-*`、`--desktop-border-*`、`--desktop-text-*`
+- Compatibility alias：`--bg`、`--panel`、`--line`、`--text`、`--accent`
+
+规则：
+
+- 新增桌面端样式优先使用 `--desktop-*` 或兼容 alias。
+- 只有 token 定义区可以新增 hex / rgba 原始值。
+- 主视觉只允许从 `--desktop-theme-h/s/l` 派生；其他界面默认中性色，最多使用主题色偏色。
+- 组件状态色使用 `--desktop-state-*` / `--desktop-state-accent-*`，不要在组件选择器里散落新的 `rgba(...)`。
+- `--desktop-brand` 只保留为兼容 alias，新实现使用 `--desktop-accent`。
+- `desktop/src/components` 中的组件只读 token，不内嵌主题数值。
+
+当前桌面端主题色入口：
+
+| Token | 默认值 | 用途 |
+|-------|--------|------|
+| `--desktop-theme-h` | `160` | 主题色 HSL hue，可由用户自定义 |
+| `--desktop-theme-s` | `80%` | 主题色饱和度 |
+| `--desktop-theme-l` | `47%` | 主题色亮度 |
+| `--desktop-accent` | derived | 主强调色 |
+| `--desktop-accent-soft` | derived | 深色背景上的主题色文字 |
+| `--desktop-text-accent` | derived | 选中、实时、主题强调文字 |
+| `--desktop-text-accent-muted` | derived | 弱主题强调文字 |
+| `--desktop-text-on-accent` | mode-specific | 实色主题背景上的反白/反黑文字 |
+| `--desktop-text-info` | mode-specific | 信息状态文字，不随主题色变化 |
+| `--desktop-text-success` | derived | 成功状态文字，默认跟随主题色 |
+| `--desktop-text-warning` | mode-specific | 警告状态文字，不随主题色变化 |
+| `--desktop-text-danger` | mode-specific | 错误状态文字，不随主题色变化 |
+| `--desktop-surface-rail` | mode-specific | 左右侧栏背景 |
+| `--desktop-surface-canvas` | mode-specific | 中央工作画布背景 |
+| `--desktop-surface-card-soft` | mode-specific | 弱卡片、计划卡背景 |
+| `--desktop-surface-code-soft` | mode-specific | 弱代码/只读计划背景 |
+| `--desktop-surface-trace` | mode-specific | Trace 区域背景 |
+| `--desktop-border-accent` | derived | 选中、focus、强调边框 |
+| `--desktop-state-accent-bg` | derived | 弱选中底色 |
+| `--desktop-state-accent-bg-strong` | derived | 强选中底色 |
+
+桌面端文字颜色规则：
+
+- 普通阅读内容、说明、路径、列表和空状态默认使用 `--desktop-text-primary` / `secondary` / `muted` / `soft`，不跟随主题色。
+- 选中态、当前任务、实时运行、安全状态、主题控件选中项可以使用 `--desktop-text-accent`。
+- 成功状态当前跟随主题色，使用 `--desktop-text-success`，不要在组件里直接引用 `--desktop-accent-soft`。
+- 信息、警告、错误是功能语义，不随用户主题色变化，分别使用 `--desktop-text-info`、`--desktop-text-warning`、`--desktop-text-danger`。
+- 实色主题背景上的文字必须使用 `--desktop-text-on-accent`；固定明暗背景的品牌标识使用组件 token，不复用 accent 文本 token。
+- 页面壳层、侧栏、工作画布、Trace、代码块必须使用 `--desktop-surface-*`，不要在组件选择器里写死暗色 `rgba(...)`，否则浅色主题会漏切。
 
 ### Foundation Palette
 
@@ -146,14 +201,51 @@
 | `--font-strong` | `750` | 小标题、强调数字 |
 | `--font-heavy` | `800` | 编号、强状态 |
 
+### Desktop Typography Tokens
+
+桌面端采用主流组件系统常见的 semantic type scale：字号按角色命名，字重按强度命名。组件优先使用这些 token，不在选择器里新增裸 `font-size` / `font-weight` 数值。
+
+| Token | Value | 用途 |
+|-------|-------|------|
+| `--desktop-text-meta` | `10px` | 极小元信息、短状态、紧凑按钮 |
+| `--desktop-text-caption` | `11px` | 表单标签、辅助文案、状态标签 |
+| `--desktop-text-body` | `12px` | 工作台正文、卡片标题、按钮文字 |
+| `--desktop-text-title` | `14px` | 应用标题、分区强标题 |
+| `--desktop-font-regular` | `400` | 正文 |
+| `--desktop-font-medium` | `650` | 次级标题、辅助强调 |
+| `--desktop-font-semibold` | `750` | 小标题、状态短句 |
+| `--desktop-font-bold` | `850` | 按钮、标签、重要字段 |
+| `--desktop-font-heavy` | `900` | 品牌标识、强状态、计数 |
+
+兼容 alias：
+
+| Alias | Maps to |
+|-------|---------|
+| `--text-xs` | `--desktop-text-meta` |
+| `--text-sm` | `--desktop-text-caption` |
+| `--text-md` | `--desktop-text-body` |
+| `--text-lg` | `--desktop-text-title` |
+
 规则：
 - 字号不随 viewport 缩放。
 - `letter-spacing` 默认 `0`，只有品牌小标签可使用正向字距。
 - 紧凑工具界面不使用 hero 级大标题。
+- 新增桌面端组件优先使用 `--desktop-text-*` / `--desktop-font-*`。
 
 ---
 
 ## Spacing Tokens
+
+间距 token 分两层：
+
+- Foundation spacing：基础数值档位，例如 `--space-8`、`--space-12`。
+- Layout / component spacing：具体场景语义，例如 `--desktop-toolbar-control-padding-x`。
+
+规则：
+- 组件优先使用语义 token；只有没有语义槽位时才使用基础 `--space-*`。
+- 同一组件族必须共用同一组 spacing token，不允许状态标签、按钮、菜单各自写一套 padding / gap。
+- 新增裸 `padding` / `gap` / `margin` 数值前，先判断是否应登记为 component token。
+- `px` 数值只允许出现在 token 定义区、一次性计算值或第三方兼容修正里。
 
 | Token | Value | 用途 |
 |-------|-------|------|
@@ -181,6 +273,31 @@
 - 同一层级组件使用同一档 spacing。
 - 紧凑列表优先 `8 / 10 / 12`。
 - 页面级区块优先 `24 / 32 / 48`。
+
+### Desktop Layout And Control Tokens
+
+桌面端工作台采用密集工具界面布局。布局和顶部控件必须走桌面端语义 token，不能在组件里单独写散落数值。
+
+| Token | Value | 用途 |
+|-------|-------|------|
+| `--desktop-layout-topbar-height` | `50px` | 桌面端顶部栏高度 |
+| `--desktop-layout-statusbar-height` | `24px` | 底部状态栏高度 |
+| `--desktop-layout-sidebar-left` | `248px` | 左侧项目栏默认宽度 |
+| `--desktop-layout-sidebar-right` | `320px` | 右侧配置 / 队列栏默认宽度 |
+| `--desktop-layout-column-gap` | `0px` | 主工作台三栏之间的结构 gap，默认靠边框分隔 |
+| `--desktop-layout-panel-gap` | `10px` | 面板内部模块间距 |
+| `--desktop-layout-panel-padding` | `12px` | 桌面端标准面板内边距 |
+| `--desktop-toolbar-control-height` | `30px` | 顶部工具栏控件高度 |
+| `--desktop-toolbar-control-padding-x` | `12px` | 顶部文字型控件左右内边距 |
+| `--desktop-toolbar-control-gap` | `7px` | 顶部控件 icon 与文字间距 |
+| `--desktop-toolbar-icon-size` | `15px` | 顶部控件图标尺寸 |
+
+顶部工具栏规则：
+- 有文字的控件统一使用 `height: var(--desktop-toolbar-control-height)`、`padding-inline: var(--desktop-toolbar-control-padding-x)`、`gap: var(--desktop-toolbar-control-gap)`。
+- 纯 icon 控件统一使用 `width = height = var(--desktop-toolbar-control-height)`。
+- 顶部状态 pill 和按钮属于同一控件族，必须共用 toolbar token。
+- 状态差异只改变 icon / 文本 / 边框语义色，不改变 padding、gap、height、border-radius。
+- 新增顶部动作前，优先复用 `Button` / `StatusPill`，不要直接手写 `div + svg + text`。
 
 ---
 

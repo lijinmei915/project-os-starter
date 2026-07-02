@@ -13,11 +13,13 @@ Usage:
 Commands:
   check    Print AI project completeness score
   report   Print score and write markdown + JSON reports（可视化打开根目录 index.html）
+  recommend  Print evidence-based next-step recommendations as JSON
   install  Install selected AI engineering docs
 
 Examples:
   bash scripts/ai-project.sh check .
   bash scripts/ai-project.sh report .
+  bash scripts/ai-project.sh recommend .
   bash scripts/ai-project.sh install . --profile core
 USAGE
 }
@@ -35,6 +37,9 @@ case "$command" in
     ;;
   report)
     bash "$script_dir/check-ai-project.sh" "${1:-.}" --write-report
+    ;;
+  recommend)
+    bash "$script_dir/recommend-next.sh" "${1:-.}" "${@:2}"
     ;;
   install)
     bash "$script_dir/install-project-os.sh" "$@"

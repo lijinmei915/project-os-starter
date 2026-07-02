@@ -106,6 +106,20 @@ GitHub 上的 CI 会在 push 和 pull request 时自动运行：
 
 ## 故障处理
 
+### 桌面端启动失败
+
+桌面端 v0.1 直接启动 Tauri：
+
+```bash
+cd desktop
+npm install
+npm run dev
+```
+
+`npm run dev` 会先启动 Vite dev server，再启动 Tauri。若 1420 端口被占用，先关闭旧的 `vite` 或 `tauri dev` 进程。
+
+如果提示 `cargo: command not found`，说明本机还没有 Rust / Cargo。先安装 Rust，再重新打开终端运行。
+
 ### check-runtime 报模板不同步
 
 运行：

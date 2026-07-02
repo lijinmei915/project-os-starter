@@ -30,6 +30,7 @@ use_when: "AI 需要帮用户启动项目、排查环境问题、或配置新的
 - `rg`：更快的文本搜索
 - `node`：运行 `tests/visual-diff.mjs` 做截图像素 diff 自测和对比
 - Chrome / Chromium：生成报告页截图和视觉 diff
+- Rust / Cargo：运行 `desktop/` Tauri 桌面端壳
 
 ## 常用命令
 
@@ -37,6 +38,22 @@ use_when: "AI 需要帮用户启动项目、排查环境问题、或配置新的
 bash scripts/check-runtime.sh .
 bash scripts/check-ai-project.sh . --write-report
 bash scripts/check-template-sync.sh .
+```
+
+启动桌面端 v0.1：
+
+```bash
+cd desktop
+npm install
+npm run dev
+```
+
+桌面端 UI 已使用 Vite + React 组件工程；`npm run dev` 会自动启动 Vite dev server 并打开 Tauri。
+
+如果提示 `cargo: command not found`，先安装 Rust：
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
 试装到临时目录：

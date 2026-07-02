@@ -21,6 +21,7 @@ last_verified: 2026-06-04
 | 怎么开始用 | `README.md` |
 | 产品定位和设计方向 | `PRODUCT.md` |
 | AI 怎么行动 | `AGENTS.md` |
+| AI 请求怎么分流 | `docs/ROUTING.md` |
 | 项目当前状态 | `PROJECT.md` |
 | 交接 / 接手 | `HANDOFF.md` |
 | 架构决策 | `docs/DECISIONS.md` |
@@ -40,7 +41,10 @@ last_verified: 2026-06-04
 回答"这是什么、怎么装、怎么开始"。不写 AI 规则、交接流水。
 
 ### AGENTS.md
-回答"AI 进来后怎么判断请求、哪些行为禁止"。不写产品介绍、项目进度。
+回答"AI 进来后先读什么、哪些行为禁止、路由摘要在哪里"。不写产品介绍、项目进度。
+
+### docs/ROUTING.md
+回答"AI 请求怎么分流、固定第一响应是什么"。不写产品介绍、项目进度。
 
 ### PROJECT.md
 回答"项目现在是什么阶段、当前架构、已知问题"。不写交接细节、变更历史。
@@ -110,4 +114,5 @@ last_verified: 2026-06-04
 |------|------|
 | `docs/NAMING.md` | 文件命名和放置位置 |
 | `AGENTS.md` | AI 的文档职责定义 |
+| `docs/ROUTING.md` | AI 请求分流细则 |
 | `PRODUCT.md` | 产品方向（文档内容需对齐产品定位） |

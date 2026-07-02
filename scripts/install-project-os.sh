@@ -303,6 +303,7 @@ install_core() {
   install_file "scripts/check-secrets.sh"
   install_file "scripts/check-ai-project.sh"
   install_file "scripts/ai-project.sh"
+  install_file "scripts/recommend-next.sh"
   install_file "scripts/add-project-docs.sh"
   install_file "scripts/build-project-graph.sh"
   install_file "scripts/check-frontend.sh"
@@ -334,6 +335,7 @@ install_product_docs() {
   install_file "INSTALL.md"
   install_documentation_doc
   install_file "docs/NAMING.md"
+  install_file "docs/ROUTING.md"
   install_file "docs/ARCHITECTURE.md"
   install_file "docs/ENVIRONMENT.md"
   install_file "docs/TESTING.md"

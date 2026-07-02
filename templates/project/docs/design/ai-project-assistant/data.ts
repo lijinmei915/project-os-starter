@@ -1,6 +1,6 @@
 export type ProjectKind = "new" | "old";
 export type CollaborationMode = "solo" | "team";
-export type OutcomeId = "product" | "page" | "run" | "handoff" | "ai" | "rag";
+export type OutcomeId = "product" | "page" | "run" | "handoff" | "design-system" | "skill" | "full" | "ai" | "rag";
 export type ContractLayerId = "entry" | "run" | "structure" | "quality" | "runtime";
 export type SectionHeadingVariant = "numbered" | "numbered-with-description" | "plain";
 export type OptionCardTone = "light" | "dark";
@@ -100,7 +100,7 @@ export interface NextCommandData {
 export const productHeader: ProductHeaderData = {
   eyebrow: "AI ENGINEERING KIT",
   title: "AI 项目工程助手",
-  description: "选择新项目走初始化向导，老项目看体检报告。",
+  description: "新项目先识别状态并推荐下一步，老项目看体检报告。",
   icon: "sparkle",
 };
 
@@ -120,17 +120,17 @@ export const projectModeOptions: SegmentedSwitchOption[] = [
 export const sectionHeadings: SectionHeading[] = [
   {
     id: "new-template-wizard",
-    title: "模板选择向导",
+    title: "项目状态识别",
     variant: "numbered-with-description",
     step: 1,
-    description: "先回答 2 个问题，帮你生成一套可理解、可运行、可检查的工程契约。",
+    description: "先判断这套资料的使用场景和当前最自然的下一步，再自动推导需要补哪些工程文件。",
   },
   {
     id: "new-template-preview",
-    title: "生成工程契约",
+    title: "推荐补齐方案",
     variant: "numbered-with-description",
     step: 2,
-    description: "结果会按 5 层组织，让项目从说明文档升级成可落地的工程契约。",
+    description: "系统按 5 层组织补齐项，让当前项目从最小上下文逐步升级成可落地的工程契约。",
   },
   {
     id: "old-code-source",
@@ -158,8 +158,8 @@ export const sectionHeadings: SectionHeading[] = [
 export const collaborationOptions: OptionCard[] = [
   {
     id: "solo",
-    title: "我一个人",
-    description: "先保持轻量，别被文档拖慢。",
+    title: "我自己用",
+    description: "先保持轻量，够 AI 和自己接着做。",
     icon: "user",
     variant: "choice",
     tone: "light",
@@ -168,8 +168,8 @@ export const collaborationOptions: OptionCard[] = [
   },
   {
     id: "team",
-    title: "有团队一起做",
-    description: "需要规则、决策记录和交接资料。",
+    title: "多人协作",
+    description: "补齐规则、决策记录和交接资料。",
     icon: "layers",
     variant: "choice",
     tone: "light",
@@ -181,7 +181,7 @@ export const collaborationOptions: OptionCard[] = [
 export const outcomeOptions: OptionCard[] = [
   {
     id: "product",
-    title: "看清方向",
+    title: "补产品方向",
     description: "定位、用户、MVP 和路线图。",
     icon: "rocket",
     variant: "strategy",
@@ -191,7 +191,7 @@ export const outcomeOptions: OptionCard[] = [
   },
   {
     id: "page",
-    title: "先有页面",
+    title: "生成页面原型",
     description: "页面原型、设计规范和视觉边界。",
     icon: "layers",
     variant: "strategy",
@@ -201,7 +201,7 @@ export const outcomeOptions: OptionCard[] = [
   },
   {
     id: "run",
-    title: "能运行起来",
+    title: "跑通工程运行",
     description: "环境、启动方式、目录和模块边界。",
     icon: "shield",
     variant: "strategy",
@@ -211,9 +211,39 @@ export const outcomeOptions: OptionCard[] = [
   },
   {
     id: "handoff",
-    title: "方便测试和交接",
+    title: "准备交接验收",
     description: "验收方式、运行手册和经验教训。",
     icon: "users",
+    variant: "strategy",
+    tone: "light",
+    state: "default",
+    trailing: "none",
+  },
+  {
+    id: "design-system",
+    title: "组件库 / 设计系统工程",
+    description: "设计规范、token、组件目录和技术栈。",
+    icon: "layers",
+    variant: "strategy",
+    tone: "light",
+    state: "default",
+    trailing: "none",
+  },
+  {
+    id: "skill",
+    title: "沉淀 Agent Skill",
+    description: "先生成最小骨架，后续由系统根据证据补资产、脚本或分发文件。",
+    icon: "sparkle",
+    variant: "strategy",
+    tone: "light",
+    state: "default",
+    trailing: "none",
+  },
+  {
+    id: "full",
+    title: "补齐治理底座",
+    description: "全套工程文档，适合补齐或接管。",
+    icon: "shield",
     variant: "strategy",
     tone: "light",
     state: "default",

@@ -1398,6 +1398,225 @@
       font-size: var(--text-12);
       line-height: 1.5;
     }
+    .kit-manual-fallback {
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      overflow: visible;
+    }
+    .kit-manual-fallback > summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-12);
+      padding: var(--space-12);
+      cursor: pointer;
+      color: var(--color-text-primary);
+      font-size: var(--text-13);
+      font-weight: var(--font-semibold);
+      list-style: none;
+    }
+    .kit-manual-fallback > summary::-webkit-details-marker {
+      display: none;
+    }
+    .kit-manual-fallback > summary::after {
+      content: "+";
+      display: inline-grid;
+      place-items: center;
+      width: 22px;
+      height: 22px;
+      border-radius: var(--radius-full);
+      background: var(--color-surface-control);
+      color: var(--color-text-muted);
+      font-family: var(--font-mono);
+      font-size: var(--text-13);
+      line-height: 1;
+      flex: 0 0 auto;
+    }
+    .kit-manual-fallback[open] > summary::after {
+      content: "-";
+    }
+    .kit-manual-fallback-note {
+      padding: 0 var(--space-12) var(--space-12);
+      color: var(--color-text-secondary);
+      font-size: var(--text-12);
+      line-height: 1.5;
+    }
+    .kit-manual-fallback .kit-section-content {
+      padding: 0;
+    }
+    .kit-goal-box {
+      display: grid;
+      gap: var(--space-10);
+      margin-bottom: var(--space-12);
+    }
+    .kit-goal-label {
+      display: block;
+      color: var(--color-text-primary);
+      font-size: var(--text-13);
+      font-weight: var(--font-semibold);
+      line-height: 1.35;
+    }
+    .kit-goal-input {
+      width: 100%;
+      min-height: 92px;
+      resize: vertical;
+      border: 1px solid var(--color-border-default);
+      border-radius: var(--radius-md);
+      background: var(--color-surface-panel);
+      color: var(--color-text-primary);
+      padding: var(--space-12);
+      font: var(--text-13)/1.55 var(--font-sans);
+      transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    }
+    .kit-goal-input:focus {
+      outline: none;
+      border-color: var(--color-border-strong);
+      box-shadow: var(--shadow-focus-muted);
+    }
+    .kit-intent-panel {
+      display: grid;
+      gap: var(--space-8);
+      padding: var(--space-10);
+      border: 1px solid var(--color-border-subtle);
+      border-radius: var(--radius-md);
+      background: rgba(255, 255, 255, .72);
+      color: var(--color-text-secondary);
+      font-size: var(--text-12);
+      line-height: 1.5;
+    }
+    .kit-intent-panel strong {
+      color: var(--color-text-primary);
+      font-size: var(--text-12);
+    }
+    .kit-intent-panel.is-clarifying {
+      border-color: var(--color-border-strong);
+      background: var(--color-surface-panel);
+    }
+    .kit-clarification-question {
+      margin: 0;
+      color: var(--color-text-primary);
+      font-weight: var(--font-semibold);
+    }
+    .kit-clarification-note {
+      margin: 0;
+      color: var(--color-text-muted);
+    }
+    .kit-intent-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-5);
+    }
+    .kit-goal-plan {
+      display: grid;
+      gap: var(--space-10);
+      padding-top: var(--space-8);
+      border-top: 1px solid var(--color-border-subtle);
+    }
+    .kit-goal-plan-row {
+      display: grid;
+      gap: var(--space-5);
+    }
+    .kit-goal-plan-label {
+      color: var(--color-text-muted);
+      font-size: var(--text-10);
+      font-weight: var(--font-semibold);
+      line-height: 1.3;
+    }
+    .kit-goal-plan-files {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-5);
+    }
+    .kit-goal-plan-action {
+      width: fit-content;
+      min-height: 36px;
+      border: 0;
+      border-radius: var(--radius-sm);
+      background: var(--color-action-primary);
+      color: var(--color-text-inverse);
+      padding: var(--space-7) var(--space-12);
+      font-size: var(--text-12);
+      font-weight: var(--font-semibold);
+      cursor: pointer;
+    }
+    .kit-goal-plan-action:hover {
+      background: var(--color-action-primary-hover);
+    }
+    .kit-goal-plan-action:focus-visible {
+      outline: none;
+      box-shadow: var(--shadow-focus-muted);
+    }
+    .kit-recommendation-engine {
+      display: grid;
+      gap: var(--space-8);
+      padding-top: var(--space-8);
+      border-top: 1px solid rgba(20, 184, 166, .16);
+    }
+    .kit-recommendation-engine-head {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-8);
+      align-items: center;
+      justify-content: space-between;
+    }
+    .kit-recommendation-engine-head code {
+      display: inline-block;
+      max-width: 100%;
+      padding: var(--space-4) var(--space-7);
+      border-radius: var(--radius-xs);
+      background: rgba(255, 255, 255, .72);
+      color: var(--color-text-secondary);
+      font-size: var(--text-10);
+      white-space: nowrap;
+    }
+    .kit-recommendation-list {
+      display: grid;
+      gap: var(--space-8);
+    }
+    .kit-recommendation-item {
+      display: grid;
+      gap: var(--space-6);
+      padding: var(--space-9);
+      border: 1px solid var(--color-border-subtle);
+      border-radius: var(--radius-sm);
+      background: rgba(255, 255, 255, .74);
+    }
+    .kit-recommendation-item-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--space-6);
+      min-width: 0;
+    }
+    .kit-recommendation-item-head strong {
+      color: var(--color-text-primary);
+      font-family: var(--font-mono);
+      font-size: var(--text-12);
+      line-height: 1.35;
+    }
+    .kit-recommendation-item p {
+      margin: 0;
+      color: var(--color-text-secondary);
+      font-size: var(--text-11);
+      line-height: 1.55;
+    }
+    .kit-recommendation-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-5);
+    }
+    .kit-recommendation-empty {
+      color: var(--color-text-secondary);
+      font-size: var(--text-11);
+      line-height: 1.5;
+    }
+    .kit-recommendation-empty code,
+    .kit-recommendation-item p code {
+      display: inline;
+      white-space: normal;
+      font-size: inherit;
+    }
     .kit-contract-layer {
       border: 1px solid var(--color-border-subtle);
       border-radius: var(--radius-md);
@@ -1995,6 +2214,22 @@
       outline: 0;
     }
     .kit-input:focus {
+      border-color: var(--color-success-strong);
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, .16);
+    }
+    .kit-run-json-input {
+      width: 100%;
+      min-height: 96px;
+      resize: vertical;
+      border: 1px solid var(--color-border-subtle);
+      border-radius: var(--radius-md);
+      background: var(--color-surface-panel);
+      color: var(--color-text-primary);
+      padding: var(--space-12);
+      font: var(--text-12)/1.55 var(--font-mono);
+      outline: 0;
+    }
+    .kit-run-json-input:focus {
       border-color: var(--color-success-strong);
       box-shadow: 0 0 0 3px rgba(16, 185, 129, .16);
     }
@@ -3074,7 +3309,7 @@
       <div>
         <div class="kit-brand"><svg class="kit-icon"><use href="#i-sparkles"></use></svg>AI Engineering Kit <a href="docs/architecture-diagram.html" class="kit-arch-link" title="查看架构全景图">架构图</a></div>
         <h1>AI 项目工程助手</h1>
-        <p>选择新项目走初始化向导，老项目看体检报告。</p>
+        <p>新项目先说目标，系统按每句话增量推荐；老项目看体检报告。</p>
       </div>
       <div class="kit-switch" role="tablist" aria-label="项目类型" data-component="SegmentedSwitch" data-variant="header-pill-tabs" data-project="new" id="kitProjectSwitch">
         <div class="kit-switch-slider" aria-hidden="true"></div>
@@ -3089,74 +3324,51 @@
           <div class="kit-card">
             <div class="kit-section-block" data-component="SectionBlock" data-variant="with-options" data-source="docs/design/ai-project-assistant/components.ts">
               <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered-with-description" data-source="docs/design/ai-project-assistant/data.ts">
-                <span class="kit-section-title" data-slot="title"><span class="kit-step-num" data-slot="step">1</span><span class="kit-section-label" data-slot="label">模板选择向导</span></span>
-                <p class="kit-section-subtitle" data-slot="description">先回答 2 个问题，帮你生成一套可理解、可运行、可检查的工程契约。</p>
+                <span class="kit-section-title" data-slot="title"><span class="kit-step-num" data-slot="step">1</span><span class="kit-section-label" data-slot="label">选择项目类型</span></span>
+                <p class="kit-section-subtitle" data-slot="description">只生成该类型的最小可信骨架；其他文件会随着项目证据按需推荐和补齐。</p>
               </div>
 
-              <div class="kit-section-content" data-slot="content">
-                <div class="kit-wizard-steps">
-                  <!-- 问题 1: 协作关系 -->
+              <div class="kit-manual-fallback" data-manual-fallback>
+                <div class="kit-section-content" data-slot="content">
+                  <div class="kit-wizard-steps">
+                  <!-- 问题 1: 下一步动作 -->
                   <div class="kit-wizard-q">
-                    <label class="kit-question-label">Q1：这个项目谁来维护？</label>
-                    <div class="kit-choice-list compact" id="wizardQ1">
-                      <button class="kit-wizard-card-sm is-active" type="button" data-val="solo">
-                        <strong>我一个人</strong>
-                        <span>先保持轻量，别被文档拖慢。</span>
+                    <label class="kit-question-label">Q1：你准备创建什么？（单选）</label>
+                    <div class="kit-choice-list is-two-col" id="wizardProjectType">
+                      <button class="kit-wizard-card-sm is-active" type="button" data-val="web">
+                        <strong>网站 / Web 应用</strong>
+                        <span>页面、交互和前后端应用。</span>
                       </button>
-                      <button class="kit-wizard-card-sm" type="button" data-val="team">
-                        <strong>有团队一起做</strong>
-                        <span>需要规则、决策记录和交接资料。</span>
+                      <button class="kit-wizard-card-sm" type="button" data-val="mobile">
+                        <strong>移动端应用</strong>
+                        <span>移动端界面、交互和工程结构。</span>
                       </button>
-                    </div>
-                  </div>
-
-                  <!-- 问题 2: 项目阶段 -->
-                  <div class="kit-wizard-q">
-                    <label class="kit-question-label">Q2：这次你想先拿到什么？</label>
-                    <div class="kit-choice-list is-two-col" id="wizardQ2">
-                      <button class="kit-wizard-card-sm is-active" type="button" data-val="product">
-                        <strong>看清方向</strong>
-                        <span>定位、用户、MVP 和路线图。</span>
+                      <button class="kit-wizard-card-sm" type="button" data-val="backend">
+                        <strong>后端服务 / API</strong>
+                        <span>服务接口、数据边界和运行方式。</span>
                       </button>
-                      <button class="kit-wizard-card-sm" type="button" data-val="page">
-                        <strong>先有页面</strong>
-                        <span>页面原型、设计规范和视觉边界。</span>
+                      <button class="kit-wizard-card-sm" type="button" data-val="ai-app">
+                        <strong>Agent / AI 应用</strong>
+                        <span>Agent、工具、提示词和评测。</span>
                       </button>
-                      <button class="kit-wizard-card-sm" type="button" data-val="run">
-                        <strong>能运行起来</strong>
-                        <span>环境、启动方式、目录和模块边界。</span>
-                      </button>
-                      <button class="kit-wizard-card-sm" type="button" data-val="handoff">
-                        <strong>方便测试和交接</strong>
-                        <span>验收方式、运行手册和经验教训。</span>
+                      <button class="kit-wizard-card-sm" type="button" data-val="skill">
+                        <strong>Agent Skill</strong>
+                        <span>可复用技能、边界和测试样例。</span>
                       </button>
                       <button class="kit-wizard-card-sm" type="button" data-val="design-system">
                         <strong>组件库 / 设计系统</strong>
-                        <span>设计规范、token、组件目录和技术栈。</span>
+                        <span>设计规范、token 和组件结构。</span>
                       </button>
-                      <button class="kit-wizard-card-sm" type="button" data-val="full">
-                        <strong>完整工程治理</strong>
-                        <span>全套工程文档，适合补齐或接管。</span>
+                      <button class="kit-wizard-card-sm" type="button" data-val="software">
+                        <strong>其他软件项目</strong>
+                        <span>使用通用低假设工程结构。</span>
                       </button>
                     </div>
                   </div>
 
-                  <!-- 问题 3: 技术领域（多选，可跳过） -->
-                  <div class="kit-wizard-q">
-                    <label class="kit-question-label">Q3：需要 AI 工程能力吗？（可多选，可跳过）</label>
-                    <div class="kit-choice-list is-two-col" id="wizardQ3">
-                      <button class="kit-wizard-card-sm" type="button" data-val="ai">
-                        <strong>AI 工程支持</strong>
-                        <span>agents、tools、prompts、evals 和 guardrails。</span>
-                      </button>
-                      <button class="kit-wizard-card-sm" type="button" data-val="rag">
-                        <strong>知识库 / RAG</strong>
-                        <span>data、ingestion、retrieval、evals 和 observability。</span>
-                      </button>
-                    </div>
-                  </div>
                 </div>
 
+                </div>
               </div>
             </div>
           </div>
@@ -3167,13 +3379,13 @@
         <div class="kit-card">
           <div class="kit-section-block" data-component="SectionBlock" data-variant="with-results" data-source="docs/design/ai-project-assistant/components.ts">
             <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered-with-description" data-source="docs/design/ai-project-assistant/data.ts">
-              <span class="kit-section-title" data-slot="title"><span class="kit-step-num" data-slot="step">2</span><span class="kit-section-label" data-slot="label">生成工程契约</span></span>
-              <p class="kit-section-subtitle" data-slot="description">结果会按 5 层组织，让项目从说明文档升级成可落地的工程契约。</p>
+              <span class="kit-section-title" data-slot="title"><span class="kit-step-num" data-slot="step">2</span><span class="kit-section-label" data-slot="label">推荐补齐方案</span></span>
+              <p class="kit-section-subtitle" data-slot="description">系统按 5 层组织补齐项，让当前项目从最小上下文逐步升级成可落地的工程契约。</p>
             </div>
             <div class="kit-section-content" data-slot="content">
               <div class="kit-contract-summary" data-component="ContractRecommendation">
                 <strong data-contract-summary-title>推荐：轻量工程契约</strong>
-                <p data-contract-summary-desc>根据左侧选择自动合并必选文件、推荐文件、代码骨架和 AI 协作规则。</p>
+                <p data-contract-summary-desc>根据当前状态和下一步动作自动合并必选文件、推荐文件、代码骨架和 AI 协作规则。</p>
               </div>
 
               <div class="kit-contract-stack" data-component="ContractLayerStack" aria-label="工程契约配置器">
@@ -3302,21 +3514,22 @@
         <div class="kit-source-config-wrap">
           <div class="kit-source-config is-active" data-kit-source-panel="local" data-component="SectionBlock" data-variant="with-form">
             <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered-with-description" data-source="docs/design/ai-project-assistant/data.ts">
-              <span class="kit-section-title" data-slot="title"><span class="kit-step-num" data-slot="step">2</span><span class="kit-section-label" data-slot="label">当前工作目录</span></span>
-              <p class="kit-section-subtitle" data-slot="description">将在下方路径执行代码体检</p>
+              <span class="kit-section-title" data-slot="title"><span class="kit-step-num" data-slot="step">2</span><span class="kit-section-label" data-slot="label">当前终端项目</span></span>
+              <p class="kit-section-subtitle" data-slot="description">在要体检的项目终端里粘贴命令，不需要填写路径</p>
             </div>
             <div class="kit-path-field" data-component="TextField" data-variant="path" data-state="readonly" data-source="docs/design/ai-project-assistant/data.ts">
-              <span class="kit-path-value" id="kitPathValue" data-slot="value" title="">选择目录后显示</span>
-              <button class="kit-directory-action" type="button" data-slot="trailingAction" data-kit-directory-browse aria-label="选择本地目录" title="选择本地目录">
-                <svg class="kit-icon"><use href="#i-folder-open"></use></svg>
+              <span class="kit-path-value" id="kitPathValue" data-slot="value" title="">命令会体检当前终端所在目录，并写入 .project-os/</span>
+              <button class="kit-directory-action" type="button" data-slot="trailingAction" data-kit-directory-browse aria-label="目录选择已停用" title="Codex 内置浏览器不稳定，改用复制命令" disabled>
+                <svg class="kit-icon"><use href="#i-file-text"></use></svg>
               </button>
               <input class="kit-directory-input" id="kitDirectoryInput" type="file" webkitdirectory directory multiple aria-hidden="true" tabindex="-1">
             </div>
             <div class="kit-hint-row">
-              <button class="kit-primary" type="button" id="kitAnalyzeBtn"><svg class="kit-icon"><use href="#i-activity"></use></svg><span data-button-label>开始体检</span></button>
-              <button class="kit-secondary-btn" type="button" data-kit-copy-local-command><svg class="kit-icon"><use href="#i-file-text"></use></svg><span data-button-label>复制本地体检命令</span></button>
+              <button class="kit-primary" type="button" id="kitAnalyzeBtn"><svg class="kit-icon"><use href="#i-file-text"></use></svg><span data-button-label>查看 Runner 产物</span></button>
+              <button class="kit-secondary-btn" type="button" data-kit-copy-local-command><svg class="kit-icon"><use href="#i-file-text"></use></svg><span data-button-label>复制当前项目体检命令</span></button>
+              <button class="kit-secondary-btn" type="button" data-kit-copy-hermes-prompt><svg class="kit-icon"><use href="#i-sparkles"></use></svg><span data-button-label>复制 Hermes 接手提示词</span></button>
             </div>
-            <div class="kit-feature-note" id="kitLocalNote"><span class="kit-status-chip is-copy">浏览器直接分析</span><span>文件仅在本地读取，不上传任何数据。</span></div>
+            <div class="kit-feature-note" id="kitLocalNote"><span class="kit-status-chip is-copy">终端本地 Runner</span><span>先用 Runner 体检当前项目；需要自动继续做时，把 Hermes 提示词粘到目标项目的 Hermes 会话里。</span></div>
           </div>
           <div class="kit-source-config" data-kit-source-panel="git" data-component="SectionBlock" data-variant="with-form">
             <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered-with-description" data-source="docs/design/ai-project-assistant/data.ts">
@@ -3325,10 +3538,10 @@
             </div>
             <input class="kit-input" id="kitGitInput" type="text" placeholder="https://github.com/...">
             <div class="kit-hint-row">
-              <button class="kit-primary" type="button" data-component="Button" data-variant="primary" data-state="copy" data-kit-copy-git-command><svg class="kit-icon"><use href="#i-github"></use></svg><span data-button-label>复制分析命令</span></button>
+              <button class="kit-primary" type="button" data-component="Button" data-variant="primary" data-state="copy" data-kit-copy-git-command><svg class="kit-icon"><use href="#i-github"></use></svg><span data-button-label>复制 Runner 命令</span></button>
               <span class="kit-hint">不在网页内直接 clone</span>
             </div>
-            <div class="kit-feature-note"><span class="kit-status-chip is-live">命令可用</span><span>填写仓库地址后复制命令，在终端中 clone 到临时目录并生成体检报告。</span></div>
+            <div class="kit-feature-note"><span class="kit-status-chip is-live">Runner 可用</span><span>填写仓库地址后复制命令，在终端中 clone 到临时目录并生成 run 记录、报告和推荐。</span></div>
           </div>
           <div class="kit-source-config" data-kit-source-panel="upload" data-component="SectionBlock" data-variant="with-form">
             <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered-with-description" data-source="docs/design/ai-project-assistant/data.ts">
@@ -3349,12 +3562,46 @@
           <div class="kit-section-block" data-component="SectionBlock" data-variant="with-results" data-source="docs/design/ai-project-assistant/components.ts">
             <div class="kit-section-heading" data-component="SectionHeading" data-variant="numbered-with-description">
               <span class="kit-section-title" data-slot="title"><span class="kit-step-num" data-slot="step">3</span><span class="kit-section-label" data-slot="label">体检结果</span></span>
-              <p class="kit-section-subtitle" data-slot="description">选择左侧目录或上传 zip 后自动显示</p>
+              <p class="kit-section-subtitle" data-slot="description">Runner 执行后查看 .project-os/runs/ 的记录</p>
             </div>
             <div id="kitOldResults" class="kit-stack" data-slot="content">
-              <div class="kit-results-empty">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>
-                <span>选择项目目录或上传 zip<br>结果会显示在这里</span>
+              <div class="kit-result-section">
+                <div class="kit-result-section-title">粘贴 Runner 回执</div>
+                <textarea class="kit-run-json-input" id="kitRunJsonInput" spellcheck="false" placeholder='把 .project-os/runs/<run-id>.json 的内容粘贴到这里'></textarea>
+                <div class="kit-hint-row">
+                  <button class="kit-primary" type="button" id="kitRenderRunBtn"><svg class="kit-icon"><use href="#i-file-text"></use></svg><span data-button-label>解析回执</span></button>
+                  <button class="kit-secondary-btn" type="button" id="kitClearRunBtn"><span data-button-label>清空</span></button>
+                </div>
+                <div class="kit-result-note">暂时没有本地服务 API，所以先用“大模型 / 页面来回粘贴”的方式查看 Runner 结果。</div>
+              </div>
+              <div class="kit-result-score">
+                <div class="kit-result-ring" data-status="usable" style="--ring-pct:100%">
+                  <strong>Run</strong><span>回执</span>
+                </div>
+                <div>
+                  <div class="kit-result-label">Runner 会告诉你这次检查有没有跑通</div>
+                  <div class="kit-result-sub">复制左侧命令后，结果写入 <code>.project-os/runs/&lt;run-id&gt;.json</code></div>
+                </div>
+              </div>
+              <div class="kit-result-section">
+                <div class="kit-result-section-title">会记录的命令</div>
+                <ul class="kit-result-list">
+                  <li class="kit-result-item pass"><span class="kit-result-dot">1</span><span><code>check-ai-project</code> 生成体检报告</span></li>
+                  <li class="kit-result-item pass"><span class="kit-result-dot">2</span><span><code>recommend-next</code> 生成下一步推荐</span></li>
+                  <li class="kit-result-item pass"><span class="kit-result-dot">3</span><span><code>check-all</code> 或 <code>runtime-probe</code> 验证工程状态</span></li>
+                </ul>
+              </div>
+              <div class="kit-result-section">
+                <div class="kit-result-section-title">会生成的产物</div>
+                <ul class="kit-result-list">
+                  <li class="kit-result-item pass"><span class="kit-result-dot">✓</span><span><code>.project-os/runs/&lt;run-id&gt;.json</code>：这次执行的回执单</span></li>
+                  <li class="kit-result-item pass"><span class="kit-result-dot">✓</span><span><code>.project-os/reports/ai-project-report.md</code>：给人看的体检报告</span></li>
+                  <li class="kit-result-item pass"><span class="kit-result-dot">✓</span><span><code>.project-os/reports/ai-project-report.json</code>：给页面和 AI 读的体检数据</span></li>
+                  <li class="kit-result-item pass"><span class="kit-result-dot">✓</span><span><code>.project-os/recommendations/recommend-next.json</code>：下一步建议</span></li>
+                </ul>
+              </div>
+              <div class="kit-result-note">
+                下一步页面会读取这份 run 记录，直接显示成功 / 失败、日志路径和推荐动作；现在先用 Runner 命令生成可信产物。
               </div>
             </div>
           </div>
@@ -3433,29 +3680,51 @@
     return row;
   }
   // ─── AI Project Wizard Logic ──────────────────────────────
+  const SKILL_ENGINEERING_FILES = [
+    ".agents/skills/example-skill/SKILL.md",
+    ".agents/skills/example-skill/agents/openai.yaml",
+    ".agents/skills/example-skill/references/topic.md",
+    ".agents/skills/example-skill/examples/example-input.md",
+    "docs/SKILL_ENGINEERING.md"
+  ];
+
+  const SKILL_ENGINEERING_STRUCTURE_FILES = [
+    ".agents/skills/example-skill/",
+    "SKILL.md",
+    "agents/openai.yaml",
+    "references/",
+    "examples/",
+    "docs/SKILL_ENGINEERING.md"
+  ];
+
   const PROJECT_STRUCTURE_PRESETS = {
+    minimal: {
+      label: "最小可信骨架",
+      desc: "只生成项目入口和项目类型直接需要的文件，其他内容按证据补齐。",
+      files: ["README.md", "AGENTS.md", "PROJECT.md", "HANDOFF.md"]
+    },
     product: {
-      label: "产品方向",
+      label: "产品方向补齐",
       desc: "先沉淀定位、用户、MVP 和路线图，适合在动手前把项目边界说清楚。",
       files: ["PRODUCT.md", "docs/PRODUCT_PLAN.md", "README.md"]
     },
     prototype: {
-      label: "页面原型",
+      label: "页面原型补齐",
       desc: "先保留单页原型、最小上下文和轻量设计记录，适合先看方向是否成立。",
       files: ["index.html", "README.md", "docs/design/"]
     },
     runnable: {
-      label: "可运行项目",
+      label: "工程运行补齐",
       desc: "补齐架构、技术栈、环境和运行手册，让项目能安装、启动和复现，具体目录结构在下方配置。",
       files: ["src/", "docs/", "tests/", "config/"]
     },
     handoff: {
-      label: "测试交接",
+      label: "交接验收补齐",
       desc: "先补齐验收方式、运行手册和交接上下文，适合让项目更容易被接手和验证。",
       files: ["docs/TESTING.md", "docs/RUNBOOK.md", "HANDOFF.md", "docs/LESSONS.md"]
     },
     full: {
-      label: "完整工程治理",
+      label: "治理底座补齐",
       desc: "全套工程文档和目录结构，覆盖产品、架构、运行、测试、交接和治理，适合补齐或接管已有项目。",
       files: ["src/", "docs/", "tests/", "config/", "prompts/", "evals/"]
     },
@@ -3468,51 +3737,70 @@
       label: "RAG / 知识库工程",
       desc: "把数据、切分、索引、检索、重排、生成和评测拆开，方便后续定位召回质量和生成质量问题。",
       files: ["src/rag/", "ingestion/", "indexing/", "retrieval/", "data/", "evals/"]
+    },
+    skill: {
+      label: "Agent Skill 补齐",
+      desc: "先生成最小 Skill 骨架，固定触发条件、边界、展示元数据和样例。",
+      files: SKILL_ENGINEERING_STRUCTURE_FILES
     }
   };
 
   const GENERATION_PLAN_PRESETS = {
+    minimal: {
+      label: "最小可信骨架",
+      maturityKey: "prototype",
+      structureKey: "minimal",
+      autoFiles: [],
+      advice: "<strong>最小可信骨架</strong>：只生成项目类型直接需要的文件，其他文件随项目证据按需增加。"
+    },
     product: {
-      label: "产品方向",
+      label: "产品方向补齐",
       maturityKey: "prototype",
       structureKey: "product",
       autoFiles: ["PRODUCT.md", "docs/PRODUCT_PLAN.md"],
-      advice: "<strong>产品方向</strong>：先拿到定位、用户、MVP 和路线图，工程结构保持轻量。"
+      advice: "<strong>产品方向补齐</strong>：先拿到定位、用户、MVP 和路线图，工程结构保持轻量。"
     },
     "page-prototype": {
-      label: "页面原型",
+      label: "页面原型补齐",
       maturityKey: "prototype",
       structureKey: "prototype",
       autoFiles: ["docs/DESIGN_STANDARDS.md"],
-      advice: "<strong>页面原型</strong>：先拿到可看的页面和最小上下文，工程治理保持轻量。"
+      advice: "<strong>页面原型补齐</strong>：先拿到可看的页面和最小上下文，工程治理保持轻量。"
     },
     runnable: {
-      label: "可运行项目",
+      label: "工程运行补齐",
       maturityKey: "mvp",
       structureKey: "runnable",
       autoFiles: ["docs/ARCHITECTURE.md", "docs/CODE_STRUCTURE.md", "docs/TECH_STACK.md", "docs/ENVIRONMENT.md", ".env.example", "docs/NAMING.md", "docs/RUNBOOK.md"],
-      advice: "<strong>可运行项目</strong>：补齐架构、代码结构、技术栈、环境和运行手册，让项目能跑起来。"
+      advice: "<strong>工程运行补齐</strong>：补齐架构、代码结构、技术栈、环境和运行手册，让项目能跑起来。"
     },
     handoff: {
-      label: "测试交接",
+      label: "交接验收补齐",
       maturityKey: "team",
       structureKey: "handoff",
       autoFiles: ["docs/NAMING.md", "docs/TESTING.md", "docs/RUNBOOK.md", "HANDOFF.md", "docs/LESSONS.md"],
-      advice: "<strong>测试交接</strong>：先补齐验收方式、运行手册、交接上下文和经验复盘。"
+      advice: "<strong>交接验收补齐</strong>：先补齐验收方式、运行手册、交接上下文和经验复盘。"
     },
     "design-system": {
-      label: "组件库 / 设计系统",
+      label: "组件库 / 设计系统工程",
       maturityKey: "mvp",
       structureKey: "runnable",
       autoFiles: ["docs/DESIGN_STANDARDS.md", "docs/CODE_STRUCTURE.md", "docs/TECH_STACK.md", "docs/NAMING.md"],
-      advice: "<strong>组件库 / 设计系统</strong>：先拿到设计规范、token 边界、组件目录和技术栈。"
+      advice: "<strong>组件库 / 设计系统工程</strong>：先拿到设计规范、token 边界、组件目录和技术栈。"
+    },
+    skill: {
+      label: "Agent Skill 补齐",
+      maturityKey: "prototype",
+      structureKey: "skill",
+      autoFiles: SKILL_ENGINEERING_FILES,
+      advice: "<strong>Agent Skill 补齐</strong>：默认生成最小 Skill 骨架；资产、脚本、schema、fixture 和分发文件由系统根据证据推导后再补。"
     },
     full: {
-      label: "完整工程治理",
+      label: "治理底座补齐",
       maturityKey: "production",
       structureKey: "full",
       autoFiles: ["PRODUCT.md", "docs/PRODUCT_PLAN.md", "docs/ARCHITECTURE.md", "docs/CODE_STRUCTURE.md", "docs/TECH_STACK.md", "docs/ENVIRONMENT.md", ".env.example", "docs/DESIGN_STANDARDS.md", "docs/NAMING.md", "docs/DOCUMENTATION.md", "docs/TESTING.md", "docs/RUNBOOK.md", "docs/CHANGELOG.md", "docs/DECISIONS.md", "docs/LESSONS.md"],
-      advice: "<strong>完整工程治理</strong>：全套工程文档，覆盖产品、架构、运行、测试、交接和治理。"
+      advice: "<strong>治理底座补齐</strong>：全套工程文档，覆盖产品、架构、运行、测试、交接和治理。"
     },
     agent: {
       label: "AI Agent 工程",
@@ -3536,12 +3824,33 @@
     run: "runnable",
     handoff: "handoff",
     "design-system": "design-system",
+    skill: "skill",
     ai: "agent",
     rag: "rag",
     full: "full"
   };
 
   const OUTCOME_FILE_PRESETS = {
+    web: {
+      files: ["docs/FRONTEND.md", "docs/BACKEND.md"],
+      field: "Web 应用结构"
+    },
+    mobile: {
+      files: ["docs/FRONTEND.md", "docs/DESIGN_STANDARDS.md"],
+      field: "移动端界面和设计边界"
+    },
+    backend: {
+      files: ["docs/BACKEND.md", "docs/ARCHITECTURE.md", "docs/ENVIRONMENT.md"],
+      field: "后端服务和 API 边界"
+    },
+    "ai-app": {
+      files: ["docs/ARCHITECTURE.md", "docs/CODE_STRUCTURE.md", "docs/TESTING.md", "prompts/", "evals/", "guardrails/"],
+      field: "Agent / AI 应用结构"
+    },
+    software: {
+      files: ["docs/ARCHITECTURE.md", "docs/CODE_STRUCTURE.md"],
+      field: "通用软件工程结构"
+    },
     product: {
       files: ["PRODUCT.md", "docs/PRODUCT_PLAN.md"],
       field: "项目入口和产品方向"
@@ -3562,6 +3871,10 @@
       files: ["docs/DESIGN_STANDARDS.md", "docs/CODE_STRUCTURE.md", "docs/TECH_STACK.md", "docs/NAMING.md"],
       field: "设计规范、token 和组件结构"
     },
+    skill: {
+      files: SKILL_ENGINEERING_FILES,
+      field: "最小 Agent Skill 工程骨架"
+    },
     full: {
       files: ["PRODUCT.md", "docs/PRODUCT_PLAN.md", "docs/TECH_STACK.md", "docs/ENVIRONMENT.md", ".env.example", "docs/NAMING.md", "docs/DOCUMENTATION.md", "docs/ARCHITECTURE.md", "docs/CODE_STRUCTURE.md", "docs/DESIGN_STANDARDS.md", "docs/TESTING.md", "docs/RUNBOOK.md", "docs/CHANGELOG.md", "docs/DECISIONS.md", "docs/LESSONS.md", "prompts/", "evals/", "guardrails/", "mcp/", "observability/", "config/"],
       field: "全套工程文档和 AI 协作规则"
@@ -3576,19 +3889,22 @@
     }
   };
 
+  function outcomeFilePreset(outcomeKey) {
+    const preset = OUTCOME_FILE_PRESETS[outcomeKey];
+    return preset;
+  }
+
   function activeOutcomeKeys() {
-    const stageActive = document.querySelector("#wizardQ2 .is-active");
-    const keys = [stageActive?.dataset.val || "product"];
-    document.querySelectorAll("#wizardQ3 .is-active").forEach(btn => {
-      keys.push(btn.dataset.val);
-    });
-    return keys;
+    const typeActive = document.querySelector("#wizardProjectType .is-active");
+    return [typeActive?.dataset.val || "web"];
+  }
+
+  function activeProjectTypeKey() {
+    return document.querySelector("#wizardProjectType .is-active")?.dataset.val || "web";
   }
 
   function activeGenerationPlanKey() {
-    const stageActive = document.querySelector("#wizardQ2 .is-active");
-    const stageKey = stageActive?.dataset.val || "product";
-    return OUTCOME_GENERATION_PLAN_KEYS[stageKey] || OUTCOME_GENERATION_PLAN_KEYS.product;
+    return "minimal";
   }
 
   function activeGenerationPlan() {
@@ -3696,6 +4012,19 @@
     }
   };
   const PROJECT_RUNTIME_PRESETS = {
+    minimal: {
+      label: "按需 Runtime",
+      desc: "初始化不预生成 AI Runtime；出现 Agent、评测、安全或外部工具证据后再补齐。",
+      levels: {
+        promptAgent: "按需",
+        evals: "按需",
+        guardrails: "按需",
+        mcp: "按需",
+        observability: "按需",
+        secrets: "按需"
+      },
+      layerFiles: []
+    },
     product: {
       label: "产品方向 Runtime",
       desc: "产品方向阶段只保留轻量 prompts 示例，先不打扰用户生成完整 AI Runtime 能力。",
@@ -3800,6 +4129,19 @@
       },
       layerFiles: ["evals/", "observability/", "prompts/", "guardrails/"]
     },
+    skill: {
+      label: "Skill Runtime",
+      desc: "Skill 项目默认只保留轻量 prompt 示例；Skill 自身规则写在 SKILL.md，不额外生成完整 Agent 目录。",
+      levels: {
+        promptAgent: "示例",
+        evals: "按需",
+        guardrails: "按需",
+        mcp: "按需",
+        observability: "按需",
+        secrets: "按需"
+      },
+      layerFiles: ["prompts/"]
+    },
   };
 
   function activeRuntimePreset() {
@@ -3883,9 +4225,10 @@
       prototype: { label: "静态页面 / 原型优先", desc: "先生成可看的页面和最小上下文，不强行引入框架和后端。", chips: ["index.html", "docs/design/"] },
       runnable: { label: "可运行项目", desc: "补齐架构、技术栈、环境和运行入口，具体目录结构按项目实际情况调整。", chips: ["src/", "docs/", "tests/", "config/"] },
       handoff: { label: "验收交接优先", desc: "先统一测试、运行手册和交接上下文，方便别人接手验证。", chips: ["docs/TESTING.md", "docs/RUNBOOK.md", "HANDOFF.md"] },
-      full: { label: "完整工程治理", desc: "全套工程文档和目录，覆盖产品、架构、运行、测试、交接和治理。", chips: ["src/", "docs/", "tests/", "config/", "prompts/"] },
+      full: { label: "治理底座补齐", desc: "全套工程文档和目录，覆盖产品、架构、运行、测试、交接和治理。", chips: ["src/", "docs/", "tests/", "config/", "prompts/"] },
       agent: { label: "Python / FastAPI 优先", desc: "Agent 服务默认按 API、agents、tools、prompts、evals 拆分。", chips: ["src/app/", "agents/", "tools/", "pyproject.toml"] },
-      rag: { label: "Python / RAG workflow", desc: "RAG 项目默认按 ingestion、indexing、retrieval、evals 拆分。", chips: ["src/rag/", "data/", "evals/", "pyproject.toml"] }
+      rag: { label: "Python / RAG workflow", desc: "RAG 项目默认按 ingestion、indexing、retrieval、evals 拆分。", chips: ["src/rag/", "data/", "evals/", "pyproject.toml"] },
+      skill: { label: "Agent Skill", desc: "Skill 默认按 .agents/skills/<name>/SKILL.md 组织，先固定触发条件、边界和示例。", chips: [".agents/skills/", "SKILL.md", "README.md"] }
     },
     data: {
       product: { label: "默认不生成", desc: "产品方向阶段不主动生成数据或知识库目录。", chips: ["按需开启"] },
@@ -3894,7 +4237,8 @@
       handoff: { label: "默认不生成", desc: "测试交接阶段不主动生成知识库链路，只保留验证和复盘入口。", chips: ["evals/", "observability/"] },
       full: { label: "按需开启", desc: "完整治理模式下按实际需要保留数据和知识库入口。", chips: ["data/", "evals/"] },
       agent: { label: "按需知识库", desc: "Agent 可保留轻量 data 入口，但不默认假设必须 RAG。", chips: ["data/", "docs/"] },
-      rag: { label: "需要知识库", desc: "RAG 默认生成 data、ingestion、retrieval、citations 等位置。", chips: ["data/", "ingestion/", "retrieval/", "citations/"] }
+      rag: { label: "需要知识库", desc: "RAG 默认生成 data、ingestion、retrieval、citations 等位置。", chips: ["data/", "ingestion/", "retrieval/", "citations/"] },
+      skill: { label: "默认不生成", desc: "Skill 本身不假设数据层；需要样例数据时再补 examples 或 fixtures。", chips: ["examples?", "fixtures?"] }
     },
     deploy: {
       prototype: { label: "暂不部署", desc: "快速原型先本地跑通，部署放到后续阶段。", chips: ["local"] },
@@ -4039,8 +4383,358 @@
     }
   }
 
+  const RECOMMENDATION_REPORT_URLS = [
+    ".project-os/recommendations/recommend-next.json",
+    "recommend-next.json"
+  ];
+  const recommendationEngineState = {
+    status: "loading",
+    data: null,
+    source: "",
+    manualOverride: false
+  };
+
+  function recommendationChipClass(value) {
+    if (value === "high" || value === "strong" || value === "clear") return "is-live";
+    if (value === "medium" || value === "probable") return "is-copy";
+    return "is-planned";
+  }
+
+  function recommendationActionLabel(action) {
+    const labels = {
+      create: "建议新建",
+      update: "建议更新",
+      keep: "保持",
+      skip: "可跳过"
+    };
+    return labels[action] || action || "建议";
+  }
+
+  function recommendationStatusText(data) {
+    const count = data?.summary?.recommendationCount ?? data?.recommendations?.length ?? 0;
+    if (data?.status === "no_obvious_gap") return "推荐引擎：已读取";
+    return `推荐引擎：${count} 个建议`;
+  }
+
+  function recommendationFiles() {
+    const recommendations = Array.isArray(recommendationEngineState.data?.recommendations)
+      ? recommendationEngineState.data.recommendations
+      : [];
+    return recommendations
+      .filter(rec => ["create", "update"].includes(rec.action || ""))
+      .map(rec => rec.file)
+      .filter(Boolean);
+  }
+
+  function shouldUseRecommendationSelection() {
+    return false;
+  }
+
+  function inferGoalIntent(rawText) {
+    const text = String(rawText || "").trim();
+    const lower = text.toLowerCase();
+    const has = (patterns) => patterns.some(pattern => pattern.test(lower));
+    const facts = [];
+    const missing = [];
+    const q3 = [];
+    let outcome = "product";
+    let summary = "先沉淀产品方向和最小项目入口。";
+
+    if (!text) {
+      return { active: false, confidence: "none", text, outcome, q3, facts, missing: ["请先描述你现在想做什么"], summary };
+    }
+
+    if (has([/登录/, /页面/, /界面/, /原型/, /表单/, /组件/, /前端/, /\bui\b/])) {
+      outcome = "page";
+      facts.push("识别到页面或原型目标");
+      summary = "先生成页面原型相关的最小工程上下文。";
+    }
+    if (has([/跑起来/, /运行/, /启动/, /安装/, /环境/, /配置/, /部署/, /怎么跑/])) {
+      outcome = "run";
+      facts.push("识别到运行复现目标");
+      summary = "优先补齐环境、技术栈和运行说明。";
+    }
+    if (has([/交接/, /接手/, /验收/, /测试/, /别人继续/, /handoff/, /review/])) {
+      outcome = "handoff";
+      facts.push("识别到交接或验收目标");
+      summary = "优先补齐测试、运行手册和交接上下文。";
+    }
+    if (has([/设计系统/, /组件库/, /\btoken\b/, /视觉规范/, /设计规范/])) {
+      outcome = "design-system";
+      facts.push("识别到设计系统目标");
+      summary = "优先补齐设计边界、组件结构和技术基线。";
+    }
+    if (has([/\bskill\b/, /技能/, /agent skill/, /可复用能力/])) {
+      outcome = "skill";
+      facts.push("识别到 Agent Skill 目标");
+      summary = "先生成最小 Skill 骨架，再按证据补参考资料或脚本。";
+    }
+    if (has([/治理/, /规范/, /完整/, /接管/, /整理/, /项目很乱/])) {
+      outcome = "full";
+      facts.push("识别到治理或接管目标");
+      summary = "优先补齐项目治理底座。";
+    }
+    if (has([/产品/, /定位/, /用户/, /\bmvp\b/, /路线/, /方向/, /后台管理/, /系统/])) {
+      facts.push("识别到产品或系统目标");
+      if (outcome === "product") summary = "先沉淀产品方向、用户和最小项目入口。";
+    }
+    if (has([/\bai\b/, /\bagent\b/, /智能体/, /prompt/, /eval/, /guardrail/])) {
+      q3.push("ai");
+      facts.push("识别到 AI 工程能力");
+    }
+    if (has([/\brag\b/, /知识库/, /检索/, /向量/, /召回/])) {
+      q3.push("rag");
+      facts.push("识别到知识库 / RAG 能力");
+    }
+
+    if (!has([/先/, /第一步/, /优先/, /原型/, /跑起来/, /交接/, /页面/, /登录/, /启动/])) {
+      missing.push("还没明确第一步优先做什么");
+    }
+    if (!facts.length) {
+      return {
+        active: true,
+        confidence: "low",
+        text,
+        outcome: null,
+        q3: [],
+        facts: [],
+        missing: ["无法从当前内容判断有效目标"],
+        summary: "我还无法判断你现在想推进什么。",
+        clarificationQuestion: "你现在最想完成的具体结果是什么？例如：做一个登录页、让现有项目跑起来，或整理项目文档。"
+      };
+    }
+
+    return { active: true, confidence: missing.length ? "medium" : "high", text, outcome, q3: [...new Set(q3)], facts, missing, summary };
+  }
+
+  function setWizardSingleValue(groupSelector, value) {
+    const group = document.querySelector(groupSelector);
+    if (!group) return;
+    group.querySelectorAll(".kit-wizard-card-sm").forEach(btn => {
+      btn.classList.toggle("is-active", btn.dataset.val === value);
+    });
+  }
+
+  function setWizardMultiValues(groupSelector, values) {
+    const selected = new Set(values);
+    const group = document.querySelector(groupSelector);
+    if (!group) return;
+    group.querySelectorAll(".kit-wizard-card-sm").forEach(btn => {
+      btn.classList.toggle("is-active", selected.has(btn.dataset.val));
+    });
+  }
+
+  function renderGoalUnderstanding(intent) {
+    const target = document.getElementById("kitGoalUnderstanding");
+    if (!target) return;
+    if (!intent.active) {
+      target.classList.remove("is-clarifying");
+      target.innerHTML = `
+        <strong>等待目标输入</strong>
+        <span>输入一句话后，会自动提取产品类型、下一步动作和需要补齐的最小文件。</span>
+      `;
+      return;
+    }
+    if (intent.confidence === "low") {
+      target.classList.add("is-clarifying");
+      target.innerHTML = `
+        <strong>${esc(intent.summary)}</strong>
+        <p class="kit-clarification-question">${esc(intent.clarificationQuestion)}</p>
+        <p class="kit-clarification-note">补充后会重新理解目标；在此之前不会推荐或生成文件。</p>
+      `;
+      return;
+    }
+    target.classList.remove("is-clarifying");
+    const preset = outcomeFilePreset(intent.outcome);
+    const recommendedFiles = preset?.files || [];
+    const deferredByOutcome = {
+      product: ["docs/TESTING.md", "docs/RUNBOOK.md", "docs/DECISIONS.md"],
+      page: ["docs/ENVIRONMENT.md", "docs/RUNBOOK.md", "docs/DECISIONS.md"],
+      run: ["docs/PRODUCT_PLAN.md", "docs/DESIGN_STANDARDS.md", "docs/DECISIONS.md"],
+      handoff: ["docs/PRODUCT_PLAN.md", "docs/DESIGN_STANDARDS.md", "prompts/"],
+      "design-system": ["docs/RUNBOOK.md", "docs/LESSONS.md", "prompts/"],
+      skill: ["scripts/", "schemas/", "fixtures/", "distribution/"],
+      full: []
+    };
+    const deferredFiles = deferredByOutcome[intent.outcome] || [];
+    target.innerHTML = `
+      <strong>${esc(intent.summary)}</strong>
+      <div class="kit-intent-chips">
+        ${intent.facts.map(item => `<span class="kit-status-chip is-copy">${esc(item)}</span>`).join("")}
+        ${intent.missing.map(item => `<span class="kit-status-chip is-planned">${esc(item)}</span>`).join("")}
+      </div>
+      <div class="kit-goal-plan">
+        <div class="kit-goal-plan-row">
+          <span class="kit-goal-plan-label">建议生成</span>
+          <div class="kit-goal-plan-files">
+            ${recommendedFiles.map(file => `<span class="kit-status-chip is-live">${esc(file)}</span>`).join("") || '<span class="kit-status-chip is-copy">只保留必选入口文件</span>'}
+          </div>
+        </div>
+        ${deferredFiles.length ? `
+          <div class="kit-goal-plan-row">
+            <span class="kit-goal-plan-label">暂不生成</span>
+            <div class="kit-goal-plan-files">
+              ${deferredFiles.map(file => `<span class="kit-status-chip is-planned">${esc(file)}</span>`).join("")}
+            </div>
+          </div>
+        ` : ""}
+        <button class="kit-goal-plan-action" type="button" data-goal-review-plan>查看并确认生成项</button>
+      </div>
+    `;
+  }
+
+  function applyGoalIntent(rawText) {
+    const intent = inferGoalIntent(rawText);
+    renderGoalUnderstanding(intent);
+    if (!intent.active) {
+      recommendationEngineState.manualOverride = false;
+      renderRecommendationEngine();
+      updateWizardSelections();
+      return;
+    }
+    if (intent.confidence === "low") {
+      recommendationEngineState.manualOverride = false;
+      const manualFallback = document.querySelector("[data-manual-fallback]");
+      if (manualFallback) manualFallback.open = false;
+      renderRecommendationEngine();
+      updateWizardSelections();
+      return;
+    }
+    recommendationEngineState.manualOverride = true;
+    renderRecommendationEngine();
+    updateWizardSelections();
+  }
+
+  function updateManualFallbackState() {
+    const details = document.querySelector("[data-manual-fallback]");
+    const title = document.querySelector("[data-manual-fallback-title]");
+    const note = document.querySelector("[data-manual-fallback-note]");
+    if (!details || !title || !note) return;
+
+    if (recommendationEngineState.status === "missing") {
+      details.open = true;
+      title.textContent = "没有扫描结果：手动选择启动方向";
+      note.textContent = "未读取到推荐 JSON，先用这组问题推导默认补齐项。生成 JSON 后，这里会退到辅助调整。";
+      return;
+    }
+
+    if (recommendationEngineState.status === "loaded") {
+      details.open = false;
+      title.textContent = "手动调整生成方向";
+      note.textContent = "推荐引擎已经读取项目证据；只有在想覆盖默认建议时，再展开这里手动调整。";
+      return;
+    }
+
+    details.open = false;
+    title.textContent = "正在读取项目扫描结果";
+    note.textContent = "如果没有推荐 JSON，会自动展开手动 fallback。";
+  }
+
+  function renderRecommendationEngine() {
+    const statusEl = document.querySelector("[data-recommendation-status]");
+    const listEl = document.querySelector("[data-recommendation-list]");
+    if (!statusEl || !listEl) return;
+    updateManualFallbackState();
+
+    if (recommendationEngineState.status === "loading") {
+      statusEl.className = "kit-status-chip is-planned";
+      statusEl.textContent = "正在读取推荐引擎";
+      listEl.innerHTML = '<div class="kit-recommendation-empty">读取 .project-os/recommendations/recommend-next.json 中。</div>';
+      return;
+    }
+
+    if (recommendationEngineState.status === "missing") {
+      statusEl.className = "kit-status-chip is-planned";
+      statusEl.textContent = "未生成推荐 JSON";
+      listEl.innerHTML = '<div class="kit-recommendation-empty">先运行 <code>bash scripts/recommend-next.sh . --write-report</code>，页面会展示真实推荐原因、证据、置信度和跳过风险。</div>';
+      return;
+    }
+
+    const data = recommendationEngineState.data;
+    const recommendations = Array.isArray(data?.recommendations) ? data.recommendations : [];
+    statusEl.className = `kit-status-chip ${recommendations.length ? "is-live" : "is-copy"}`;
+    statusEl.textContent = recommendationStatusText(data);
+
+    if (!recommendations.length) {
+      listEl.innerHTML = `
+        <div class="kit-recommendation-empty">
+          已读取 <code>${esc(recommendationEngineState.source)}</code>。需要额外生成时，可展开左侧手动调整。
+        </div>
+      `;
+      return;
+    }
+
+    listEl.innerHTML = recommendations.slice(0, 5).map(rec => `
+      <div class="kit-recommendation-item">
+        <div class="kit-recommendation-item-head">
+          <strong>${esc(rec.file)}</strong>
+          <span class="kit-status-chip ${recommendationChipClass(rec.confidence)}">${esc(rec.confidence || "unknown")}</span>
+          <span class="kit-status-chip ${recommendationChipClass(rec.evidenceStrength)}">${esc(rec.evidenceStrength || "evidence")}</span>
+          <span class="kit-status-chip ${recommendationChipClass(rec.gapClarity)}">${esc(rec.gapClarity || "gap")}</span>
+          <span class="kit-status-chip is-copy">${esc(recommendationActionLabel(rec.action))}</span>
+        </div>
+        <p>${esc(rec.reason || "")}</p>
+        ${rec.confidenceReason ? `<p><strong>置信度：</strong>${esc(rec.confidenceReason)}</p>` : ""}
+        ${rec.riskIfSkipped ? `<p><strong>跳过风险：</strong>${esc(rec.riskIfSkipped)}</p>` : ""}
+        <div class="kit-recommendation-meta">
+          ${(Array.isArray(rec.evidence) ? rec.evidence.slice(0, 3) : []).map(item => `<span class="kit-status-chip is-copy">${esc(item)}</span>`).join("")}
+        </div>
+        ${rec.check ? `<p><strong>检查：</strong><code>${esc(rec.check)}</code></p>` : ""}
+      </div>
+    `).join("") + (recommendations.length > 5 ? `<div class="kit-recommendation-empty">还有 ${recommendations.length - 5} 个建议，可在 JSON 里查看完整列表。</div>` : "");
+  }
+
+  async function loadRecommendationEngineReport() {
+    renderRecommendationEngine();
+    for (const url of RECOMMENDATION_REPORT_URLS) {
+      try {
+        const response = await fetch(url, { cache: "no-store" });
+        if (!response.ok) continue;
+        const data = await response.json();
+        if (data?.schemaVersion !== "project-os.recommendation.v0.1") continue;
+        recommendationEngineState.status = "loaded";
+        recommendationEngineState.data = data;
+        recommendationEngineState.source = url;
+        renderRecommendationEngine();
+        updateWizardSelections();
+        return;
+      } catch (e) {
+        // Try the next URL; local file:// and some servers may block missing JSON reads.
+      }
+    }
+    recommendationEngineState.status = "missing";
+    renderRecommendationEngine();
+    updateWizardSelections();
+  }
+
+  function renderRecommendationDrivenContract() {
+    const title = document.querySelector("[data-contract-summary-title]");
+    const desc = document.querySelector("[data-contract-summary-desc]");
+    const files = recommendationFiles();
+    if (recommendationEngineState.status !== "loaded" || recommendationEngineState.manualOverride) return false;
+    if (title) title.textContent = files.length ? "推荐：项目扫描补齐" : "推荐：无需额外补齐";
+    if (desc) {
+      desc.textContent = files.length
+        ? `推荐引擎已根据项目证据发现 ${files.length} 个补齐项；下方只默认勾选这些建议和必选入口文件。`
+        : "推荐引擎已读取当前项目证据，暂未发现明显缺口；下方只保留必选入口文件。需要额外生成时，可展开左侧手动调整。";
+    }
+    return true;
+  }
+
   function updateWizardSelections() {
-    const collab = document.querySelector("#wizardQ1 .is-active")?.dataset.val;
+    if (shouldUseRecommendationSelection()) {
+      const autoCheck = new Set(recommendationFiles());
+      document.querySelectorAll("[data-template-file]").forEach(input => {
+        input.checked = autoCheck.has(input.dataset.templateFile);
+      });
+      renderRecommendationDrivenContract();
+      renderStructureSummary();
+      renderAdvancedSummary();
+      renderRuntimeSummary();
+      if (typeof updateContractMeters === "function") updateContractMeters();
+      return;
+    }
+
     const outcomes = activeOutcomeKeys();
     const generationPlan = activeGenerationPlan();
     const maturityKey = activeMaturityKey();
@@ -4050,18 +4744,9 @@
     const autoCheck = new Set();
     let advice = { collab: "", fields: [], growth: "", structure: "", template: "core-template", reason: "" };
 
-    // --- 维度 1: 协作关系 (Q1) -> 侧重交接与治理 ---
-    if (collab === "team") {
-      autoCheck.add("docs/NAMING.md");
-      autoCheck.add("docs/DOCUMENTATION.md");
-      advice.collab = "<strong>有团队维护</strong>：会补上文档治理，减少交接时信息丢失。";
-    } else {
-      advice.collab = "<strong>一个人维护</strong>：先保持轻量，只保留必要文档，避免一开始负担太重。";
-    }
-
     // --- 维度 2: 本次想先拿到什么 (Q2) -> 单选一一映射 ---
     outcomes.forEach(outcomeKey => {
-      const outcomePreset = OUTCOME_FILE_PRESETS[outcomeKey];
+      const outcomePreset = outcomeFilePreset(outcomeKey);
       if (!outcomePreset) return;
       outcomePreset.files.forEach(file => autoCheck.add(file));
       advice.fields.push(outcomePreset.field);
@@ -4074,7 +4759,10 @@
     advice.structure = generationPlan.advice;
 
     const optionalCount = autoCheck.size;
-    if (activeGenerationPlanKey() === "page-prototype" && collab === "solo" && optionalCount <= 5) {
+    if (activeProjectTypeKey() === "skill") {
+      advice.template = "product-template";
+      advice.reason = "你现在是在沉淀可复用能力，先生成轻量 Skill 骨架；如果要做资产型、工具型或分发型，再按需补对应文件。";
+    } else if (activeGenerationPlanKey() === "page-prototype" && optionalCount <= 5) {
       advice.template = "core-template";
       advice.reason = "你现在更适合轻量启动，先让 AI 拿到最小上下文。";
     } else if (maturityKey === "prototype") {
@@ -4086,7 +4774,7 @@
     }
 
     let contractName = advice.template === "core-template" ? "轻量工程契约" : maturity.contract;
-    if (collab === "solo" && maturityKey === "team") contractName = "交接工程契约";
+    if (maturityKey === "team") contractName = "交接工程契约";
     renderContractRecommendation(advice, contractName, maturity, structure, generationPlan);
 
     // 执行勾选同步
@@ -4099,20 +4787,26 @@
     if (typeof updateContractMeters === "function") updateContractMeters();
   }
 
-  // 绑定向导按钮事件：Q1 / Q2 单选，Q3 多选 toggle
-  document.querySelectorAll("#wizardQ1 .kit-wizard-card-sm, #wizardQ2 .kit-wizard-card-sm").forEach(btn => {
+  // 绑定向导按钮事件：项目类型和完成阶段单选，专项能力多选
+  document.querySelectorAll("#wizardProjectType .kit-wizard-card-sm").forEach(btn => {
     btn.addEventListener("click", () => {
+      recommendationEngineState.manualOverride = true;
+      renderRecommendationEngine();
       const parent = btn.parentElement;
       parent.querySelectorAll(".kit-wizard-card-sm").forEach(b => b.classList.remove("is-active"));
       btn.classList.add("is-active");
       updateWizardSelections();
     });
   });
-  document.querySelectorAll("#wizardQ3 .kit-wizard-card-sm").forEach(btn => {
-    btn.addEventListener("click", () => {
-      btn.classList.toggle("is-active");
-      updateWizardSelections();
-    });
+  const goalInput = document.getElementById("kitGoalInput");
+  if (goalInput) {
+    goalInput.addEventListener("input", () => applyGoalIntent(goalInput.value));
+  }
+  document.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-goal-review-plan]");
+    if (!button) return;
+    const recommendation = document.querySelector("[data-contract-summary-title]");
+    if (recommendation) recommendation.scrollIntoView({ behavior: "smooth", block: "start" });
   });
 
   document.querySelectorAll("[data-kit-project]").forEach((button) => {
@@ -4162,12 +4856,19 @@
     { file: "docs/DOCUMENTATION.md", title: "文档治理", desc: "文档边界和更新时机", group: "工程运行：安装和协作" },
     { file: "docs/ARCHITECTURE.md", title: "架构和模块职责", desc: "模块、目录、数据流和边界", group: "代码结构：架构和目录" },
     { file: "docs/CODE_STRUCTURE.md", title: "代码结构", desc: "代码分层规则", group: "代码结构：架构和目录" },
+    { file: "docs/FRONTEND.md", title: "前端工程边界", desc: "页面、组件、状态和交互边界", group: "代码结构：架构和目录" },
+    { file: "docs/BACKEND.md", title: "后端工程边界", desc: "服务、接口、数据和错误处理边界", group: "代码结构：架构和目录" },
     { file: "docs/DESIGN_STANDARDS.md", title: "设计规范", desc: "界面、组件、视觉边界", group: "代码结构：架构和目录" },
     { file: "docs/TESTING.md", title: "测试和验收方式", desc: "怎么验证改动没坏", group: "质量保障层：测试和交接" },
     { file: "docs/RUNBOOK.md", title: "运行手册", desc: "常见操作和故障处理", group: "质量保障层：测试和交接" },
     { file: "docs/CHANGELOG.md", title: "变更记录", desc: "结构性改动留痕", group: "质量保障层：测试和交接" },
     { file: "docs/DECISIONS.md", title: "决策记录", desc: "重要取舍为什么这样定", group: "质量保障层：测试和交接" },
     { file: "docs/LESSONS.md", title: "经验教训", desc: "犯错后立即记录", group: "质量保障层：测试和交接" },
+    { file: ".agents/skills/example-skill/SKILL.md", title: "Skill 主入口", desc: "触发条件、边界和工作流", group: "AI 协作规则：Skill 工程" },
+    { file: ".agents/skills/example-skill/agents/openai.yaml", title: "Skill 展示元数据", desc: "名称、简介和默认触发示例", group: "AI 协作规则：Skill 工程" },
+    { file: ".agents/skills/example-skill/examples/example-input.md", title: "Skill 样例输入", desc: "典型用户输入和期望输出", group: "AI 协作规则：Skill 工程" },
+    { file: ".agents/skills/example-skill/references/topic.md", title: "Skill 参考资料", desc: "运行时按需读取的领域知识", group: "AI 协作规则：Skill 工程" },
+    { file: "docs/SKILL_ENGINEERING.md", title: "Skill 工程规范", desc: "最小、资产型、工具型和分发型边界", group: "AI 协作规则：Skill 工程" },
     { file: "prompts/", title: "AI 对话模板", desc: "告诉 AI 怎么帮你干活", group: "AI 协作规则" },
     { file: "evals/", title: "AI 质量检查", desc: "验证 AI 的输出对不对", group: "AI 协作规则" },
     { file: "guardrails/", title: "AI 禁区", desc: "哪些事不让 AI 碰", group: "AI 协作规则" },
@@ -4236,10 +4937,18 @@
   const CONTRACT_LAYER_FILES = {
     entry: ["README.md", "AGENTS.md", "PROJECT.md", "HANDOFF.md", "PRODUCT.md", "docs/PRODUCT_PLAN.md"],
     run: ["docs/TECH_STACK.md", "docs/ENVIRONMENT.md", ".env.example", "docs/NAMING.md", "docs/DOCUMENTATION.md"],
-    structure: ["docs/ARCHITECTURE.md", "docs/CODE_STRUCTURE.md", "docs/DESIGN_STANDARDS.md"],
+    structure: ["docs/ARCHITECTURE.md", "docs/CODE_STRUCTURE.md", "docs/FRONTEND.md", "docs/BACKEND.md", "docs/DESIGN_STANDARDS.md"],
     quality: ["docs/TESTING.md", "docs/RUNBOOK.md", "docs/CHANGELOG.md", "docs/DECISIONS.md", "docs/LESSONS.md"],
     runtime: ["prompts/", "evals/", "guardrails/", "mcp/", "observability/", "config/"]
   };
+
+  function contractLayerFiles(layer) {
+    const files = new Set(layer === "entry" ? REQUIRED_FILES : []);
+    document.querySelectorAll(`[data-layer-options="${layer}"] [data-template-file]`).forEach(input => {
+      files.add(input.dataset.templateFile);
+    });
+    return files.size ? [...files] : (CONTRACT_LAYER_FILES[layer] || []);
+  }
 
   function selectedContractFiles() {
     const selected = new Set(REQUIRED_FILES);
@@ -4253,9 +4962,10 @@
     renderStructureSummary();
     renderRuntimeSummary();
     const selected = selectedContractFiles();
-    Object.entries(CONTRACT_LAYER_FILES).forEach(([layer, files]) => {
+    Object.keys(CONTRACT_LAYER_FILES).forEach((layer) => {
       const el = document.querySelector(`[data-contract-layer="${layer}"]`);
       if (!el) return;
+      const files = contractLayerFiles(layer);
       const count = files.filter(file => selected.has(file)).length;
       const meter = el.querySelector("[data-contract-meter]");
       if (meter) meter.textContent = `${count}/${files.length}`;
@@ -4347,11 +5057,138 @@
 
   updateWizardSelections();
   updateContractMeters();
+  loadRecommendationEngineReport();
 
   // Tiny outer-scope HTML escape, shared by new-project and audit panels
   function esc(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
+
+  function renderRunnerReceipt(record) {
+    const el = document.getElementById('kitOldResults');
+    if (!el) return;
+    const commands = Array.isArray(record.commands) ? record.commands : [];
+    const outputs = record.outputs || {};
+    const status = record.status || 'unknown';
+    const failed = commands.filter(command => Number(command.exitCode) !== 0);
+    const statusClass = status === 'passed' ? 'strong' : status === 'failed' ? 'weak' : 'usable';
+    const statusLabel = status === 'passed' ? '运行通过' : status === 'failed' ? '有命令失败' : '需要查看';
+    const outputRows = [
+      ['Run 回执', outputs.runRecord],
+      ['体检报告', outputs.reportMarkdown],
+      ['体检数据', outputs.reportJson],
+      ['推荐下一步', outputs.recommendationsJson]
+    ].filter(([, value]) => value);
+    el.innerHTML = `
+      <div class="kit-result-section">
+        <div class="kit-result-section-title">粘贴 Runner 回执</div>
+        <textarea class="kit-run-json-input" id="kitRunJsonInput" spellcheck="false" placeholder="把 .project-os/runs/<run-id>.json 的内容粘贴到这里"></textarea>
+        <div class="kit-hint-row">
+          <button class="kit-primary" type="button" id="kitRenderRunBtn"><svg class="kit-icon"><use href="#i-file-text"></use></svg><span data-button-label>解析回执</span></button>
+          <button class="kit-secondary-btn" type="button" id="kitClearRunBtn"><span data-button-label>清空</span></button>
+        </div>
+      </div>
+      <div class="kit-result-score">
+        <div class="kit-result-ring" data-status="${statusClass}" style="--ring-pct:100%">
+          <strong>${esc(status)}</strong><span>Run</span>
+        </div>
+        <div>
+          <div class="kit-result-label">${esc(statusLabel)}</div>
+          <div class="kit-result-sub">Run ID：<code>${esc(record.runId || 'unknown')}</code></div>
+          <div class="kit-result-sub">目标：<code>${esc(record.target && record.target.path ? record.target.path : '未记录')}</code></div>
+        </div>
+      </div>
+      <div class="kit-result-section">
+        <div class="kit-result-section-title">命令结果</div>
+        <ul class="kit-result-list">
+          ${commands.map(command => {
+            const ok = Number(command.exitCode) === 0;
+            return `<li class="kit-result-item ${ok ? 'pass' : 'gap'}"><span class="kit-result-dot">${ok ? '✓' : '!'}</span><span><code>${esc(command.name || 'command')}</code> exit ${esc(command.exitCode)}<br><span class="muted">日志：<code>${esc(command.logFile || '未记录')}</code></span></span></li>`;
+          }).join('') || '<li class="kit-result-item gap"><span class="kit-result-dot">!</span><span>没有命令记录</span></li>'}
+        </ul>
+      </div>
+      <div class="kit-result-section">
+        <div class="kit-result-section-title">生成产物</div>
+        <ul class="kit-result-list">
+          ${outputRows.map(([label, value]) => `<li class="kit-result-item pass"><span class="kit-result-dot">✓</span><span>${esc(label)}：<code>${esc(value)}</code></span></li>`).join('')}
+        </ul>
+      </div>
+      <div class="kit-result-note">
+        ${esc(record.next && record.next.summary ? record.next.summary : '查看命令日志和推荐结果，决定下一步。')}
+        ${failed.length ? `<br>失败命令：${failed.map(command => `<code>${esc(command.name)}</code>`).join('、')}` : ''}
+      </div>
+    `;
+    bindRunnerReceiptControls();
+  }
+
+  function resetRunnerReceiptPanel() {
+    const el = document.getElementById('kitOldResults');
+    if (!el) return;
+    el.innerHTML = `
+      <div class="kit-result-section">
+        <div class="kit-result-section-title">粘贴 Runner 回执</div>
+        <textarea class="kit-run-json-input" id="kitRunJsonInput" spellcheck="false" placeholder="把 .project-os/runs/<run-id>.json 的内容粘贴到这里"></textarea>
+        <div class="kit-hint-row">
+          <button class="kit-primary" type="button" id="kitRenderRunBtn"><svg class="kit-icon"><use href="#i-file-text"></use></svg><span data-button-label>解析回执</span></button>
+          <button class="kit-secondary-btn" type="button" id="kitClearRunBtn"><span data-button-label>清空</span></button>
+        </div>
+        <div class="kit-result-note">暂时没有本地服务 API，所以先用“大模型 / 页面来回粘贴”的方式查看 Runner 结果。</div>
+      </div>
+      <div class="kit-result-score">
+        <div class="kit-result-ring" data-status="usable" style="--ring-pct:100%">
+          <strong>Run</strong><span>回执</span>
+        </div>
+        <div>
+          <div class="kit-result-label">Runner 会告诉你这次检查有没有跑通</div>
+          <div class="kit-result-sub">复制左侧命令后，结果写入 <code>.project-os/runs/&lt;run-id&gt;.json</code></div>
+        </div>
+      </div>
+      <div class="kit-result-section">
+        <div class="kit-result-section-title">会记录的命令</div>
+        <ul class="kit-result-list">
+          <li class="kit-result-item pass"><span class="kit-result-dot">1</span><span><code>check-ai-project</code> 生成体检报告</span></li>
+          <li class="kit-result-item pass"><span class="kit-result-dot">2</span><span><code>recommend-next</code> 生成下一步推荐</span></li>
+          <li class="kit-result-item pass"><span class="kit-result-dot">3</span><span><code>check-all</code> 或 <code>runtime-probe</code> 验证工程状态</span></li>
+        </ul>
+      </div>
+      <div class="kit-result-section">
+        <div class="kit-result-section-title">会生成的产物</div>
+        <ul class="kit-result-list">
+          <li class="kit-result-item pass"><span class="kit-result-dot">✓</span><span><code>.project-os/runs/&lt;run-id&gt;.json</code>：这次执行的回执单</span></li>
+          <li class="kit-result-item pass"><span class="kit-result-dot">✓</span><span><code>.project-os/reports/ai-project-report.md</code>：给人看的体检报告</span></li>
+          <li class="kit-result-item pass"><span class="kit-result-dot">✓</span><span><code>.project-os/reports/ai-project-report.json</code>：给页面和 AI 读的体检数据</span></li>
+          <li class="kit-result-item pass"><span class="kit-result-dot">✓</span><span><code>.project-os/recommendations/recommend-next.json</code>：下一步建议</span></li>
+        </ul>
+      </div>
+      <div class="kit-result-note">
+        下一步页面会读取这份 run 记录，直接显示成功 / 失败、日志路径和推荐动作；现在先用 Runner 命令生成可信产物。
+      </div>
+    `;
+    bindRunnerReceiptControls();
+  }
+
+  function bindRunnerReceiptControls() {
+    const input = document.getElementById('kitRunJsonInput');
+    const renderButton = document.getElementById('kitRenderRunBtn');
+    const clearButton = document.getElementById('kitClearRunBtn');
+    if (renderButton && input) {
+      renderButton.addEventListener('click', () => {
+        try {
+          const record = JSON.parse(input.value.trim());
+          if (record.schemaVersion !== 'project-os.project-run.v0.1') {
+            throw new Error('不是 Project OS Runner 回执');
+          }
+          renderRunnerReceipt(record);
+        } catch (error) {
+          openFileViewer('Runner 回执解析失败', error.message || 'JSON 格式不正确', '粘贴内容');
+        }
+      });
+    }
+    if (clearButton) {
+      clearButton.addEventListener('click', resetRunnerReceiptPanel);
+    }
+  }
+  bindRunnerReceiptControls();
 
   // ─── File viewer modal: open any markdown file with render/raw tabs ─
   function openFileViewer(title, content, source) {
@@ -4574,8 +5411,12 @@
     'docs/ENVIRONMENT.md', 'docs/ARCHITECTURE.md', 'docs/CODE_STRUCTURE.md',
     'docs/TESTING.md', 'docs/RUNBOOK.md', 'docs/CHANGELOG.md',
     'docs/DECISIONS.md', 'docs/NAMING.md', 'docs/DOCUMENTATION.md',
-    'docs/DESIGN_STANDARDS.md', 'docs/PRODUCT_PLAN.md', 'docs/LESSONS.md',
+    'docs/DESIGN_STANDARDS.md', 'docs/SKILL_ENGINEERING.md', 'docs/PRODUCT_PLAN.md', 'docs/LESSONS.md',
     'docs/SECURITY.md', 'docs/AI_SAFETY.md',
+    '.agents/skills/example-skill/SKILL.md',
+    '.agents/skills/example-skill/agents/openai.yaml',
+    '.agents/skills/example-skill/examples/example-input.md',
+    '.agents/skills/example-skill/references/topic.md',
     'prompts/README.md', 'agents/README.md', 'tools/README.md',
     'evals/README.md', 'guardrails/README.md', 'mcp/README.md',
     'observability/README.md', 'guardrails/human_review.md',
@@ -5130,6 +5971,224 @@
   }
 
   const GENERATED_RUNTIME_TEMPLATES = {
+    ".agents/skills/example-skill/SKILL.md": [
+      "---",
+      "name: example-skill",
+      "description: >",
+      "  Use this skill when <!-- 待补：写清用户什么时候应该触发这个 skill -->.",
+      "---",
+      "",
+      "# Example Skill",
+      "",
+      "## Role",
+      "",
+      "<!-- 待补：这个 skill 负责什么 -->",
+      "",
+      "中文说明：",
+      "<!-- 待补：用一句中文说明它解决什么问题 -->",
+      "",
+      "## When To Use",
+      "",
+      "- <!-- 待补：触发条件 1 -->",
+      "- <!-- 待补：触发条件 2 -->",
+      "",
+      "## Boundaries",
+      "",
+      "- Do not <!-- 待补：不该做什么 -->",
+      "- Prefer <!-- 待补：优先使用什么输入、工具或文件 -->",
+      "",
+      "## Workflow",
+      "",
+      "1. <!-- 待补：第一步 -->",
+      "2. <!-- 待补：第二步 -->",
+      "3. <!-- 待补：收尾和验证方式 -->",
+      "",
+      "## Verification",
+      "",
+      "- <!-- 待补：如何确认 skill 输出是对的 -->",
+      ""
+    ].join("\n"),
+    ".agents/skills/example-skill/agents/openai.yaml": "interface:\n  display_name: \"Example Skill\"\n  short_description: \"一句话说明这个 skill 帮 AI 做什么\"\n  default_prompt: \"Use $example-skill to <!-- 待补：典型任务 -->.\"\n\npolicy:\n  allow_implicit_invocation: true\n",
+    ".agents/skills/example-skill/examples/example-input.md": [
+      "# Example Input",
+      "",
+      "## 用户输入",
+      "",
+      "```txt",
+      "<!-- 待补：用户会怎样触发这个 Skill -->",
+      "```",
+      "",
+      "## 期望输出",
+      "",
+      "- <!-- 待补：输出格式、关键字段或验收标准 -->",
+      ""
+    ].join("\n"),
+    ".agents/skills/example-skill/rules/R01_scope.md": [
+      "# R01 Scope",
+      "",
+      "> 用途：定义这个 Skill 什么时候该进入，什么时候必须退出。",
+      "",
+      "## 适合处理",
+      "",
+      "- <!-- 待补 -->",
+      "",
+      "## 不适合处理",
+      "",
+      "- <!-- 待补 -->",
+      "",
+      "## 输入优先级",
+      "",
+      "1. 用户当前明确要求",
+      "2. 当前项目文件",
+      "3. Skill references 中的背景材料",
+      ""
+    ].join("\n"),
+    ".agents/skills/example-skill/rules/R02_workflow.md": [
+      "# R02 Workflow",
+      "",
+      "> 用途：把 Skill 的执行步骤写成可复用流程。",
+      "",
+      "## 流程",
+      "",
+      "1. 判断是否命中 `R01_scope.md`。",
+      "2. 读取必要 references，不要一次性加载无关材料。",
+      "3. 产出结果前做边界检查。",
+      "4. 用 examples 中的样例补充验收。",
+      "",
+      "## 收尾检查",
+      "",
+      "- 是否回答了用户当前请求",
+      "- 是否越过 Skill 边界",
+      "- 是否留下了可验证结果",
+      ""
+    ].join("\n"),
+    ".agents/skills/example-skill/references/topic.md": [
+      "# Topic Reference",
+      "",
+      "> 用途：存放这个 Skill 运行时按需读取的领域知识。",
+      "",
+      "## 读取规则",
+      "",
+      "- 只读取当前任务需要的文件。",
+      "- 大文件先摘要，不要整份塞进上下文。",
+      "- references 只放知识材料，不放运行规则。",
+      ""
+    ].join("\n"),
+    ".agents/skills/example-skill/assets/templates/starter.md": [
+      "# Starter Template",
+      "",
+      "<!-- 待补：这个 Skill 生成结果时可复用的模板 -->",
+      "",
+      "## Section",
+      "",
+      "- {{item}}",
+      ""
+    ].join("\n"),
+    ".agents/skills/example-skill/assets/styles/tokens.css": [
+      ":root {",
+      "  --skill-color-text: #17201f;",
+      "  --skill-color-muted: #6f7977;",
+      "  --skill-color-border: #dfe7e4;",
+      "  --skill-color-surface: #ffffff;",
+      "  --skill-radius-card: 8px;",
+      "  --skill-space-4: 4px;",
+      "  --skill-space-8: 8px;",
+      "  --skill-space-16: 16px;",
+      "}",
+      ""
+    ].join("\n"),
+    ".agents/skills/example-skill/assets/data/manifest.json": "{\n  \"templates\": [\"assets/templates/starter.md\"],\n  \"styles\": [\"assets/styles/tokens.css\"],\n  \"references\": [\"references/design.md\"]\n}\n",
+    ".agents/skills/example-skill/references/design.md": [
+      "# Design Reference",
+      "",
+      "> 用途：资产型 Skill 的视觉、组件和输出风格边界。",
+      "",
+      "## 视觉边界",
+      "",
+      "- <!-- 待补：颜色、排版、密度、组件规则 -->",
+      "",
+      "## 禁止",
+      "",
+      "- <!-- 待补：不要生成什么风格或结构 -->",
+      ""
+    ].join("\n"),
+    ".agents/skills/example-skill/scripts/example-check.js": [
+      "#!/usr/bin/env node",
+      "const fs = require('node:fs');",
+      "",
+      "const target = process.argv[2];",
+      "if (!target) {",
+      "  console.error('Usage: node scripts/example-check.js <file>');",
+      "  process.exit(1);",
+      "}",
+      "",
+      "const text = fs.readFileSync(target, 'utf8');",
+      "if (!text.trim()) {",
+      "  console.error('Input file is empty.');",
+      "  process.exit(1);",
+      "}",
+      "",
+      "console.log('OK');",
+      ""
+    ].join("\n"),
+    ".agents/skills/example-skill/schemas/input.schema.json": "{\n  \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",\n  \"type\": \"object\",\n  \"required\": [\"input\"],\n  \"properties\": {\n    \"input\": { \"type\": \"string\" }\n  },\n  \"additionalProperties\": false\n}\n",
+    ".agents/skills/example-skill/fixtures/example.json": "{\n  \"input\": \"<!-- 待补：示例输入 -->\"\n}\n",
+    ".agents/skills/example-skill/tests/example.test.md": [
+      "# Example Test",
+      "",
+      "## 命令",
+      "",
+      "```bash",
+      "node .agents/skills/example-skill/scripts/example-check.js .agents/skills/example-skill/fixtures/example.json",
+      "```",
+      "",
+      "## 期望",
+      "",
+      "- 输出 `OK`",
+      "- 输入为空时退出码非 0",
+      ""
+    ].join("\n"),
+    ".agents/skills/example-skill/open-design.json": "{\n  \"$schema\": \"https://open-design.ai/schemas/plugin.v1.json\",\n  \"specVersion\": \"1.0.0\",\n  \"name\": \"example-skill\",\n  \"title\": \"Example Skill\",\n  \"version\": \"0.1.0\",\n  \"description\": \"Reusable agent skill generated by Project OS.\",\n  \"compat\": {\n    \"agentSkills\": [{ \"path\": \"./SKILL.md\" }]\n  },\n  \"od\": {\n    \"kind\": \"skill\",\n    \"taskKind\": \"new-generation\",\n    \"mode\": \"utility\",\n    \"capabilities\": [\"prompt:inject\"],\n    \"inputs\": []\n  }\n}\n",
+    ".agents/skills/example-skill/USAGE.md": [
+      "# Usage",
+      "",
+      "## 安装",
+      "",
+      "把 `example-skill/` 放到当前 agent 支持的 skills 目录。",
+      "",
+      "## 触发",
+      "",
+      "```txt",
+      "<!-- 待补：用户触发语句 -->",
+      "```",
+      "",
+      "## 验收",
+      "",
+      "- <!-- 待补：如何判断这个 Skill 可用 -->",
+      ""
+    ].join("\n"),
+    ".agents/skills/example-skill/CHANGELOG.md": [
+      "# Changelog",
+      "",
+      "## 0.1.0",
+      "",
+      "- Initial skill scaffold.",
+      ""
+    ].join("\n"),
+    ".agents/skills/example-skill/scripts/build-dist.sh": [
+      "#!/usr/bin/env bash",
+      "set -euo pipefail",
+      "",
+      "ROOT=\"$(cd \"$(dirname \"$0\")/..\" && pwd)\"",
+      "DIST=\"$ROOT/dist/example-skill\"",
+      "rm -rf \"$DIST\"",
+      "mkdir -p \"$DIST\"",
+      "cp \"$ROOT/SKILL.md\" \"$DIST/SKILL.md\"",
+      "cp \"$ROOT/README.md\" \"$DIST/README.md\"",
+      "[ -f \"$ROOT/open-design.json\" ] && cp \"$ROOT/open-design.json\" \"$DIST/open-design.json\"",
+      "echo \"Built $DIST\"",
+      ""
+    ].join("\n"),
     "prompts/README.md": [
       "# Prompts",
       "",
@@ -5242,7 +6301,47 @@
     "prompts/eval/.gitkeep": "",
     "tools/schemas/.gitkeep": "",
     "evals/reports/.gitkeep": "",
-    "mcp/servers/.gitkeep": ""
+    "mcp/servers/.gitkeep": "",
+    "docs/SKILL_ENGINEERING.md": [
+      "---",
+      "layer: knowledge",
+      "type: spec",
+      "last_verified: 2026-06-13",
+      "---",
+      "",
+      "# Skill 工程规范",
+      "",
+      "> 用途：定义当前项目里 Agent Skill / Codex Skill 的生成边界。",
+      "> 什么时候更新：skill 结构、触发方式、分发策略或验收方式变化时。",
+      "> 不要写什么：具体某个 skill 的业务规则、一次性调研流水。",
+      "",
+      "## 默认原则",
+      "",
+      "- Skill 不是小型应用工程，默认不要生成过重完整包。",
+      "- 用户不需要选择 Skill 类型，也不需要知道 assets、scripts、schema、dist 是什么。",
+      "- 系统应先生成最小骨架，再根据目标产物、已有文件、下一步动作和验收要求自动补文件。",
+      "- `SKILL.md` 负责触发条件、边界、工作流和收尾检查。",
+      "- `references/` 放按需读取的领域知识。",
+      "- `assets/` 放输出模板、样式和数据资产。",
+      "- `scripts/` 放确定性操作。",
+      "- `tests/` / `fixtures/` 只在有脚本或可复测输出时生成。",
+      "",
+      "## 推导信号",
+      "",
+      "- 目标产物：文本、报告、HTML、设计稿、数据、脚本结果或安装包。",
+      "- 已有文件：`SKILL.md`、`open-design.json`、`assets/`、`scripts/`、`schemas/`、`fixtures/`、`dist/`。",
+      "- 下一步动作：继续写规则、预览输出、运行检查、安装、发布或分享。",
+      "- 验收要求：是否需要可复测输入、确定性检查、版本记录或外部安装验证。",
+      "",
+      "## 自动补文件",
+      "",
+      "- 默认：`SKILL.md` + `examples/` + 可选 `agents/openai.yaml`。",
+      "- 需要稳定领域资料或流程规则：增加 `references/`。",
+      "- 目标产物需要模板、报告、视觉或可复用资产：增加 `assets/` 和 `references/design.md`。",
+      "- 验收需要校验、转换、打包或本地工具：增加 `scripts/`、`schemas/`、`fixtures/`、`tests/`。",
+      "- 下一步动作需要发布、分享或安装包：增加 build-dist 和 manifest，并生成裁剪后的 `dist/`。",
+      ""
+    ].join("\n")
   };
 
   function generatedRuntimeTemplate(file) {
@@ -5487,6 +6586,70 @@
     'docs/TESTING.md': {
       aliases: ['TESTING.md', 'QA.md', '测试.md', '验收.md'],
       keywords: ['test', 'testing', 'qa', 'acceptance', '测试', '验收']
+    },
+    '.agents/skills/example-skill/SKILL.md': {
+      aliases: ['SKILL.md', '.agents/skills/SKILL.md', '.claude/skills/SKILL.md', '技能.md'],
+      keywords: ['skill', 'skills', 'agent skill', 'trigger', 'workflow', '技能', '触发', '工作流']
+    },
+    '.agents/skills/example-skill/agents/openai.yaml': {
+      aliases: ['agents/openai.yaml', 'openai.yaml', '技能展示.md'],
+      keywords: ['skill', 'metadata', 'display', 'default prompt', '技能', '展示', '元数据']
+    },
+    '.agents/skills/example-skill/examples/example-input.md': {
+      aliases: ['examples/example-input.md', 'examples/input.md', '样例输入.md'],
+      keywords: ['skill', 'example', 'input', 'sample', '技能', '样例', '输入']
+    },
+    '.agents/skills/example-skill/references/topic.md': {
+      aliases: ['references/topic.md', 'references/context.md', '参考资料.md'],
+      keywords: ['skill', 'references', 'knowledge', 'context', '技能', '参考', '资料']
+    },
+    '.agents/skills/example-skill/assets/templates/starter.md': {
+      aliases: ['assets/templates/starter.md', 'templates/starter.md', '模板.md'],
+      keywords: ['skill', 'template', 'starter', 'asset', '技能', '模板', '资产']
+    },
+    '.agents/skills/example-skill/assets/styles/tokens.css': {
+      aliases: ['assets/styles/tokens.css', 'tokens.css', 'style.css'],
+      keywords: ['skill', 'style', 'tokens', 'css', '技能', '样式', '设计']
+    },
+    '.agents/skills/example-skill/assets/data/manifest.json': {
+      aliases: ['assets/data/manifest.json', 'manifest.json', 'assets.json'],
+      keywords: ['skill', 'asset', 'manifest', 'data', '技能', '资产', '清单']
+    },
+    '.agents/skills/example-skill/references/design.md': {
+      aliases: ['references/design.md', 'DESIGN.md', '设计参考.md'],
+      keywords: ['skill', 'design', 'reference', '技能', '设计', '参考']
+    },
+    '.agents/skills/example-skill/scripts/example-check.js': {
+      aliases: ['scripts/example-check.js', 'scripts/check.js', 'check.js'],
+      keywords: ['skill', 'script', 'check', 'tool', '技能', '脚本', '检查']
+    },
+    '.agents/skills/example-skill/schemas/input.schema.json': {
+      aliases: ['schemas/input.schema.json', 'input.schema.json', 'schema.json'],
+      keywords: ['skill', 'schema', 'input', 'json', '技能', '输入', '结构']
+    },
+    '.agents/skills/example-skill/fixtures/example.json': {
+      aliases: ['fixtures/example.json', 'example.json', 'fixture.json'],
+      keywords: ['skill', 'fixture', 'example', 'json', '技能', '样例', '测试数据']
+    },
+    '.agents/skills/example-skill/tests/example.test.md': {
+      aliases: ['tests/example.test.md', 'tests/README.md', '测试说明.md'],
+      keywords: ['skill', 'test', 'acceptance', '技能', '测试', '验收']
+    },
+    '.agents/skills/example-skill/open-design.json': {
+      aliases: ['open-design.json', 'manifest.json', 'plugin.json'],
+      keywords: ['skill', 'plugin', 'manifest', 'open design', '技能', '插件', '元数据']
+    },
+    '.agents/skills/example-skill/USAGE.md': {
+      aliases: ['USAGE.md', 'usage.md', '使用说明.md'],
+      keywords: ['skill', 'usage', 'install', '技能', '使用', '安装']
+    },
+    '.agents/skills/example-skill/CHANGELOG.md': {
+      aliases: ['CHANGELOG.md', 'changes.md', '变更记录.md'],
+      keywords: ['skill', 'changelog', 'release', '技能', '变更', '版本']
+    },
+    '.agents/skills/example-skill/scripts/build-dist.sh': {
+      aliases: ['scripts/build-dist.sh', 'build-dist.sh', 'dist.sh'],
+      keywords: ['skill', 'build', 'dist', 'package', '技能', '打包', '发布']
     },
     'docs/SECURITY.md': {
       aliases: ['SECURITY.md', 'docs/SECURITY.md', '安全.md', '安全说明.md'],
@@ -5898,7 +7061,9 @@
   const directoryInput = document.getElementById("kitDirectoryInput");
   const directoryPathValue = document.getElementById("kitPathValue");
   if (directoryBrowseButton && directoryInput && directoryPathValue) {
-    directoryBrowseButton.addEventListener("click", () => directoryInput.click());
+    directoryBrowseButton.addEventListener("click", () => {
+      openFileViewer('本机目录选择已停用', 'Codex 内置浏览器打开系统目录选择器时可能不稳定。请使用“复制 Runner 命令”，在终端里对目标项目执行本地分析。', '防止宿主闪退');
+    });
     directoryInput.addEventListener("change", () => {
       const firstFile = directoryInput.files && directoryInput.files[0];
       if (!firstFile) return;
@@ -5952,7 +7117,11 @@
   }
   const localCommandButton = document.querySelector("[data-kit-copy-local-command]");
   if (localCommandButton) {
-    localCommandButton.addEventListener("click", () => copyKitCommand(localCommandButton, "bash scripts/check-ai-project.sh . --write-report --html"));
+    localCommandButton.addEventListener("click", () => copyKitCommand(localCommandButton, "bash /Users/heqiao/Desktop/Claude练习/project-starter-pack/scripts/project-runner.sh . --source local"));
+  }
+  const hermesPromptButton = document.querySelector("[data-kit-copy-hermes-prompt]");
+  if (hermesPromptButton) {
+    hermesPromptButton.addEventListener("click", () => copyKitCommand(hermesPromptButton, "先读 AGENTS.md、PROJECT.md 和 HANDOFF.md；如果存在，也读 .project-os/state.json、最新 .project-os/runs/*.json 和 .project-os/recommendations/recommend-next.json。\\n\\n请按 Project OS 规则判断当前最小下一步，只给我一个执行计划。涉及修改源码、删除文件、权限配置、数据库、部署、push 或 PR 前必须先等我确认。\\n\\n如果只是体检或推荐，可以运行现有检查；完成后说明结果、风险和建议写回位置。"));
   }
   const docCommandButton = document.querySelector("[data-kit-copy-doc-command]");
   if (docCommandButton) {
@@ -5976,7 +7145,7 @@
         return;
       }
       const safeRepo = repo.replace(/"/g, '\\"');
-      const command = 'tmp_dir="$(mktemp -d)" && git clone "' + safeRepo + '" "$tmp_dir/project" && bash scripts/check-ai-project.sh "$tmp_dir/project" --write-report --html';
+      const command = 'if [ ! -f scripts/project-runner.sh ]; then echo "请先 cd 到 Project OS / starter-pack 根目录再运行"; exit 1; fi; tmp_dir="$(mktemp -d)" && git clone "' + safeRepo + '" "$tmp_dir/project" && bash scripts/project-runner.sh "$tmp_dir/project" --source git --uri "' + safeRepo + '"';
       copyKitCommand(gitCommandButton, command);
     });
   }
@@ -6833,19 +8002,7 @@
     }
     if (analyzeBtn) {
       analyzeBtn.addEventListener('click', async () => {
-        // Try File System Access API first (Chrome/Edge) for read+write
-        if (typeof window.showDirectoryPicker === 'function') {
-          try {
-            const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
-            await analyzeWithHandle(handle);
-            return;
-          } catch (e) {
-            if (e && e.name === 'AbortError') return; // user cancelled
-            console.warn('showDirectoryPicker failed, falling back:', e);
-          }
-        }
-        // Fallback: read-only directory input
-        if (dirInput) dirInput.click();
+        openFileViewer('Runner 产物', '复制“当前项目体检命令”后，到要体检的项目终端里粘贴运行。命令里的 . 就是当前项目目录；Runner 会在这个项目里生成 .project-os/runs/<run-id>.json、reports 和 recommendations。', '终端本地 Runner');
       });
     }
 
@@ -6868,7 +8025,7 @@
     if (zipZone && zipInput) {
       const openZipInput = () => {
         if (typeof JSZip === 'undefined') {
-          openFileViewer('当前浏览器不能解析 zip', '这个内嵌浏览器没有加载 zip 解析器。请切到“读取本机目录”并复制本地体检命令，或在普通 Chrome / Edge 中打开此页后再上传 zip。', '浏览器能力受限');
+          openFileViewer('当前浏览器不能解析 zip', '这个内嵌浏览器没有加载 zip 解析器。请切到“读取本机目录”并复制 Runner 命令，或在普通 Chrome / Edge 中打开此页后再上传 zip。', '浏览器能力受限');
           return;
         }
         zipInput.click();

@@ -52,6 +52,7 @@ docs/ 放工程治理。
 | 文件 | 回答的问题 |
 |------|------------|
 | `docs/ARCHITECTURE.md` | 系统结构和模块职责 |
+| `docs/ROUTING.md` | AI 请求分流规则 |
 | `docs/ENVIRONMENT.md` | 环境、依赖、启动 |
 | `docs/TESTING.md` | 测试验收 |
 | `docs/RUNBOOK.md` | 常见操作和故障处理 |

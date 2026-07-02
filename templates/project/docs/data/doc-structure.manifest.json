@@ -1,0 +1,210 @@
+{
+  "schemaVersion": "project-os.doc-structure.v0.1",
+  "sourceOfTruth": "docs/DOCUMENTATION.md",
+  "description": "Machine-readable documentation ownership map. It prevents orphan docs, duplicated responsibilities, and missing required sections.",
+  "documents": [
+    {
+      "file": "README.md",
+      "responsibility": "项目入口、安装前说明和最短使用路径",
+      "ssotFor": ["项目怎么开始用"],
+      "requiredSections": [],
+      "forbiddenOverlap": ["AI 行为规则", "当前交接流水", "详细文档治理规则"]
+    },
+    {
+      "file": "INSTALL.md",
+      "responsibility": "安装方式、profile 边界和接入命令",
+      "ssotFor": ["Project OS 安装"],
+      "requiredSections": [],
+      "forbiddenOverlap": ["当前项目状态", "长期产品路线"]
+    },
+    {
+      "file": "AGENTS.md",
+      "responsibility": "AI 行为边界、路由摘要、运行命令和禁止行为",
+      "ssotFor": ["AI 应该怎么行动"],
+      "requiredSections": ["Quick Start For Agents", "Commands", "Working Boundaries", "Documentation Governance"],
+      "forbiddenOverlap": ["产品介绍", "详细变更历史", "当前交接流水"]
+    },
+    {
+      "file": "PROJECT.md",
+      "responsibility": "当前项目阶段、架构、进度和下一步重点",
+      "ssotFor": ["现在项目是什么状态"],
+      "requiredSections": ["项目定位", "当前架构", "当前进度", "下一步重点"],
+      "forbiddenOverlap": ["详细历史流水", "完整路线图", "一次性任务记录"]
+    },
+    {
+      "file": "HANDOFF.md",
+      "responsibility": "当前交接摘要、最近完成、风险和下一步",
+      "ssotFor": ["下一个人或 AI 怎么接手"],
+      "requiredSections": ["接手摘要", "最近完成", "风险与注意", "下一步建议"],
+      "forbiddenOverlap": ["长期路线图", "产品介绍", "完整变更日志"]
+    },
+    {
+      "file": "PRODUCT.md",
+      "responsibility": "产品定位、用户、核心价值和产品边界",
+      "ssotFor": ["产品是什么", "给谁用", "不做什么"],
+      "requiredSections": [],
+      "forbiddenOverlap": ["工程运行命令", "交接流水"]
+    },
+    {
+      "file": "docs/ARCHITECTURE.md",
+      "responsibility": "系统边界、模块职责、运行路径和架构约束",
+      "ssotFor": ["架构和模块职责是什么"],
+      "requiredSections": ["当前定位", "核心层次", "运行路径", "模块职责"],
+      "forbiddenOverlap": ["完整目录树", "测试命令细节"]
+    },
+    {
+      "file": "docs/AUTO_GROWTH.md",
+      "responsibility": "自动反思、规则修剪和长期成长机制",
+      "ssotFor": ["自动成长机制"],
+      "requiredSections": [],
+      "forbiddenOverlap": ["当前交接流水", "具体任务执行记录"]
+    },
+    {
+      "file": "docs/BACKEND.md",
+      "responsibility": "后端技术选择、API、数据存储、安全和后端约定",
+      "ssotFor": ["后端技术边界"],
+      "requiredSections": ["1. 技术栈选型", "2. 架构与 API", "3. 数据库与存储"],
+      "forbiddenOverlap": ["前端组件规范", "产品路线"]
+    },
+    {
+      "file": "docs/CHANGELOG.md",
+      "responsibility": "结构性变更记录和影响范围",
+      "ssotFor": ["这次结构性改动影响了哪里"],
+      "requiredSections": [],
+      "forbiddenOverlap": ["当前交接待办", "未来路线图主体"]
+    },
+    {
+      "file": "docs/CODE_STRUCTURE.md",
+      "responsibility": "代码、组件、脚本和目录分类规则",
+      "ssotFor": ["代码结构怎么分层"],
+      "requiredSections": ["使用方式", "分类规则", "分类总览"],
+      "forbiddenOverlap": ["架构决策原因", "环境变量"]
+    },
+    {
+      "file": "docs/DECISIONS.md",
+      "responsibility": "架构和产品治理决策记录",
+      "ssotFor": ["为什么做过某个架构决定"],
+      "requiredSections": ["决策列表"],
+      "forbiddenOverlap": ["完整变更流水", "当前交接摘要"]
+    },
+    {
+      "file": "docs/DESIGN_STANDARDS.md",
+      "responsibility": "UI 设计规则、tokens 使用和视觉边界",
+      "ssotFor": ["UI 和设计边界"],
+      "requiredSections": ["当前状态", "文档结构", "总规则"],
+      "forbiddenOverlap": ["具体页面实现代码", "后端技术栈"]
+    },
+    {
+      "file": "docs/DESKTOP_APP.md",
+      "responsibility": "桌面端产品方向、技术选型、本地 Agent Core 和执行权限边界",
+      "ssotFor": ["桌面端怎么做", "本地 Agent Core 怎么接入 coding"],
+      "requiredSections": ["核心结论", "产品定位", "技术选择", "架构形态", "Coding 形态", "阶段路线"],
+      "forbiddenOverlap": ["一次性开发任务流水", "完整 IDE 功能清单", "具体 UI 文案"]
+    },
+    {
+      "file": "docs/DOCUMENTATION.md",
+      "responsibility": "文档边界、SSOT、结构契约和文档治理规则",
+      "ssotFor": ["文档应该怎么写", "信息应该归哪个文件"],
+      "requiredSections": ["SSOT 原则", "文档结构契约", "文档治理机器校验"],
+      "forbiddenOverlap": ["当前交接流水", "业务功能细节"]
+    },
+    {
+      "file": "docs/ENVIRONMENT.md",
+      "responsibility": "环境、依赖、变量、启动命令和常见环境问题",
+      "ssotFor": ["环境变量和启动方式是什么"],
+      "requiredSections": ["运行环境", "常用命令", "环境变量", "常见问题"],
+      "forbiddenOverlap": ["真实密钥", "测试策略主体"]
+    },
+    {
+      "file": "docs/FRONTEND.md",
+      "responsibility": "前端技术选择、状态管理、样式组件和前端约定",
+      "ssotFor": ["前端技术边界"],
+      "requiredSections": ["1. 技术栈选型", "2. 状态管理", "3. 样式与组件库"],
+      "forbiddenOverlap": ["后端 API 细节", "产品路线"]
+    },
+    {
+      "file": "docs/KNOWLEDGE_SCHEMA.md",
+      "responsibility": "知识图谱、frontmatter 和语义元数据规范",
+      "ssotFor": ["知识结构化字段"],
+      "requiredSections": ["两层元数据并存", "Frontmatter 字段", "新增文件接入规则"],
+      "forbiddenOverlap": ["文档职责分配表", "当前交接流水"]
+    },
+    {
+      "file": "docs/LESSONS.md",
+      "responsibility": "错误模式、复盘和新增约束",
+      "ssotFor": ["犯过什么错，新增了什么约束"],
+      "requiredSections": [],
+      "forbiddenOverlap": ["普通变更日志", "产品路线"]
+    },
+    {
+      "file": "docs/NAMING.md",
+      "responsibility": "文件、目录、schema、报告和模板命名规则",
+      "ssotFor": ["文档应该怎么命名"],
+      "requiredSections": ["总原则", "根目录主流文件", "docs/ 工程文档", "schemas/ 机器可读契约"],
+      "forbiddenOverlap": ["文档内容职责", "当前任务流水"]
+    },
+    {
+      "file": "docs/PRODUCT_PLAN.md",
+      "responsibility": "产品愿景、阶段路线和长期规划边界",
+      "ssotFor": ["长期产品路线"],
+      "requiredSections": ["产品愿景", "当前阶段判断"],
+      "forbiddenOverlap": ["当前交接流水", "具体测试命令"]
+    },
+    {
+      "file": "docs/PROJECT_MEMORY_AND_RUNNER.md",
+      "responsibility": "项目记忆、后台执行器、写回规则和人工确认边界",
+      "ssotFor": ["项目记忆和后台执行器怎么工作"],
+      "requiredSections": ["核心结论", "项目记忆", "后台执行器", "人工确认边界", "检查闭环"],
+      "forbiddenOverlap": ["具体 UI 文案", "长期产品路线", "某次任务流水"]
+    },
+    {
+      "file": "docs/RECOMMENDATION_ENGINE.md",
+      "responsibility": "推荐引擎证据、信号、缺口、推荐和 UI 呈现规则",
+      "ssotFor": ["推荐引擎如何推导下一步"],
+      "requiredSections": ["输入证据", "Signal", "Gap", "Recommendation", "验收"],
+      "forbiddenOverlap": ["具体模板全文", "UI 视觉规范主体"]
+    },
+    {
+      "file": "docs/ROUTING.md",
+      "responsibility": "Project OS 路由模式、入口响应和验收输入规则",
+      "ssotFor": ["AI 请求应该怎么分流"],
+      "requiredSections": ["Project OS Installation Entry", "路由模式", "增量意图契约"],
+      "forbiddenOverlap": ["产品介绍", "具体页面实现"]
+    },
+    {
+      "file": "docs/RUNBOOK.md",
+      "responsibility": "常见操作、故障处理、发布前检查和恢复方式",
+      "ssotFor": ["常见操作和故障怎么处理"],
+      "requiredSections": ["本地自检", "同步模板", "发布前检查", "故障处理"],
+      "forbiddenOverlap": ["测试策略主体", "架构设计原因"]
+    },
+    {
+      "file": "docs/SKILL_ENGINEERING.md",
+      "responsibility": "Skill 类型、触发边界、生成策略和验收方式",
+      "ssotFor": ["Skill 工程怎么生成"],
+      "requiredSections": ["核心判断", "内部推导层级", "生成策略"],
+      "forbiddenOverlap": ["具体 skill 全文", "项目交接流水"]
+    },
+    {
+      "file": "docs/TEMPLATE_GOVERNANCE.md",
+      "responsibility": "模板文件分层、映射、增删流程和预设治理",
+      "ssotFor": ["模板文件怎么治理"],
+      "requiredSections": ["文件分层", "当前文件映射", "新增模板文件流程"],
+      "forbiddenOverlap": ["文档内容 SSOT 表", "当前交接流水"]
+    },
+    {
+      "file": "docs/TESTING.md",
+      "responsibility": "测试分层、测试命令、验收策略和 CI 检查",
+      "ssotFor": ["怎么测试和验收"],
+      "requiredSections": ["测试分层", "收尾时最小检查"],
+      "forbiddenOverlap": ["环境变量清单", "具体架构决策原因"]
+    },
+    {
+      "file": "docs/WIZARD_PRESETS.md",
+      "responsibility": "向导状态识别、预设映射和文件补齐矩阵",
+      "ssotFor": ["项目状态识别和补齐策略怎么映射文件"],
+      "requiredSections": ["文件分层", "状态识别结构", "完整覆盖矩阵"],
+      "forbiddenOverlap": ["推荐引擎评分公式", "模板正文"]
+    }
+  ]
+}

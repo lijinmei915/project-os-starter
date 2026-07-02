@@ -61,6 +61,56 @@ Classification:
 
 ---
 
+## Incremental Intent Contract
+
+Before routing, extract and update a compact understanding of the user's latest message and available project evidence.
+
+```json
+{
+  "facts": [],
+  "currentIntent": "",
+  "futureSignals": [],
+  "constraints": [],
+  "negativeConstraints": [],
+  "missing": [],
+  "confidence": "high | medium | low",
+  "route": "INSTALL | CLARIFICATION | INIT | AUDIT | HYBRID | DOMAIN"
+}
+```
+
+Rules:
+
+- Treat every new user message as incremental evidence; preserve useful facts from earlier messages.
+- Distinguish current actions from future possibilities. Future signals must not trigger immediate full-package generation.
+- Respect negative constraints such as "不要改代码", "暂时不部署", or "先别生成文件".
+- Route directly when `currentIntent` is clear and confidence is high or medium.
+- Use `CLARIFICATION` only when confidence is low, the current action is missing, or multiple current actions conflict.
+- Ask only one question that resolves the most important missing field.
+- Do not expose the full JSON unless useful; it is an internal reasoning contract.
+
+中文说明：
+每句话都作为增量证据。先提取事实、当前动作、未来需求、限制和缺口，再决定路由。
+未来可能做的事只记录，不立即生成；用户明确说“不要 / 暂不”的内容必须进入负向约束。
+只有当前动作不清楚、意图冲突或置信度低时，才进入 `CLARIFICATION`。
+
+Examples:
+
+```txt
+想做一个后台管理系统，先做登录页，以后可能接 AI 客服
+-> currentIntent: page prototype
+-> futureSignals: AI customer service
+-> route: INIT / Prototype-first
+```
+
+```txt
+1234567
+-> currentIntent: unknown
+-> confidence: low
+-> route: CLARIFICATION
+```
+
+---
+
 ## Project OS Installation Entry
 
 Project OS can enter the installation flow through either natural language intent detection or the explicit `/os` command.
@@ -177,7 +227,8 @@ HYBRID means project takeover.
 
 中文说明：
 HYBRID 是“接管项目”，先盘点、整理、稳定，再继续推进。
-如果不确定，默认使用 HYBRID。
+只有目录证据明确显示已有项目、且用户表达继续 / 整理 / 接管意图时，才使用 HYBRID。
+只有用户话语不明确时，进入 CLARIFICATION，不要盲目默认 HYBRID。
 
 ---
 
@@ -190,22 +241,23 @@ HYBRID 是“接管项目”，先盘点、整理、稳定，再继续推进。
 - MUST decide INIT start mode before UI, code, or file generation.
 - MUST continue from INSTALL / INIT into INIT start mode selection when the user is asking to initialize/start the project.
 - MUST ask at most 2-3 questions when clarification is needed.
-- MUST prefer HYBRID when unsure.
+- MUST use CLARIFICATION when user intent is unclear and directory evidence does not establish an existing-project takeover.
 
 中文说明：
 项目级请求不能跳过分类直接写页面或代码。
 必须先判断项目状态，再决定走 `INSTALL` / `INIT` / `AUDIT` / `HYBRID`。
 如果是 INIT，还要先明确启动方式。
 如果是 `INSTALL / INIT`，安装不是终点，还要继续进入 INIT。
-不确定时默认 `HYBRID`。
+目录证据明确为已有项目且用户要继续 / 整理 / 接管时使用 `HYBRID`。
+如果只是用户话语不明确，使用 `CLARIFICATION`。
 
 ---
 
 ## INIT Start Mode Gate
 
-For INIT requests, after detecting project state, MUST ask or decide the start mode before execution.
+For INIT requests, infer the smallest useful next action from the user's evidence before asking about start mode.
 
-If the user did not clearly request a prototype, foundation, or full setup, the FIRST response after classification MUST be:
+If the user's current action is still unclear after inference, ask the compatibility start-mode question:
 
 ```txt
 这是一个 INIT 请求。你希望我按哪种方式开始？
@@ -224,10 +276,24 @@ Start modes:
 2. Foundation-first: establish project structure, docs, and rules first
 3. Full setup: establish foundation first, then generate UI/code
 
-Do not generate files or code until the INIT start mode is clear.
+When the user already states a clear current action, infer the start mode and proceed with the minimum necessary output. Do not force the compatibility question.
+
+Examples:
+
+```txt
+先做登录页
+-> infer Prototype-first; do not ask the three-option question.
+
+先把项目规范和目录搭好，暂时不要页面
+-> infer Foundation-first; respect the negative constraint.
+
+我想做一个后台管理系统
+-> current action is still broad; ask the compatibility start-mode question.
+```
 
 中文说明：
-INIT 阶段必须先确认启动方式。不能一上来直接问技术栈、功能范围、数据库、部署或组件库，更不能直接写代码或生成页面。
+INIT 阶段先从用户话语推导最小下一步。用户已经明确“先做登录页 / 先搭基础”时，不重复要求选择模式。
+只有当前动作仍然宽泛时，才问兼容的启动方式问题。
 
 ---
 

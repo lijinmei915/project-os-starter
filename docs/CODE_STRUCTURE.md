@@ -192,7 +192,8 @@ use_when: "AI 要新建文件、移动代码、或判断某段逻辑该放在哪
 | 文件 | 职责 |
 |------|------|
 | `README.md` | 给人看的入口说明 |
-| `AGENTS.md` | AI 运行规则和 v1 路由契约 |
+| `AGENTS.md` | AI 运行规则入口和行为边界 |
+| `docs/ROUTING.md` | v1 路由契约和固定第一响应 |
 | `CLAUDE.md` | Claude 专属配置和 CLI 第一响应约束 |
 | `PROJECT.md` | 当前项目状态 SSOT |
 | `HANDOFF.md` | 当前交接上下文 SSOT |

@@ -91,6 +91,7 @@ for f in "${ALL_MD[@]}"; do
     # Skip external/example/anti-pattern refs
     [[ "$ref" == "GEMINI.md" ]] && continue
     [[ "$ref" == "CODEX.md" ]] && continue
+    [[ "$ref" == "HERMES.md" ]] && continue
     [[ "$ref" == "CURSOR.md" ]] && continue
     [[ "$ref" == ".env.example" ]] && continue
     [[ "$ref" == "notes.md" ]] && continue
@@ -174,7 +175,24 @@ done < <(find "$TPL_DOCS/docs" -maxdepth 1 -name "*.md" 2>/dev/null)
 
 echo ""
 
-# ─── Check 6: index.html template sync ───
+# ─── Check 6: Low-assumption technical templates ───
+echo "🧭 低假设技术模板检查（FRONTEND/BACKEND 不默认推荐具体技术栈）"
+tech_default_patterns='例如：|React /|Vue /|Svelte /|Vanilla JS|Vite /|Webpack|Next\.js|Nuxt|Redux|Zustand|React Query|SWR|Apollo|React Hook Form|Formik|Tailwind CSS|CSS Modules|Styled Components|shadcn/ui|Radix|Ant Design|Lucide|Heroicons|Node\.js /|Python /|Go /|Java|Express /|NestJS|FastAPI|Django|Gin|Node 20\+|Python 3\.11\+|RESTful /|GraphQL|tRPC|gRPC|Swagger|OpenAPI|Postman|PostgreSQL /|MySQL|Redis /|MongoDB|Prisma|Drizzle|SQLAlchemy|GORM|AWS S3|JWT /|OAuth2\.0|OIDC|RBAC'
+for f in "$TPL_DOCS/docs/FRONTEND.md" "$TPL_DOCS/docs/BACKEND.md"; do
+  name="${f#$TPL_DOCS/}"
+  if [[ ! -f "$f" ]]; then
+    continue
+  fi
+  if grep -Eq "$tech_default_patterns" "$f"; then
+    fail "$name — 不应在模板里默认列具体主流技术栈"
+  else
+    pass "$name — 未写死具体技术栈"
+  fi
+done
+
+echo ""
+
+# ─── Check 7: index.html template sync ───
 echo "🔄 index.html 同步检查"
 if diff -q "$REPO_ROOT/index.html" "$TPL_PROJECT/index.html" >/dev/null 2>&1; then
   pass "index.html 与 templates/project/index.html 一致"

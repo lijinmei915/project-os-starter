@@ -6,8 +6,9 @@
 
 ## 当前状态
 
-- 尚未接入 Radix / shadcn / ai-components
-- 尚未建立应用级 `src/components`
+- 已开始接入 Radix / shadcn-style 本地组件层
+- 桌面端已有 `desktop/src/main.jsx` 函数组件和 `desktop/src/styles.css` token layer
+- 已建立 `desktop/src/components/ui` 作为桌面端 primitive 组件入口
 - 已沉淀 AI 项目工程助手报告页的轻量组件契约
 - 当前报告页由 `templates/report/ai-project-report.html` 渲染静态 HTML
 - 组件契约通过 `data-component`、`data-variant`、`data-state` 和 TypeScript 数据源承载
@@ -43,6 +44,47 @@
 | `WritePlanPanel` | Pattern | `docs/design/ai-project-assistant/components.md` | `docs/design/ai-project-assistant/components.ts` / `data.ts` | `templates/report/ai-project-report.html` |
 | `TextField` | Primitive | `docs/design/ai-project-assistant/components.md` | `docs/design/ai-project-assistant/components.ts` / `data.ts` | `templates/report/ai-project-report.html` |
 | `Button` | Primitive | `docs/design/ai-project-assistant/components.md` | `docs/design/ai-project-assistant/components.ts` / `data.ts` | `templates/report/ai-project-report.html` |
+
+## 桌面端 v0.1 组件现状
+
+桌面端当前先以内联 React 函数组件承载真实产品链路，后续稳定后再拆入 `desktop/src/components`。
+
+| 组件 / Pattern | 分层 | 当前承载 | 说明 |
+|----------------|------|----------|------|
+| `TopBar` | Pattern | `desktop/src/main.jsx` | 应用级头部、状态和全局操作 |
+| `ProjectSidebar` | Pattern | `desktop/src/main.jsx` | 项目 registry、目录选择和文件树 |
+| `AgentWorkspace` | Composition | `desktop/src/main.jsx` | Plan / Diff / Runner 主工作区 |
+| `ProviderPanel` | Pattern | `desktop/src/main.jsx` | Provider profile、模型刷新和测试 |
+| `TaskQueueItem` | Pattern | `desktop/src/main.jsx` | 本地任务队列项 |
+| `ReadonlyPlan` | Pattern | `desktop/src/main.jsx` | 只读计划展示 |
+| `PatchDraft` | Pattern | `desktop/src/main.jsx` | Diff 草案审阅 |
+| `SectionTitle` | Primitive | `desktop/src/main.jsx` | 小节标题与 meta |
+| `Metric` | Primitive | `desktop/src/main.jsx` | 紧凑指标行 |
+| `MemoryItem` | Pattern | `desktop/src/main.jsx` | 记忆条目 |
+| `ProviderStatusRow` | Pattern | `desktop/src/components/workbench/provider-status-row.jsx` | Provider 启用状态与 Key 状态展示 |
+| `TaskCommandBar` | Pattern | `desktop/src/components/workbench/task-command-bar.jsx` | Diff / Runner 等任务操作按钮组 |
+| `ThemeMenu` | Pattern | `desktop/src/components/workbench/theme-menu.jsx` | 顶部主题下拉，支持深浅模式和主题色切换 |
+| `Button` | Primitive | `desktop/src/components/ui/button.jsx` | Radix Slot + CVA 变体，视觉映射到 Desktop tokens |
+| `Input` | Primitive | `desktop/src/components/ui/input.jsx` | 表单与 Composer 输入框，视觉映射到 Desktop tokens |
+| `Select` | Primitive | `desktop/src/components/ui/select.jsx` | Provider 和模型下拉，视觉映射到 Desktop tokens |
+| `Badge` | Primitive | `desktop/src/components/ui/badge.jsx` | 任务状态、只读标识和队列状态，视觉映射到 Desktop tokens |
+| `Panel` | Primitive | `desktop/src/components/ui/panel.jsx` | Provider、Queue、Diff、Runner、Index 等容器，视觉映射到 Desktop tokens |
+| `Field` | Composition | `desktop/src/components/ui/field.jsx` | Radix Label + 本地表单组合，视觉映射到 Desktop tokens |
+| `Notice` | Primitive | `desktop/src/components/ui/notice.jsx` | 提示、成功和错误反馈，视觉映射到 Desktop tokens |
+| `SectionTitle` | Primitive | `desktop/src/components/ui/section-title.jsx` | 小节标题和 meta，视觉映射到 Desktop tokens |
+| `Tabs` | Primitive | `desktop/src/components/ui/tabs.jsx` | Radix Tabs + 本地标签样式，视觉映射到 Desktop tokens |
+| `Tooltip` | Primitive | `desktop/src/components/ui/tooltip.jsx` | Radix Tooltip + 本地提示样式，视觉映射到 Desktop tokens |
+| `Dialog` | Primitive | `desktop/src/components/ui/dialog.jsx` | Radix Dialog + 本地弹窗样式，视觉映射到 Desktop tokens |
+| `DropdownMenu` | Primitive | `desktop/src/components/ui/dropdown-menu.jsx` | Radix Dropdown Menu + 本地菜单样式，视觉映射到 Desktop tokens |
+| `Switch` | Primitive | `desktop/src/components/ui/switch.jsx` | Radix Switch + 本地开关样式，视觉映射到 Desktop tokens |
+
+规则：
+
+- 新增桌面端 UI 时，先复用上表组件或通过 variant / state 扩展。
+- 新增视觉值必须进 `desktop/src/styles.css` token layer，不能直接写在 JSX 或局部选择器里。
+- 后续新增交互能力优先使用 Radix 官方 primitives，再通过本地 shadcn-style 组件映射到 Desktop tokens。
+- 稳定后继续抽出 `Checkbox` 等官方 primitives 包装层。
+- Headless / shadcn-style 组件只能作为本地组件源码进入项目，不直接依赖第三方默认视觉主题。
 
 ## 组合模式登记
 

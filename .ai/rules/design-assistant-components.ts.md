@@ -1,0 +1,1 @@
+../../docs/design/ai-project-assistant/components.ts

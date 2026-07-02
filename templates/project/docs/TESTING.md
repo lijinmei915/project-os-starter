@@ -1,3 +1,9 @@
+---
+layer: knowledge
+type: spec
+last_verified: 2026-06-04
+---
+
 # 测试与验收
 
 > 用途：定义测试分层、验收标准和收尾检查。
@@ -75,3 +81,12 @@ bash scripts/check-runtime.sh .
 - 代码改动是否运行了测试
 - 下一步如有变化，是否更新了 `HANDOFF.md`
 - 踩坑后是否更新了 `docs/LESSONS.md`
+
+## 相关文件
+
+| 文件 | 关系 |
+|------|------|
+| `docs/ENVIRONMENT.md` | 测试依赖环境配置 |
+| `docs/RUNBOOK.md` | 自检和发布流程 |
+| `docs/LESSONS.md` | 测试中发现的问题复盘 |
+| `HANDOFF.md` | 测试结果影响交接状态 |

@@ -1,3 +1,9 @@
+---
+layer: knowledge
+type: guide
+last_verified: 2026-06-04
+---
+
 # 运行手册
 
 > 用途：记录常见操作、发布流程和故障处理步骤。
@@ -36,3 +42,12 @@ npm run lint
 ```
 
 <!-- 按项目实际场景补充 -->
+
+## 相关文件
+
+| 文件 | 关系 |
+|------|------|
+| `docs/ENVIRONMENT.md` | 环境配置和依赖 |
+| `docs/TESTING.md` | 测试和验收命令 |
+| `HANDOFF.md` | 发布后更新交接状态 |
+| `docs/CHANGELOG.md` | 结构性改动记录 |

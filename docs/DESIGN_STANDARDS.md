@@ -11,14 +11,14 @@ use_when: "AI 要调整 UI 样式、选颜色/字号/间距、或判断设计方
 > 用途：定义当前设计边界、token 方向、布局规则和组件库策略。
 > 什么时候更新：设计系统范围、token 分类、组件库接入策略或 UI 约束变化时。
 > 不要写什么：前端实现流水、当前交接、与设计无关的工程决策。
-> 当前阶段不接组件库；已存在静态 HTML 报告页和轻量组件契约，但尚未建立应用级前端组件工程。
+> 当前桌面端允许接入 Headless / shadcn-style 组件层；组件视觉必须映射到 Project OS tokens。
 > 具体 token、布局和组件索引见 `docs/design/*.md`。
 
 ---
 
 ## 当前状态
 
-Project OS 现在没有应用级 `src/`、没有组件库，也没有 React / Vue 等前端运行层。
+Project OS 现在已有 `desktop/` Tauri + React 前端运行层，并开始接入 Headless / shadcn-style 本地组件层。
 
 但 AI 项目工程助手报告页已经形成静态 HTML 原型和轻量组件契约：
 
@@ -27,6 +27,7 @@ Project OS 现在没有应用级 `src/`、没有组件库，也没有 React / Vu
 - 组件契约登记在 `docs/design/ai-project-assistant/components.md`
 - TS 数据源和类型契约登记在 `docs/design/ai-project-assistant/components.ts`、`docs/design/ai-project-assistant/data.ts`
 - 组件索引登记在 `docs/design/component-index.md`
+- 桌面端 v0.1 使用 `desktop/src/styles.css` 中的 Desktop token layer，不能在后续组件里继续散落硬编码颜色、字号、间距和状态色。
 
 设计规范的作用是：
 
@@ -68,19 +69,21 @@ Project OS 现在没有应用级 `src/`、没有组件库，也没有 React / Vu
 - 不为了“显得完整”额外套无意义卡片或装饰
 - 没有明确分组意义时，优先保持结构简单
 
-### 4. 组件库暂不接入
+### 4. 组件库策略
 
-当前阶段不接：
+桌面端当前采用：
 
-- Radix Themes
-- shadcn/ui
-- ai-components
+- Radix primitives / Slot 等无头能力
+- shadcn-style 本地组件拷贝与改造
+- Project OS Desktop token layer 作为视觉 SSOT
 
-后续接入前，需要先明确：
+规则：
 
-- 组件层是否由 `frontend` 直接使用
-- 是否需要 `ai-components` 二次封装
-- Design Tokens 如何映射到组件库主题
+- 不直接套第三方默认主题。
+- 不把组件库 token 当作项目 token 的 SSOT。
+- 新增组件先落在 `desktop/src/components/ui`，通过 variant / state 复用。
+- 组件视觉值必须来自 `docs/design/tokens.md` 和 `desktop/src/styles.css` 的 token layer。
+- `ai-components` 暂不作为运行时组件层；后续若接入，只能作为更高层组合或生成协议。
 
 ---
 
@@ -106,4 +109,4 @@ Project OS 的设计规范目标不是写一份大而全 UI 手册，而是让 A
 - 该走 `design-system`
 - 该复用 token
 - 该尊重布局和状态规则
-- 当前阶段不接组件库
+- 组件库要接，但必须走 Headless / token-mapped 路线

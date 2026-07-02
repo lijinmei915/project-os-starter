@@ -151,6 +151,7 @@ adapters/CLAUDE.md -> CLAUDE.md
 adapters/CODEX.md  -> CODEX.md
 adapters/CURSOR.md -> .cursor/rules/project-os.md
 adapters/GEMINI.md -> GEMINI.md
+adapters/HERMES.md -> HERMES.md
 ```
 
 安装方式：
@@ -160,11 +161,13 @@ bash scripts/install-adapter.sh claude .
 bash scripts/install-adapter.sh codex .
 bash scripts/install-adapter.sh cursor .
 bash scripts/install-adapter.sh gemini .
+bash scripts/install-adapter.sh hermes .
 ```
 
 中文说明：
 adapter 不是新的规则源头，只是把 `AGENTS.md` 的职责翻译成对应工具更容易自动读取的文件。
 需要哪个工具，就安装哪个 adapter。
+Hermes 本身会读取项目 `AGENTS.md`，`HERMES.md` 只保留 Project OS 接手提示和项目记忆读取顺序。
 
 ---
 

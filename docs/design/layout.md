@@ -130,6 +130,27 @@ Brand / Title / Description        Primary Mode Switch
 - 页面 H1 不进入卡片。
 - 小型工作台标题使用 `--text-32`，不要使用 hero 级大字。
 
+### Desktop Topbar 布局
+
+桌面端顶部栏是密集工具栏，不使用营销页 header 规则。
+
+结构：
+
+```txt
+Brand / Current Workspace        Runtime Status        Theme / Primary Action
+```
+
+规则：
+- 顶部栏高度使用 `--desktop-layout-topbar-height`。
+- 品牌区只放产品名、当前工作区和 logo，不放流程结果。
+- 运行模式状态使用 `StatusPill`，不使用普通按钮样式。
+- 顶部右侧所有控件属于同一个 toolbar control 族，统一使用 `--desktop-toolbar-*` token。
+- 文字型控件和状态 pill 的左右 padding、icon gap、高度必须一致。
+- 纯 icon 控件必须是正方形，边长等于 `--desktop-toolbar-control-height`。
+- 运行状态、主题按钮、主操作按钮之间使用 toolbar group gap，不在单个组件上额外加 margin。
+- 状态差异不能改变控件尺寸、圆角、左右内边距或 icon 与文字间距。
+- 小白可见文案避免 `core`、`runtime` 等工程词；tooltip 可解释真实能力边界。
+
 ---
 
 ## Segmented Control 布局

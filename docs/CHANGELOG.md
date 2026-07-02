@@ -23,6 +23,72 @@ use_when: "AI 需要回溯某个功能是什么时候改的、为什么改的、
 
 ---
 
+## 2026-06-13
+
+### AI Engineering Kit / governance
+
+#### Project OS Console 产品定位收束
+
+- **改动**：(1) `PROJECT.md` 和 `docs/PRODUCT_PLAN.md` 将当前方向收束为 `Project OS Console`；(2) 明确当前优先级为理解项目、推荐补齐、生成文件、跑检查和维护交接状态；(3) Agent 自动执行、多 Agent 工作台和远程 runtime 放到后续阶段。
+- **影响**：后续迭代不再以“工程包选择器”或“Hermes Studio 复制品”为目标，而是先把 Project OS 的项目治理控制台闭环做扎实；首页推荐区应优先接入 `scripts/recommend-next.sh` 的 JSON 契约。
+- **相关文件**：`PROJECT.md`, `docs/PRODUCT_PLAN.md`, `HANDOFF.md`, `docs/CHANGELOG.md`, `scripts/recommend-next.sh`。
+
+#### AGENTS 官方风格收口 + 路由细则下沉 + runtime warning 清零
+
+- **改动**：(1) 根 `AGENTS.md` 改为短入口，保留 Quick Start、Commands、Working Boundaries、Routing Summary 和少量边界规则；(2) 新增 `docs/ROUTING.md` 承接安装入口、路由模式、固定第一响应和 v1 验收契约；(3) `docs/DOCUMENTATION.md` 增加根 `AGENTS.md` 体量约束和可分发内容定义；(4) `check-runtime.sh` 的 guidance header 扫描窗口从 12 行扩到 24 行，兼容带 YAML frontmatter 的文档；(5) `PROJECT.md` 去掉历史路线标签，`HANDOFF.md` 压缩为当前接手摘要。
+- **影响**：根规则入口更接近官方 `AGENTS.md` 风格；路由细则有独立 SSOT；`check-runtime.sh` 从 33 个误报 / 语义 warning 降到 0 warning；目标项目模板也能分发 `docs/ROUTING.md`。
+- **相关文件**：`AGENTS.md`, `docs/ROUTING.md`, `docs/DOCUMENTATION.md`, `docs/NAMING.md`, `docs/ARCHITECTURE.md`, `docs/CODE_STRUCTURE.md`, `PROJECT.md`, `HANDOFF.md`, `scripts/check-runtime.sh`, `scripts/install-project-os.sh`, `templates/project-docs/docs/ROUTING.md`, `templates/project/docs/ROUTING.md`。
+
+#### Skill 证据推导规范 + Agent Skill 默认骨架轻量化
+
+- **改动**：(1) 新增 `docs/SKILL_ENGINEERING.md`，定义最小 Skill、参考资料、资产、工具脚本和分发文件的证据推导边界；(2) AI 项目工程助手的 `Agent Skill 工程` 默认生成物改为最小骨架；(3) 资产、脚本、schema、fixture 和分发文件仍保留模板能力，但不再作为默认向导卡片展示；(4) 目标项目模板同步 `docs/SKILL_ENGINEERING.md` 和更新后的 `index.html`。
+- **影响**：用户不需要选择 Skill 类型，也不需要知道内部目录；做 Skill 时先生成可进入、可触发、可验收的最小工程，后续由系统根据目标产物、已有文件、下一步动作和验收要求补文件，避免 Skill 一开始就膨胀成完整工程包。
+- **相关文件**：`docs/SKILL_ENGINEERING.md`, `docs/DOCUMENTATION.md`, `docs/NAMING.md`, `index.html`, `templates/project/index.html`, `HANDOFF.md`。
+
+#### 新项目向导从分包选择改为状态识别与补齐策略
+
+- **改动**：(1) 新项目页标题从“模板选择向导 / 生成工程契约”改为“项目状态识别 / 推荐补齐方案”；(2) Q2 文案从“生成哪类工程”改为“先推进哪个下一步”；(3) 产品、页面、运行、交接、Skill、治理等选项改为动作语言，底层 preset 保留为内部补齐策略；(4) `docs/WIZARD_PRESETS.md` 改为状态识别与补齐策略映射。
+- **影响**：用户不再需要理解工程包；Project OS 根据维护场景、下一步动作、已有文件和验收要求推导推荐文件，UI 更接近 OpenDesign 的“识别状态后暴露动作”模式。
+- **相关文件**：`index.html`, `templates/project/index.html`, `docs/WIZARD_PRESETS.md`, `docs/design/ai-project-assistant/data.ts`, `docs/design/ai-project-assistant/components.md`, `HANDOFF.md`。
+
+#### 推荐引擎证据契约
+
+- **改动**：(1) 新增 `docs/RECOMMENDATION_ENGINE.md`，定义 evidence -> signals -> gaps -> recommendations -> checks 的推荐链路；(2) 明确每个默认推荐项必须能说明 reason、evidence、confidence、check，并允许跳过；(3) `docs/WIZARD_PRESETS.md` 明确当前实现仍是轻量规则映射，不能伪装成完整智能识别。
+- **影响**：后续推荐文件不再只靠 Q1 / Q2 / Q3 固定映射；升级推荐逻辑时有明确验收标准，可以逐步做到“检测到什么证据，所以推荐补什么”。
+- **相关文件**：`docs/RECOMMENDATION_ENGINE.md`, `docs/WIZARD_PRESETS.md`, `docs/DOCUMENTATION.md`, `docs/NAMING.md`, `HANDOFF.md`。
+
+#### 素材库低假设治理
+
+- **改动**：(1) `docs/DOCUMENTATION.md` 增加素材库原则：文档模板只定义结构、填写槽位和证据来源，不默认推荐具体主流技术栈；(2) `FRONTEND.md`、`BACKEND.md` 模板改为“当前选择 / 状态 / 证据来源”记录表，具体技术从依赖文件、配置文件或用户已确认决策推导；(3) `check-templates.sh` 增加低假设技术模板检查，阻止模板重新写死框架、数据库、ORM、部署或组件库。
+- **影响**：Project OS 的素材库从“替用户选技术”改为“帮 AI 记录证据和边界”；推荐能跟随项目事实变化，不会因为模板过时而带偏新项目或老项目接入。
+- **相关文件**：`docs/DOCUMENTATION.md`, `templates/project-docs/docs/FRONTEND.md`, `templates/project-docs/docs/BACKEND.md`, `templates/project-docs/docs/ROUTING.md`, `scripts/check-templates.sh`, `HANDOFF.md`。
+
+#### Recommendation Engine v0.1 CLI
+
+- **改动**：(1) 新增 `scripts/recommend-next.sh`，扫描目标项目并输出 `project-os.recommendation.v0.1` JSON；(2) JSON 按 evidence、signals、gaps、recommendations、checks 分层，每条推荐包含 reason、evidence、confidence、check、overridable；(3) `scripts/ai-project.sh` 增加 `recommend` 子命令；(4) core profile 分发该脚本，回归测试覆盖推荐 JSON 和安装后可运行性。
+- **影响**：Project OS 开始从固定向导映射进入“基于证据推荐下一步”的执行内核；后续 UI 可以消费该 JSON，把“检测到什么，所以推荐补什么”展示给用户。
+- **相关文件**：`scripts/recommend-next.sh`, `scripts/ai-project.sh`, `docs/RECOMMENDATION_ENGINE.md`, `docs/DOCUMENTATION.md`, `docs/NAMING.md`, `scripts/install-project-os.sh`, `scripts/sync-templates.sh`, `scripts/check-template-sync.sh`, `tests/run-tests.sh`, `templates/project/scripts/recommend-next.sh`。
+
+#### 推荐引擎结果接入首页
+
+- **改动**：(1) 首页“推荐补齐方案”新增推荐引擎证据区，优先读取 `.project-os/recommendations/recommend-next.json`；(2) 读取成功时展示推荐数量、原因、证据、置信度、跳过风险和检查命令；(3) 读取不到 JSON 时保留现有向导推荐，并提示运行 `bash scripts/recommend-next.sh . --write-report`；(4) 勾选逻辑也开始以推荐引擎为准：有 recommendations 时只默认勾推荐项，没有明显缺口时只保留必选入口文件；(5) 截图回归 marker 覆盖推荐引擎入口。
+- **影响**：Project OS Console 的 UI 开始从“前端静态推导”过渡到“CLI 推荐引擎驱动”；Q1-Q3 退为手动 fallback，只有缺少推荐 JSON 或用户主动调整时才接管勾选。
+- **相关文件**：`index.html`, `templates/project/index.html`, `tests/screenshot-regression.sh`, `HANDOFF.md`。
+
+#### 一句话目标作为推荐 evidence
+
+- **改动**：(1) 首页第一步从“当前项目识别结果”改为“一句话目标”；(2) 新增目标输入框，用户输入一句话后按规则提取页面、运行、交接、设计系统、Skill、治理、AI/RAG 等信号；(3) 用户话语会驱动现有 Q1-Q3 fallback 的隐藏状态和勾选结果，但不暴露成工程包选择；(4) 识别结果下直接展示“建议生成 / 暂不生成 / 查看并确认生成项”执行计划；(5) `docs/RECOMMENDATION_ENGINE.md` 明确“用户话语证据”进入同一条 evidence -> signals -> gaps -> recommendations 链路。
+- **影响**：新项目入口从“选择模板/扫描不存在的新项目”转为“用户说目标，系统按当前必要项增量生成”；Q1-Q3 保留为底层手动细调，不再是主交互。
+- **相关文件**：`index.html`, `templates/project/index.html`, `docs/RECOMMENDATION_ENGINE.md`, `tests/screenshot-regression.sh`, `HANDOFF.md`。
+
+#### project-setup 增量意图契约
+
+- **改动**：(1) `project-setup` 新增 facts / currentIntent / futureSignals / constraints / negativeConstraints / missing / confidence / route 结构化意图契约；(2) 明确每条用户消息作为增量 evidence；(3) 当前动作明确时自动推导最小下一步，低置信度、冲突或缺少当前动作时才进入 CLARIFICATION；(4) 用户话语不明确且没有已有项目目录证据时，不再盲目默认 HYBRID；(5) clarification reference 增加 `1234567` 和冲突意图的最小澄清规则。
+- **影响**：`project-setup` 从固定路由问答守门员升级为 Conversation-first 入口，同时保留 v1 固定验收 case 的兼容性。
+- **相关文件**：`.agents/skills/project-setup/SKILL.md`, `.claude/skills/project-setup/SKILL.md`, `.agents/skills/project-setup/references/clarification.md`, `.claude/skills/project-setup/references/clarification.md`, `AGENTS.md`, `docs/ROUTING.md`, `tests/cases.md`, `HANDOFF.md`。
+
+---
+
 ## 2026-06-05
 
 ### AI Engineering Kit / self engineering

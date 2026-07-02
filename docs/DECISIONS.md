@@ -283,6 +283,24 @@ use_when: "AI 需要理解某个架构选择的背景、或面临类似决策需
 
 ---
 
+#### D016 — 桌面端采用 Tauri + Local Agent Core，不先做完整 IDE
+
+**决定**: Project OS Desktop 采用 `Tauri + Local Agent Core + Workbench UI`。桌面端先做本地项目工作台、模型计划、受控 runner、diff review 和记忆沉淀，不先做完整 IDE。
+
+**放弃**: 暂不优先选 Electron；不先做 Monaco 完整编辑器、插件市场、调试器、多 Agent 编排或开放 skill 安装器。
+
+**原因**:
+- Project OS 的核心是项目理解、推荐、执行、验证和交接，不是复制 VS Code。
+- 浏览器静态页无法安全处理本地文件权限、命令执行和模型密钥；桌面端需要一个受控本地 core。
+- Tauri 更轻，权限模型更适合把文件、命令、密钥和 provider 调用收束到 Local Agent Core。
+
+**影响**:
+- 新的桌面端方向以 `docs/DESKTOP_APP.md` 为 SSOT。
+- 后续 `desktop/` 先加载 Vite + React 组件化工作台，再逐步接项目 registry、本地扫描、模型计划和受控执行。
+- 写文件和命令执行必须经过白名单工具、diff review 和检查闭环。
+
+---
+
 ## 待记录
 
 暂无新的架构决策待补。

@@ -15,6 +15,7 @@ Adapters:
   codex   -> CODEX.md
   cursor  -> .cursor/rules/project-os.md
   gemini  -> GEMINI.md
+  hermes  -> HERMES.md
 
 Example:
   bash scripts/install-adapter.sh claude .
@@ -57,6 +58,10 @@ case "$adapter" in
   gemini)
     src_rel="adapters/GEMINI.md"
     dest_rel="GEMINI.md"
+    ;;
+  hermes)
+    src_rel="adapters/HERMES.md"
+    dest_rel="HERMES.md"
     ;;
   *)
     echo "ERROR: unknown adapter: $adapter"

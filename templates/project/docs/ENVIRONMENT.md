@@ -1,3 +1,9 @@
+---
+layer: knowledge
+type: spec
+last_verified: 2026-06-04
+---
+
 # 环境说明
 
 > 用途：说明本地运行、依赖、环境变量和外部服务。
@@ -46,3 +52,11 @@ bash scripts/check-secrets.sh .
 ## 常见环境问题
 
 - `未记录`
+
+## 相关文件
+
+| 文件 | 关系 |
+|------|------|
+| `docs/ARCHITECTURE.md` | 系统结构决定运行方式 |
+| `docs/RUNBOOK.md` | 常见操作和故障处理 |
+| `docs/TESTING.md` | 测试命令也依赖环境配置 |

@@ -29,6 +29,9 @@ tests/cross-tool-matrix.md
 | 5 | 这个项目有点乱，帮我整理一下继续做 | `project-setup / HYBRID` |
 | 6 | 帮我设计 tokens 规范 | `design-system` |
 | 7 | 帮我写一个登录页 | `frontend` |
+| 8 | 1234567 | `project-setup / CLARIFICATION / low confidence` |
+| 9 | 想做后台管理系统，先做登录页，以后接 AI 客服 | `project-setup / INIT / Prototype-first`; AI 客服只记为 future signal |
+| 10 | 帮我看看，不要改 | `project-setup / AUDIT`; `不要改` 记为 negative constraint |
 
 ## 当前结论
 

@@ -127,7 +127,7 @@ is_template() {
 
 is_ssot() {
   case "$1" in
-    AGENTS.md|PROJECT.md|HANDOFF.md|docs/DOCUMENTATION.md|docs/NAMING.md|docs/ARCHITECTURE.md|docs/ENVIRONMENT.md|docs/TESTING.md|docs/RUNBOOK.md|docs/DECISIONS.md|docs/LESSONS.md|schemas/*.json) printf 'true' ;;
+    AGENTS.md|PROJECT.md|HANDOFF.md|docs/DOCUMENTATION.md|docs/NAMING.md|docs/ROUTING.md|docs/ARCHITECTURE.md|docs/ENVIRONMENT.md|docs/TESTING.md|docs/RUNBOOK.md|docs/DECISIONS.md|docs/LESSONS.md|schemas/*.json) printf 'true' ;;
     *) printf 'false' ;;
   esac
 }
@@ -153,6 +153,7 @@ fm_field() {
         val=substr(line, length(key)+2)
         sub(/^[ \t]+/, "", val)
         sub(/[ \t]+$/, "", val)
+        sub(/^"/, "", val); sub(/"$/, "", val)
         print val
         exit
       }
@@ -249,6 +250,8 @@ while IFS= read -r file; do
   doc_type="$(fm_field "$file" "type")"
   last_verified="$(fm_field "$file" "last_verified")"
   stale_flag="$(compute_stale "$last_verified")"
+  teaches="$(fm_field "$file" "teaches")"
+  use_when="$(fm_field "$file" "use_when")"
 
   # 无 frontmatter 时按文件类型/路径派生架构层，让架构图能完整显示
   if [ -z "$arch_layer" ]; then
@@ -259,9 +262,9 @@ while IFS= read -r file; do
     esac
   fi
 
-  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
     "$file" "$kind" "$layer" "$template_flag" "$ssot_flag" "$executable_flag" \
-    "$arch_layer" "$doc_type" "$last_verified" "$stale_flag" >> "$nodes_file"
+    "$arch_layer" "$doc_type" "$last_verified" "$stale_flag" "$teaches" "$use_when" >> "$nodes_file"
 
   # --- depends_on 声明式依赖边 ---
   deps_raw="$(fm_field "$file" "depends_on")"
@@ -326,8 +329,12 @@ tmp_json="$tmp_dir/project-graph.json"
     {
       if (NR > 1) printf ",\n"
       stale = ($10 == "true") ? "true" : "false"
-      printf "    {\"id\":\"%s\",\"kind\":\"%s\",\"layer\":\"%s\",\"template\":%s,\"ssot\":%s,\"executable\":%s,\"archLayer\":\"%s\",\"docType\":\"%s\",\"lastVerified\":\"%s\",\"stale\":%s}", \
-        esc($1), esc($2), esc($3), $4, $5, $6, esc($7), esc($8), esc($9), stale
+      teaches_part = ""
+      if ($11 != "") teaches_part = ",\"teaches\":\"" esc($11) "\""
+      use_when_part = ""
+      if ($12 != "") use_when_part = ",\"useWhen\":\"" esc($12) "\""
+      printf "    {\"id\":\"%s\",\"kind\":\"%s\",\"layer\":\"%s\",\"template\":%s,\"ssot\":%s,\"executable\":%s,\"archLayer\":\"%s\",\"docType\":\"%s\",\"lastVerified\":\"%s\",\"stale\":%s%s%s}", \
+        esc($1), esc($2), esc($3), $4, $5, $6, esc($7), esc($8), esc($9), stale, teaches_part, use_when_part
     }
   ' "$nodes_file"
   printf '\n  ],\n'
@@ -359,5 +366,41 @@ else
     mkdir -p "docs/data"
     cp "$graph_file" "docs/data/project-graph.json"
     echo "Page copy written: docs/data/project-graph.json"
+  fi
+
+  # --- Knowledge Registry: 语义索引 ---
+  registry_file="$graph_dir/knowledge-registry.json"
+  registry_count=0
+  tmp_registry="$tmp_dir/knowledge-registry.json"
+  {
+    printf '{\n'
+    printf '  "schemaVersion": "knowledge-registry.v0.1",\n'
+    printf '  "generatedAt": "%s",\n' "$(json_escape "$generated_at")"
+    printf '  "entries": [\n'
+    first_reg=1
+    awk -F'\t' '
+      function esc(s) {
+        gsub(/\\/, "\\\\", s); gsub(/"/, "\\\"", s)
+        gsub(/\t/, "\\t", s); gsub(/\r/, "\\r", s)
+        return s
+      }
+      $11 != "" || $12 != "" {
+        if (NR_OUT++ > 0) printf ",\n"
+        teaches = ($11 != "") ? esc($11) : ""
+        use_when = ($12 != "") ? esc($12) : ""
+        stale = ($10 == "true") ? "true" : "false"
+        printf "    {\"id\":\"%s\",\"teaches\":\"%s\",\"useWhen\":\"%s\",\"layer\":\"%s\",\"type\":\"%s\",\"stale\":%s}", \
+          esc($1), teaches, use_when, esc($7), esc($8), stale
+      }
+    ' "$nodes_file"
+    printf '\n  ]\n'
+    printf '}\n'
+  } > "$tmp_registry"
+  registry_count="$(grep -c '"id"' "$tmp_registry" || echo 0)"
+  mv "$tmp_registry" "$registry_file"
+  echo "Knowledge registry written: $registry_file (entries: $registry_count)"
+  if [ -d "docs/data" ]; then
+    cp "$registry_file" "docs/data/knowledge-registry.json"
+    echo "Page copy written: docs/data/knowledge-registry.json"
   fi
 fi

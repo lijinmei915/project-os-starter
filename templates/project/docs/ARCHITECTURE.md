@@ -1,3 +1,10 @@
+---
+layer: knowledge
+type: spec
+last_verified: 2026-06-04
+depends_on: [AGENTS.md]
+---
+
 # 架构说明
 
 > 用途：说明当前项目的系统结构、核心模块、数据流和边界。
@@ -33,3 +40,12 @@
 1. 补真实目录职责
 2. 补启动 / 构建 / 部署路径
 3. 补关键数据流
+
+## 相关文件
+
+| 文件 | 关系 |
+|------|------|
+| `docs/CODE_STRUCTURE.md` | 代码分层细节（本文件偏系统，那个偏目录） |
+| `docs/ENVIRONMENT.md` | 运行环境和依赖 |
+| `PRODUCT.md` | 产品定位决定架构方向 |
+| `docs/DECISIONS.md` | 架构决策的原因记录 |
