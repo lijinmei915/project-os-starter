@@ -1,8 +1,8 @@
 ---
 layer: knowledge
 type: spec
-last_verified: 2026-06-13
-depends_on: [PRODUCT.md]
+last_verified: 2026-07-03
+depends_on: [PRODUCT.md, docs/DESKTOP_APP.md, docs/REFERENCE_SYSTEMS.md]
 teaches: "产品的阶段划分、各阶段目标、成功标准和演进路线"
 use_when: "AI 需要判断当前该做哪个阶段的事、或评估某个需求是否在当前阶段范围内时"
 ---
@@ -15,15 +15,17 @@ use_when: "AI 需要判断当前该做哪个阶段的事、或评估某个需求
 
 ## 产品愿景
 
-把 AI 驱动开发流程收口成一个可复制、可验证、可交接的 Project OS Console，并逐步演进为本地优先的 Project OS Desktop 工作台。
+把 AI 驱动开发流程收口成一个可复制、可验证、可交接的 Project OS Console，并逐步演进为本地优先的 OmniDesk / Project OS Desktop 工作台。
 
-它的目标不是复制 Hermes Studio 这类通用 Agent runtime 工作台，而是先稳定一个更靠近项目治理的控制台：
+OmniDesk 的目标是让任何新项目或老项目都可以被接入一个统一的本地 AI 工程工作台。用户不用操心项目治理、上下文维护、研发流程、模型配置和工程检查，只需要持续在工作台里对话、决策和执行。系统会跟随 Project OS 的流程认识项目、管理目标、约束协作、辅助实现、验证质量，并在使用过程中沉淀记忆、优化能力、自动演进，让项目越做越清晰，系统越用越好用。
+
+它的目标不是复制 Hermes Studio 这类通用 Agent runtime 工作台，而是把成熟 Agent / 治理工具作为可接入执行器和参照系，自己负责用户入口、项目治理中枢和长期项目记忆：
 
 ```txt
-理解项目 -> 推荐补齐 -> 生成文件 -> 跑检查 -> 维护交接状态 -> 后续再接 Agent 自动执行
+添加项目 -> 认识项目 -> 定义目标 -> 约束协作 -> 设计实现 -> 验证质量 -> 记忆沉淀 -> 推荐下一步
 ```
 
-当前优先级是 Project OS Console 内核，同时桌面端方向已确定为 `Tauri + Local Agent Core + Workbench UI`。桌面端路线见 `docs/DESKTOP_APP.md`，但多 Agent 编排、远程执行和完整 IDE 仍不进入当前阶段。
+当前优先级是 Project OS Console 内核和 OmniDesk Desktop v0.1，同时桌面端方向已确定为 `Tauri + Local Agent Core + Workbench UI`。桌面端路线见 `docs/DESKTOP_APP.md`，参照系统取舍见 `docs/REFERENCE_SYSTEMS.md`；多 Agent 编排、远程执行和完整 IDE 仍不进入当前阶段。
 
 ---
 

@@ -1,6 +1,6 @@
 {
   "name": "project-os-starter",
-  "description": "Project OS Desktop / Console：检查并补齐通用 AI 工程文件，并逐步演进为本地 AI 项目工作台",
+  "description": "OmniDesk / Project OS Desktop：会持续学习项目的本地 AI 工程工作台，让任何新老项目都能按清晰流程被理解、治理、开发和演进",
   "phase": "stabilizing",
   "stage": "Project OS Console 内核收口期 / Desktop v0.1 方向确认期",
   "status": {
@@ -51,6 +51,7 @@
       "desktop/ 受控 Apply Patch v0.1",
       "desktop/ Apply 后自动验证 v0.1",
       "desktop/ 本地 run summary 写入 v0.1",
+      "desktop/ 用户确认后合并 run summary 到 HANDOFF.md v0.1",
       "desktop/ token layer 和组件索引登记",
       "desktop/ Headless 组件库接入起点",
       "desktop/ Button primitive 组件化和交互态 token 化",
@@ -64,7 +65,9 @@
       "desktop/ 可配置主题色 token 架构",
       "desktop/ 顶部主题菜单和本地主题偏好",
       "desktop/ 主题设置 Rust 本地配置持久化",
-      "desktop/ 自定义主题色新增和删除"
+      "desktop/ 自定义主题色新增和删除",
+      "OmniDesk 北极星目标确认：用户入口 + 项目治理中枢 + 本地项目记忆",
+      "Hermes 等成熟工具定位为参照系统和可接入执行器"
     ],
     "doing": [
       "AI Engineering Kit 自身工程化补齐",
@@ -77,8 +80,9 @@
       "真实老项目样本文档质量校准",
       "报告数据层和评分模型对应关系校准",
       "真实工具会话抽样复查",
-      "接入交接状态合并确认",
-      "将主题设置继续打磨为更小白的品牌色入口，例如支持粘贴 HEX、命名品牌色和重置默认"
+      "打磨交接状态结构化合并和冲突提示",
+      "将主题设置继续打磨为更小白的品牌色入口，例如支持粘贴 HEX、命名品牌色和重置默认",
+      "围绕参照系统文档校准 OmniDesk 工作区树、文件 tab、任务执行和项目记忆"
     ]
   },
   "architecture": {

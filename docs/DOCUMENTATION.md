@@ -64,6 +64,7 @@ English for scheduling, Chinese for cognition.
 | AI 应该怎么行动 | `AGENTS.md` |
 | AI 请求应该怎么分流 | `docs/ROUTING.md` |
 | 推荐引擎如何用证据推导文件和动作 | `docs/RECOMMENDATION_ENGINE.md` |
+| Hermes 等成熟治理工程如何借鉴和接入 | `docs/REFERENCE_SYSTEMS.md` |
 | 项目状态识别和补齐策略怎么映射文件 | `docs/WIZARD_PRESETS.md` |
 | 现在项目是什么状态 | `PROJECT.md` |
 | 下一个人或 AI 怎么接手 | `HANDOFF.md` |

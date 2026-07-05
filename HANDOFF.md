@@ -23,6 +23,7 @@ depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
 
 ## 最近完成
 
+- 交互规则已统一为“主流对话优先”：默认先直接回答或处理当前问题，不主动拆任务、不展示内部路由 / Steps / Checks / 审批流；只有删除/覆盖、发布/push、批量重构、有副作用命令、需求明显不清或用户明确要求计划时，才先说明方案并等待确认。源 `AGENTS.md`、分发模板 `templates/project/AGENTS.md` 和 Codex adapter 已同步。
 - 根 `AGENTS.md` 按官方风格收口：保留 Quick Start、Commands、Working Boundaries、Routing Summary、协作边界和短引用。
 - 新增 `docs/ROUTING.md` 作为 Project OS 请求分流和固定第一响应的 SSOT；根 `AGENTS.md` 只保留摘要和链接。
 - `docs/DOCUMENTATION.md` 增加根 `AGENTS.md` 体量约束：长细则、示例、表格和验收 case 应下沉到专题文档。
@@ -54,7 +55,8 @@ depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
 - 桌面端已新增 patch draft / Diff 草案审阅：Rust command `generate_patch_draft` 会基于任务 plan 读取安全候选文件上下文，调用 provider 生成 unified diff JSON；失败时回退本地占位草案。前端 Active Task 增加 `Generate Patch` 和 Diff Draft 面板，生成结果写回同一任务记录。当前仍不写文件，Apply 需要下一步单独接入确认流程。
 - 桌面端已新增受控 Apply Patch：Rust command `apply_patch_draft` 只接受任务里的 `patchDraft.diff`，先跑 `git apply --check`，通过后再 `git apply`；占位草案、空 diff 和非 unified diff 会被拒绝。前端 Active Task 增加 `Apply Patch` 按钮，成功后把 apply result 写回任务记录。下一步应接 Apply 后自动跑匹配检查并写回 run summary。
 - Apply 后自动验证已接入：前端 `applyPatchDraft` 成功后会根据 plan 匹配白名单 checks，逐个调用 `run_guarded_check`，并把自动验证 run、状态和 `verificationSummary` 写回同一任务记录；全部通过为 `done`，任一失败为 `failed`。
-- 本地 run summary 已接入：Rust command `write_run_summary` 会把任务标题、状态、Apply 结果、验证摘要、文件列表和检查结果追加写入 `.project-os/runs/desktop-summary.md`；前端 Apply + Verify 结束后自动调用，并把 summary path 写回任务记录。当前仍未自动合并进 `HANDOFF.md` 正文，下一步应做“确认合并到交接”。
+- 本地 run summary 已接入：Rust command `write_run_summary` 会把任务标题、状态、Apply 结果、验证摘要、文件列表和检查结果追加写入 `.project-os/runs/desktop-summary.md`；前端 Apply + Verify 结束后自动调用，并把 summary path 写回任务记录。
+- 交接状态合并确认已接入：Rust command `merge_run_summary_to_handoff` 只读取任务里的 `runSummary.summary`，在用户点击 `Merge Handoff` 后追加固定 `Desktop 合并记录` 区块到当前项目 `HANDOFF.md`；缺少 `HANDOFF.md` 或 run summary 时拒绝执行。当前是追加式合并，下一步可做结构化合并、冲突提示和摘要去重。
 - 桌面端设计系统边界已更新：目标已转为真实桌面工作台，允许并推荐接 Headless / shadcn-style 本地组件层；当前已安装 `@radix-ui/react-slot`、`class-variance-authority`、`clsx`，并新增 `desktop/src/components/ui/button.jsx` 与 `desktop/src/lib/cn.js`。视觉仍以 `desktop/src/styles.css` 的 `--desktop-*` token layer 为 SSOT，不能直接套第三方默认主题或继续散落硬编码视觉值。
 - 桌面端按钮已开始组件化：顶部栏、项目选择、项目添加、任务发送、Diff / Runner 操作、Queue Approve、Provider 模型刷新 / 测试和保存按钮已迁到本地 `Button` primitive；`uiButton` 已补齐 hover、active、focus-visible、disabled 状态，并通过 Desktop tokens 控制状态色。
 - 桌面端输入和下拉已开始组件化：新增 `desktop/src/components/ui/input.jsx` 与 `desktop/src/components/ui/select.jsx`，Composer、项目路径、Provider 配置和模型选择已改用 `Input` / `Select` primitive；输入、下拉、placeholder 和下拉箭头颜色已映射到 Desktop tokens。
@@ -92,6 +94,6 @@ bash tests/run-tests.sh
 
 ## 下一步建议
 
-1. 接入交接状态合并确认，形成更完整的 coding 闭环。
+1. 打磨交接状态结构化合并、冲突提示和摘要去重。
 2. 将主题设置继续打磨为更小白的品牌色入口，例如支持粘贴 HEX、命名品牌色和重置默认。
 3. 打磨任务执行记录和模型调用反馈。

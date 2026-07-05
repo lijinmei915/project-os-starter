@@ -172,7 +172,7 @@ export function ThemeMenu() {
 
   return (
     <DropdownMenu>
-      <Tooltip content="主题设置">
+      <Tooltip content="主题">
         <DropdownMenuTrigger asChild>
           <Button variant="subtle" size="icon" type="button" aria-label="主题">
             <Sun className="buttonIcon" strokeWidth={2.25} aria-hidden="true" />

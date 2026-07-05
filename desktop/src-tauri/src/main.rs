@@ -1,12 +1,16 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use std::collections::HashMap;
 use std::fs;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::time::Duration;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
+use tauri::{AppHandle, Emitter, State};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -42,6 +46,8 @@ struct RegistryProject {
     path: String,
     phase: String,
     is_current: bool,
+    health: String,
+    status_label: String,
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -78,6 +84,17 @@ struct WorkspaceSnapshot {
     trace: Vec<String>,
 }
 
+#[derive(Default)]
+struct TerminalState {
+    sessions: Mutex<HashMap<String, TerminalSession>>,
+}
+
+struct TerminalSession {
+    child: Box<dyn Child + Send>,
+    master: Box<dyn MasterPty + Send>,
+    writer: Box<dyn Write + Send>,
+}
+
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ReadonlyPlan {
@@ -107,6 +124,21 @@ struct GeneratePlanInput {
     task: String,
     #[serde(default)]
     attachments: Vec<PlanAttachment>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ChatWithModelInput {
+    message: String,
+    #[serde(default)]
+    attachments: Vec<PlanAttachment>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RenameRegistryProjectInput {
+    id: String,
+    name: String,
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -214,6 +246,49 @@ struct RunGuardedCheckInput {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct RunTerminalCommandInput {
+    command: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StartTerminalSessionInput {
+    #[serde(default = "default_terminal_session_id")]
+    session_id: String,
+    #[serde(default = "default_terminal_cols")]
+    cols: u16,
+    #[serde(default = "default_terminal_rows")]
+    rows: u16,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WriteTerminalSessionInput {
+    #[serde(default = "default_terminal_session_id")]
+    session_id: String,
+    data: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ResizeTerminalSessionInput {
+    #[serde(default = "default_terminal_session_id")]
+    session_id: String,
+    #[serde(default = "default_terminal_cols")]
+    cols: u16,
+    #[serde(default = "default_terminal_rows")]
+    rows: u16,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StopTerminalSessionInput {
+    #[serde(default = "default_terminal_session_id")]
+    session_id: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct DesktopTaskInput {
     task: Value,
 }
@@ -233,6 +308,12 @@ struct ApplyPatchDraftInput {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct WriteRunSummaryInput {
+    task: Value,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MergeRunSummaryToHandoffInput {
     task: Value,
 }
 
@@ -279,6 +360,14 @@ struct RunSummaryResult {
     summary: String,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct HandoffMergeResult {
+    path: String,
+    message: String,
+    merged_at: String,
+}
+
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct GuardedCheckResult {
@@ -288,6 +377,46 @@ struct GuardedCheckResult {
     success: bool,
     code: Option<i32>,
     output: String,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct TerminalCommandResult {
+    id: String,
+    label: String,
+    command: String,
+    cwd: String,
+    success: bool,
+    code: Option<i32>,
+    output: String,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct TerminalSessionResult {
+    session_id: String,
+    cwd: String,
+    shell: String,
+    running: bool,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct TerminalOutputEvent {
+    session_id: String,
+    data: String,
+}
+
+fn default_terminal_session_id() -> String {
+    "main".to_string()
+}
+
+fn default_terminal_cols() -> u16 {
+    100
+}
+
+fn default_terminal_rows() -> u16 {
+    28
 }
 
 #[derive(Deserialize)]
@@ -349,6 +478,14 @@ struct ProviderModelTestResult {
     message: String,
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ChatWithModelResult {
+    reply: String,
+    should_create_plan: bool,
+    intent: String,
+}
+
 #[derive(Deserialize)]
 struct ModelsListResponse {
     data: Vec<ModelItem>,
@@ -385,12 +522,7 @@ fn get_workspace_snapshot() -> Result<WorkspaceSnapshot, String> {
     let run_count = count_run_records(&root);
     let (file_count, docs_count) = count_workspace_files(&root);
 
-    let project_name = state
-        .as_ref()
-        .and_then(|json| json.get("name"))
-        .and_then(Value::as_str)
-        .unwrap_or(&current_project.name)
-        .to_string();
+    let project_name = current_project.name.clone();
     let phase = state
         .as_ref()
         .and_then(|json| json.get("phase"))
@@ -514,6 +646,95 @@ fn switch_registry_project(id: String) -> Result<WorkspaceSnapshot, String> {
 }
 
 #[tauri::command]
+fn rename_registry_project(input: RenameRegistryProjectInput) -> Result<WorkspaceSnapshot, String> {
+    let next_name = input.name.trim();
+    if next_name.is_empty() {
+        return Err("项目名称不能为空。".to_string());
+    }
+    if next_name.chars().count() > 60 {
+        return Err("项目名称太长了，建议控制在 60 个字以内。".to_string());
+    }
+
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let project = registry
+        .projects
+        .iter_mut()
+        .find(|project| project.id == input.id)
+        .ok_or_else(|| "未找到这个项目".to_string())?;
+    project.name = next_name.to_string();
+    save_registry(&app_root, &registry)?;
+    get_workspace_snapshot()
+}
+
+#[tauri::command]
+fn remove_registry_project(id: String) -> Result<WorkspaceSnapshot, String> {
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    if registry.projects.len() <= 1 {
+        return Err("至少保留一个工作台项目；这个项目不能移除。".to_string());
+    }
+    let original_len = registry.projects.len();
+    registry.projects.retain(|project| project.id != id);
+    if registry.projects.len() == original_len {
+        return Err("未找到这个项目".to_string());
+    }
+    if registry.current_project_id == id {
+        registry.current_project_id = registry
+            .projects
+            .first()
+            .map(|project| project.id.clone())
+            .ok_or_else(|| "registry 中没有项目".to_string())?;
+    }
+    save_registry(&app_root, &registry)?;
+    get_workspace_snapshot()
+}
+
+#[tauri::command]
+fn open_project_folder(id: String) -> Result<(), String> {
+    let app_root = find_workspace_root()?;
+    let registry = load_or_seed_registry(&app_root)?;
+    let project = registry
+        .projects
+        .iter()
+        .find(|project| project.id == id)
+        .ok_or_else(|| "未找到这个项目".to_string())?;
+    let project_path = PathBuf::from(&project.path);
+    if !project_path.exists() {
+        return Err("这个项目路径已经不存在，无法查看本地文件。".to_string());
+    }
+    if !project_path.is_dir() {
+        return Err("这个项目不是文件夹，无法查看本地文件。".to_string());
+    }
+
+    #[cfg(target_os = "macos")]
+    let mut command = {
+        let mut command = Command::new("open");
+        command.arg(&project_path);
+        command
+    };
+
+    #[cfg(target_os = "windows")]
+    let mut command = {
+        let mut command = Command::new("explorer");
+        command.arg(&project_path);
+        command
+    };
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let mut command = {
+        let mut command = Command::new("xdg-open");
+        command.arg(&project_path);
+        command
+    };
+
+    command
+        .spawn()
+        .map_err(|err| format!("无法打开本地文件：{}", err))?;
+    Ok(())
+}
+
+#[tauri::command]
 fn read_engineering_file(input: ReadEngineeringFileInput) -> Result<EngineeringFilePreview, String> {
     const MAX_PREVIEW_BYTES: usize = 80 * 1024;
 
@@ -571,6 +792,57 @@ fn read_engineering_file(input: ReadEngineeringFileInput) -> Result<EngineeringF
         truncated,
         size: metadata.len(),
     })
+}
+
+#[tauri::command]
+async fn chat_with_model(input: ChatWithModelInput) -> Result<ChatWithModelResult, String> {
+    let message = input.message.trim().to_string();
+    if message.is_empty() && input.attachments.is_empty() {
+        return Err("请输入内容".to_string());
+    }
+
+    let attachments = input
+        .attachments
+        .into_iter()
+        .filter(|attachment| {
+            attachment.mime_type.starts_with("image/")
+                && attachment.data_url.starts_with("data:image/")
+                && attachment.data_url.len() < 4_000_000
+        })
+        .take(4)
+        .collect::<Vec<_>>();
+
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let current_project = current_registry_project(&mut registry, &app_root)?;
+    let root = PathBuf::from(&current_project.path);
+    let provider = load_or_seed_provider_config(&app_root)?;
+    let state = read_json(root.join(".project-os/state.json"));
+    let project_name = state
+        .as_ref()
+        .and_then(|json| json.get("name"))
+        .and_then(Value::as_str)
+        .unwrap_or(&current_project.name)
+        .to_string();
+    let stage = state
+        .as_ref()
+        .and_then(|json| json.get("stage"))
+        .and_then(Value::as_str)
+        .unwrap_or("未读取到阶段信息")
+        .to_string();
+
+    if provider.enabled {
+        match generate_provider_chat(&provider, &root, &project_name, &stage, &message, &attachments).await {
+            Ok(result) => return Ok(result),
+            Err(err) => {
+                let mut fallback = local_chat_result(&message, !attachments.is_empty());
+                fallback.reply = format!("{}（模型暂时不可用：{}）", fallback.reply, err);
+                return Ok(fallback);
+            }
+        }
+    }
+
+    Ok(local_chat_result(&message, !attachments.is_empty()))
 }
 
 #[tauri::command]
@@ -824,6 +1096,51 @@ fn write_run_summary(input: WriteRunSummaryInput) -> Result<RunSummaryResult, St
         path: ".project-os/runs/desktop-summary.md".to_string(),
         message: "任务摘要已写入本地 run summary".to_string(),
         summary,
+    })
+}
+
+#[tauri::command]
+fn merge_run_summary_to_handoff(input: MergeRunSummaryToHandoffInput) -> Result<HandoffMergeResult, String> {
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let current_project = current_registry_project(&mut registry, &app_root)?;
+    let root = PathBuf::from(&current_project.path);
+    let handoff_path = root.join("HANDOFF.md");
+    if !handoff_path.is_file() {
+        return Err("当前项目没有 HANDOFF.md，不能自动合并交接。".to_string());
+    }
+
+    let task = input.task;
+    let summary = task
+        .pointer("/runSummary/summary")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| "任务还没有 run summary，请先完成 Apply + Verify。".to_string())?;
+    let title = task
+        .get("title")
+        .and_then(Value::as_str)
+        .unwrap_or("未命名任务");
+    let merged_at = current_timestamp_string();
+    let existing = fs::read_to_string(&handoff_path).map_err(|err| err.to_string())?;
+    let block = format!(
+        r#"
+
+## Desktop 合并记录 - {}
+
+> 来源：Project OS Desktop 用户确认合并。
+
+{}
+"#,
+        title, summary
+    );
+    let content = format!("{}{}\n", existing.trim_end(), block);
+    fs::write(&handoff_path, content).map_err(|err| err.to_string())?;
+
+    Ok(HandoffMergeResult {
+        path: "HANDOFF.md".to_string(),
+        message: "任务摘要已合并到 HANDOFF.md".to_string(),
+        merged_at,
     })
 }
 
@@ -1106,6 +1423,166 @@ async fn generate_provider_patch_draft(
     draft.guardrails.push("当前只是 patch 草案，尚未写入文件。".to_string());
     draft.trace.push(format!("PROVIDER_PATCH: {}", provider.model));
     Ok(draft)
+}
+
+async fn generate_provider_chat(
+    provider: &ProviderConfig,
+    root: &Path,
+    project_name: &str,
+    stage: &str,
+    message: &str,
+    attachments: &[PlanAttachment],
+) -> Result<ChatWithModelResult, String> {
+    let api_key = read_secret_from_env_or_dotenv(root, &provider.api_key_env)
+        .ok_or_else(|| format!("环境变量或 .env.local 中未设置 {}", provider.api_key_env))?;
+    if api_key.trim().is_empty() {
+        return Err(format!("环境变量 {} 为空", provider.api_key_env));
+    }
+
+    let endpoint = chat_completions_endpoint(&provider.api_base);
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(45))
+        .build()
+        .map_err(|err| err.to_string())?;
+    let router_prompt = chat_router_prompt(project_name, stage, message, attachments);
+    let user_content = if attachments.is_empty() {
+        Value::String(router_prompt)
+    } else {
+        let mut parts = vec![json!({
+            "type": "text",
+            "text": router_prompt
+        })];
+        for attachment in attachments {
+            parts.push(json!({
+                "type": "image_url",
+                "image_url": {
+                    "url": attachment.data_url,
+                    "detail": "auto"
+                }
+            }));
+        }
+        Value::Array(parts)
+    };
+    let response = client
+        .post(endpoint)
+        .bearer_auth(api_key)
+        .json(&json!({
+            "model": provider.model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are OmniDesk, a local AI project workbench assistant. Return only strict JSON with keys reply, shouldCreatePlan, intent. Do not include markdown fences."
+                },
+                {
+                    "role": "user",
+                    "content": user_content
+                }
+            ],
+            "temperature": 0.45
+        }))
+        .send()
+        .await
+        .map_err(|err| err.to_string())?;
+
+    let status = response.status();
+    if !status.is_success() {
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("provider HTTP {}: {}", status, trim_for_trace(&body)));
+    }
+
+    let chat: ChatCompletionsResponse = response.json().await.map_err(|err| err.to_string())?;
+    let content = chat
+        .choices
+        .first()
+        .map(|choice| choice.message.content.trim())
+        .filter(|content| !content.is_empty())
+        .ok_or_else(|| "provider 返回空内容".to_string())?;
+    let mut result: ChatWithModelResult = serde_json::from_str(content)
+        .map_err(|err| format!("chat JSON 解析失败: {}", err))?;
+    if result.reply.trim().is_empty() {
+        result.reply = "我在。你可以直接说想做什么，我会先判断是普通对话还是需要创建计划。".to_string();
+    }
+    if result.intent.trim().is_empty() {
+        result.intent = if result.should_create_plan { "task" } else { "chat" }.to_string();
+    }
+    Ok(result)
+}
+
+fn chat_router_prompt(project_name: &str, stage: &str, message: &str, attachments: &[PlanAttachment]) -> String {
+    let attachment_note = if attachments.is_empty() {
+        "No image attachments.".to_string()
+    } else {
+        format!(
+            "Image attachments: {}.",
+            attachments
+                .iter()
+                .map(|attachment| attachment.name.clone())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    };
+    format!(
+        r#"Current project: {project_name}
+Current stage: {stage}
+{attachment_note}
+
+User message:
+{message}
+
+Decide whether this is normal conversation or a concrete project task.
+
+Return strict JSON only:
+{{
+  "reply": "Chinese, natural, concise assistant reply shown in chat",
+  "shouldCreatePlan": false,
+  "intent": "chat | question | inspect | task"
+}}
+
+Rules:
+- Greetings, small talk, broad questions, or "what is X" shouldCreatePlan=false.
+- Only set shouldCreatePlan=true when the user clearly asks OmniDesk to modify, generate, fix, run checks, inspect screenshots/files as a task, or create an execution plan.
+- If shouldCreatePlan=true, reply should briefly acknowledge that you will create a plan.
+- Do not invent completed work.
+- Do not mention internal JSON or routing.
+"#
+    )
+}
+
+fn local_chat_result(message: &str, has_attachments: bool) -> ChatWithModelResult {
+    let should_create_plan = has_attachments || is_task_like_message(message);
+    ChatWithModelResult {
+        reply: if should_create_plan {
+            "可以，我先把它作为一个项目任务理解，生成计划前会保持只读，不直接改文件。".to_string()
+        } else if is_greeting_message(message) {
+            "你好，我在。你可以直接说想改什么、想看哪个文件，或者让我帮你把当前项目下一步理清楚。".to_string()
+        } else {
+            "我在。这个更像普通对话，我先不创建待办；如果你想让我开始做，直接说“帮我改/检查/生成”。".to_string()
+        },
+        should_create_plan,
+        intent: if should_create_plan { "task" } else { "chat" }.to_string(),
+    }
+}
+
+fn is_greeting_message(message: &str) -> bool {
+    let normalized = message
+        .trim()
+        .trim_matches(|ch: char| ch.is_ascii_punctuation() || ch.is_whitespace() || "。！？!，,".contains(ch))
+        .to_lowercase();
+    matches!(
+        normalized.as_str(),
+        "hi" | "hello" | "hey" | "你好" | "您好" | "哈喽" | "嗨" | "在吗" | "在么"
+    )
+}
+
+fn is_task_like_message(message: &str) -> bool {
+    let text = message.trim().to_lowercase();
+    [
+        "帮我", "改", "修", "优化", "生成", "创建", "新增", "删除", "检查", "跑", "执行",
+        "实现", "接入", "配置", "预览", "截图", "报错", "不行", "失败",
+        "做成", "设计", "重构", "提交", "推送", "commit", "push", "build", "check",
+    ]
+    .iter()
+    .any(|keyword| text.contains(keyword))
 }
 
 fn extract_plan_files(plan: &Value, root: &Path) -> Vec<String> {
@@ -1621,6 +2098,247 @@ fn run_guarded_check(input: RunGuardedCheckInput) -> Result<GuardedCheckResult, 
         code: output.status.code(),
         output: combined,
     })
+}
+
+#[tauri::command]
+fn run_terminal_command(input: RunTerminalCommandInput) -> Result<TerminalCommandResult, String> {
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let current_project = current_registry_project(&mut registry, &app_root)?;
+    let root = PathBuf::from(&current_project.path);
+    if !root.exists() || !root.is_dir() {
+        return Err("当前项目路径不存在或不是目录".to_string());
+    }
+
+    let command = input.command.trim();
+    validate_terminal_command(command)?;
+
+    let mut child = Command::new("zsh")
+        .args(["-lc", command])
+        .current_dir(&root)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|err| err.to_string())?;
+
+    let started_at = Instant::now();
+    let timeout = Duration::from_secs(30);
+    let mut timed_out = false;
+
+    loop {
+        match child.try_wait().map_err(|err| err.to_string())? {
+            Some(_) => break,
+            None if started_at.elapsed() >= timeout => {
+                timed_out = true;
+                let _ = child.kill();
+                break;
+            }
+            None => std::thread::sleep(Duration::from_millis(80)),
+        }
+    }
+
+    let output = child.wait_with_output().map_err(|err| err.to_string())?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let mut combined = format!("{}{}", stdout, stderr);
+    if timed_out {
+        combined.push_str("\nCommand timed out after 30s.");
+    }
+
+    Ok(TerminalCommandResult {
+        id: "terminal".to_string(),
+        label: "Terminal".to_string(),
+        command: command.to_string(),
+        cwd: root.to_string_lossy().to_string(),
+        success: output.status.success() && !timed_out,
+        code: output.status.code(),
+        output: trim_runner_output(&combined),
+    })
+}
+
+#[tauri::command]
+fn start_terminal_session(
+    app: AppHandle,
+    state: State<TerminalState>,
+    input: StartTerminalSessionInput,
+) -> Result<TerminalSessionResult, String> {
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let current_project = current_registry_project(&mut registry, &app_root)?;
+    let root = PathBuf::from(&current_project.path);
+    if !root.exists() || !root.is_dir() {
+        return Err("当前项目路径不存在或不是目录".to_string());
+    }
+
+    let session_id = if input.session_id.trim().is_empty() {
+        default_terminal_session_id()
+    } else {
+        input.session_id.trim().to_string()
+    };
+
+    {
+        let mut sessions = state.sessions.lock().map_err(|err| err.to_string())?;
+        if let Some(mut existing) = sessions.remove(&session_id) {
+            let _ = existing.child.kill();
+        }
+    }
+
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+    let pty_system = native_pty_system();
+    let cols = input.cols.clamp(20, 400);
+    let rows = input.rows.clamp(8, 200);
+    let pair = pty_system
+        .openpty(PtySize {
+            rows,
+            cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        })
+        .map_err(|err| err.to_string())?;
+
+    let mut command = CommandBuilder::new(shell.clone());
+    command.cwd(root.clone());
+    command.env("TERM", "xterm-256color");
+    command.env("COLORTERM", "truecolor");
+
+    let child = pair
+        .slave
+        .spawn_command(command)
+        .map_err(|err| err.to_string())?;
+    let mut reader = pair.master.try_clone_reader().map_err(|err| err.to_string())?;
+    let writer = pair.master.take_writer().map_err(|err| err.to_string())?;
+    let reader_session_id = session_id.clone();
+    let reader_app = app.clone();
+
+    std::thread::spawn(move || {
+        let mut buffer = [0_u8; 4096];
+        loop {
+            match reader.read(&mut buffer) {
+                Ok(0) => break,
+                Ok(size) => {
+                    let data = String::from_utf8_lossy(&buffer[..size]).to_string();
+                    let _ = reader_app.emit(
+                        "terminal://output",
+                        TerminalOutputEvent {
+                            session_id: reader_session_id.clone(),
+                            data,
+                        },
+                    );
+                }
+                Err(_) => break,
+            }
+        }
+    });
+
+    let mut sessions = state.sessions.lock().map_err(|err| err.to_string())?;
+    sessions.insert(
+        session_id.clone(),
+        TerminalSession {
+            child,
+            master: pair.master,
+            writer,
+        },
+    );
+
+    Ok(TerminalSessionResult {
+        session_id,
+        cwd: root.to_string_lossy().to_string(),
+        shell,
+        running: true,
+    })
+}
+
+#[tauri::command]
+fn write_terminal_session(
+    state: State<TerminalState>,
+    input: WriteTerminalSessionInput,
+) -> Result<(), String> {
+    let session_id = if input.session_id.trim().is_empty() {
+        default_terminal_session_id()
+    } else {
+        input.session_id.trim().to_string()
+    };
+    let mut sessions = state.sessions.lock().map_err(|err| err.to_string())?;
+    let session = sessions
+        .get_mut(&session_id)
+        .ok_or_else(|| "终端还没有启动".to_string())?;
+    session
+        .writer
+        .write_all(input.data.as_bytes())
+        .map_err(|err| err.to_string())?;
+    session.writer.flush().map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+fn resize_terminal_session(
+    state: State<TerminalState>,
+    input: ResizeTerminalSessionInput,
+) -> Result<(), String> {
+    let session_id = if input.session_id.trim().is_empty() {
+        default_terminal_session_id()
+    } else {
+        input.session_id.trim().to_string()
+    };
+    let sessions = state.sessions.lock().map_err(|err| err.to_string())?;
+    let session = sessions
+        .get(&session_id)
+        .ok_or_else(|| "终端还没有启动".to_string())?;
+    session
+        .master
+        .resize(PtySize {
+            rows: input.rows.clamp(8, 200),
+            cols: input.cols.clamp(20, 400),
+            pixel_width: 0,
+            pixel_height: 0,
+        })
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+fn stop_terminal_session(
+    state: State<TerminalState>,
+    input: StopTerminalSessionInput,
+) -> Result<(), String> {
+    let session_id = if input.session_id.trim().is_empty() {
+        default_terminal_session_id()
+    } else {
+        input.session_id.trim().to_string()
+    };
+    let mut sessions = state.sessions.lock().map_err(|err| err.to_string())?;
+    if let Some(mut session) = sessions.remove(&session_id) {
+        let _ = session.child.kill();
+    }
+    Ok(())
+}
+
+fn validate_terminal_command(command: &str) -> Result<(), String> {
+    if command.is_empty() {
+        return Err("请输入要运行的命令".to_string());
+    }
+    if command.len() > 1000 {
+        return Err("命令太长，请拆成更小的步骤".to_string());
+    }
+    if command.contains('\0') {
+        return Err("命令包含非法字符".to_string());
+    }
+
+    let normalized = command.to_lowercase();
+    let blocked_patterns = [
+        "rm -rf /",
+        "rm -rf ~",
+        "sudo ",
+        "su -",
+        "mkfs",
+        "diskutil erase",
+        ":(){",
+        "chmod -r 777 /",
+        "chown -r ",
+    ];
+    if blocked_patterns.iter().any(|pattern| normalized.contains(pattern)) {
+        return Err("这个命令看起来风险过高，已被终端保护拦截。".to_string());
+    }
+
+    Ok(())
 }
 
 struct GuardedCheckSpec {
@@ -2412,14 +3130,36 @@ fn registry_projects(registry: &RegistryFile) -> Vec<RegistryProject> {
     registry
         .projects
         .iter()
-        .map(|project| RegistryProject {
-            id: project.id.clone(),
-            name: project.name.clone(),
-            path: project.path.clone(),
-            phase: project.phase.clone(),
-            is_current: project.id == registry.current_project_id,
+        .map(|project| {
+            let (health, status_label) = project_health(project);
+            RegistryProject {
+                id: project.id.clone(),
+                name: project.name.clone(),
+                path: project.path.clone(),
+                phase: project.phase.clone(),
+                is_current: project.id == registry.current_project_id,
+                health,
+                status_label,
+            }
         })
         .collect()
+}
+
+fn project_health(project: &RegistryFileProject) -> (String, String) {
+    let root = PathBuf::from(&project.path);
+    if !root.exists() || !root.is_dir() {
+        return ("missing".to_string(), "路径失效".to_string());
+    }
+    let has_state = root.join(".project-os/state.json").is_file();
+    let has_project = root.join("PROJECT.md").is_file();
+    let has_handoff = root.join("HANDOFF.md").is_file();
+    if has_state && has_project && has_handoff {
+        return ("ready".to_string(), "已接入 · Project OS".to_string());
+    }
+    if has_state || has_project || has_handoff || root.join("AGENTS.md").is_file() {
+        return ("partial".to_string(), "缺少关键文件".to_string());
+    }
+    ("external".to_string(), "未初始化 · 普通项目".to_string())
 }
 
 fn normalize_project_path(path: &str) -> Result<PathBuf, String> {
@@ -2581,15 +3321,21 @@ fn is_ignored_path(path: &Path) -> bool {
 
 fn main() {
     tauri::Builder::default()
+        .manage(TerminalState::default())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             get_workspace_snapshot,
             add_registry_project,
             switch_registry_project,
+            rename_registry_project,
+            remove_registry_project,
+            open_project_folder,
+            chat_with_model,
             generate_readonly_plan,
             generate_patch_draft,
             apply_patch_draft,
             write_run_summary,
+            merge_run_summary_to_handoff,
             list_desktop_tasks,
             save_desktop_task,
             get_model_catalog,
@@ -2601,7 +3347,12 @@ fn main() {
             probe_provider_models,
             test_provider_model,
             read_engineering_file,
-            run_guarded_check
+            run_guarded_check,
+            run_terminal_command,
+            start_terminal_session,
+            write_terminal_session,
+            resize_terminal_session,
+            stop_terminal_session
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Project OS Desktop");

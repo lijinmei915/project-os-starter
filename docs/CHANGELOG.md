@@ -23,6 +23,16 @@ use_when: "AI 需要回溯某个功能是什么时候改的、为什么改的、
 
 ---
 
+## 2026-07-03
+
+### OmniDesk / Project OS Desktop
+
+#### OmniDesk 北极星目标 + 成熟工具参照系统
+
+- **改动**：(1) `PROJECT.md` 和 `docs/PRODUCT_PLAN.md` 明确 OmniDesk 是会持续学习项目的本地 AI 工程工作台，目标是让任何新老项目按统一流程被理解、治理、开发和演进；(2) 新增 `docs/REFERENCE_SYSTEMS.md`，定义 Hermes、Codex CLI、Claude Code 等成熟工具是参照系统和可接入执行器，不替代 OmniDesk 的用户入口；(3) `docs/DOCUMENTATION.md`、`docs/NAMING.md` 和 `docs/data/doc-structure.manifest.json` 登记参照系统文档职责；(4) `.project-os/state.json` 同步机器可读项目描述。
+- **影响**：后续桌面端设计以“用户入口 + 项目治理中枢 + 本地项目记忆”为北极星；Hermes 等工具优先作为底层执行能力和治理形态参考，执行结果必须回写 `.project-os/`，不把外部 runtime 当作默认产品入口。
+- **相关文件**：`PROJECT.md`, `docs/PRODUCT_PLAN.md`, `docs/REFERENCE_SYSTEMS.md`, `docs/DOCUMENTATION.md`, `docs/NAMING.md`, `docs/data/doc-structure.manifest.json`, `.project-os/state.json`, `docs/CHANGELOG.md`。
+
 ## 2026-06-13
 
 ### AI Engineering Kit / governance

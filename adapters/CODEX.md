@@ -50,6 +50,8 @@ The turn is only complete after the INIT start mode is clear.
 
 ## Codex Notes
 
+- Use mainstream chat behavior by default: answer or act on the user's current request first, without exposing internal routes, step lists, checks, or approval flow unless they are useful to the user.
+- Ask for confirmation before destructive, irreversible, publishing, pushing, broad refactor, or unclear changes.
 - Prefer small, verifiable patches.
 - Preserve existing user work.
 - Run shell checks when available.

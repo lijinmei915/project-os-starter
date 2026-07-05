@@ -1,17 +1,22 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Bot, BookOpen, Brain, CheckCircle2, ClipboardList, FileStack, Package, Plus, Settings, ShieldCheck, TerminalSquare, Wrench } from "lucide-react";
+import { Terminal } from "@xterm/xterm";
+import { FitAddon } from "@xterm/addon-fit";
+import { Bot, BookOpen, Brain, CheckCircle2, ChevronsDownUp, ChevronsUpDown, ChevronRight, ClipboardList, Copy, FileStack, MoreHorizontal, Package, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Settings, ShieldCheck, TerminalSquare, Wrench, X } from "lucide-react";
 import omnideskLogo from "./assets/omnidesk-logo.svg";
 import { ChatComposer } from "./components/workbench/chat-composer";
 import { Conversation, ConversationArtifact, ConversationMessage } from "./components/workbench/conversation";
 import { InfoCallout } from "./components/workbench/info-callout";
 import { ProviderStatusRow } from "./components/workbench/provider-status-row";
+import { SystemSettingsMenu } from "./components/workbench/system-settings-menu";
 import { TaskCard } from "./components/workbench/task-card";
 import { TaskCommandBar } from "./components/workbench/task-command-bar";
 import { ThemeMenu } from "./components/workbench/theme-menu";
+import { WorkspaceTree } from "./components/workbench/workspace-tree";
 import { Button } from "./components/ui/button";
 import { Badge } from "./components/ui/badge";
-import { Dialog, DialogContent, DialogTrigger } from "./components/ui/dialog";
+import { Dialog, DialogClose, DialogContent, DialogTrigger } from "./components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "./components/ui/dropdown-menu";
 import { Field } from "./components/ui/field";
 import { Input } from "./components/ui/input";
 import { Notice } from "./components/ui/notice";
@@ -21,7 +26,41 @@ import { Select } from "./components/ui/select";
 import { Switch } from "./components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Tooltip, TooltipProvider } from "./components/ui/tooltip";
+import { projectGovernanceOutline } from "./workspace-outline";
+import "@xterm/xterm/css/xterm.css";
 import "./styles.css";
+
+class AppErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidCatch(error) {
+    console.error("OmniDesk render error", error);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="appError">
+          <Panel className="appErrorPanel" variant="soft">
+            <strong>界面刚刚出错了</strong>
+            <p>{safeDisplayText(this.state.error?.message, "未知错误")}</p>
+            <Button type="button" variant="primary" onClick={() => window.location.reload()}>
+              重新载入
+            </Button>
+          </Panel>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const fallbackSnapshot = {
   projectName: "project-os-starter",
@@ -93,102 +132,277 @@ const engineeringFlow = [
     title: "认识项目",
     meta: "当前",
     icon: BookOpen,
-    description: "项目身份、阶段和本地状态。",
+    description: "项目基本状态。",
     files: ["PROJECT.md", ".project-os/state.json", "README.md"],
+    items: [
+      { title: "项目是什么", description: "名称、用途和阶段。", relatedFiles: ["PROJECT.md", ".project-os/state.json"] },
+      { title: "现在做到哪", description: "当前进度和下一步。", relatedFiles: ["PROJECT.md", "HANDOFF.md"] },
+      { title: "怎么启动", description: "本地启动方式。", relatedFiles: ["README.md", "docs/RUNBOOK.md", "docs/DESKTOP_APP.md"] },
+      { title: "有什么风险", description: "已知风险和边界。", relatedFiles: ["HANDOFF.md", "docs/LESSONS.md"] },
+      { title: "本地项目状态", description: "接入和文件状态。", relatedFiles: [".project-os/state.json", ".project-os/desktop-registry.json"] },
+    ],
   },
   {
     title: "定义目标",
     meta: "路线",
     icon: ClipboardList,
-    description: "产品目标、桌面端方向和近期重点。",
-    files: ["docs/PRODUCT_PLAN.md", "docs/DESKTOP_APP.md", "HANDOFF.md"],
+    description: "目标、对象和边界。",
+    files: ["docs/PRODUCT_PLAN.md", "PROJECT.md", "HANDOFF.md"],
+    items: [
+      { title: "项目目标", description: "问题和结果。", relatedFiles: ["docs/PRODUCT_PLAN.md", "PROJECT.md"] },
+      { title: "目标用户", description: "核心使用者。", relatedFiles: ["docs/PRODUCT_PLAN.md", "PROJECT.md"] },
+      { title: "使用场景", description: "主要工作流。", relatedFiles: ["docs/PRODUCT_PLAN.md", "docs/DESKTOP_APP.md"] },
+      { title: "当前范围", description: "做什么和不做什么。", relatedFiles: ["PROJECT.md", "HANDOFF.md"] },
+      { title: "成功标准", description: "完成判断标准。", relatedFiles: ["docs/PRODUCT_PLAN.md", "docs/TESTING.md", "HANDOFF.md"] },
+    ],
   },
   {
-    title: "约束协作",
+    title: "工作规则",
     meta: "规则",
     icon: ShieldCheck,
-    description: "AI 行为边界、路由和文档维护规则。",
+    description: "协作方式和权限。",
     files: ["AGENTS.md", "docs/ROUTING.md", "docs/DOCUMENTATION.md", "docs/NAMING.md"],
+    items: [
+      { title: "角色边界", description: "谁能做什么。", relatedFiles: ["AGENTS.md"] },
+      { title: "请求路由", description: "需求处理流程。", relatedFiles: ["docs/ROUTING.md"] },
+      { title: "执行权限", description: "自动和确认边界。", relatedFiles: ["AGENTS.md", "docs/ROUTING.md"] },
+      { title: "文档规则", description: "信息归属位置。", relatedFiles: ["docs/DOCUMENTATION.md", "docs/NAMING.md"] },
+      { title: "风险约束", description: "禁止和复盘规则。", relatedFiles: ["AGENTS.md", "docs/LESSONS.md"] },
+    ],
   },
   {
     title: "设计实现",
     meta: "方案",
     icon: Wrench,
-    description: "架构、代码结构和设计系统。",
+    description: "方案、架构和实现结构。",
     files: ["docs/ARCHITECTURE.md", "docs/CODE_STRUCTURE.md", "docs/DESIGN_STANDARDS.md", "docs/design/tokens.md"],
+    items: [
+      { title: "方案设计", description: "整体解决方案。", relatedFiles: ["docs/PRODUCT_PLAN.md", "docs/DESKTOP_APP.md"] },
+      { title: "系统架构", description: "模块和依赖关系。", relatedFiles: ["docs/ARCHITECTURE.md"] },
+      { title: "数据模型", description: "对象、状态和关系。", relatedFiles: ["schemas/*", "docs/data/*"] },
+      { title: "界面规范", description: "组件和设计 token。", relatedFiles: ["docs/DESIGN_STANDARDS.md", "docs/design/tokens.md", "desktop/src/styles.css"] },
+      { title: "实现结构", description: "目录和模块职责。", relatedFiles: ["docs/CODE_STRUCTURE.md", "desktop/src/main.jsx", "desktop/src-tauri/src/main.rs"] },
+    ],
   },
   {
-    title: "验证质量",
+    title: "验证交付",
     meta: "检查",
     icon: CheckCircle2,
-    description: "测试、运行手册和可执行检查。",
+    description: "验收、测试和交付结果。",
     files: ["docs/TESTING.md", "docs/RUNBOOK.md", "scripts/check-runtime.sh", "scripts/check-ai-project.sh"],
+    items: [
+      { title: "验收标准", description: "完成判断标准。", relatedFiles: ["docs/PRODUCT_PLAN.md", "docs/TESTING.md"] },
+      { title: "检查清单", description: "必须检查事项。", relatedFiles: ["docs/TESTING.md", "scripts/check-runtime.sh", "scripts/check-ai-project.sh"] },
+      { title: "测试验证", description: "功能和回归验证。", relatedFiles: ["docs/TESTING.md", "desktop/package.json"] },
+      { title: "交付产物", description: "最终交付内容。", relatedFiles: ["docs/RUNBOOK.md", "templates/*", "dist/*"] },
+      { title: "质量记录", description: "结果和遗留问题。", relatedFiles: [".project-os/runs/*", ".project-os/recommendations/recommend-next.json", "HANDOFF.md"] },
+    ],
   },
   {
-    title: "Agent 能力",
-    meta: "能力",
-    icon: Bot,
-    description: "Agent 规则、技能、适配和模型连接。",
-    files: [".agents/skills/*", "AGENTS.md", "adapters/*", ".project-os/desktop-provider.json"],
-  },
-  {
-    title: "工程资源",
-    meta: "资源",
-    icon: Package,
-    description: "脚本、模板、schema 和可分发资源。",
-    files: ["scripts/*", "schemas/*", "templates/*", "templates/project-docs/*"],
-  },
-  {
-    title: "记忆沉淀",
+    title: "复盘沉淀",
     meta: "记忆",
     icon: Brain,
-    description: "交接、经验、决策和结构化知识。",
+    description: "经验和下一步。",
     files: ["HANDOFF.md", "docs/LESSONS.md", "docs/DECISIONS.md", ".project-os/runs/*", "docs/data/knowledge-registry.json"],
+    items: [
+      { title: "当前交接", description: "继续工作上下文。", relatedFiles: ["HANDOFF.md"] },
+      { title: "经验复盘", description: "踩坑和修正。", relatedFiles: ["docs/LESSONS.md"] },
+      { title: "关键决策", description: "重要取舍记录。", relatedFiles: ["docs/DECISIONS.md", "docs/CHANGELOG.md"] },
+      { title: "运行记录", description: "任务和检查记录。", relatedFiles: [".project-os/runs/*", "docs/data/knowledge-registry.json"] },
+    ],
   },
 ];
 
 const workspaceAreas = [
   {
-    title: "项目治理",
+    title: "项目流程",
     meta: "流程",
     icon: ClipboardList,
-    description: "按真实研发流程管理项目工程文件。",
-    files: ["认识项目", "定义目标", "约束协作", "设计实现", "验证质量", "记忆沉淀"],
+    description: "从理解到复盘的项目阶段。",
+    files: ["认识项目", "定义目标", "工作规则", "设计实现", "验证交付", "复盘沉淀"],
   },
   {
-    title: "记忆",
+    title: "知识记忆",
     meta: "上下文",
     icon: Brain,
-    description: "长期经验、偏好、决策和运行记录。",
-    files: ["HANDOFF.md", "docs/LESSONS.md", "docs/DECISIONS.md", ".project-os/runs/*"],
+    description: "项目、用户、规则和会话记忆。",
+    children: [
+      {
+        title: "项目上下文",
+        meta: "项目",
+        icon: BookOpen,
+        description: "项目目标和状态。",
+        files: ["PROJECT.md", "HANDOFF.md", ".project-os/state.json", "docs/PRODUCT_PLAN.md"],
+      },
+      {
+        title: "用户偏好",
+        meta: "全局",
+        icon: Brain,
+        description: "长期工作偏好。",
+        files: ["OmniDesk global: user-profile.json", "OmniDesk global: global-preferences.json"],
+      },
+      {
+        title: "团队规则",
+        meta: "规则",
+        icon: Settings,
+        description: "长期协作规则。",
+        files: ["AGENTS.md", "docs/ROUTING.md", "docs/DOCUMENTATION.md"],
+      },
+      {
+        title: "决策记录",
+        meta: "项目",
+        icon: ClipboardList,
+        description: "关键取舍记录。",
+        files: ["docs/DECISIONS.md", "docs/LESSONS.md", "docs/CHANGELOG.md"],
+      },
+      {
+        title: "会话摘要",
+        meta: "当前",
+        icon: Brain,
+        description: "对话沉淀内容。",
+        files: [".project-os/conversations/*", ".project-os/memory/*"],
+      },
+    ],
+    files: ["项目上下文", "用户偏好", "团队规则", "决策记录", "会话摘要"],
   },
   {
-    title: "Agent 能力",
-    meta: "技能",
-    icon: Bot,
-    description: "Agent 规则、技能包、适配器和模型连接。",
-    files: [".agents/skills/*", "AGENTS.md", "adapters/*", ".project-os/desktop-provider.json"],
+    title: "任务执行",
+    meta: "执行",
+    icon: TerminalSquare,
+    description: "对话、计划、待办、运行和结果。",
+    children: [
+      {
+        title: "对话",
+        meta: "当前",
+        icon: BookOpen,
+        description: "任务对话入口。",
+        files: [".project-os/conversations/*"],
+      },
+      {
+        title: "计划",
+        meta: "步骤",
+        icon: ClipboardList,
+        description: "执行步骤和范围。",
+        files: [".project-os/runs/*", ".project-os/recommendations/recommend-next.json"],
+      },
+      {
+        title: "待办",
+        meta: "队列",
+        icon: ClipboardList,
+        description: "已确认任务队列。",
+        files: [".project-os/runs/desktop-tasks/*"],
+      },
+      {
+        title: "运行记录",
+        meta: "日志",
+        icon: TerminalSquare,
+        description: "命令和工具日志。",
+        files: [".project-os/runs/*", ".project-os/runs/desktop-summary.md"],
+      },
+      {
+        title: "执行结果",
+        meta: "结果",
+        icon: CheckCircle2,
+        description: "Diff、产物和检查结果。",
+        files: [".project-os/runs/*", "HANDOFF.md"],
+      },
+    ],
+    files: ["对话", "计划", "待办", "运行记录", "执行结果"],
   },
   {
-    title: "工程文件",
+    title: "工程资产",
     meta: "资产",
     icon: FileStack,
-    description: "项目运行、文档治理和交付所需的关键文件。",
-    files: ["PROJECT.md", "docs/*", "schemas/*", "templates/*"],
+    description: "文档、代码、数据契约和模板。",
+    children: [
+      {
+        title: "核心文档",
+        meta: "入口",
+        icon: BookOpen,
+        description: "项目入口文档。",
+        files: ["README.md", "PROJECT.md", "HANDOFF.md", "AGENTS.md"],
+      },
+      {
+        title: "产品文档",
+        meta: "产品",
+        icon: ClipboardList,
+        description: "计划和决策文档。",
+        files: ["docs/PRODUCT_PLAN.md", "docs/DESKTOP_APP.md", "docs/DECISIONS.md", "docs/CHANGELOG.md"],
+      },
+      {
+        title: "设计资产",
+        meta: "设计",
+        icon: Wrench,
+        description: "设计规范和 tokens。",
+        files: ["docs/DESIGN_STANDARDS.md", "docs/design/*"],
+      },
+      {
+        title: "代码结构",
+        meta: "代码",
+        icon: FileStack,
+        description: "源码和脚本结构。",
+        files: ["desktop/*", "scripts/*", "adapters/*"],
+      },
+      {
+        title: "数据契约",
+        meta: "数据",
+        icon: TerminalSquare,
+        description: "Schema 和 manifest。",
+        files: ["schemas/*", "docs/data/*"],
+      },
+      {
+        title: "模板资源",
+        meta: "模板",
+        icon: Package,
+        description: "可分发模板。",
+        files: ["templates/*", "templates/project-docs/*", "templates/report/*"],
+      },
+    ],
+    files: ["核心文档", "产品文档", "设计资产", "代码结构", "数据契约", "模板资源"],
   },
   {
-    title: "运行检查",
-    meta: "验证",
-    icon: TerminalSquare,
-    description: "检查脚本、测试入口和受控 runner。",
-    files: ["scripts/check-runtime.sh", "scripts/check-ai-project.sh", "scripts/check-template-sync.sh", "scripts/project-runner.sh"],
-  },
-  {
-    title: "设置",
+    title: "Agent 配置",
     meta: "配置",
-    icon: Settings,
-    description: "模型、主题、项目 registry 和本地配置。",
-    files: [".project-os/desktop-provider.json", ".project-os/desktop-theme.json", ".project-os/desktop-registry.json"],
+    icon: Bot,
+    description: "模型、技能、工具和适配器。",
+    children: [
+      {
+        title: "模型配置",
+        meta: "模型",
+        icon: Settings,
+        description: "Provider 和模型。",
+        files: [".project-os/desktop-provider.json", ".project-os/model-catalog.json"],
+      },
+      {
+        title: "工具权限",
+        meta: "权限",
+        icon: ShieldCheck,
+        description: "工具调用边界。",
+        files: ["AGENTS.md", "docs/DESKTOP_APP.md", "docs/AI_SAFETY.md"],
+      },
+      {
+        title: "Skills",
+        meta: "技能",
+        icon: Bot,
+        description: "Agent 能力扩展。",
+        files: [".agents/skills/*", "docs/SKILL_ENGINEERING.md"],
+      },
+      {
+        title: "适配器",
+        meta: "适配",
+        icon: FileStack,
+        description: "工具入口适配。",
+        files: ["adapters/*", "CODEX.md", "CLAUDE.md"],
+      },
+      {
+        title: "执行边界",
+        meta: "边界",
+        icon: ShieldCheck,
+        description: "确认和禁止规则。",
+        files: ["AGENTS.md", "docs/ROUTING.md", "docs/SECURITY.md"],
+      },
+    ],
+    files: [".agents/skills/*", "AGENTS.md", "adapters/*", ".project-os/desktop-provider.json"],
   },
 ];
 
@@ -274,7 +488,7 @@ const guardedChecks = [
 ];
 
 async function loadWorkspaceSnapshot() {
-  if (!window.__TAURI_INTERNALS__) {
+  if (!isTauriRuntime()) {
     return fallbackSnapshot;
   }
 
@@ -283,7 +497,7 @@ async function loadWorkspaceSnapshot() {
 }
 
 async function loadProviderStatus() {
-  if (!window.__TAURI_INTERNALS__) {
+  if (!isTauriRuntime()) {
     return loadPreviewProviderStatus();
   }
 
@@ -292,7 +506,7 @@ async function loadProviderStatus() {
 }
 
 async function loadModelCatalog() {
-  if (!window.__TAURI_INTERNALS__) {
+  if (!isTauriRuntime()) {
     return loadPreviewJson("/.project-os/model-catalog.json", fallbackModelCatalog);
   }
 
@@ -301,7 +515,7 @@ async function loadModelCatalog() {
 }
 
 async function loadDesktopTasks() {
-  if (!window.__TAURI_INTERNALS__) {
+  if (!isTauriRuntime()) {
     return [];
   }
 
@@ -331,7 +545,7 @@ async function loadPreviewProviderStatus() {
 }
 
 async function invokeWorkspaceCommand(command, payload) {
-  if (!window.__TAURI_INTERNALS__) {
+  if (!isTauriRuntime()) {
     throw new Error("当前是浏览器预览，只能查看界面；请在桌面 App 窗口里保存配置。");
   }
 
@@ -349,14 +563,14 @@ function readFileAsDataUrl(file) {
 }
 
 async function persistDesktopTask(task) {
-  if (!window.__TAURI_INTERNALS__) {
+  if (!isTauriRuntime()) {
     return task;
   }
   return invokeWorkspaceCommand("save_desktop_task", { input: { task } });
 }
 
 async function pickProjectDirectory() {
-  if (!window.__TAURI_INTERNALS__) {
+  if (!isTauriRuntime()) {
     throw new Error("浏览器预览模式暂不支持系统目录选择器");
   }
 
@@ -364,7 +578,7 @@ async function pickProjectDirectory() {
   return open({
     directory: true,
     multiple: false,
-    title: "选择要接入 Project OS Desktop 的项目目录",
+    title: "新建或选择要加入 OmniDesk 的项目目录",
   });
 }
 
@@ -414,6 +628,7 @@ function TopBar({
           </DialogContent>
         </Dialog>
         <ThemeMenu />
+        <SystemSettingsMenu />
         <Tooltip content="开始一段新的对话">
           <Button variant="primary" type="button" onClick={onStartConversation}>
             <Plus className="buttonIcon" strokeWidth={2.25} aria-hidden="true" />
@@ -425,121 +640,238 @@ function TopBar({
   );
 }
 
-function ProjectSidebar({ snapshot, onSwitchProject, onPickProject, onSelectEngineeringFile, projectActionError, selectedEngineeringFile }) {
+function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot, onSwitchProject, onPickProject, onOpenProjectFolder, onRenameProject, onRemoveProject, onSelectEngineeringFile, projectActionError, selectedEngineeringFile }) {
   const [activeArea, setActiveArea] = useState(workspaceAreas[0].title);
-  const [activeFlow, setActiveFlow] = useState(engineeringFlow[0].title);
+  const [activeChildByArea, setActiveChildByArea] = useState({
+    项目流程: engineeringFlow[0].title,
+    知识记忆: "项目上下文",
+  });
+  const [renameProject, setRenameProject] = useState(null);
+  const [renameName, setRenameName] = useState("");
+  const [projectsOpen, setProjectsOpen] = useState(true);
+  const [workspaceOpen, setWorkspaceOpen] = useState(true);
+  const [nodeOpenByKey, setNodeOpenByKey] = useState({});
+  const [fileSummaryOpenByKey, setFileSummaryOpenByKey] = useState({});
 
-  const renderFileSummary = (item) => (
-    <div className="treeDetail" aria-label={`${item.title}工程文件`}>
-      <div className="treeDescription">{item.description}</div>
+  const openRenameDialog = (project) => {
+    setRenameProject(project);
+    setRenameName(project.name);
+  };
+
+  const submitRename = async (event) => {
+    event.preventDefault();
+    if (!renameProject) return;
+    const ok = await onRenameProject(renameProject.id, renameName);
+    if (ok) {
+      setRenameProject(null);
+      setRenameName("");
+    }
+  };
+
+  const isFileSummaryOpen = (key) => fileSummaryOpenByKey[key] === true;
+  const isNodeOpen = (key) => nodeOpenByKey[key] !== false;
+  const toggleNodeOpen = (key) => {
+    setNodeOpenByKey((current) => ({
+      ...current,
+      [key]: current[key] === false,
+    }));
+  };
+  const toggleFileSummary = (key) => {
+    setFileSummaryOpenByKey((current) => ({
+      ...current,
+      [key]: current[key] !== true,
+    }));
+  };
+  const allFileSummaryKeys = [
+    ...workspaceAreas.map((item) => item.title),
+    ...workspaceAreas.flatMap((item) => {
+      const childItems = item.title === "项目流程" ? engineeringFlow : item.children || [];
+      return childItems.map((flow) => `${item.title}/${flow.title}`);
+    }),
+  ];
+  const allFileSummariesOpen = allFileSummaryKeys.every((key) => isFileSummaryOpen(key));
+  const toggleAllFileSummaries = () => {
+    const nextOpen = !allFileSummariesOpen;
+    setFileSummaryOpenByKey(Object.fromEntries(allFileSummaryKeys.map((key) => [key, nextOpen])));
+    if (nextOpen) {
+      setNodeOpenByKey(Object.fromEntries(workspaceAreas.map((item) => [item.title, true])));
+    }
+  };
+
+  const copyProjectPath = async (projectPath) => {
+    try {
+      await navigator.clipboard.writeText(projectPath);
+      setProjectActionError("");
+    } catch (err) {
+      setProjectActionError(`复制路径失败：${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
+  const projectStatusTone = (project) => {
+    if (project.health === "ready") return "success";
+    if (project.health === "missing") return "danger";
+    if (project.health === "partial") return "running";
+    return "";
+  };
+
+  if (collapsed) {
+    return (
+      <aside className="left left-collapsed" aria-label="左侧工作区已折叠">
+        <div className="collapsedRail">
+          <button className="collapsedRailItem active" type="button" onClick={onToggleCollapsed} aria-label="项目">
+            <Package strokeWidth={2.15} aria-hidden="true" />
+          </button>
+          <button className="collapsedRailItem" type="button" onClick={onToggleCollapsed} aria-label="项目流程">
+            <ClipboardList strokeWidth={2.15} aria-hidden="true" />
+          </button>
+          <button className="collapsedRailItem" type="button" onClick={onToggleCollapsed} aria-label="记忆">
+            <Brain strokeWidth={2.15} aria-hidden="true" />
+          </button>
+          <Tooltip content="展开工作区">
+            <Button className="railToggleButton sideCornerButton" size="icon" variant="ghost" type="button" onClick={onToggleCollapsed} aria-label="展开工作区">
+              <PanelLeftOpen strokeWidth={1.75} aria-hidden="true" />
+            </Button>
+          </Tooltip>
+        </div>
+      </aside>
+    );
+  }
+
+  const renderFileSummary = (item) => {
+    const displayItems = item.items || item.files.map((file) => ({
+      title: file,
+      description: item.description,
+      relatedFiles: [file],
+    }));
+
+    return (
+    <div className="treeDetail" aria-label={`${item.title}工程事项`}>
       <div className="treeFileList">
-        {item.files.map((file) => (
+        {displayItems.map((entry) => (
           <button
-            className={`treeFile${selectedEngineeringFile?.path === file ? " active" : ""}`}
-            key={file}
-            onClick={() => onSelectEngineeringFile({ path: file, group: item.title, description: item.description })}
-            title={file}
+            className={`treeFile treeTopic${selectedEngineeringFile?.path === `${item.title}/${entry.title}` ? " active" : ""}`}
+            key={entry.title}
+            onClick={() => onSelectEngineeringFile({
+              path: `${item.title}/${entry.title}`,
+              group: item.title,
+              title: entry.title,
+              description: entry.description,
+              relatedFiles: entry.relatedFiles,
+              virtual: true,
+            })}
+            title={entry.description}
             type="button"
           >
-            {file}
+            {entry.title}
           </button>
         ))}
       </div>
     </div>
   );
+  };
 
   return (
     <aside className="left">
       <div className="leftScroll">
-        <SectionTitle
-          title="项目"
-          meta={snapshot.projects.length}
-          actions={(
-            <Tooltip content="添加本地项目">
-              <Button className="sectionIconAction" size="icon" variant="ghost" type="button" onClick={onPickProject} aria-label="添加本地项目">
-                <Plus strokeWidth={2.25} aria-hidden="true" />
-              </Button>
-            </Tooltip>
-          )}
-        />
-        <div className="projectList" aria-label="已接入项目">
-          {snapshot.projects.map((project) => (
-            <button
-              className={`projectItem${project.isCurrent ? " active" : ""}`}
-              type="button"
-              key={project.id}
-              title={project.path}
-              onClick={() => onSwitchProject(project.id)}
-            >
-              <span className="projectMark">{project.name.slice(0, 2).toUpperCase()}</span>
-              <span className="projectMeta">
-                <strong>{project.name}</strong>
-              </span>
-            </button>
-          ))}
-        </div>
-        {projectActionError ? <div className="projectError">{projectActionError}</div> : null}
-
-        <SectionTitle title="工作区" />
-        <nav className="flowNav workspaceTree" aria-label="工作区">
-          {workspaceAreas.map((item) => {
-            const Icon = item.icon;
-            const isActive = item.title === activeArea;
-            const showGovernanceFlow = isActive && item.title === "项目治理";
-
-            return (
-              <div className="workspaceGroup treeNode treeNode-root" key={item.title}>
-                <button
-                  className={`flowItem treeRow${isActive ? " active" : ""}`}
-                  onClick={() => setActiveArea(item.title)}
-                  type="button"
-                >
-                  <span className="flowIcon" aria-hidden="true">
-                    <Icon strokeWidth={2.25} />
-                  </span>
-                  <span className="flowText">{item.title}</span>
-                  <span className="flowMeta">{item.meta}</span>
+        <div className="leftRailSection">
+          <SectionTitle
+            title="项目"
+            meta={snapshot.projects.length}
+            open={projectsOpen}
+            onToggle={() => setProjectsOpen((value) => !value)}
+            toggleLabel={projectsOpen ? "收起项目" : "展开项目"}
+          />
+          {projectsOpen ? (
+            <div className="projectList" aria-label="已接入项目">
+              {snapshot.projects.map((project) => (
+                <div className="projectTileWrap" key={project.id}>
+                  <button
+                    className={`projectTile${project.isCurrent ? " active" : ""}`}
+                    type="button"
+                    onClick={() => onSwitchProject(project.id)}
+                    aria-label={`切换到项目 ${project.name}`}
+                  >
+                    {projectStatusTone(project) ? <span className={`projectStatusDot projectStatusDot-${projectStatusTone(project)}`} /> : null}
+                    <span className="projectMark">{project.name.slice(0, 2).toUpperCase()}</span>
+                  </button>
+                  <div className="projectHoverCard" role="group" aria-label={`${project.name} 项目信息`}>
+                    <div className="projectHoverMain">
+                      <strong title={project.name}>{project.name}</strong>
+                      <span title={project.path}>{project.path}</span>
+                    </div>
+                    <button className="projectCopyPath" type="button" onClick={() => copyProjectPath(project.path)} aria-label={`复制 ${project.name} 路径`} title="复制路径">
+                      <Copy strokeWidth={2.15} aria-hidden="true" />
+                    </button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button className="projectMenuButton" size="icon" variant="ghost" type="button" aria-label={`项目菜单：${project.name}`}>
+                          <MoreHorizontal strokeWidth={2.25} aria-hidden="true" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem onSelect={() => onOpenProjectFolder(project.id)}>查看本地文件</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => openRenameDialog(project)}>修改名称</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem className="dangerMenuItem" onSelect={() => onRemoveProject(project.id)}>
+                          从工作台移除
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              ))}
+              <Tooltip content="新建或添加项目">
+                <button className="projectTile projectTile-add" type="button" onClick={onPickProject} aria-label="新建或添加项目">
+                  <Plus strokeWidth={2.25} aria-hidden="true" />
                 </button>
-                {showGovernanceFlow ? (
-                  <div className="inlineFlowDetail treeChildren">
-                    <nav className="flowNav governanceNav" aria-label="项目治理流程">
-                      {engineeringFlow.map((flow) => {
-                        const FlowIcon = flow.icon;
-                        const flowActive = flow.title === activeFlow;
-
-                        return (
-                          <div className="flowTreeNode treeNode" key={flow.title}>
-                            <button
-                              className={`flowItem flowItem-compact treeRow${flowActive ? " active" : ""}`}
-                              onClick={() => setActiveFlow(flow.title)}
-                              type="button"
-                            >
-                              <span className="flowIcon" aria-hidden="true">
-                                <FlowIcon strokeWidth={2.25} />
-                              </span>
-                              <span className="flowText">{flow.title}</span>
-                              <span className="flowMeta">{flow.meta}</span>
-                            </button>
-                            {flowActive ? (
-                              <div className="flowNodeDetail treeChildren">
-                                {renderFileSummary(flow)}
-                              </div>
-                            ) : null}
-                          </div>
-                        );
-                      })}
-                    </nav>
-                  </div>
-                ) : isActive ? (
-                  <div className="inlineFlowDetail">
-                    {renderFileSummary(item)}
-                  </div>
-                ) : null}
+              </Tooltip>
+            </div>
+          ) : null}
+          {projectActionError ? <div className="projectError">{projectActionError}</div> : null}
+        </div>
+        <Dialog open={Boolean(renameProject)} onOpenChange={(open) => {
+          if (!open) {
+            setRenameProject(null);
+            setRenameName("");
+          }
+        }}>
+          <DialogContent
+            title="修改项目名称"
+            description="这里只修改 OmniDesk 工作台里的显示名称，不会重命名本地文件夹。"
+          >
+            <form className="projectRenameForm" onSubmit={submitRename}>
+              <Field label="项目名称" htmlFor="project-rename-input">
+                <Input
+                  autoFocus
+                  id="project-rename-input"
+                  maxLength={60}
+                  onChange={(event) => setRenameName(event.target.value)}
+                  placeholder="输入项目名称"
+                  value={renameName}
+                />
+              </Field>
+              <div className="projectRenameActions">
+                <DialogClose asChild>
+                  <Button type="button" variant="ghost">取消</Button>
+                </DialogClose>
+                <Button disabled={!renameName.trim()} type="submit" variant="primary">保存</Button>
               </div>
-            );
-          })}
-        </nav>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        <WorkspaceTree
+          activeTopicPath={selectedEngineeringFile?.path}
+          onSelectTopic={onSelectEngineeringFile}
+          outline={projectGovernanceOutline}
+        />
       </div>
+      <Tooltip content="折叠工作区">
+        <Button className="sideCornerButton sideCornerButton-left" size="icon" variant="ghost" type="button" onClick={onToggleCollapsed} aria-label="折叠工作区">
+          <PanelLeftClose strokeWidth={1.75} aria-hidden="true" />
+        </Button>
+      </Tooltip>
+      <div className="sidebarResizer sidebarResizer-left" role="separator" aria-label="拖拽调整左侧宽度" onPointerDown={onResizeStart} />
     </aside>
   );
 }
@@ -568,9 +900,94 @@ function checksForPlan(plan) {
   );
 }
 
+function previewChatResult(message, hasAttachments) {
+  const normalized = message.trim().replace(/[。！？!?,，\s]/g, "").toLowerCase();
+  const taskLike = hasAttachments || [
+    "帮我", "改", "修", "优化", "生成", "创建", "新增", "删除", "检查", "执行",
+    "实现", "接入", "配置", "截图", "报错", "失败", "做成", "设计", "push",
+  ].some((keyword) => message.toLowerCase().includes(keyword));
+  const greeting = ["hi", "hello", "hey", "你好", "您好", "哈喽", "嗨", "在吗", "在么"].includes(normalized);
+  return {
+    intent: taskLike ? "task" : "chat",
+    reply: taskLike
+      ? "可以，我先把它作为项目任务理解，进入计划前不会直接改文件。"
+      : greeting
+        ? "你好，我在。桌面 App 里会直接走你配置的模型；浏览器预览只能做本地分流。"
+        : "我在。这个更像普通对话，先不创建待办；如果你想让我开始做，直接说“帮我改/检查/生成”。",
+    shouldCreatePlan: taskLike,
+  };
+}
+
+function safeDisplayText(value, fallback = "") {
+  if (typeof value === "string") return value;
+  if (value == null) return fallback;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function isTauriRuntime() {
+  return Boolean(window.__TAURI_INTERNALS__ || window.__TAURI__ || window.__TAURI_METADATA__);
+}
+
+function cleanTerminalText(value) {
+  let text = safeDisplayText(value);
+  text = text
+    .replace(/\x1B\][^\x07]*(?:\x07|\x1B\\)/g, "")
+    .replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, "")
+    .replace(/\x1B[@-Z\\-_]/g, "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n");
+
+  while (text.includes("\b")) {
+    const next = text.replace(/[^\n]\x08/g, "").replace(/^\x08/gm, "");
+    if (next === text) break;
+    text = next;
+  }
+
+  return text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
+}
+
+function conversationTitle(turns) {
+  const firstUser = turns.find((turn) => turn.role === "user");
+  const title = safeDisplayText(firstUser?.text, "新对话").trim() || "新对话";
+  return title.length > 24 ? `${title.slice(0, 24)}...` : title;
+}
+
+function conversationPreview(turns) {
+  const last = [...turns].reverse().find((turn) => turn.text);
+  const preview = safeDisplayText(last?.text, "暂无内容").trim() || "暂无内容";
+  return preview.length > 42 ? `${preview.slice(0, 42)}...` : preview;
+}
+
+function isNoiseTask(task) {
+  const title = safeDisplayText(task?.title).trim().replace(/[。！？!?,，\s]/g, "").toLowerCase();
+  return /^\d+$/.test(title) || ["hi", "hello", "hey", "你好", "您好", "哈喽", "嗨", "在吗", "在么"].includes(title);
+}
+
+const chatStarterPrompts = [
+  "检查当前项目还有哪些风险",
+  "整理下一步任务并生成计划",
+  "查看最近改动并准备审查",
+  "运行一轮基础检查",
+];
+
+function workspaceFileTabId(file) {
+  return `file:${file?.path || file?.preview?.path || file?.topic?.title || "preview"}`;
+}
+
 function AgentWorkspace({
   snapshot,
   selectedEngineeringFile,
+  chatTurns,
+  terminalLogs,
+  terminalRunningId,
+  terminalText,
+  terminalChunks,
+  terminalSession,
+  terminalError,
   loading,
   error,
   readonlyPlan,
@@ -583,18 +1000,35 @@ function AgentWorkspace({
   patchError,
   applyLoading,
   applyError,
+  handoffLoading,
+  handoffError,
   conversationResetKey,
+  onChatTurnsChange,
   onGeneratePlan,
   onGeneratePatchDraft,
   onApplyPatchDraft,
+  onMergeHandoff,
   onRunGuardedCheck,
+  onRunTerminalCheck,
+  onRunTerminalCommand,
+  onWriteTerminalData,
+  onResizeTerminalSession,
+  onRestartTerminalSession,
 }) {
   const [taskInput, setTaskInput] = useState("");
   const [attachments, setAttachments] = useState([]);
   const [pendingTurn, setPendingTurn] = useState(null);
+  const [chatLoading, setChatLoading] = useState(false);
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState("plan");
+  const [workspaceTabs, setWorkspaceTabs] = useState([
+    { id: "plan", title: "对话", kind: "conversation", closable: false },
+    { id: "terminal", title: "终端", kind: "terminal", closable: false },
+    { id: "diff", title: "改动预览", kind: "diff", closable: true },
+    { id: "checks", title: "运行检查", kind: "checks", closable: true },
+    { id: "trace", title: "记录", kind: "trace", closable: true },
+  ]);
   const composerRef = React.useRef(null);
-  const isConversationEmpty = !activeTask && !readonlyPlan && !loading && !error && !pendingTurn;
+  const isConversationEmpty = !chatTurns.length && !activeTask && !readonlyPlan && !loading && !error && !pendingTurn && !chatLoading;
 
   useEffect(() => {
     setTaskInput("");
@@ -603,17 +1037,48 @@ function AgentWorkspace({
       return [];
     });
     setPendingTurn(null);
+    onChatTurnsChange([]);
     setActiveWorkspaceTab("plan");
+      setWorkspaceTabs((current) => current.filter((tab) => tab.kind !== "file"));
     composerRef.current?.focus();
   }, [conversationResetKey]);
 
   useEffect(() => {
     if (selectedEngineeringFile) {
-      setActiveWorkspaceTab("file");
+      const tabId = workspaceFileTabId(selectedEngineeringFile);
+      const title =
+        selectedEngineeringFile.preview?.name ||
+        selectedEngineeringFile.topic?.title ||
+        selectedEngineeringFile.path ||
+        "文件";
+      setWorkspaceTabs((current) => {
+        const nextTab = {
+          file: selectedEngineeringFile,
+          id: tabId,
+          title,
+          kind: "file",
+          closable: true,
+        };
+        return current.some((tab) => tab.id === tabId)
+          ? current.map((tab) => (tab.id === tabId ? { ...tab, ...nextTab } : tab))
+          : [...current, nextTab];
+      });
+      setActiveWorkspaceTab(tabId);
     } else {
       setActiveWorkspaceTab("plan");
     }
   }, [selectedEngineeringFile]);
+
+  const closeWorkspaceTab = (event, tabId) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const tab = workspaceTabs.find((item) => item.id === tabId);
+    if (!tab?.closable) return;
+    setWorkspaceTabs((current) => current.filter((item) => item.id !== tabId));
+    if (activeWorkspaceTab === tabId) {
+      setActiveWorkspaceTab("plan");
+    }
+  };
 
   const addImageFiles = async (fileList) => {
     const files = Array.from(fileList || []).filter((file) => file.type.startsWith("image/"));
@@ -649,7 +1114,12 @@ function AgentWorkspace({
     });
   };
 
-  const submitTask = (event) => {
+  const useStarterPrompt = (prompt) => {
+    setTaskInput(prompt);
+    requestAnimationFrame(() => composerRef.current?.focus());
+  };
+
+  const submitTask = async (event) => {
     event.preventDefault();
     const nextInput = taskInput.trim();
     if (!nextInput && !attachments.length) return;
@@ -660,12 +1130,62 @@ function AgentWorkspace({
       name: attachment.name,
       url: attachment.url,
     }));
-    setPendingTurn({
+    const userTurn = {
       attachments: submittedAttachments,
+      id: `${Date.now()}-user`,
+      role: "user",
       text: nextInput || "请根据截图帮我分析并修改。",
-    });
+    };
     setTaskInput("");
     setAttachments([]);
+    onChatTurnsChange([...chatTurns, userTurn]);
+    setChatLoading(true);
+
+    let chatResult;
+    try {
+      if (!isTauriRuntime()) {
+        chatResult = previewChatResult(nextInput, submittedAttachments.length > 0);
+      } else {
+        chatResult = await invokeWorkspaceCommand("chat_with_model", {
+          input: {
+            attachments: submittedAttachments.map((attachment) => ({
+              dataUrl: attachment.dataUrl,
+              mimeType: attachment.mimeType,
+              name: attachment.name,
+            })),
+            message: nextInput,
+          },
+        });
+      }
+    } catch (err) {
+      chatResult = {
+        intent: "task",
+        reply: `我先按项目任务处理。模型对话暂时不可用：${err instanceof Error ? err.message : String(err)}`,
+        shouldCreatePlan: true,
+      };
+    } finally {
+      setChatLoading(false);
+    }
+
+    if (!chatResult?.shouldCreatePlan) {
+      onChatTurnsChange([
+        ...chatTurns,
+        userTurn,
+        {
+          id: `${Date.now()}-assistant`,
+          role: "assistant",
+          text: safeDisplayText(chatResult?.reply, "我在。你可以继续说想做什么。"),
+        },
+      ]);
+      submittedAttachments.forEach((attachment) => URL.revokeObjectURL(attachment.url));
+      return;
+    }
+
+    setPendingTurn({
+      attachments: submittedAttachments,
+      showUser: false,
+      text: nextInput || "请根据截图帮我分析并修改。",
+    });
     onGeneratePlan({
       attachments: submittedAttachments.map((attachment) => ({
         dataUrl: attachment.dataUrl,
@@ -678,28 +1198,62 @@ function AgentWorkspace({
         setPendingTurn(null);
         submittedAttachments.forEach((attachment) => URL.revokeObjectURL(attachment.url));
       }
+    }).catch(() => {
+      setPendingTurn(null);
+      submittedAttachments.forEach((attachment) => URL.revokeObjectURL(attachment.url));
     });
   };
 
   return (
     <Tabs className="center" value={activeWorkspaceTab} onValueChange={setActiveWorkspaceTab}>
       <TabsList className="tabs" aria-label="工作区视图">
-        <TabsTrigger className="tab" value="plan">对话</TabsTrigger>
-        {selectedEngineeringFile ? (
-          <TabsTrigger className="tab fileTab" value="file">{selectedEngineeringFile.preview?.name || "文件"}</TabsTrigger>
-        ) : null}
-        <TabsTrigger className="tab" value="diff">改动预览</TabsTrigger>
-        <TabsTrigger className="tab" value="checks">运行检查</TabsTrigger>
-        <TabsTrigger className="tab" value="trace">记录</TabsTrigger>
+        {workspaceTabs.map((tab) => (
+          <TabsTrigger className={`tab workspaceTab ${tab.kind === "file" ? "fileTab" : ""}`} key={tab.id} value={tab.id}>
+            <span>{tab.title}</span>
+            {tab.closable ? (
+              <button
+                aria-label={`关闭 ${tab.title}`}
+                className="workspaceTabClose"
+                onClick={(event) => closeWorkspaceTab(event, tab.id)}
+                type="button"
+              >
+                <X aria-hidden="true" />
+              </button>
+            ) : null}
+          </TabsTrigger>
+        ))}
       </TabsList>
 
       <TabsContent className="workspaceTabContent agentCanvas" value="plan">
         {isConversationEmpty ? (
           <div className="conversationStart">
             <h2>有什么新点子？</h2>
+            <div className="conversationStarters" aria-label="建议任务">
+              {chatStarterPrompts.map((prompt) => (
+                <button key={prompt} type="button" onClick={() => useStarterPrompt(prompt)}>
+                  {prompt}
+                </button>
+              ))}
+            </div>
           </div>
         ) : (
           <Conversation>
+            {chatTurns.map((turn) => (
+              <ConversationMessage key={turn.id} role={turn.role}>
+                <div>{safeDisplayText(turn.text)}</div>
+                {turn.attachments?.length ? (
+                  <div className="conversationAttachmentGrid">
+                    {turn.attachments.map((attachment) => (
+                      <figure className="conversationAttachment" key={attachment.id}>
+                        <img src={attachment.url} alt={attachment.name} />
+                        <figcaption>{attachment.name}</figcaption>
+                      </figure>
+                    ))}
+                  </div>
+                ) : null}
+              </ConversationMessage>
+            ))}
+
             {activeTask || readonlyPlan || loading || error ? (
               <ConversationMessage
                 meta={loading ? "连接中" : error ? "需要检查" : snapshot.phase}
@@ -733,8 +1287,11 @@ function AgentWorkspace({
                       patchError={patchError}
                       applyLoading={applyLoading}
                       applyError={applyError}
+                      handoffLoading={handoffLoading}
+                      handoffError={handoffError}
                       onGeneratePatchDraft={onGeneratePatchDraft}
                       onApplyPatchDraft={onApplyPatchDraft}
+                      onMergeHandoff={onMergeHandoff}
                       onRunGuardedCheck={onRunGuardedCheck}
                     />
                   ) : (
@@ -745,23 +1302,30 @@ function AgentWorkspace({
               </ConversationMessage>
             ) : null}
 
-          {pendingTurn ? (
+          {pendingTurn || chatLoading ? (
             <>
-              <ConversationMessage role="user">
-                <div>{pendingTurn.text}</div>
-                {pendingTurn.attachments.length ? (
-                  <div className="conversationAttachmentGrid">
-                    {pendingTurn.attachments.map((attachment) => (
-                      <figure className="conversationAttachment" key={attachment.id}>
-                        <img src={attachment.url} alt={attachment.name} />
-                        <figcaption>{attachment.name}</figcaption>
-                      </figure>
-                    ))}
-                  </div>
-                ) : null}
-              </ConversationMessage>
-              <ConversationMessage className="conversationMessage-thinking" grouped role="assistant" title="OmniDesk">
-                正在思考...
+              {pendingTurn && pendingTurn.showUser !== false ? (
+                <ConversationMessage role="user">
+                  <div>{safeDisplayText(pendingTurn.text)}</div>
+                  {pendingTurn.attachments?.length ? (
+                    <div className="conversationAttachmentGrid">
+                      {pendingTurn.attachments.map((attachment) => (
+                        <figure className="conversationAttachment" key={attachment.id}>
+                          <img src={attachment.url} alt={attachment.name} />
+                          <figcaption>{attachment.name}</figcaption>
+                        </figure>
+                      ))}
+                    </div>
+                  ) : null}
+                </ConversationMessage>
+              ) : null}
+              <ConversationMessage className="conversationMessage-thinking" role="assistant" title="OmniDesk">
+                <span>正在思考</span>
+                <span className="thinkingDots" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                </span>
               </ConversationMessage>
             </>
           ) : null}
@@ -779,48 +1343,307 @@ function AgentWorkspace({
         )}
       </TabsContent>
 
-      {selectedEngineeringFile ? (
-        <TabsContent className="workspaceTabContent fileCanvas" value="file">
-          <EngineeringFileTab selectedEngineeringFile={selectedEngineeringFile} />
-        </TabsContent>
-      ) : null}
-
-      <TabsContent className="workspaceTabContent agentCanvas emptyWorkspacePanel" value="diff">
-        <Notice variant="muted">改动预览会在生成 patch 草案后显示。</Notice>
-      </TabsContent>
-
-      <TabsContent className="workspaceTabContent agentCanvas emptyWorkspacePanel" value="checks">
-        <Notice variant="muted">运行检查会在确认计划后显示可执行项。</Notice>
-      </TabsContent>
-
-      <TabsContent className="workspaceTabContent agentCanvas emptyWorkspacePanel" value="trace">
-        <div className="terminal conversationTerminal">
-          {snapshot.trace.map((line) => (
-            <div key={line}>{line}</div>
-          ))}
-        </div>
-      </TabsContent>
+      {workspaceTabs.filter((tab) => tab.id !== "plan").map((tab) => {
+        if (tab.kind === "file") {
+          return (
+            <TabsContent className="workspaceTabContent fileCanvas" key={tab.id} value={tab.id}>
+              <EngineeringFileTab selectedEngineeringFile={tab.file} />
+            </TabsContent>
+          );
+        }
+        if (tab.kind === "terminal") {
+          return (
+            <TabsContent className="workspaceTabContent terminalWorkspace" key={tab.id} value={tab.id}>
+              <TerminalDock
+                active={activeWorkspaceTab === tab.id}
+                logs={terminalLogs}
+                runningId={terminalRunningId}
+                onRunCheck={onRunTerminalCheck}
+                onRunCommand={onRunTerminalCommand}
+                onWriteTerminalData={onWriteTerminalData}
+                onResizeTerminalSession={onResizeTerminalSession}
+                onRestartTerminalSession={onRestartTerminalSession}
+                text={terminalText}
+                chunks={terminalChunks}
+                session={terminalSession}
+                error={terminalError}
+              />
+            </TabsContent>
+          );
+        }
+        if (tab.kind === "diff") {
+          return (
+            <TabsContent className="workspaceTabContent agentCanvas emptyWorkspacePanel" key={tab.id} value={tab.id}>
+              <Notice variant="muted">改动预览会在生成 patch 草案后显示。</Notice>
+            </TabsContent>
+          );
+        }
+        if (tab.kind === "checks") {
+          return (
+            <TabsContent className="workspaceTabContent agentCanvas emptyWorkspacePanel" key={tab.id} value={tab.id}>
+              <Notice variant="muted">运行检查会在确认计划后显示可执行项。</Notice>
+            </TabsContent>
+          );
+        }
+        if (tab.kind === "trace") {
+          return (
+            <TabsContent className="workspaceTabContent agentCanvas emptyWorkspacePanel" key={tab.id} value={tab.id}>
+              <div className="terminal conversationTerminal">
+                {snapshot.trace.map((line) => (
+                  <div key={line}>{line}</div>
+                ))}
+              </div>
+            </TabsContent>
+          );
+        }
+        return null;
+      })}
 
       {activeWorkspaceTab === "plan" ? (
-        <ChatComposer
+        <ChatDock
           attachments={attachments}
-          inputRef={composerRef}
-          disabled={planLoading}
+          chatLoading={chatLoading}
+          composerRef={composerRef}
           onFilesSelected={addImageFiles}
-          onChange={(event) => setTaskInput(event.target.value)}
+          onInputChange={(event) => setTaskInput(event.target.value)}
           onPaste={handlePaste}
           onRemoveAttachment={removeAttachment}
           onSubmit={submitTask}
-          placeholder="说说你想改什么，例如：把 Provider 配置改成更小白的流程..."
-          sending={planLoading}
-          value={taskInput}
+          planLoading={planLoading}
+          taskInput={taskInput}
         />
       ) : null}
     </Tabs>
   );
 }
 
+function ChatDock({
+  attachments,
+  chatLoading,
+  composerRef,
+  onFilesSelected,
+  onInputChange,
+  onPaste,
+  onRemoveAttachment,
+  onSubmit,
+  planLoading,
+  taskInput,
+}) {
+  return (
+    <section className="chatDock" aria-label="对话输入">
+      <ChatComposer
+        attachments={attachments}
+        inputRef={composerRef}
+        disabled={planLoading || chatLoading}
+        onFilesSelected={onFilesSelected}
+        onChange={onInputChange}
+        onPaste={onPaste}
+        onRemoveAttachment={onRemoveAttachment}
+        onSubmit={onSubmit}
+        placeholder="说说你想改什么，例如：把 Provider 配置改成更小白的流程..."
+        sending={planLoading || chatLoading}
+        value={taskInput}
+      />
+    </section>
+  );
+}
+
+function TerminalDock({
+  active = true,
+  logs,
+  runningId,
+  onRunCheck,
+  onRunCommand,
+  onWriteTerminalData,
+  onResizeTerminalSession,
+  onRestartTerminalSession,
+  text,
+  chunks,
+  session,
+  error,
+}) {
+  const terminalHostRef = React.useRef(null);
+  const xtermRef = React.useRef(null);
+  const fitAddonRef = React.useRef(null);
+  const writeDataRef = React.useRef(onWriteTerminalData);
+  const resizeSessionRef = React.useRef(onResizeTerminalSession);
+  const writtenChunkCountRef = React.useRef(0);
+  const lastSizeRef = React.useRef({ cols: 0, rows: 0 });
+  const isRunning = Boolean(runningId);
+
+  useEffect(() => {
+    writeDataRef.current = onWriteTerminalData;
+  }, [onWriteTerminalData]);
+
+  useEffect(() => {
+    resizeSessionRef.current = onResizeTerminalSession;
+  }, [onResizeTerminalSession]);
+
+  const syncTerminalSize = React.useCallback(() => {
+    if (!xtermRef.current || !fitAddonRef.current) return;
+    try {
+      fitAddonRef.current.fit();
+      const cols = xtermRef.current.cols;
+      const rows = xtermRef.current.rows;
+      if (!cols || !rows) return;
+      if (cols === lastSizeRef.current.cols && rows === lastSizeRef.current.rows) return;
+      lastSizeRef.current = { cols, rows };
+      resizeSessionRef.current?.(cols, rows);
+    } catch {
+      // Ignore fit races while the panel is settling.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!terminalHostRef.current || xtermRef.current) return undefined;
+
+    const terminal = new Terminal({
+      allowProposedApi: false,
+      convertEol: true,
+      cursorBlink: true,
+      cursorStyle: "block",
+      disableStdin: false,
+      fontFamily: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace",
+      fontSize: 11,
+      letterSpacing: 0,
+      lineHeight: 1.35,
+      scrollback: 5000,
+      theme: {
+        background: "#050908",
+        black: "#101716",
+        blue: "#7ea7ff",
+        brightBlack: "#66706f",
+        brightBlue: "#a9c2ff",
+        brightCyan: "#8ee8d3",
+        brightGreen: "#7ce4b0",
+        brightMagenta: "#d7b7ff",
+        brightRed: "#ff9a87",
+        brightWhite: "#f4fbf8",
+        brightYellow: "#ffe09a",
+        cursor: "#35e6aa",
+        cyan: "#68d8c2",
+        foreground: "#d7e3df",
+        green: "#35d892",
+        magenta: "#c8a5ff",
+        red: "#ff846f",
+        selectionBackground: "#214238",
+        white: "#d7e3df",
+        yellow: "#ffd680",
+      },
+    });
+    const fitAddon = new FitAddon();
+    terminal.loadAddon(fitAddon);
+    terminal.open(terminalHostRef.current);
+    terminal.focus();
+    terminal.onData((data) => {
+      writeDataRef.current(data);
+    });
+    xtermRef.current = terminal;
+    fitAddonRef.current = fitAddon;
+    requestAnimationFrame(syncTerminalSize);
+
+    window.addEventListener("resize", syncTerminalSize);
+    return () => {
+      window.removeEventListener("resize", syncTerminalSize);
+      terminal.dispose();
+      xtermRef.current = null;
+      fitAddonRef.current = null;
+      writtenChunkCountRef.current = 0;
+      lastSizeRef.current = { cols: 0, rows: 0 };
+    };
+  }, [syncTerminalSize]);
+
+  useEffect(() => {
+    if (!xtermRef.current) return;
+    const nextChunks = Array.isArray(chunks) ? chunks.slice(writtenChunkCountRef.current) : [];
+    nextChunks.forEach((chunk) => xtermRef.current.write(chunk.data || ""));
+    writtenChunkCountRef.current = Array.isArray(chunks) ? chunks.length : 0;
+  }, [chunks]);
+
+  useEffect(() => {
+    if (!xtermRef.current || !session) return;
+    xtermRef.current.reset();
+    writtenChunkCountRef.current = 0;
+    try {
+      requestAnimationFrame(syncTerminalSize);
+      xtermRef.current.focus();
+    } catch {
+      // Ignore focus/fit races during hot reload.
+    }
+  }, [session, syncTerminalSize]);
+
+  useEffect(() => {
+    if (!active || !xtermRef.current) return;
+    requestAnimationFrame(() => {
+      syncTerminalSize();
+      xtermRef.current?.focus();
+    });
+  }, [active, syncTerminalSize]);
+
+  const runShortcut = async (check) => {
+    await onWriteTerminalData(`${check.command}\r`);
+  };
+
+  return (
+    <section className="terminalDock" aria-label="终端">
+      <div className="terminalDockHeader">
+        <div className="terminalDockTitle">
+          <TerminalSquare aria-hidden="true" />
+          <span>Terminal</span>
+          {session?.cwd ? <em>{session.cwd}</em> : null}
+        </div>
+        <div className="terminalDockActions">
+          {guardedChecks.slice(0, 4).map((check) => (
+            <Button
+              key={check.id}
+              size="sm"
+              type="button"
+              variant="ghost"
+              onClick={() => runShortcut(check)}
+            >
+              {check.label}
+            </Button>
+          ))}
+          <Button size="sm" type="button" variant="ghost" onClick={() => onWriteTerminalData("\u0003")}>
+            Ctrl+C
+          </Button>
+          <Button size="sm" type="button" variant="ghost" onClick={onRestartTerminalSession}>
+            Restart
+          </Button>
+        </div>
+      </div>
+      <div className="terminal terminalDockOutput terminalDockXterm" ref={terminalHostRef} />
+      {error ? <Notice className="terminalNotice" variant="danger">{error}</Notice> : null}
+    </section>
+  );
+}
+
 function EngineeringFileTab({ selectedEngineeringFile }) {
+  if (selectedEngineeringFile.topic) {
+    return (
+      <Panel className="engineeringFilePreview filePreviewPanel" variant="soft">
+        <div className="engineeringFileHeader">
+          <div>
+            <strong>{selectedEngineeringFile.topic.title}</strong>
+            <p>{selectedEngineeringFile.topic.description}</p>
+          </div>
+          <Badge>{selectedEngineeringFile.group}</Badge>
+        </div>
+        <div className="topicPreview">
+          <Notice variant="info">这些是给人看的工作事项；背后的工程文件只在需要查看时打开。</Notice>
+          <div className="topicFileList">
+            <strong>关联工程文件</strong>
+            <div>
+              {selectedEngineeringFile.topic.relatedFiles.map((file) => (
+                <code key={file}>{file}</code>
+              ))}
+            </div>
+          </div>
+        </div>
+      </Panel>
+    );
+  }
+
   return (
     <Panel className="engineeringFilePreview filePreviewPanel" variant="soft">
       <div className="engineeringFileHeader">
@@ -857,8 +1680,11 @@ function ActiveTask({
   patchError,
   applyLoading,
   applyError,
+  handoffLoading,
+  handoffError,
   onGeneratePatchDraft,
   onApplyPatchDraft,
+  onMergeHandoff,
   onRunGuardedCheck,
 }) {
   const runnableChecks = checksForPlan(task.plan);
@@ -893,11 +1719,18 @@ function ActiveTask({
               onClick: () => onApplyPatchDraft(task.id),
               variant: "primary",
             },
+            {
+              disabled: handoffLoading || !task.runSummary || Boolean(task.handoffMerge),
+              key: "merge-handoff",
+              label: handoffLoading ? "Merging" : task.handoffMerge ? "Handoff Merged" : "Merge Handoff",
+              onClick: () => onMergeHandoff(task.id),
+            },
           ]}
           meta={task.patchDraft?.files?.length ? `${task.patchDraft.files.length} files` : "等待生成 patch 草案。"}
         />
         {patchError ? <Notice className="planError" variant="danger">{patchError}</Notice> : null}
         {applyError ? <Notice className="planError" variant="danger">{applyError}</Notice> : null}
+        {handoffError ? <Notice className="planError" variant="danger">{handoffError}</Notice> : null}
         {task.applyResult ? <Notice className="providerSuccess" variant="success">{task.applyResult.message}</Notice> : null}
         {task.verificationSummary ? (
           <Notice className={task.status === taskStatuses.failed ? "providerError" : "providerSuccess"} variant={task.status === taskStatuses.failed ? "danger" : "success"}>
@@ -905,6 +1738,7 @@ function ActiveTask({
           </Notice>
         ) : null}
         {task.runSummary ? <Notice className="providerHint" variant="info">{task.runSummary.message}：{task.runSummary.path}</Notice> : null}
+        {task.handoffMerge ? <Notice className="providerSuccess" variant="success">{task.handoffMerge.message}：{task.handoffMerge.path}</Notice> : null}
         {task.patchDraft ? <PatchDraft draft={task.patchDraft} /> : null}
       </Panel>
       <Panel className="runnerPanel" variant="code">
@@ -996,22 +1830,46 @@ function PlanList({ title, items, mono }) {
 }
 
 function RightRail({
+  collapsed,
+  onResizeStart,
+  onToggleCollapsed,
   snapshot,
   tasks,
   activeTaskId,
+  conversations,
+  activeConversationId,
+  onSelectConversation,
   onSelectTask,
   onMarkTaskWaiting,
 }) {
-  const todoMeta = tasks.length || snapshot.queue.length;
+  const visibleTasks = tasks.filter((task) => !isNoiseTask(task));
+  const todoMeta = visibleTasks.length || snapshot.queue.length;
   const progressValue = Math.min(86, 48 + Math.min(snapshot.recommendationCount, 8) * 4 + Math.min(snapshot.runCount, 6) * 3);
+
+  if (collapsed) {
+    return (
+      <aside className="right right-collapsed" aria-label="右侧状态栏已折叠">
+        <div className="collapsedRail collapsedRail-right">
+          <button className="collapsedRailItem active" type="button" onClick={onToggleCollapsed} aria-label={`目标进度 ${progressValue}%`}>
+            <span className="collapsedProgress">{progressValue}</span>
+          </button>
+          <button className="collapsedRailItem" type="button" onClick={onToggleCollapsed} aria-label={`待办 ${todoMeta}`}>
+            <ClipboardList strokeWidth={2.15} aria-hidden="true" />
+          </button>
+          <Tooltip content="展开状态栏">
+            <Button className="railToggleButton sideCornerButton" size="icon" variant="ghost" type="button" onClick={onToggleCollapsed} aria-label="展开状态栏">
+              <PanelRightOpen strokeWidth={1.75} aria-hidden="true" />
+            </Button>
+          </Tooltip>
+        </div>
+      </aside>
+    );
+  }
 
   return (
     <aside className="right">
       <div className="rightScroll">
-        <details className="railSection" open>
-          <summary>
-            <SectionTitle title="目标进度" meta={`${progressValue}%`} />
-          </summary>
+        <RailDisclosure title="目标进度" meta={`${progressValue}%`} defaultOpen>
           <Panel className="goalProgress" variant="soft" padding="sm">
             <div className="goalProgressHeader">
               <strong>Desktop v0.1 工作台</strong>
@@ -1026,15 +1884,29 @@ function RightRail({
               <span>待跑检查</span>
             </div>
           </Panel>
-        </details>
+        </RailDisclosure>
 
-        <details className="railSection" open>
-          <summary>
-            <SectionTitle title="待办" meta={todoMeta} />
-          </summary>
+        <RailDisclosure className="railHistory" title="对话历史" meta={conversations.length} defaultOpen>
           <div className="queue">
-            {tasks.length ? (
-              tasks.map((task) => (
+            {conversations.length ? (
+              conversations.map((conversation) => (
+                <ConversationHistoryItem
+                  active={conversation.id === activeConversationId}
+                  conversation={conversation}
+                  key={conversation.id}
+                  onSelectConversation={onSelectConversation}
+                />
+              ))
+            ) : (
+              <Notice variant="muted">普通聊天会保存在这里；确认执行后才会进入待办。</Notice>
+            )}
+          </div>
+        </RailDisclosure>
+
+        <RailDisclosure className="railTasks" title="待办" meta={todoMeta} defaultOpen>
+          <div className="queue">
+            {visibleTasks.length ? (
+              visibleTasks.map((task) => (
                 <TaskQueueItem
                   active={task.id === activeTaskId}
                   key={task.id}
@@ -1056,12 +1928,9 @@ function RightRail({
               ))
             )}
           </div>
-        </details>
+        </RailDisclosure>
 
-        <details className="railSection contextSection">
-          <summary>
-            <SectionTitle title="对话背景" meta={snapshot.memory.length} />
-          </summary>
+        <RailDisclosure className="contextSection" title="对话背景" meta={snapshot.memory.length}>
           <div className="memory">
           {snapshot.memory.map((item) => (
             <MemoryItem marker={item.marker} title={item.title} muted={item.muted} key={item.title}>
@@ -1069,10 +1938,49 @@ function RightRail({
             </MemoryItem>
           ))}
           </div>
-        </details>
+        </RailDisclosure>
       </div>
-
+      <Tooltip content="折叠状态栏">
+        <Button className="sideCornerButton sideCornerButton-right" size="icon" variant="ghost" type="button" onClick={onToggleCollapsed} aria-label="折叠状态栏">
+          <PanelRightClose strokeWidth={1.75} aria-hidden="true" />
+        </Button>
+      </Tooltip>
+      <div className="sidebarResizer sidebarResizer-right" role="separator" aria-label="拖拽调整右侧宽度" onPointerDown={onResizeStart} />
     </aside>
+  );
+}
+
+function RailDisclosure({ children, className = "", defaultOpen = false, meta, title }) {
+  return (
+    <details className={`railSection railDisclosure ${className}`} open={defaultOpen}>
+      <summary className="railDisclosureSummary">
+        <span className="railDisclosureTitle">
+          <ChevronRight className="railDisclosureIcon" strokeWidth={2.25} aria-hidden="true" />
+          <span>{title}</span>
+        </span>
+        <span className="railDisclosureMeta">{meta}</span>
+      </summary>
+      <div className="railDisclosureBody">{children}</div>
+    </details>
+  );
+}
+
+function ConversationHistoryItem({ conversation, active, onSelectConversation }) {
+  return (
+    <Panel as="article" className={`conversationHistoryItem${active ? " active" : ""}`} padding="none">
+      <button
+        aria-label={`打开对话：${conversation.title}`}
+        className="conversationHistoryButton"
+        type="button"
+        onClick={() => onSelectConversation(conversation.id)}
+      >
+        <div className="conversationHistoryHead">
+          <strong>{conversation.title}</strong>
+          <span>{conversation.updatedAt}</span>
+        </div>
+        <p>{conversation.preview}</p>
+      </button>
+    </Panel>
   );
 }
 
@@ -1441,11 +2349,27 @@ function formatBytes(bytes) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+const sidebarSizing = {
+  leftDefault: 248,
+  leftMin: 220,
+  leftMax: 420,
+  rightDefault: 320,
+  rightMin: 280,
+  rightMax: 460,
+};
+
+function clampSidebarWidth(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
 function App() {
   const [snapshot, setSnapshot] = useState(fallbackSnapshot);
   const [readonlyPlan, setReadonlyPlan] = useState(fallbackPlan);
   const [tasks, setTasks] = useState([]);
   const [activeTaskId, setActiveTaskId] = useState("");
+  const [chatTurns, setChatTurns] = useState([]);
+  const [conversations, setConversations] = useState([]);
+  const [activeConversationId, setActiveConversationId] = useState(() => `conv-${Date.now()}`);
   const [provider, setProvider] = useState(fallbackProvider);
   const [modelCatalog, setModelCatalog] = useState(fallbackModelCatalog);
   const [source, setSource] = useState("preview");
@@ -1456,13 +2380,86 @@ function App() {
   const [planError, setPlanError] = useState("");
   const [runnerLoadingId, setRunnerLoadingId] = useState("");
   const [runnerError, setRunnerError] = useState("");
+  const [terminalRunningId, setTerminalRunningId] = useState("");
+  const [terminalLogs, setTerminalLogs] = useState([]);
+  const [terminalText, setTerminalText] = useState("");
+  const [terminalChunks, setTerminalChunks] = useState([]);
+  const [terminalSession, setTerminalSession] = useState(null);
+  const [terminalError, setTerminalError] = useState("");
   const [patchLoading, setPatchLoading] = useState(false);
   const [patchError, setPatchError] = useState("");
   const [applyLoading, setApplyLoading] = useState(false);
   const [applyError, setApplyError] = useState("");
+  const [handoffLoading, setHandoffLoading] = useState(false);
+  const [handoffError, setHandoffError] = useState("");
   const [providerError, setProviderError] = useState("");
   const [conversationResetKey, setConversationResetKey] = useState(0);
   const [selectedEngineeringFile, setSelectedEngineeringFile] = useState(null);
+  const [leftCollapsed, setLeftCollapsed] = useState(false);
+  const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [leftWidth, setLeftWidth] = useState(sidebarSizing.leftDefault);
+  const [rightWidth, setRightWidth] = useState(sidebarSizing.rightDefault);
+
+  const beginSidebarResize = (side, event) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = side === "left" ? leftWidth : rightWidth;
+    const min = side === "left" ? sidebarSizing.leftMin : sidebarSizing.rightMin;
+    const max = side === "left" ? sidebarSizing.leftMax : sidebarSizing.rightMax;
+
+    const move = (moveEvent) => {
+      const delta = moveEvent.clientX - startX;
+      const nextWidth = side === "left" ? startWidth + delta : startWidth - delta;
+      const clamped = clampSidebarWidth(nextWidth, min, max);
+      if (side === "left") {
+        setLeftWidth(clamped);
+      } else {
+        setRightWidth(clamped);
+      }
+    };
+
+    const stop = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+      document.body.classList.remove("isResizingSidebar");
+    };
+
+    document.body.classList.add("isResizingSidebar");
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop, { once: true });
+  };
+
+  const updateChatTurns = (nextTurns) => {
+    setChatTurns(nextTurns);
+    if (!nextTurns.length) return;
+    const now = new Date().toLocaleTimeString("zh-CN", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    setConversations((current) => {
+      const exists = current.some((conversation) => conversation.id === activeConversationId);
+      const record = {
+        id: activeConversationId,
+        preview: conversationPreview(nextTurns),
+        title: conversationTitle(nextTurns),
+        turns: nextTurns.map((turn) => ({
+          id: turn.id,
+          role: turn.role,
+          text: turn.text,
+        })),
+        updatedAt: now,
+      };
+      const next = exists
+        ? current.map((conversation) => (conversation.id === activeConversationId ? { ...conversation, ...record } : conversation))
+        : [record, ...current];
+      try {
+        window.localStorage?.setItem("omnidesk.conversations.v1", JSON.stringify(next));
+      } catch {
+        // localStorage may be unavailable in some embedded contexts.
+      }
+      return next;
+    });
+  };
 
   const setAndPersistTask = async (nextTask) => {
     setTasks((current) => {
@@ -1484,7 +2481,7 @@ function App() {
 
   const applySnapshot = (nextSnapshot) => {
     setSnapshot({ ...fallbackSnapshot, ...nextSnapshot });
-    setSource(window.__TAURI_INTERNALS__ ? "tauri" : "preview");
+    setSource(isTauriRuntime() ? "tauri" : "preview");
     setError("");
   };
 
@@ -1513,15 +2510,27 @@ function App() {
   }, []);
 
   useEffect(() => {
+    try {
+      const records = JSON.parse(window.localStorage?.getItem("omnidesk.conversations.v1") || "[]");
+      if (Array.isArray(records)) {
+        setConversations(records.slice(0, 50));
+      }
+    } catch {
+      setConversations([]);
+    }
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
 
     loadDesktopTasks()
       .then((records) => {
         if (cancelled || !Array.isArray(records)) return;
         setTasks(records);
-        if (records[0]?.id) {
-          setActiveTaskId(records[0].id);
-          setReadonlyPlan(records[0].plan || null);
+        const firstTask = records.find((record) => !isNoiseTask(record));
+        if (firstTask?.id) {
+          setActiveTaskId(firstTask.id);
+          setReadonlyPlan(firstTask.plan || null);
         }
       })
       .catch((err) => {
@@ -1553,6 +2562,60 @@ function App() {
 
     return () => {
       cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isTauriRuntime()) {
+      setTerminalText("浏览器预览不能启动本地终端。请在桌面 App 窗口里使用完整终端。");
+      return undefined;
+    }
+
+    let cancelled = false;
+    let unlisten = null;
+
+    const startTerminal = async () => {
+      try {
+        const { listen } = await import("@tauri-apps/api/event");
+        unlisten = await listen("terminal://output", (event) => {
+          const payload = event.payload || {};
+          if (payload.sessionId && payload.sessionId !== "main") return;
+          setTerminalChunks((current) => [
+            ...current,
+            {
+              data: payload.data || "",
+              id: `${Date.now()}-${current.length}`,
+            },
+          ].slice(-2000));
+          setTerminalText((current) => `${current}${cleanTerminalText(payload.data || "")}`.slice(-50000));
+        });
+        setTerminalChunks([]);
+        const session = await invokeWorkspaceCommand("start_terminal_session", {
+          input: { sessionId: "main", cols: 120, rows: 32 },
+        });
+        if (!cancelled) {
+          setTerminalSession(session);
+          setTerminalError("");
+          setTerminalText((current) => current || `Connected to ${session.shell} at ${session.cwd}\n`);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setTerminalError(err instanceof Error ? err.message : String(err));
+          setTerminalText((current) => current || "终端启动失败。");
+        }
+      }
+    };
+
+    startTerminal();
+
+    return () => {
+      cancelled = true;
+      if (unlisten) {
+        unlisten();
+      }
+      invokeWorkspaceCommand("stop_terminal_session", {
+        input: { sessionId: "main" },
+      }).catch(() => {});
     };
   }, []);
 
@@ -1598,6 +2661,54 @@ function App() {
     }
   };
 
+  const removeProject = async (id) => {
+    const project = snapshot.projects.find((item) => item.id === id);
+    if (!project) return;
+    if (snapshot.projects.length <= 1) {
+      setProjectActionError("至少保留一个工作台项目；可以先添加新项目，再移除这个项目。");
+      return;
+    }
+    setProjectActionError("");
+    setLoading(true);
+    try {
+      const nextSnapshot = await invokeWorkspaceCommand("remove_registry_project", { id });
+      applySnapshot(nextSnapshot);
+      setActiveTaskId("");
+      setReadonlyPlan(null);
+      setSelectedEngineeringFile(null);
+    } catch (err) {
+      setProjectActionError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openProjectFolder = async (id) => {
+    setProjectActionError("");
+    try {
+      await invokeWorkspaceCommand("open_project_folder", { id });
+    } catch (err) {
+      setProjectActionError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const renameProject = async (id, name) => {
+    setProjectActionError("");
+    setLoading(true);
+    try {
+      const nextSnapshot = await invokeWorkspaceCommand("rename_registry_project", {
+        input: { id, name },
+      });
+      applySnapshot(nextSnapshot);
+      return true;
+    } catch (err) {
+      setProjectActionError(err instanceof Error ? err.message : String(err));
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const selectEngineeringFile = async (file) => {
     const nextFile = {
       ...file,
@@ -1610,7 +2721,35 @@ function App() {
     setReadonlyPlan(null);
     setPlanError("");
 
-    if (!window.__TAURI_INTERNALS__) {
+    if (file.virtual && Array.isArray(file.relatedFiles)) {
+      setSelectedEngineeringFile({
+        ...nextFile,
+        loading: false,
+        topic: {
+          title: file.title || file.path,
+          description: file.description,
+          relatedFiles: file.relatedFiles,
+        },
+      });
+      return;
+    }
+
+    if (file.virtual) {
+      setSelectedEngineeringFile({
+        ...nextFile,
+        loading: false,
+        preview: {
+          content: "这个入口属于 OmniDesk 全局记忆，不属于当前项目文件。\n\n建议后续保存到应用级本地配置：\n- user-profile.json：用户画像\n- global-preferences.json：全局偏好\n\n这样它会跨项目生效，不污染当前项目的 .project-os/。",
+          language: "text",
+          name: file.path.replace("OmniDesk global: ", ""),
+          size: 0,
+          truncated: false,
+        },
+      });
+      return;
+    }
+
+    if (!isTauriRuntime()) {
       setSelectedEngineeringFile({
         ...nextFile,
         error: "浏览器预览不能读取本地文件，请在桌面 App 窗口里查看。",
@@ -1683,7 +2822,19 @@ function App() {
     setSelectedEngineeringFile(null);
   };
 
+  const selectConversation = (id) => {
+    const conversation = conversations.find((item) => item.id === id);
+    if (!conversation) return;
+    setActiveConversationId(id);
+    setChatTurns(Array.isArray(conversation.turns) ? conversation.turns : []);
+    setActiveTaskId("");
+    setReadonlyPlan(null);
+    setSelectedEngineeringFile(null);
+  };
+
   const startNewConversation = () => {
+    setActiveConversationId(`conv-${Date.now()}`);
+    setChatTurns([]);
     setActiveTaskId("");
     setReadonlyPlan(null);
     setSelectedEngineeringFile(null);
@@ -1717,6 +2868,7 @@ function App() {
         ...result,
         finishedAt: new Date().toISOString(),
       };
+      appendTerminalLog(result);
       const task = tasks.find((item) => item.id === taskId);
       if (task) {
         await setAndPersistTask({
@@ -1727,6 +2879,12 @@ function App() {
       }
       return true;
     } catch (err) {
+      appendTerminalLog({
+        id: checkId,
+        command: guardedChecks.find((check) => check.id === checkId)?.command || checkId,
+        output: err instanceof Error ? err.message : String(err),
+        success: false,
+      });
       setRunnerError(err instanceof Error ? err.message : String(err));
       setTasks((current) =>
         current.map((task) =>
@@ -1736,6 +2894,118 @@ function App() {
       return false;
     } finally {
       setRunnerLoadingId("");
+    }
+  };
+
+  const appendTerminalLog = (result) => {
+    const now = new Date().toLocaleTimeString("zh-CN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    setTerminalLogs((current) => [
+      {
+        command: result.command || result.id || "unknown command",
+        id: `${Date.now()}-${result.id || "terminal"}`,
+        output: result.output || (result.success ? "Command completed." : "Command failed."),
+        status: result.success ? "success" : "failed",
+        timestamp: now,
+      },
+      ...current,
+    ].slice(0, 8));
+    setTerminalText((current) => `${current}\n$ ${result.command || result.id || "command"}\n${cleanTerminalText(result.output || "")}\n`.slice(-50000));
+  };
+
+  const writeTerminalData = async (data) => {
+    if (!data) return false;
+    try {
+      await invokeWorkspaceCommand("write_terminal_session", {
+        input: { sessionId: "main", data },
+      });
+      setTerminalError("");
+      return true;
+    } catch (err) {
+      setTerminalError(err instanceof Error ? err.message : String(err));
+      return false;
+    }
+  };
+
+  const resizeTerminalSession = async (cols, rows) => {
+    if (!isTauriRuntime() || !cols || !rows) return false;
+    try {
+      await invokeWorkspaceCommand("resize_terminal_session", {
+        input: { sessionId: "main", cols, rows },
+      });
+      return true;
+    } catch (err) {
+      setTerminalError(err instanceof Error ? err.message : String(err));
+      return false;
+    }
+  };
+
+  const restartTerminalSession = async () => {
+    if (!isTauriRuntime()) return false;
+    setTerminalError("");
+    try {
+      await invokeWorkspaceCommand("stop_terminal_session", {
+        input: { sessionId: "main" },
+      });
+      setTerminalText("");
+      setTerminalChunks([]);
+      setTerminalSession(null);
+      const session = await invokeWorkspaceCommand("start_terminal_session", {
+        input: { sessionId: "main", cols: 120, rows: 32 },
+      });
+      setTerminalSession(session);
+      setTerminalText(`Connected to ${session.shell} at ${session.cwd}\n`);
+      return true;
+    } catch (err) {
+      setTerminalError(err instanceof Error ? err.message : String(err));
+      return false;
+    }
+  };
+
+  const runTerminalCheck = async (checkId) => {
+    setRunnerError("");
+    setTerminalRunningId(checkId);
+    try {
+      const result = await invokeWorkspaceCommand("run_guarded_check", {
+        input: { checkId },
+      });
+      appendTerminalLog(result);
+      return true;
+    } catch (err) {
+      appendTerminalLog({
+        id: checkId,
+        command: guardedChecks.find((check) => check.id === checkId)?.command || checkId,
+        output: err instanceof Error ? err.message : String(err),
+        success: false,
+      });
+      return false;
+    } finally {
+      setTerminalRunningId("");
+    }
+  };
+
+  const runTerminalCommand = async (command) => {
+    setRunnerError("");
+    setTerminalRunningId("terminal");
+    try {
+      const result = await invokeWorkspaceCommand("run_terminal_command", {
+        input: { command },
+      });
+      appendTerminalLog(result);
+      return true;
+    } catch (err) {
+      appendTerminalLog({
+        id: "terminal",
+        command,
+        output: err instanceof Error ? err.message : String(err),
+        success: false,
+      });
+      return false;
+    } finally {
+      setTerminalRunningId("");
     }
   };
 
@@ -1832,6 +3102,29 @@ function App() {
     }
   };
 
+  const mergeHandoff = async (taskId) => {
+    const task = tasks.find((item) => item.id === taskId);
+    if (!task) return false;
+
+    setHandoffError("");
+    setHandoffLoading(true);
+    try {
+      const handoffMerge = await invokeWorkspaceCommand("merge_run_summary_to_handoff", {
+        input: { task },
+      });
+      await setAndPersistTask({
+        ...task,
+        handoffMerge,
+      });
+      return true;
+    } catch (err) {
+      setHandoffError(err instanceof Error ? err.message : String(err));
+      return false;
+    } finally {
+      setHandoffLoading(false);
+    }
+  };
+
   const saveProvider = async (form) => {
     setProviderError("");
     try {
@@ -1872,11 +3165,23 @@ function App() {
         providerError={providerError}
         onStartConversation={startNewConversation}
       />
-      <main className="workspace">
+      <main
+        className={`workspace${leftCollapsed ? " leftCollapsed" : ""}${rightCollapsed ? " rightCollapsed" : ""}`}
+        style={{
+          "--desktop-layout-sidebar-left": `${leftWidth}px`,
+          "--desktop-layout-sidebar-right": `${rightWidth}px`,
+        }}
+      >
         <ProjectSidebar
+          collapsed={leftCollapsed}
+          onResizeStart={(event) => beginSidebarResize("left", event)}
+          onToggleCollapsed={() => setLeftCollapsed((value) => !value)}
           snapshot={snapshot}
           onSwitchProject={switchProject}
           onPickProject={pickProject}
+          onOpenProjectFolder={openProjectFolder}
+          onRenameProject={renameProject}
+          onRemoveProject={removeProject}
           onSelectEngineeringFile={selectEngineeringFile}
           projectActionError={projectActionError}
           selectedEngineeringFile={selectedEngineeringFile}
@@ -1884,6 +3189,13 @@ function App() {
         <AgentWorkspace
           snapshot={snapshot}
           selectedEngineeringFile={selectedEngineeringFile}
+          chatTurns={chatTurns}
+          terminalLogs={terminalLogs}
+          terminalRunningId={terminalRunningId}
+          terminalText={terminalText}
+          terminalChunks={terminalChunks}
+          terminalSession={terminalSession}
+          terminalError={terminalError}
           loading={loading}
           error={error}
           readonlyPlan={readonlyPlan}
@@ -1896,16 +3208,31 @@ function App() {
           patchError={patchError}
           applyLoading={applyLoading}
           applyError={applyError}
+          handoffLoading={handoffLoading}
+          handoffError={handoffError}
           conversationResetKey={conversationResetKey}
+          onChatTurnsChange={updateChatTurns}
           onGeneratePlan={generatePlan}
           onGeneratePatchDraft={generatePatchDraft}
           onApplyPatchDraft={applyPatchDraft}
+          onMergeHandoff={mergeHandoff}
           onRunGuardedCheck={runGuardedCheck}
+          onRunTerminalCheck={runTerminalCheck}
+          onRunTerminalCommand={runTerminalCommand}
+          onWriteTerminalData={writeTerminalData}
+          onResizeTerminalSession={resizeTerminalSession}
+          onRestartTerminalSession={restartTerminalSession}
         />
         <RightRail
+          collapsed={rightCollapsed}
+          onResizeStart={(event) => beginSidebarResize("right", event)}
+          onToggleCollapsed={() => setRightCollapsed((value) => !value)}
           snapshot={snapshot}
           tasks={tasks}
           activeTaskId={activeTaskId}
+          conversations={conversations}
+          activeConversationId={activeConversationId}
+          onSelectConversation={selectConversation}
           onSelectTask={selectTask}
           onMarkTaskWaiting={markTaskWaiting}
         />
@@ -1916,4 +3243,8 @@ function App() {
   );
 }
 
-createRoot(document.getElementById("root")).render(<App />);
+createRoot(document.getElementById("root")).render(
+  <AppErrorBoundary>
+    <App />
+  </AppErrorBoundary>
+);

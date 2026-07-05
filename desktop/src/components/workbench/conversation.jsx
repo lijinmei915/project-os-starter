@@ -3,8 +3,16 @@ import omnideskLogo from "../../assets/omnidesk-logo.svg";
 import { cn } from "../../lib/cn";
 
 export function Conversation({ children, className, ...props }) {
+  const conversationRef = React.useRef(null);
+
+  React.useEffect(() => {
+    const node = conversationRef.current;
+    if (!node) return;
+    node.scrollIntoView({ block: "end" });
+  }, [children]);
+
   return (
-    <div className={cn("conversation", className)} role="log" aria-live="polite" {...props}>
+    <div className={cn("conversation", className)} role="log" aria-live="polite" ref={conversationRef} {...props}>
       {children}
     </div>
   );

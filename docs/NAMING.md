@@ -75,6 +75,7 @@ docs/ 放工程治理。
 | `docs/ROUTING.md` | AI 请求应该怎么分流 |
 | `docs/RECOMMENDATION_ENGINE.md` | 推荐引擎如何用证据推导文件和动作 |
 | `docs/PROJECT_MEMORY_AND_RUNNER.md` | 项目记忆和后台执行器怎么工作 |
+| `docs/REFERENCE_SYSTEMS.md` | Hermes 等成熟工具如何借鉴和接入 |
 | `docs/WIZARD_PRESETS.md` | 项目状态识别和补齐策略怎么映射文件 |
 | `docs/ARCHITECTURE.md` | 系统结构和模块职责是什么 |
 | `docs/ENVIRONMENT.md` | 本地环境、依赖、环境变量怎么准备 |

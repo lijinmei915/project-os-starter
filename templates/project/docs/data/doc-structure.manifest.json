@@ -165,6 +165,13 @@
       "forbiddenOverlap": ["具体模板全文", "UI 视觉规范主体"]
     },
     {
+      "file": "docs/REFERENCE_SYSTEMS.md",
+      "responsibility": "OmniDesk 与 Hermes、Claude Projects、Cursor 等成熟工具的关系、借鉴边界和接入策略",
+      "ssotFor": ["成熟治理工程如何借鉴和接入"],
+      "requiredSections": ["核心结论", "对比矩阵", "Hermes 的定位", "接入策略", "当前阶段取舍"],
+      "forbiddenOverlap": ["具体 UI 微调", "一次性竞品截图流水", "未经确认的市场宣传结论"]
+    },
+    {
       "file": "docs/ROUTING.md",
       "responsibility": "Project OS 路由模式、入口响应和验收输入规则",
       "ssotFor": ["AI 请求应该怎么分流"],
