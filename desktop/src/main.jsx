@@ -2,10 +2,9 @@ import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
-import { Bot, BookOpen, Brain, CheckCircle2, ChevronsDownUp, ChevronsUpDown, ChevronRight, ClipboardList, Copy, FileStack, MoreHorizontal, Package, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Settings, ShieldCheck, TerminalSquare, Wrench, X } from "lucide-react";
-import omnideskLogo from "./assets/omnidesk-logo.svg";
+import { Bot, BookOpen, Brain, Check, CheckCircle2, ChevronsDownUp, ChevronsUpDown, ChevronRight, ClipboardList, Copy, Eraser, FileStack, Loader2, MoreHorizontal, Package, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, RotateCcw, Settings, ShieldCheck, Square, TerminalSquare, Wrench, X } from "lucide-react";
 import { ChatComposer } from "./components/workbench/chat-composer";
-import { Conversation, ConversationArtifact, ConversationMessage } from "./components/workbench/conversation";
+import { Conversation, ConversationMessage } from "./components/workbench/conversation";
 import { InfoCallout } from "./components/workbench/info-callout";
 import { ProviderStatusRow } from "./components/workbench/provider-status-row";
 import { SystemSettingsMenu } from "./components/workbench/system-settings-menu";
@@ -90,9 +89,9 @@ const fallbackSnapshot = {
   ],
   queue: [
     {
-      title: "接入本地项目 registry",
-      status: "建议下一步",
-      body: "让桌面工作台记住已接入项目，并作为后续模型计划层的入口。",
+      title: "打磨右侧工作流",
+      status: "进行中",
+      body: "目标、任务、对话、背景分清楚。",
       tone: "accent",
     },
   ],
@@ -126,6 +125,27 @@ const taskStatuses = {
   done: "done",
   failed: "failed",
 };
+
+function buildPreviewPlan(input, snapshot) {
+  const task = safeDisplayText(input?.task, "未命名任务").trim() || "未命名任务";
+  return {
+    task,
+    projectName: snapshot.projectName,
+    mode: "plan",
+    summary: `我会先围绕「${task}」理清范围，再给出最小下一步。`,
+    steps: [
+      "确认用户真正想解决的问题。",
+      "读取当前项目状态和交接记录。",
+      "列出最小可执行改动和风险。",
+      "用户确认后再进入具体改动和检查。",
+    ],
+    filesToRead: ["PROJECT.md", "HANDOFF.md", "AGENTS.md"],
+    candidateChanges: ["先不写文件，只形成下一步建议。"],
+    checks: ["bash scripts/check-runtime.sh ."],
+    guardrails: ["不自动写文件。", "不自动运行命令。"],
+    trace: ["PREVIEW: browser-only local plan."],
+  };
+}
 
 const engineeringFlow = [
   {
@@ -597,7 +617,7 @@ function TopBar({
     <header className="topbar">
         <div className="brand">
         <div className="mark" aria-hidden="true">
-          <img src={omnideskLogo} alt="" />
+          <span className="markGlyph" />
         </div>
         <div>
           <div className="brandTitle">OmniDesk</div>
@@ -893,6 +913,16 @@ function createTaskFromPlan(plan, taskText, projectName) {
   };
 }
 
+function taskStatusLabel(status) {
+  return {
+    [taskStatuses.planned]: "待确认",
+    [taskStatuses.waitingApproval]: "待批准",
+    [taskStatuses.running]: "进行中",
+    [taskStatuses.done]: "已完成",
+    [taskStatuses.failed]: "失败",
+  }[status] || status || "待确认";
+}
+
 function checksForPlan(plan) {
   const checks = Array.isArray(plan?.checks) ? plan.checks : [];
   return guardedChecks.filter((check) =>
@@ -902,20 +932,47 @@ function checksForPlan(plan) {
 
 function previewChatResult(message, hasAttachments) {
   const normalized = message.trim().replace(/[。！？!?,，\s]/g, "").toLowerCase();
-  const taskLike = hasAttachments || [
-    "帮我", "改", "修", "优化", "生成", "创建", "新增", "删除", "检查", "执行",
-    "实现", "接入", "配置", "截图", "报错", "失败", "做成", "设计", "push",
-  ].some((keyword) => message.toLowerCase().includes(keyword));
+  const lowerMessage = message.toLowerCase();
+  const explicitTask = [
+    "帮我改", "帮我修", "帮我优化", "帮我生成", "帮我创建", "帮我新增", "帮我删除",
+    "帮我执行", "帮我跑", "开始执行", "生成计划", "创建任务", "改代码", "修复",
+    "实现", "接入", "配置", "做成", "设计", "push", "提交", "应用 patch",
+  ].some((keyword) => lowerMessage.includes(keyword));
   const greeting = ["hi", "hello", "hey", "你好", "您好", "哈喽", "嗨", "在吗", "在么"].includes(normalized);
+  const questionLike = [
+    "为什么", "怎么", "哪些", "还有哪些", "是什么", "吗", "呢", "看一下", "看看",
+    "检查当前项目还有哪些风险", "有哪些风险",
+  ].some((keyword) => message.includes(keyword));
+  const shouldCreatePlan = explicitTask || (hasAttachments && !questionLike);
+  const riskLike = message.includes("风险") || lowerMessage.includes("risk");
   return {
-    intent: taskLike ? "task" : "chat",
-    reply: taskLike
-      ? "可以，我先把它作为项目任务理解，进入计划前不会直接改文件。"
+    intent: shouldCreatePlan ? "task" : questionLike ? "question" : "chat",
+    reply: shouldCreatePlan
+      ? "可以。我先整理下一步，等你确认后再动手。"
       : greeting
-        ? "你好，我在。桌面 App 里会直接走你配置的模型；浏览器预览只能做本地分流。"
-        : "我在。这个更像普通对话，先不创建待办；如果你想让我开始做，直接说“帮我改/检查/生成”。",
-    shouldCreatePlan: taskLike,
+        ? "你好，我在。你可以直接问项目情况，也可以说想改哪里。"
+        : riskLike
+          ? "主要风险有三类：交接记录可能继续膨胀；对话和执行状态容易混在一起；模型或检查失败时反馈还不够像人话。我建议先把普通问答和执行任务彻底分开，再打磨失败提示。"
+          : "我先直接回答。需要我动手时，说“生成计划”或“帮我改”。",
+    shouldCreatePlan,
   };
+}
+
+function isExecutionWorkspaceTab(tab, actionMode) {
+  if (tab.id === "plan" || tab.kind === "terminal" || tab.kind === "file") return true;
+  return actionMode;
+}
+
+function actionPromptsForMessage(message, intent) {
+  const text = safeDisplayText(message).trim();
+  if (!text || intent === "task") return [];
+  return [
+    {
+      id: "generate-plan",
+      label: "生成计划",
+      task: text,
+    },
+  ];
 }
 
 function safeDisplayText(value, fallback = "") {
@@ -952,14 +1009,59 @@ function cleanTerminalText(value) {
 
 function conversationTitle(turns) {
   const firstUser = turns.find((turn) => turn.role === "user");
-  const title = safeDisplayText(firstUser?.text, "新对话").trim() || "新对话";
-  return title.length > 24 ? `${title.slice(0, 24)}...` : title;
+  const title = cleanConversationText(firstUser?.text) || "新对话";
+  return compactConversationText(title, 24);
 }
 
 function conversationPreview(turns) {
-  const last = [...turns].reverse().find((turn) => turn.text);
-  const preview = safeDisplayText(last?.text, "暂无内容").trim() || "暂无内容";
-  return preview.length > 42 ? `${preview.slice(0, 42)}...` : preview;
+  const meaningful = [...turns]
+    .reverse()
+    .map((turn) => cleanConversationText(turn.text))
+    .find((text) => text && !isLowSignalConversationText(text));
+  return compactConversationText(meaningful || "暂无内容", 52);
+}
+
+function cleanConversationText(value) {
+  return safeDisplayText(value)
+    .replace(/\s+/g, " ")
+    .replace(/生成计划$/g, "")
+    .trim();
+}
+
+function compactConversationText(value, maxLength) {
+  const text = cleanConversationText(value);
+  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+}
+
+function visibleConversationPreview(conversation) {
+  const title = cleanConversationText(conversation?.title);
+  const preview = cleanConversationText(conversation?.preview);
+  if (!preview || preview === title || isLowSignalConversationText(preview)) return "";
+  return compactConversationText(preview, 34);
+}
+
+function groupedConversations(conversations) {
+  const groups = [];
+  const today = conversations.filter(Boolean);
+  if (today.length) {
+    groups.push({ label: "今天", items: today });
+  }
+  return groups;
+}
+
+function isLowSignalConversationText(text) {
+  const normalized = cleanConversationText(text).replace(/[。！？!?,，\s]/g, "").toLowerCase();
+  if (!normalized) return true;
+  if (/^\d+$/.test(normalized)) return true;
+  if (["hi", "hello", "hey", "你好", "您好", "哈喽", "嗨", "在吗", "在么"].includes(normalized)) return true;
+  return [
+    "我在",
+    "已创建执行计划",
+    "已生成执行前计划",
+    "我先直接回答",
+    "模型对话暂时不可用",
+    "浏览器预览",
+  ].some((phrase) => text.includes(phrase));
 }
 
 function isNoiseTask(task) {
@@ -972,6 +1074,10 @@ const chatStarterPrompts = [
   "整理下一步任务并生成计划",
   "查看最近改动并准备审查",
   "运行一轮基础检查",
+];
+
+const executionTabs = [
+  { id: "execution", title: "执行", kind: "execution", closable: false },
 ];
 
 function workspaceFileTabId(file) {
@@ -1008,6 +1114,7 @@ function AgentWorkspace({
   onGeneratePatchDraft,
   onApplyPatchDraft,
   onMergeHandoff,
+  onRunChatAction,
   onRunGuardedCheck,
   onRunTerminalCheck,
   onRunTerminalCommand,
@@ -1023,11 +1130,9 @@ function AgentWorkspace({
   const [workspaceTabs, setWorkspaceTabs] = useState([
     { id: "plan", title: "对话", kind: "conversation", closable: false },
     { id: "terminal", title: "终端", kind: "terminal", closable: false },
-    { id: "diff", title: "改动预览", kind: "diff", closable: true },
-    { id: "checks", title: "运行检查", kind: "checks", closable: true },
-    { id: "trace", title: "记录", kind: "trace", closable: true },
   ]);
   const composerRef = React.useRef(null);
+  const actionMode = Boolean(activeTask || readonlyPlan);
   const isConversationEmpty = !chatTurns.length && !activeTask && !readonlyPlan && !loading && !error && !pendingTurn && !chatLoading;
 
   useEffect(() => {
@@ -1119,6 +1224,19 @@ function AgentWorkspace({
     requestAnimationFrame(() => composerRef.current?.focus());
   };
 
+  const ensureExecutionTabs = () => {
+    setWorkspaceTabs((current) => [
+      ...current,
+      ...executionTabs.filter((tab) => !current.some((item) => item.id === tab.id)),
+    ]);
+  };
+
+  useEffect(() => {
+    if (actionMode) {
+      ensureExecutionTabs();
+    }
+  }, [actionMode]);
+
   const submitTask = async (event) => {
     event.preventDefault();
     const nextInput = taskInput.trim();
@@ -1159,9 +1277,9 @@ function AgentWorkspace({
       }
     } catch (err) {
       chatResult = {
-        intent: "task",
-        reply: `我先按项目任务处理。模型对话暂时不可用：${err instanceof Error ? err.message : String(err)}`,
-        shouldCreatePlan: true,
+        intent: "chat",
+        reply: `我现在先按本地规则回答。模型对话暂时不可用：${err instanceof Error ? err.message : String(err)}`,
+        shouldCreatePlan: false,
       };
     } finally {
       setChatLoading(false);
@@ -1173,6 +1291,7 @@ function AgentWorkspace({
         userTurn,
         {
           id: `${Date.now()}-assistant`,
+          actions: actionPromptsForMessage(nextInput, chatResult?.intent),
           role: "assistant",
           text: safeDisplayText(chatResult?.reply, "我在。你可以继续说想做什么。"),
         },
@@ -1186,6 +1305,7 @@ function AgentWorkspace({
       showUser: false,
       text: nextInput || "请根据截图帮我分析并修改。",
     });
+    ensureExecutionTabs();
     onGeneratePlan({
       attachments: submittedAttachments.map((attachment) => ({
         dataUrl: attachment.dataUrl,
@@ -1207,17 +1327,17 @@ function AgentWorkspace({
   return (
     <Tabs className="center" value={activeWorkspaceTab} onValueChange={setActiveWorkspaceTab}>
       <TabsList className="tabs" aria-label="工作区视图">
-        {workspaceTabs.map((tab) => (
+        {workspaceTabs.filter((tab) => isExecutionWorkspaceTab(tab, actionMode)).map((tab) => (
           <TabsTrigger className={`tab workspaceTab ${tab.kind === "file" ? "fileTab" : ""}`} key={tab.id} value={tab.id}>
             <span>{tab.title}</span>
             {tab.closable ? (
               <button
                 aria-label={`关闭 ${tab.title}`}
                 className="workspaceTabClose"
-                onClick={(event) => closeWorkspaceTab(event, tab.id)}
                 type="button"
+                onClick={(event) => closeWorkspaceTab(event, tab.id)}
               >
-                <X aria-hidden="true" />
+                <X strokeWidth={2} aria-hidden="true" />
               </button>
             ) : null}
           </TabsTrigger>
@@ -1241,6 +1361,19 @@ function AgentWorkspace({
             {chatTurns.map((turn) => (
               <ConversationMessage key={turn.id} role={turn.role}>
                 <div>{safeDisplayText(turn.text)}</div>
+                {turn.actions?.length ? (
+                  <div className="conversationActions">
+                    {turn.actions.map((action) => (
+                      <button
+                        key={action.id}
+                        type="button"
+                        onClick={() => onRunChatAction?.(action)}
+                      >
+                        {action.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
                 {turn.attachments?.length ? (
                   <div className="conversationAttachmentGrid">
                     {turn.attachments.map((attachment) => (
@@ -1254,17 +1387,17 @@ function AgentWorkspace({
               </ConversationMessage>
             ))}
 
-            {activeTask || readonlyPlan || loading || error ? (
+            {loading || error ? (
               <ConversationMessage
                 meta={loading ? "连接中" : error ? "需要检查" : snapshot.phase}
                 role="assistant"
                 title="OmniDesk"
               >
                 {loading
-                  ? "正在连接本地工作模式，读取项目、任务队列和运行记录。"
+                  ? "正在连接本地工作区。"
                   : error
                     ? `本地能力暂时不可用：${error}`
-                    : "你可以直接在下面说想改什么。我会先理解需求，给出计划，再生成改动预览和运行检查。"}
+                    : null}
               </ConversationMessage>
             ) : null}
 
@@ -1275,29 +1408,8 @@ function AgentWorkspace({
                 title="OmniDesk"
               >
                 {activeTask
-                  ? "我已经把这个请求放进当前对话，下面是计划、改动草案和受控检查。"
-                  : "这是刚生成的执行计划。确认后可以继续生成改动草案。"}
-                <ConversationArtifact title={activeTask ? "当前对话" : "执行计划"}>
-                  {activeTask ? (
-                    <ActiveTask
-                      task={activeTask}
-                      runnerLoadingId={runnerLoadingId}
-                      runnerError={runnerError}
-                      patchLoading={patchLoading}
-                      patchError={patchError}
-                      applyLoading={applyLoading}
-                      applyError={applyError}
-                      handoffLoading={handoffLoading}
-                      handoffError={handoffError}
-                      onGeneratePatchDraft={onGeneratePatchDraft}
-                      onApplyPatchDraft={onApplyPatchDraft}
-                      onMergeHandoff={onMergeHandoff}
-                      onRunGuardedCheck={onRunGuardedCheck}
-                    />
-                  ) : (
-                    <ReadonlyPlan plan={readonlyPlan} />
-                  )}
-                </ConversationArtifact>
+                  ? "我整理好了下一步，详情放在「执行」里。你确认后我再继续动手。"
+                  : "我整理好了下一步，详情放在「执行」里。"}
                 {planError ? <Notice className="planError" variant="danger">{planError}</Notice> : null}
               </ConversationMessage>
             ) : null}
@@ -1330,20 +1442,11 @@ function AgentWorkspace({
             </>
           ) : null}
 
-          {activeTask || readonlyPlan ? (
-            <ConversationMessage className="conversationMessage-compact" meta="local log" role="assistant" title="记录">
-              <div className="terminal conversationTerminal">
-                {snapshot.trace.map((line) => (
-                  <div key={line}>{line}</div>
-                ))}
-              </div>
-            </ConversationMessage>
-          ) : null}
           </Conversation>
         )}
       </TabsContent>
 
-      {workspaceTabs.filter((tab) => tab.id !== "plan").map((tab) => {
+      {workspaceTabs.filter((tab) => tab.id !== "plan" && isExecutionWorkspaceTab(tab, actionMode)).map((tab) => {
         if (tab.kind === "file") {
           return (
             <TabsContent className="workspaceTabContent fileCanvas" key={tab.id} value={tab.id}>
@@ -1371,10 +1474,37 @@ function AgentWorkspace({
             </TabsContent>
           );
         }
+        if (tab.kind === "execution") {
+          return (
+            <TabsContent className="workspaceTabContent agentCanvas executionWorkspace" key={tab.id} value={tab.id}>
+              {activeTask ? (
+                <ActiveTask
+                  task={activeTask}
+                  runnerLoadingId={runnerLoadingId}
+                  runnerError={runnerError}
+                  patchLoading={patchLoading}
+                  patchError={patchError}
+                  applyLoading={applyLoading}
+                  applyError={applyError}
+                  handoffLoading={handoffLoading}
+                  handoffError={handoffError}
+                  onGeneratePatchDraft={onGeneratePatchDraft}
+                  onApplyPatchDraft={onApplyPatchDraft}
+                  onMergeHandoff={onMergeHandoff}
+                  onRunGuardedCheck={onRunGuardedCheck}
+                />
+              ) : readonlyPlan ? (
+                <ReadonlyPlan plan={readonlyPlan} />
+              ) : (
+                <Notice variant="muted">生成计划后，执行详情会显示在这里。</Notice>
+              )}
+            </TabsContent>
+          );
+        }
         if (tab.kind === "diff") {
           return (
             <TabsContent className="workspaceTabContent agentCanvas emptyWorkspacePanel" key={tab.id} value={tab.id}>
-              <Notice variant="muted">改动预览会在生成 patch 草案后显示。</Notice>
+              <Notice variant="muted">生成改动后，会在这里预览。</Notice>
             </TabsContent>
           );
         }
@@ -1440,7 +1570,7 @@ function ChatDock({
         onPaste={onPaste}
         onRemoveAttachment={onRemoveAttachment}
         onSubmit={onSubmit}
-        placeholder="说说你想改什么，例如：把 Provider 配置改成更小白的流程..."
+        placeholder="问项目情况、描述想法，或说要改什么..."
         sending={planLoading || chatLoading}
         value={taskInput}
       />
@@ -1563,7 +1693,7 @@ function TerminalDock({
   useEffect(() => {
     if (!xtermRef.current || !session) return;
     xtermRef.current.reset();
-    writtenChunkCountRef.current = 0;
+    writtenChunkCountRef.current = Array.isArray(chunks) ? chunks.length : 0;
     try {
       requestAnimationFrame(syncTerminalSize);
       xtermRef.current.focus();
@@ -1580,36 +1710,44 @@ function TerminalDock({
     });
   }, [active, syncTerminalSize]);
 
-  const runShortcut = async (check) => {
-    await onWriteTerminalData(`${check.command}\r`);
+  const clearTerminal = () => {
+    xtermRef.current?.clear();
+    writtenChunkCountRef.current = Array.isArray(chunks) ? chunks.length : 0;
+    requestAnimationFrame(() => xtermRef.current?.focus());
   };
 
   return (
     <section className="terminalDock" aria-label="终端">
       <div className="terminalDockHeader">
-        <div className="terminalDockTitle">
-          <TerminalSquare aria-hidden="true" />
-          <span>Terminal</span>
-          {session?.cwd ? <em>{session.cwd}</em> : null}
-        </div>
+        <Tooltip content={session?.cwd || "终端"}>
+          <div className="terminalSessionTabs" role="tablist" aria-label="终端会话">
+            <button className="terminalSessionTab active" type="button" role="tab" aria-selected="true">
+              <TerminalSquare aria-hidden="true" />
+              <span>main</span>
+            </button>
+          </div>
+        </Tooltip>
         <div className="terminalDockActions">
-          {guardedChecks.slice(0, 4).map((check) => (
-            <Button
-              key={check.id}
-              size="sm"
-              type="button"
-              variant="ghost"
-              onClick={() => runShortcut(check)}
-            >
-              {check.label}
+          <Tooltip content="新建会话">
+            <Button className="terminalIconButton" size="icon" type="button" variant="ghost" onClick={onRestartTerminalSession} aria-label="新建终端会话">
+              <Plus strokeWidth={2} aria-hidden="true" />
             </Button>
-          ))}
-          <Button size="sm" type="button" variant="ghost" onClick={() => onWriteTerminalData("\u0003")}>
-            Ctrl+C
-          </Button>
-          <Button size="sm" type="button" variant="ghost" onClick={onRestartTerminalSession}>
-            Restart
-          </Button>
+          </Tooltip>
+          <Tooltip content="清空屏幕">
+            <Button className="terminalIconButton" size="icon" type="button" variant="ghost" onClick={clearTerminal} aria-label="清空终端屏幕">
+              <Eraser strokeWidth={2} aria-hidden="true" />
+            </Button>
+          </Tooltip>
+          <Tooltip content="停止当前命令">
+            <Button className="terminalIconButton" size="icon" type="button" variant="ghost" onClick={() => onWriteTerminalData("\u0003")} aria-label="停止当前命令">
+              <Square strokeWidth={2} aria-hidden="true" />
+            </Button>
+          </Tooltip>
+          <Tooltip content="重启终端">
+            <Button className="terminalIconButton" size="icon" type="button" variant="ghost" onClick={onRestartTerminalSession} aria-label="重启终端">
+              <RotateCcw strokeWidth={2} aria-hidden="true" />
+            </Button>
+          </Tooltip>
         </div>
       </div>
       <div className="terminal terminalDockOutput terminalDockXterm" ref={terminalHostRef} />
@@ -1696,86 +1834,89 @@ function ActiveTask({
           <strong>{task.title}</strong>
           <span>{task.projectName} · {task.createdAt}</span>
         </div>
-        <Badge status={task.status}>{task.status}</Badge>
+        <Badge status={task.status}>{taskStatusLabel(task.status)}</Badge>
       </div>
       <ReadonlyPlan plan={task.plan} />
-      <Panel className="diffPanel" variant="info">
-        <div className="runnerHeader">
-          <strong>Diff Draft</strong>
-          <span>只生成草案，不写入文件</span>
-        </div>
-        <TaskCommandBar
-          actions={[
-            {
-              disabled: patchLoading,
-              key: "generate-patch",
-              label: patchLoading ? "Generating" : task.patchDraft ? "Regenerate Patch" : "Generate Patch",
-              onClick: () => onGeneratePatchDraft(task.id),
-            },
-            {
-              disabled: applyLoading || !task.patchDraft,
-              key: "apply-patch",
-              label: applyLoading ? "Applying" : "Apply Patch",
-              onClick: () => onApplyPatchDraft(task.id),
-              variant: "primary",
-            },
-            {
-              disabled: handoffLoading || !task.runSummary || Boolean(task.handoffMerge),
-              key: "merge-handoff",
-              label: handoffLoading ? "Merging" : task.handoffMerge ? "Handoff Merged" : "Merge Handoff",
-              onClick: () => onMergeHandoff(task.id),
-            },
-          ]}
-          meta={task.patchDraft?.files?.length ? `${task.patchDraft.files.length} files` : "等待生成 patch 草案。"}
-        />
-        {patchError ? <Notice className="planError" variant="danger">{patchError}</Notice> : null}
-        {applyError ? <Notice className="planError" variant="danger">{applyError}</Notice> : null}
-        {handoffError ? <Notice className="planError" variant="danger">{handoffError}</Notice> : null}
-        {task.applyResult ? <Notice className="providerSuccess" variant="success">{task.applyResult.message}</Notice> : null}
-        {task.verificationSummary ? (
-          <Notice className={task.status === taskStatuses.failed ? "providerError" : "providerSuccess"} variant={task.status === taskStatuses.failed ? "danger" : "success"}>
-            {task.verificationSummary}
-          </Notice>
-        ) : null}
-        {task.runSummary ? <Notice className="providerHint" variant="info">{task.runSummary.message}：{task.runSummary.path}</Notice> : null}
-        {task.handoffMerge ? <Notice className="providerSuccess" variant="success">{task.handoffMerge.message}：{task.handoffMerge.path}</Notice> : null}
-        {task.patchDraft ? <PatchDraft draft={task.patchDraft} /> : null}
-      </Panel>
-      <Panel className="runnerPanel" variant="code">
-        <div className="runnerHeader">
-          <strong>Guarded Runner</strong>
-          <span>只运行白名单检查</span>
-        </div>
-        <TaskCommandBar
-          actions={runnableChecks.map((check) => ({
-            disabled: Boolean(runnerLoadingId),
-            key: check.id,
-            label: runnerLoadingId === check.id ? "Running" : check.label,
-            onClick: () => onRunGuardedCheck(task.id, check.id),
-          }))}
-        >
-          {runnableChecks.length ? (
-            null
-          ) : (
-            <span>当前计划没有匹配到可运行检查。</span>
-          )}
-        </TaskCommandBar>
-        {runnerError ? <Notice className="planError" variant="danger">{runnerError}</Notice> : null}
-        {task.runs?.length ? (
-          <div className="runnerResults">
-            {task.runs.map((run) => (
-              <div className={`runnerResult ${run.success ? "success" : "failed"}`} key={`${run.id}-${run.finishedAt}`}>
-                <div>
-                  <strong>{run.label}</strong>
-                  <span>{run.command}</span>
-                </div>
-                <em>{run.success ? "passed" : `failed ${run.code ?? ""}`}</em>
-                <pre>{run.output || "No output."}</pre>
-              </div>
-            ))}
+      <details className="executionTools">
+        <summary>更多操作</summary>
+        <Panel className="diffPanel" variant="info">
+          <div className="runnerHeader">
+            <strong>改动草稿</strong>
+            <span>先预览，不直接写入</span>
           </div>
-        ) : null}
-      </Panel>
+          <TaskCommandBar
+            actions={[
+              {
+                disabled: patchLoading,
+                key: "generate-patch",
+                label: patchLoading ? "生成中" : task.patchDraft ? "重新生成" : "生成改动",
+                onClick: () => onGeneratePatchDraft(task.id),
+              },
+              {
+                disabled: applyLoading || !task.patchDraft,
+                key: "apply-patch",
+                label: applyLoading ? "应用中" : "应用改动",
+                onClick: () => onApplyPatchDraft(task.id),
+                variant: "primary",
+              },
+              {
+                disabled: handoffLoading || !task.runSummary || Boolean(task.handoffMerge),
+                key: "merge-handoff",
+                label: handoffLoading ? "合并中" : task.handoffMerge ? "已更新交接" : "更新交接",
+                onClick: () => onMergeHandoff(task.id),
+              },
+            ]}
+            meta={task.patchDraft?.files?.length ? `${task.patchDraft.files.length} 个文件` : "还没有生成改动。"}
+          />
+          {patchError ? <Notice className="planError" variant="danger">{patchError}</Notice> : null}
+          {applyError ? <Notice className="planError" variant="danger">{applyError}</Notice> : null}
+          {handoffError ? <Notice className="planError" variant="danger">{handoffError}</Notice> : null}
+          {task.applyResult ? <Notice className="providerSuccess" variant="success">{task.applyResult.message}</Notice> : null}
+          {task.verificationSummary ? (
+            <Notice className={task.status === taskStatuses.failed ? "providerError" : "providerSuccess"} variant={task.status === taskStatuses.failed ? "danger" : "success"}>
+              {task.verificationSummary}
+            </Notice>
+          ) : null}
+          {task.runSummary ? <Notice className="providerHint" variant="info">{task.runSummary.message}：{task.runSummary.path}</Notice> : null}
+          {task.handoffMerge ? <Notice className="providerSuccess" variant="success">{task.handoffMerge.message}：{task.handoffMerge.path}</Notice> : null}
+          {task.patchDraft ? <PatchDraft draft={task.patchDraft} /> : null}
+        </Panel>
+        <Panel className="runnerPanel" variant="code">
+          <div className="runnerHeader">
+            <strong>检查</strong>
+            <span>只运行已允许的命令</span>
+          </div>
+          <TaskCommandBar
+            actions={runnableChecks.map((check) => ({
+              disabled: Boolean(runnerLoadingId),
+              key: check.id,
+              label: runnerLoadingId === check.id ? "运行中" : check.label,
+              onClick: () => onRunGuardedCheck(task.id, check.id),
+            }))}
+          >
+            {runnableChecks.length ? (
+              null
+            ) : (
+              <span>当前没有可运行的检查。</span>
+            )}
+          </TaskCommandBar>
+          {runnerError ? <Notice className="planError" variant="danger">{runnerError}</Notice> : null}
+          {task.runs?.length ? (
+            <div className="runnerResults">
+              {task.runs.map((run) => (
+                <div className={`runnerResult ${run.success ? "success" : "failed"}`} key={`${run.id}-${run.finishedAt}`}>
+                  <div>
+                    <strong>{run.label}</strong>
+                    <span>{run.command}</span>
+                  </div>
+                <em>{run.success ? "通过" : `失败 ${run.code ?? ""}`}</em>
+                  <pre>{run.output || "No output."}</pre>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </Panel>
+      </details>
     </Panel>
   );
 }
@@ -1797,18 +1938,18 @@ function ReadonlyPlan({ plan }) {
     <Panel as="article" className="readonlyPlan" variant="soft">
       <div className="planHeader">
         <div>
-          <strong>{plan.mode}</strong>
+          <strong>下一步计划</strong>
           <span>{plan.projectName}</span>
         </div>
-        <Badge>只读</Badge>
+        <Badge>待确认</Badge>
       </div>
       <p>{plan.summary}</p>
       <div className="planColumns">
-        <PlanList title="Steps" items={plan.steps} />
-        <PlanList title="Read" items={plan.filesToRead} />
-        <PlanList title="Changes" items={plan.candidateChanges} />
-        <PlanList title="Checks" items={plan.checks} mono />
-        <PlanList title="Guardrails" items={plan.guardrails} />
+        <PlanList title="怎么做" items={plan.steps} />
+        <PlanList title="会看什么" items={plan.filesToRead} />
+        <PlanList title="可能改哪里" items={plan.candidateChanges} />
+        <PlanList title="怎么确认" items={plan.checks} mono />
+        <PlanList title="边界" items={plan.guardrails} />
       </div>
     </Panel>
   );
@@ -1839,21 +1980,35 @@ function RightRail({
   conversations,
   activeConversationId,
   onSelectConversation,
+  onDeleteConversation,
   onSelectTask,
   onMarkTaskWaiting,
 }) {
   const visibleTasks = tasks.filter((task) => !isNoiseTask(task));
+  const conversationGroups = groupedConversations(conversations);
   const todoMeta = visibleTasks.length || snapshot.queue.length;
   const progressValue = Math.min(86, 48 + Math.min(snapshot.recommendationCount, 8) * 4 + Math.min(snapshot.runCount, 6) * 3);
+  const goalTodos = visibleTasks.length
+    ? visibleTasks.map((task) => ({
+        description: task.plan?.summary || task.projectName || "",
+        id: task.id,
+        status: task.status,
+        title: task.title,
+      }))
+    : [
+        { id: "goal-todo-1", status: taskStatuses.done, title: "明确目标和结构", description: "目标只讲结果。" },
+        { id: "goal-todo-2", status: taskStatuses.running, title: "拆解右侧工作流", description: "任务呈现为 todo。" },
+        { id: "goal-todo-3", status: taskStatuses.planned, title: "验证对话与背景", description: "减少干扰。" },
+      ];
 
   if (collapsed) {
     return (
       <aside className="right right-collapsed" aria-label="右侧状态栏已折叠">
         <div className="collapsedRail collapsedRail-right">
-          <button className="collapsedRailItem active" type="button" onClick={onToggleCollapsed} aria-label={`目标进度 ${progressValue}%`}>
+          <button className="collapsedRailItem active" type="button" onClick={onToggleCollapsed} aria-label={`目标 ${progressValue}%`}>
             <span className="collapsedProgress">{progressValue}</span>
           </button>
-          <button className="collapsedRailItem" type="button" onClick={onToggleCollapsed} aria-label={`待办 ${todoMeta}`}>
+          <button className="collapsedRailItem" type="button" onClick={onToggleCollapsed} aria-label={`任务 ${todoMeta}`}>
             <ClipboardList strokeWidth={2.15} aria-hidden="true" />
           </button>
           <Tooltip content="展开状态栏">
@@ -1869,68 +2024,68 @@ function RightRail({
   return (
     <aside className="right">
       <div className="rightScroll">
-        <RailDisclosure title="目标进度" meta={`${progressValue}%`} defaultOpen>
-          <Panel className="goalProgress" variant="soft" padding="sm">
-            <div className="goalProgressHeader">
-              <strong>Desktop v0.1 工作台</strong>
-              <span>{snapshot.stage}</span>
+        <RailDisclosure title="目标" meta="收口中">
+          <div className="goalStack">
+            <div className="goalProgress">
+              <div className="goalProgressHeader">
+                <strong>打磨桌面对话体验</strong>
+                <span>普通聊天自然，任务入口清晰。</span>
+              </div>
+              <div className="goalProgressBar" aria-hidden="true">
+                <span style={{ width: `${progressValue}%` }} />
+              </div>
+              <div className="goalSteps">
+                <span>方向明确</span>
+                <span>界面收口</span>
+                <span>待验证</span>
+              </div>
             </div>
-            <div className="goalProgressBar" aria-hidden="true">
-              <span style={{ width: `${progressValue}%` }} />
+            <div className="goalTaskHeader">
+              <span>任务</span>
+              <span>{goalTodos.length}</span>
             </div>
-            <div className="goalSteps">
-              <span>已接入项目</span>
-              <span>治理中</span>
-              <span>待跑检查</span>
-            </div>
-          </Panel>
+            <ol className="goalTodoList">
+              {goalTodos.map((todo, index) => (
+                <GoalTodoItem
+                  active={todo.id === activeTaskId}
+                  description={todo.description}
+                  index={index}
+                  key={todo.id}
+                  status={todo.status}
+                  title={todo.title}
+                  onSelect={visibleTasks.length ? () => onSelectTask(todo.id) : undefined}
+                />
+              ))}
+            </ol>
+          </div>
         </RailDisclosure>
 
-        <RailDisclosure className="railHistory" title="对话历史" meta={conversations.length} defaultOpen>
+        <RailDisclosure className="railHistory" title="对话" meta={conversations.length}>
           <div className="queue">
             {conversations.length ? (
-              conversations.map((conversation) => (
-                <ConversationHistoryItem
-                  active={conversation.id === activeConversationId}
-                  conversation={conversation}
-                  key={conversation.id}
-                  onSelectConversation={onSelectConversation}
-                />
+              conversationGroups.map((group) => (
+                <div className="conversationHistoryGroup" key={group.label}>
+                  {conversationGroups.length > 1 ? (
+                    <div className="conversationHistoryGroupLabel">{group.label}</div>
+                  ) : null}
+                  {group.items.map((conversation) => (
+                    <ConversationHistoryItem
+                      active={conversation.id === activeConversationId}
+                      conversation={conversation}
+                      key={conversation.id}
+                      onDeleteConversation={onDeleteConversation}
+                      onSelectConversation={onSelectConversation}
+                    />
+                  ))}
+                </div>
               ))
             ) : (
-              <Notice variant="muted">普通聊天会保存在这里；确认执行后才会进入待办。</Notice>
+              <Notice variant="muted">普通聊天会保存在这里；确认执行后才会进入任务。</Notice>
             )}
           </div>
         </RailDisclosure>
 
-        <RailDisclosure className="railTasks" title="待办" meta={todoMeta} defaultOpen>
-          <div className="queue">
-            {visibleTasks.length ? (
-              visibleTasks.map((task) => (
-                <TaskQueueItem
-                  active={task.id === activeTaskId}
-                  key={task.id}
-                  task={task}
-                  onSelectTask={onSelectTask}
-                  onMarkTaskWaiting={onMarkTaskWaiting}
-                />
-              ))
-            ) : (
-              snapshot.queue.map((item, index) => (
-                <TaskCard
-                  body={item.body}
-                  key={item.title}
-                  progress={index === 0 ? 62 : undefined}
-                  status={item.status}
-                  title={item.title}
-                  tone={item.tone}
-                />
-              ))
-            )}
-          </div>
-        </RailDisclosure>
-
-        <RailDisclosure className="contextSection" title="对话背景" meta={snapshot.memory.length}>
+        <RailDisclosure className="contextSection" title="背景" meta={snapshot.memory.length}>
           <div className="memory">
           {snapshot.memory.map((item) => (
             <MemoryItem marker={item.marker} title={item.title} muted={item.muted} key={item.title}>
@@ -1965,7 +2120,7 @@ function RailDisclosure({ children, className = "", defaultOpen = false, meta, t
   );
 }
 
-function ConversationHistoryItem({ conversation, active, onSelectConversation }) {
+function ConversationHistoryItem({ conversation, active, onDeleteConversation, onSelectConversation }) {
   return (
     <Panel as="article" className={`conversationHistoryItem${active ? " active" : ""}`} padding="none">
       <button
@@ -1978,9 +2133,51 @@ function ConversationHistoryItem({ conversation, active, onSelectConversation })
           <strong>{conversation.title}</strong>
           <span>{conversation.updatedAt}</span>
         </div>
-        <p>{conversation.preview}</p>
       </button>
+      <Tooltip content="删除对话">
+        <button
+          aria-label={`删除对话：${conversation.title}`}
+          className="conversationHistoryDelete"
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onDeleteConversation(conversation.id);
+          }}
+        >
+          <X strokeWidth={2} aria-hidden="true" />
+        </button>
+      </Tooltip>
     </Panel>
+  );
+}
+
+function GoalTodoItem({ active, description, index, onSelect, status, title }) {
+  const done = status === taskStatuses.done;
+  const running = status === taskStatuses.running || status === taskStatuses.waitingApproval;
+  const failed = status === taskStatuses.failed;
+  const label = failed ? "失败" : running ? "进行中" : done ? "已完成" : "待开始";
+  const content = (
+    <>
+      <span className="goalTodoIndex">{index + 1}</span>
+      <span className="goalTodoText">
+        <span className="goalTodoTitle">{title}</span>
+      </span>
+      <span className="goalTodoStatus" aria-label={label}>
+        {done ? <Check strokeWidth={2.25} aria-hidden="true" /> : running ? <Loader2 strokeWidth={2} aria-hidden="true" /> : null}
+      </span>
+    </>
+  );
+
+  return (
+    <li className={`goalTodoItem${active ? " active" : ""}${done ? " done" : ""}${running ? " running" : ""}${failed ? " failed" : ""}`}>
+      {onSelect ? (
+        <button className="goalTodoButton" type="button" onClick={onSelect}>
+          {content}
+        </button>
+      ) : (
+        <div className="goalTodoButton">{content}</div>
+      )}
+    </li>
   );
 }
 
@@ -2065,6 +2262,30 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
 
   const updateField = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const createProfile = () => {
+    const id = `profile-${Date.now()}`;
+    const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
+    const preset = activePreset || catalogProviders.find((item) => item.id === "gateway") || catalogProviders[0];
+    setApiKey("");
+    setCustomModel(false);
+    setDetectedModels([]);
+    setProbeError("");
+    setModelTestMessage("");
+    setSelectedProviderId(preset?.id || "gateway");
+    setForm((current) => ({
+      ...current,
+      provider: preset?.provider || "openai-compatible",
+      model: preset?.models?.[0] || current.model || "gpt-4o-mini",
+      apiBase: preset?.apiBase || current.apiBase,
+      apiKeyEnv: `OMNIDESK_API_KEY_${suffix}`,
+      enabled: true,
+      profileId: id,
+      profileName: "新 API",
+      profileNote: "",
+      profileWebsite: preset?.website || "",
+    }));
   };
 
   const applyPreset = (preset) => {
@@ -2206,25 +2427,36 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
         <InfoCallout>当前是浏览器预览，只能查看界面。保存 Key、刷新模型和写入配置需要在桌面 App 窗口中操作。</InfoCallout>
       ) : null}
       {profiles.length ? (
-        <Field label="配置档案">
-          {({ id }) => <Select id={id} value={form.profileId || provider.activeProfileId || ""} onChange={selectProfile}>
-            {profiles.map((profile) => (
-              <option value={profile.id} key={profile.id}>
-                {profile.name}{profile.hasApiKey ? " · Key 已保存" : ""}
-              </option>
-            ))}
-          </Select>}
+        <Field label="API 档案">
+          {({ id }) => (
+            <div className="providerProfileRow">
+              <Select id={id} value={form.profileId || provider.activeProfileId || ""} onChange={selectProfile}>
+                {profiles.map((profile) => (
+                  <option value={profile.id} key={profile.id}>
+                    {profile.name}{profile.hasApiKey ? " · Key 已保存" : ""}
+                  </option>
+                ))}
+              </Select>
+              <Button className="textAction" size="sm" variant="ghost" type="button" onClick={createProfile}>
+                新建
+              </Button>
+            </div>
+          )}
         </Field>
-      ) : null}
+      ) : (
+        <Button className="textAction providerCreateFirst" size="sm" variant="ghost" type="button" onClick={createProfile}>
+          新建 API 档案
+        </Button>
+      )}
       <div className="providerSectionTitle">连接设置</div>
-      <Field label="服务商">
+      <Field label={<RequiredLabel>接入预设</RequiredLabel>}>
         {({ id }) => <Select id={id} value={selectedProviderId || activePreset?.id || "gateway"} onChange={selectPreset}>
           {catalogProviders.map((preset) => (
             <option value={preset.id} key={preset.id}>{preset.label}</option>
           ))}
         </Select>}
       </Field>
-      <Field label="API Key">
+      <Field label={<RequiredLabel>API Key</RequiredLabel>} hint={provider.hasApiKey ? "已保存时可留空；填写新 Key 会覆盖当前档案。" : "新档案必须填写 API Key。"}>
         {({ id }) => <Input
           id={id}
           type="password"
@@ -2233,7 +2465,7 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
           placeholder={provider.hasApiKey ? "已保存；留空则不修改" : "粘贴你的 API Key"}
         />}
       </Field>
-      <Field label="API 请求地址">
+      <Field label={<RequiredLabel>API 请求地址</RequiredLabel>}>
         {({ id }) => <Input id={id} value={form.apiBase} onChange={(event) => updateField("apiBase", event.target.value)} />}
       </Field>
       <div className="providerSectionTitle">
@@ -2247,7 +2479,7 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
           </Button>
         </span>
       </div>
-      <Field label="模型名称">
+      <Field label={<RequiredLabel>模型</RequiredLabel>}>
         {({ id }) => <Select id={id} value={!customModel && modelOptions.includes(form.model) ? form.model : "__custom"} onChange={selectModel}>
           {modelOptions.map((model) => (
             <option value={model} key={model}>{model}</option>
@@ -2256,7 +2488,7 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
         </Select>}
       </Field>
       {customModel || !modelOptions.includes(form.model) ? (
-        <Field label="自定义模型">
+        <Field label={<RequiredLabel>自定义模型</RequiredLabel>}>
           {({ id }) => <Input
             id={id}
             value={form.model}
@@ -2269,9 +2501,9 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
         <Notice className="providerHint" variant="info">已从网关读取 {detectedModels.length} 个模型。下拉列表里的是这个 API Key 当前能看到的模型池。</Notice>
       ) : null}
       {modelTestMessage ? <Notice className="providerSuccess" variant="success">{modelTestMessage}</Notice> : null}
-      <div className="providerSectionTitle">账号资料</div>
+      <div className="providerSectionTitle">档案信息（可选）</div>
       <div className="providerSplit">
-        <Field label="供应商名称">
+        <Field label="档案名称">
           {({ id }) => <Input
             id={id}
             value={form.profileName || activePreset?.label || ""}
@@ -2307,16 +2539,28 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
       </details>
       <div className="toggleRow">
         <Switch
-          aria-label="启用 provider"
+          aria-label="启用当前 API 档案"
           checked={form.enabled}
           onCheckedChange={(checked) => updateField("enabled", checked)}
         />
-        启用 provider
+        <span>
+          启用当前档案
+          <small>关闭后不调用模型，改用本地规则回答。</small>
+        </span>
       </div>
       <Button variant="primary" type="submit" disabled={isPreview}>保存并启用</Button>
       {probeError ? <Notice className="providerError" variant="danger">{probeError}</Notice> : null}
       {providerError ? <Notice className="providerError" variant="danger">{providerError}</Notice> : null}
     </Panel>
+  );
+}
+
+function RequiredLabel({ children }) {
+  return (
+    <span className="requiredLabel">
+      {children}
+      <span aria-hidden="true" className="requiredMark">*</span>
+    </span>
   );
 }
 
@@ -2437,21 +2681,22 @@ function App() {
       minute: "2-digit",
     });
     setConversations((current) => {
-      const exists = current.some((conversation) => conversation.id === activeConversationId);
+      const title = conversationTitle(nextTurns);
       const record = {
         id: activeConversationId,
         preview: conversationPreview(nextTurns),
-        title: conversationTitle(nextTurns),
+        title,
         turns: nextTurns.map((turn) => ({
+          actions: turn.actions,
           id: turn.id,
           role: turn.role,
           text: turn.text,
         })),
         updatedAt: now,
       };
-      const next = exists
-        ? current.map((conversation) => (conversation.id === activeConversationId ? { ...conversation, ...record } : conversation))
-        : [record, ...current];
+      const merged = current
+        .filter((conversation) => conversation.id !== activeConversationId && conversation.title !== title);
+      const next = [record, ...merged].slice(0, 50);
       try {
         window.localStorage?.setItem("omnidesk.conversations.v1", JSON.stringify(next));
       } catch {
@@ -2527,11 +2772,6 @@ function App() {
       .then((records) => {
         if (cancelled || !Array.isArray(records)) return;
         setTasks(records);
-        const firstTask = records.find((record) => !isNoiseTask(record));
-        if (firstTask?.id) {
-          setActiveTaskId(firstTask.id);
-          setReadonlyPlan(firstTask.plan || null);
-        }
       })
       .catch((err) => {
         if (!cancelled) {
@@ -2781,24 +3021,26 @@ function App() {
     setPlanError("");
     setPlanLoading(true);
     try {
-      let plan;
-      try {
-        plan = await invokeWorkspaceCommand("generate_readonly_plan", { input });
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        const isOldGeneratePlanArgs =
-          message.includes("generate_readonly_plan") &&
-          message.includes("missing required key") &&
-          message.includes("task");
-        if (!isOldGeneratePlanArgs) {
-          throw err;
+      let plan = buildPreviewPlan(input, snapshot);
+      if (isTauriRuntime()) {
+        try {
+          plan = await invokeWorkspaceCommand("generate_readonly_plan", { input });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          const isOldGeneratePlanArgs =
+            message.includes("generate_readonly_plan") &&
+            message.includes("missing required key") &&
+            message.includes("task");
+          if (!isOldGeneratePlanArgs) {
+            throw err;
+          }
+          const attachmentNote = input.attachments?.length
+            ? `\n\n附带截图：${input.attachments.map((attachment) => attachment.name).join("、")}\n提示：当前桌面端后端还未重启到多模态版本，本次先按文字和附件名称生成计划。`
+            : "";
+          plan = await invokeWorkspaceCommand("generate_readonly_plan", {
+            task: `${input.task}${attachmentNote}`,
+          });
         }
-        const attachmentNote = input.attachments?.length
-          ? `\n\n附带截图：${input.attachments.map((attachment) => attachment.name).join("、")}\n提示：当前桌面端后端还未重启到多模态版本，本次先按文字和附件名称生成计划。`
-          : "";
-        plan = await invokeWorkspaceCommand("generate_readonly_plan", {
-          task: `${input.task}${attachmentNote}`,
-        });
       }
       const nextTask = createTaskFromPlan(plan, input.task, snapshot.projectName);
       setReadonlyPlan(plan);
@@ -2810,6 +3052,15 @@ function App() {
     } finally {
       setPlanLoading(false);
     }
+  };
+
+  const runChatAction = async (action) => {
+    if (action?.id !== "generate-plan" || !action.task) return false;
+    const ok = await generatePlan({ task: action.task, attachments: [] });
+    if (ok) {
+      setSelectedEngineeringFile(null);
+    }
+    return ok;
   };
 
   const activeTask = tasks.find((task) => task.id === activeTaskId) || null;
@@ -2830,6 +3081,33 @@ function App() {
     setActiveTaskId("");
     setReadonlyPlan(null);
     setSelectedEngineeringFile(null);
+  };
+
+  const deleteConversation = (id) => {
+    const conversation = conversations.find((item) => item.id === id);
+    if (!conversation) return;
+    const ok = window.confirm(`删除「${conversation.title}」？`);
+    if (!ok) return;
+
+    const nextConversations = conversations.filter((item) => item.id !== id);
+    setConversations(nextConversations);
+    try {
+      window.localStorage?.setItem("omnidesk.conversations.v1", JSON.stringify(nextConversations));
+    } catch {
+      // localStorage may be unavailable in some embedded contexts.
+    }
+
+    if (activeConversationId !== id) return;
+    const nextConversation = nextConversations[0];
+    if (nextConversation) {
+      setActiveConversationId(nextConversation.id);
+      setChatTurns(Array.isArray(nextConversation.turns) ? nextConversation.turns : []);
+      setActiveTaskId("");
+      setReadonlyPlan(null);
+      setSelectedEngineeringFile(null);
+      return;
+    }
+    startNewConversation();
   };
 
   const startNewConversation = () => {
@@ -3216,6 +3494,7 @@ function App() {
           onGeneratePatchDraft={generatePatchDraft}
           onApplyPatchDraft={applyPatchDraft}
           onMergeHandoff={mergeHandoff}
+          onRunChatAction={runChatAction}
           onRunGuardedCheck={runGuardedCheck}
           onRunTerminalCheck={runTerminalCheck}
           onRunTerminalCommand={runTerminalCommand}
@@ -3233,6 +3512,7 @@ function App() {
           conversations={conversations}
           activeConversationId={activeConversationId}
           onSelectConversation={selectConversation}
+          onDeleteConversation={deleteConversation}
           onSelectTask={selectTask}
           onMarkTaskWaiting={markTaskWaiting}
         />

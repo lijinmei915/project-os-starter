@@ -833,7 +833,15 @@ async fn chat_with_model(input: ChatWithModelInput) -> Result<ChatWithModelResul
 
     if provider.enabled {
         match generate_provider_chat(&provider, &root, &project_name, &stage, &message, &attachments).await {
-            Ok(result) => return Ok(result),
+            Ok(mut result) => {
+                if result.should_create_plan && !should_create_plan_for_message(&message, !attachments.is_empty()) {
+                    result.should_create_plan = false;
+                    if result.intent.trim().is_empty() || result.intent == "task" {
+                        result.intent = "question".to_string();
+                    }
+                }
+                return Ok(result);
+            }
             Err(err) => {
                 let mut fallback = local_chat_result(&message, !attachments.is_empty());
                 fallback.reply = format!("{}（模型暂时不可用：{}）", fallback.reply, err);
@@ -1255,9 +1263,9 @@ fn build_local_readonly_plan(context: PlanContext) -> ReadonlyPlan {
     ReadonlyPlan {
         task: context.task.clone(),
         project_name: context.project_name.clone(),
-        mode: "readonly-plan".to_string(),
+        mode: "plan".to_string(),
         summary: format!(
-            "针对「{}」生成只读执行计划；当前项目为 {}，阶段为 {}。{}",
+            "我会先围绕「{}」理清范围，再给出最小下一步。当前项目为 {}，阶段为 {}。{}",
             context.task,
             context.project_name,
             context.stage,
@@ -1273,9 +1281,9 @@ fn build_local_readonly_plan(context: PlanContext) -> ReadonlyPlan {
         checks,
         guardrails: vec![
             "不自动写文件。".to_string(),
-            "不执行任意 shell，只建议白名单检查命令。".to_string(),
+            "不自动运行命令。".to_string(),
             "模型 API key 不进入前端。".to_string(),
-            "进入执行阶段前需要用户确认改动范围。".to_string(),
+            "继续动手前需要用户确认改动范围。".to_string(),
         ],
         trace,
     }
@@ -1350,7 +1358,7 @@ async fn generate_provider_plan(context: &PlanContext) -> Result<ReadonlyPlan, S
     let mut plan: ReadonlyPlan = serde_json::from_str(content)
         .map_err(|err| format!("provider JSON 解析失败: {}", err))?;
 
-    plan.mode = "provider-readonly-plan".to_string();
+    plan.mode = "plan".to_string();
     plan.task = context.task.clone();
     plan.project_name = context.project_name.clone();
     plan.guardrails.push("真实 provider 已调用，但仍只生成计划，不执行写入。".to_string());
@@ -1540,7 +1548,8 @@ Return strict JSON only:
 
 Rules:
 - Greetings, small talk, broad questions, or "what is X" shouldCreatePlan=false.
-- Only set shouldCreatePlan=true when the user clearly asks OmniDesk to modify, generate, fix, run checks, inspect screenshots/files as a task, or create an execution plan.
+- Questions that ask "why", "how", "what risks", "what happened", "is this ok", or "look at this" shouldCreatePlan=false and should receive a natural answer.
+- Only set shouldCreatePlan=true when the user clearly asks OmniDesk to modify files, generate a plan, create a task, apply a patch, run commands/checks, or implement/fix code.
 - If shouldCreatePlan=true, reply should briefly acknowledge that you will create a plan.
 - Do not invent completed work.
 - Do not mention internal JSON or routing.
@@ -1549,14 +1558,20 @@ Rules:
 }
 
 fn local_chat_result(message: &str, has_attachments: bool) -> ChatWithModelResult {
-    let should_create_plan = has_attachments || is_task_like_message(message);
+    let should_create_plan = should_create_plan_for_message(message, has_attachments);
     ChatWithModelResult {
         reply: if should_create_plan {
-            "可以，我先把它作为一个项目任务理解，生成计划前会保持只读，不直接改文件。".to_string()
+            "可以。我先整理下一步，等你确认后再动手。".to_string()
         } else if is_greeting_message(message) {
-            "你好，我在。你可以直接说想改什么、想看哪个文件，或者让我帮你把当前项目下一步理清楚。".to_string()
+            "你好，我在。你可以直接问项目情况，也可以说想改哪里。".to_string()
+        } else if is_question_like_message(message) {
+            if message.contains("风险") {
+                "主要风险有三类：交接记录可能继续膨胀；对话和执行状态容易混在一起；模型或检查失败时反馈还不够像人话。建议先把普通问答和执行任务分开，再打磨失败提示。".to_string()
+            } else {
+                "我先直接回答这个问题；需要我动手时，再说“生成计划”或“帮我改”。".to_string()
+            }
         } else {
-            "我在。这个更像普通对话，我先不创建待办；如果你想让我开始做，直接说“帮我改/检查/生成”。".to_string()
+            "我在。你可以继续问，也可以直接说想让我改哪里。".to_string()
         },
         should_create_plan,
         intent: if should_create_plan { "task" } else { "chat" }.to_string(),
@@ -1574,12 +1589,31 @@ fn is_greeting_message(message: &str) -> bool {
     )
 }
 
+fn should_create_plan_for_message(message: &str, has_attachments: bool) -> bool {
+    if is_question_like_message(message) {
+        return false;
+    }
+    is_task_like_message(message) || has_attachments
+}
+
+fn is_question_like_message(message: &str) -> bool {
+    let text = message.trim().to_lowercase();
+    [
+        "为什么", "怎么", "哪些", "还有哪些", "是什么", "吗", "呢", "咋回事",
+        "看一下", "看看", "风险", "问题在哪", "自然吗", "正常吗",
+        "why", "how", "what", "which", "risk", "risks",
+    ]
+    .iter()
+    .any(|keyword| text.contains(keyword))
+}
+
 fn is_task_like_message(message: &str) -> bool {
     let text = message.trim().to_lowercase();
     [
-        "帮我", "改", "修", "优化", "生成", "创建", "新增", "删除", "检查", "跑", "执行",
-        "实现", "接入", "配置", "预览", "截图", "报错", "不行", "失败",
-        "做成", "设计", "重构", "提交", "推送", "commit", "push", "build", "check",
+        "帮我改", "帮我修", "帮我优化", "帮我生成", "帮我创建", "帮我新增", "帮我删除",
+        "帮我执行", "帮我跑", "开始执行", "生成计划", "创建任务", "改代码", "修复",
+        "实现", "接入", "配置", "做成", "设计", "重构", "提交", "推送",
+        "commit", "push", "build", "apply patch",
     ]
     .iter()
     .any(|keyword| text.contains(keyword))
@@ -2200,6 +2234,7 @@ fn start_terminal_session(
     command.cwd(root.clone());
     command.env("TERM", "xterm-256color");
     command.env("COLORTERM", "truecolor");
+    command.env("PROMPT_EOL_MARK", "");
 
     let child = pair
         .slave

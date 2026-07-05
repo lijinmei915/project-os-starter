@@ -1,8 +1,8 @@
 {
-  "name": "project-os-desktop",
+  "name": "omnidesk",
   "version": "0.1.0",
   "private": true,
-  "description": "Project OS Desktop shell for the local AI project workbench.",
+  "description": "OmniDesk local AI project workbench.",
   "type": "module",
   "scripts": {
     "dev": "tauri dev",

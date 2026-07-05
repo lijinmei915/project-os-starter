@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Project OS Desktop",
+  "productName": "OmniDesk",
   "version": "0.1.0",
   "identifier": "ai.project-os.desktop",
   "build": {
@@ -13,7 +13,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "Project OS Desktop",
+        "title": "OmniDesk",
         "width": 1280,
         "height": 860,
         "minWidth": 1024,
