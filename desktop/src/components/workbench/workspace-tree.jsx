@@ -26,12 +26,20 @@ function topicKey(parts) {
   return parts.filter(Boolean).join("/");
 }
 
+function nodeKey(node, fallback = "") {
+  return node?.id || fallback || node?.title || "";
+}
+
+function itemKey({ child, item, node }) {
+  return item.id || topicKey([nodeKey(node, node.title), child ? nodeKey(child, child.title) : "", item.title]);
+}
+
 function collectTopicKeys(outline) {
   return outline.flatMap((node) => {
     const childKeys = (node.children || []).flatMap((child) => (
       child.items || []
-    ).map((item) => topicKey([node.title, child.title, item.title])));
-    const ownKeys = (node.items || []).map((item) => topicKey([node.title, item.title]));
+    ).map((item) => itemKey({ child, item, node })));
+    const ownKeys = (node.items || []).map((item) => itemKey({ item, node }));
     return [...childKeys, ...ownKeys];
   });
 }
@@ -61,11 +69,14 @@ export function WorkspaceTree({ activeTopicPath, onSelectTopic, outline }) {
   };
 
   const openTopic = ({ child, item, node }) => {
-    const path = topicKey([node.title, child?.title, item.title]);
+    const path = itemKey({ child, item, node });
     onSelectTopic({
       description: item.description,
       group: child?.title || node.title,
+      id: item.id,
       path,
+      statusSource: item.statusSource || child?.statusSource || node.statusSource,
+      updatesWhen: item.updatesWhen || child?.updatesWhen || node.updatesWhen,
       relatedFiles: item.relatedFiles || [],
       title: item.title,
       virtual: true,
@@ -80,11 +91,11 @@ export function WorkspaceTree({ activeTopicPath, onSelectTopic, outline }) {
       <div className="treeDetail" aria-label={`${child.title}事项`}>
         <div className="treeFileList">
           {items.map((item) => {
-            const path = topicKey([node.title, child.title, item.title]);
+            const path = itemKey({ child, item, node });
             return (
               <button
                 className={`treeFile treeTopic${activeTopicPath === path ? " active" : ""}`}
-                key={item.title}
+                key={path}
                 onClick={() => openTopic({ child, item, node })}
                 title={item.description}
                 type="button"
@@ -126,13 +137,13 @@ export function WorkspaceTree({ activeTopicPath, onSelectTopic, outline }) {
       <nav className="flowNav workspaceTree" aria-label="工作区">
       {outline.map((node) => {
         const NodeIcon = iconFor(node);
-        const nodeId = node.id || node.title;
+        const nodeId = nodeKey(node);
         const isActive = activeNodeId === nodeId || expandedMode;
         const children = node.children || [];
         const hasChildren = children.length > 0;
         const showChildren = hasChildren && isActive && isNodeOpen(nodeId);
-        const activeChild = activeChildByNode[nodeId] || children[0]?.title;
-        const ownTopicOpen = (node.items || []).some((item) => isTopicOpen(topicKey([node.title, item.title])));
+        const activeChild = activeChildByNode[nodeId] || nodeKey(children[0]);
+        const ownTopicOpen = (node.items || []).some((item) => isTopicOpen(itemKey({ item, node })));
 
         return (
           <div className="workspaceGroup treeNode treeNode-root" key={nodeId}>
@@ -165,12 +176,13 @@ export function WorkspaceTree({ activeTopicPath, onSelectTopic, outline }) {
                 <nav className="flowNav governanceNav" aria-label={`${node.title}子项`}>
                   {children.map((child) => {
                     const ChildIcon = iconFor(child);
-                    const childActive = child.title === activeChild;
-                    const childTopicKeys = (child.items || []).map((item) => topicKey([node.title, child.title, item.title]));
+                    const childId = nodeKey(child);
+                    const childActive = childId === activeChild;
+                    const childTopicKeys = (child.items || []).map((item) => itemKey({ child, item, node }));
                     const showTopics = childTopicKeys.some((key) => isTopicOpen(key));
 
                     return (
-                      <div className="flowTreeNode treeNode" key={child.title}>
+                      <div className="flowTreeNode treeNode" key={childId}>
                         <button
                           className={`flowItem flowItem-compact treeRow${childActive ? " active" : ""}`}
                           onClick={() => {
@@ -179,7 +191,7 @@ export function WorkspaceTree({ activeTopicPath, onSelectTopic, outline }) {
                               setTopicOpenByKey((current) => ({ ...current, ...Object.fromEntries(childTopicKeys.map((key) => [key, nextOpen])) }));
                               return;
                             }
-                            setActiveChildByNode((current) => ({ ...current, [nodeId]: child.title }));
+                            setActiveChildByNode((current) => ({ ...current, [nodeId]: childId }));
                             setTopicOpenByKey((current) => ({ ...current, ...Object.fromEntries(childTopicKeys.map((key) => [key, true])) }));
                           }}
                           type="button"

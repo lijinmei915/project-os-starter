@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "project-profile.schema.json",
+  "title": "Project OS Profile",
+  "description": "Large, structured project profile for natural conversation-driven governance. UI should reveal only useful slices, while agents can use the full profile as background context.",
+  "type": "object",
+  "required": ["schemaVersion", "fields"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "project-os.project-profile.v0.1"
+    },
+    "projectId": {
+      "type": "string"
+    },
+    "updatedAt": {
+      "type": "string"
+    },
+    "fields": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/profileField" },
+      "properties": {
+        "identity.summary": { "$ref": "#/$defs/profileField" },
+        "identity.type": { "$ref": "#/$defs/profileField" },
+        "identity.lifecycle": { "$ref": "#/$defs/profileField" },
+        "identity.uniqueDescription": { "$ref": "#/$defs/profileField" },
+        "product.longTermGoal": { "$ref": "#/$defs/profileField" },
+        "product.coreValue": { "$ref": "#/$defs/profileField" },
+        "product.targetUsers": { "$ref": "#/$defs/profileField" },
+        "product.useCases": { "$ref": "#/$defs/profileField" },
+        "product.successCriteria": { "$ref": "#/$defs/profileField" },
+        "product.scope": { "$ref": "#/$defs/profileField" },
+        "product.nonGoals": { "$ref": "#/$defs/profileField" },
+        "user.globalPreferences": { "$ref": "#/$defs/profileField" },
+        "user.skillLevel": { "$ref": "#/$defs/profileField" },
+        "user.communicationStyle": { "$ref": "#/$defs/profileField" },
+        "governance.routing": { "$ref": "#/$defs/profileField" },
+        "governance.permissions": { "$ref": "#/$defs/profileField" },
+        "governance.documentation": { "$ref": "#/$defs/profileField" },
+        "engineering.architecture": { "$ref": "#/$defs/profileField" },
+        "engineering.dataModel": { "$ref": "#/$defs/profileField" },
+        "engineering.designSystem": { "$ref": "#/$defs/profileField" },
+        "engineering.testing": { "$ref": "#/$defs/profileField" },
+        "engineering.delivery": { "$ref": "#/$defs/profileField" },
+        "memory.risks": { "$ref": "#/$defs/profileField" },
+        "memory.decisions": { "$ref": "#/$defs/profileField" },
+        "memory.lessons": { "$ref": "#/$defs/profileField" }
+      }
+    }
+  },
+  "$defs": {
+    "profileField": {
+      "type": "object",
+      "required": ["value", "status", "source"],
+      "properties": {
+        "value": {
+          "description": "String, array, or object depending on the field.",
+          "oneOf": [
+            { "type": "string" },
+            { "type": "array", "items": {} },
+            { "type": "object" },
+            { "type": "null" }
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["unknown", "inferred", "user_confirmed", "document_confirmed", "outdated"]
+        },
+        "source": {
+          "type": "string",
+          "description": "conversation, PROJECT.md, docs/PRODUCT_PLAN.md, HANDOFF.md, etc."
+        },
+        "updatedAt": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

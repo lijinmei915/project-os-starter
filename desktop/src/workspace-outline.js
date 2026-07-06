@@ -1,3 +1,106 @@
+const governanceMeta = {
+  "认识项目": {
+    id: "understand-project",
+    files: ["PROJECT.md", ".project-os/state.json", "README.md", "HANDOFF.md"],
+    statusSource: ".project-os/state.json",
+    updatesWhen: "接入项目、项目阶段变化、启动方式变化或风险变化时更新。",
+  },
+  "定义目标": {
+    id: "define-goal",
+    files: ["docs/PRODUCT_PLAN.md", "PROJECT.md", "HANDOFF.md"],
+    statusSource: "PROJECT.md",
+    updatesWhen: "目标、用户、场景、范围或成功标准变化时更新。",
+  },
+  "工作规则": {
+    id: "work-rules",
+    files: ["AGENTS.md", "docs/ROUTING.md", "docs/DOCUMENTATION.md", "docs/NAMING.md"],
+    statusSource: "AGENTS.md",
+    updatesWhen: "AI 行为边界、路由、权限或文档归属规则变化时更新。",
+  },
+  "设计实现": {
+    id: "design-implementation",
+    files: ["docs/ARCHITECTURE.md", "docs/CODE_STRUCTURE.md", "docs/DESIGN_STANDARDS.md", "desktop/src/*"],
+    statusSource: "docs/ARCHITECTURE.md",
+    updatesWhen: "架构、数据模型、界面规范或代码结构变化时更新。",
+  },
+  "验证交付": {
+    id: "validate-delivery",
+    files: ["docs/TESTING.md", "docs/RUNBOOK.md", "scripts/*", ".project-os/runs/*"],
+    statusSource: ".project-os/runs/*",
+    updatesWhen: "检查命令、验收标准、交付产物或质量记录变化时更新。",
+  },
+  "复盘沉淀": {
+    id: "retrospective-memory",
+    files: ["HANDOFF.md", "docs/LESSONS.md", "docs/DECISIONS.md", "docs/CHANGELOG.md"],
+    statusSource: "HANDOFF.md",
+    updatesWhen: "交接、经验、决策或长期记忆变化时更新。",
+  },
+};
+
+const itemMeta = {
+  "项目是什么": { id: "project-identity", statusSource: ".project-os/state.json" },
+  "现在做到哪": { id: "project-progress", statusSource: "HANDOFF.md" },
+  "怎么启动": { id: "project-runbook", statusSource: "docs/RUNBOOK.md" },
+  "有什么风险": { id: "project-risks", statusSource: "HANDOFF.md" },
+  "本地项目状态": { id: "local-project-state", statusSource: ".project-os/state.json" },
+  "项目目标": { id: "product-goal", statusSource: "docs/PRODUCT_PLAN.md" },
+  "目标用户": { id: "target-users", statusSource: "docs/PRODUCT_PLAN.md" },
+  "使用场景": { id: "use-cases", statusSource: "docs/PRODUCT_PLAN.md" },
+  "当前范围": { id: "scope-boundary", statusSource: "PROJECT.md" },
+  "成功标准": { id: "success-criteria", statusSource: "docs/TESTING.md" },
+  "角色边界": { id: "role-boundary", statusSource: "AGENTS.md" },
+  "请求路由": { id: "request-routing", statusSource: "docs/ROUTING.md" },
+  "执行权限": { id: "execution-permissions", statusSource: "AGENTS.md" },
+  "文档规则": { id: "documentation-rules", statusSource: "docs/DOCUMENTATION.md" },
+  "风险约束": { id: "risk-constraints", statusSource: "docs/LESSONS.md" },
+  "方案设计": { id: "solution-design", statusSource: "docs/PRODUCT_PLAN.md" },
+  "系统架构": { id: "system-architecture", statusSource: "docs/ARCHITECTURE.md" },
+  "数据模型": { id: "data-model", statusSource: "schemas/*" },
+  "界面规范": { id: "ui-standards", statusSource: "docs/DESIGN_STANDARDS.md" },
+  "实现结构": { id: "code-structure", statusSource: "docs/CODE_STRUCTURE.md" },
+  "验收标准": { id: "acceptance-criteria", statusSource: "docs/TESTING.md" },
+  "检查清单": { id: "checklist", statusSource: "docs/TESTING.md" },
+  "测试验证": { id: "test-validation", statusSource: "desktop/package.json" },
+  "交付产物": { id: "deliverables", statusSource: "docs/RUNBOOK.md" },
+  "质量记录": { id: "quality-records", statusSource: ".project-os/runs/*" },
+  "当前交接": { id: "handoff", statusSource: "HANDOFF.md" },
+  "经验复盘": { id: "lessons", statusSource: "docs/LESSONS.md" },
+  "关键决策": { id: "decisions", statusSource: "docs/DECISIONS.md" },
+  "运行记录": { id: "run-records", statusSource: ".project-os/runs/*" },
+};
+
+function slug(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function enrichItem(item, parentId) {
+  const meta = itemMeta[item.title] || {};
+  const id = meta.id || `${parentId}-${slug(item.title)}`;
+  return {
+    ...item,
+    ...meta,
+    id,
+    files: item.relatedFiles || item.files || [],
+    updatesWhen: item.updatesWhen || meta.updatesWhen || "用户提到相关事实变化，或关联文件内容变化时更新。",
+  };
+}
+
+function enrichNode(node, parentId = "") {
+  const meta = governanceMeta[node.title] || {};
+  const id = node.id || meta.id || [parentId, slug(node.title)].filter(Boolean).join("-");
+  return {
+    ...node,
+    ...meta,
+    id,
+    children: (node.children || []).map((child) => enrichNode(child, id)),
+    items: (node.items || []).map((item) => enrichItem(item, id)),
+    mapKind: node.mapKind || "project-governance",
+  };
+}
+
 export const projectGovernanceFlow = [
   {
     title: "认识项目",
@@ -85,7 +188,7 @@ export const projectGovernanceOutline = [
     meta: "流程",
     icon: "clipboard",
     description: "从理解到复盘的项目阶段。",
-    children: projectGovernanceFlow,
+    children: projectGovernanceFlow.map((node) => enrichNode(node, "project-governance")),
   },
   {
     id: "memory",
@@ -312,13 +415,13 @@ export const projectGovernanceOutline = [
       },
     ],
   },
-];
+].map((node) => enrichNode(node));
 
 export function outlineLeafKeys(outline) {
   return outline.flatMap((node) => {
     const children = node.children || [];
-    const childKeys = children.flatMap((child) => (child.items || []).map((item) => `${node.title}/${child.title}/${item.title}`));
-    const ownKeys = (node.items || []).map((item) => `${node.title}/${item.title}`);
+    const childKeys = children.flatMap((child) => (child.items || []).map((item) => item.id || `${node.title}/${child.title}/${item.title}`));
+    const ownKeys = (node.items || []).map((item) => item.id || `${node.title}/${item.title}`);
     return [...childKeys, ...ownKeys];
   });
 }

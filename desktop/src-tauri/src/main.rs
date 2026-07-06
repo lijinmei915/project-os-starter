@@ -40,6 +40,17 @@ struct MemoryItem {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+struct ProjectProfile {
+    intro: String,
+    long_term_goal: String,
+    target_users: String,
+    use_cases: String,
+    user_preferences: String,
+    missing_fields: Vec<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct RegistryProject {
     id: String,
     name: String,
@@ -81,6 +92,7 @@ struct WorkspaceSnapshot {
     tree: Vec<TreeItem>,
     queue: Vec<QueueItem>,
     memory: Vec<MemoryItem>,
+    project_profile: ProjectProfile,
     trace: Vec<String>,
 }
 
@@ -291,6 +303,24 @@ struct StopTerminalSessionInput {
 #[serde(rename_all = "camelCase")]
 struct DesktopTaskInput {
     task: Value,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ProfileFieldPatch {
+    key: String,
+    value: Value,
+    status: String,
+    source: String,
+    confidence: f64,
+    #[serde(default)]
+    notes: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct NaturalProfileUpdateInput {
+    patches: Vec<ProfileFieldPatch>,
 }
 
 #[derive(Deserialize)]
@@ -577,6 +607,7 @@ fn get_workspace_snapshot() -> Result<WorkspaceSnapshot, String> {
                 muted: true,
             },
         ],
+        project_profile: build_project_profile(&root, &project_name),
         trace: vec![
             format!("ROOT: {}", root.display()),
             format!("REGISTRY: {} project(s)", registry.projects.len()),
@@ -992,6 +1023,64 @@ fn save_desktop_task(input: DesktopTaskInput) -> Result<Value, String> {
     let content = serde_json::to_string_pretty(&task).map_err(|err| err.to_string())?;
     fs::write(path, format!("{content}\n")).map_err(|err| err.to_string())?;
     Ok(task)
+}
+
+#[tauri::command]
+fn update_project_profile_from_conversation(input: NaturalProfileUpdateInput) -> Result<WorkspaceSnapshot, String> {
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let current_project = current_registry_project(&mut registry, &app_root)?;
+    let root = PathBuf::from(&current_project.path);
+    let patches: Vec<ProfileFieldPatch> = input
+        .patches
+        .into_iter()
+        .filter(|patch| is_profile_field_allowed(&patch.key))
+        .collect();
+    if patches.is_empty() {
+        return get_workspace_snapshot();
+    }
+
+    let path = root.join(".project-os/project-profile.json");
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|err| err.to_string())?;
+    }
+    let mut profile = read_json(path.clone()).unwrap_or_else(|| {
+        json!({
+            "schemaVersion": "project-os.project-profile.v0.1",
+            "projectId": current_project.id,
+            "updatedAt": "",
+            "fields": {}
+        })
+    });
+    let updated_at = current_timestamp_string();
+    profile["schemaVersion"] = json!("project-os.project-profile.v0.1");
+    profile["projectId"] = json!(current_project.id);
+    profile["updatedAt"] = json!(updated_at.clone());
+    if !profile.get("fields").is_some_and(Value::is_object) {
+        profile["fields"] = json!({});
+    }
+    let fields = profile
+        .get_mut("fields")
+        .and_then(Value::as_object_mut)
+        .ok_or_else(|| "project-profile fields 格式异常".to_string())?;
+
+    for patch in patches {
+        fields.insert(
+            patch.key,
+            json!({
+                "value": patch.value,
+                "status": normalize_profile_status(&patch.status),
+                "source": patch.source,
+                "updatedAt": updated_at,
+                "confidence": patch.confidence.clamp(0.0, 1.0),
+                "notes": patch.notes
+            }),
+        );
+    }
+
+    let content = serde_json::to_string_pretty(&profile).map_err(|err| err.to_string())?;
+    fs::write(path, format!("{content}\n")).map_err(|err| err.to_string())?;
+    get_workspace_snapshot()
 }
 
 #[tauri::command]
@@ -2586,6 +2675,198 @@ fn read_json(path: PathBuf) -> Option<Value> {
         .and_then(|content| serde_json::from_str(&content).ok())
 }
 
+fn read_text(root: &Path, relative: &str) -> String {
+    fs::read_to_string(root.join(relative)).unwrap_or_default()
+}
+
+fn clean_markdown_line(line: &str) -> String {
+    line.trim()
+        .trim_start_matches(['-', '*', '>', ' '])
+        .trim()
+        .trim_matches('`')
+        .trim()
+        .to_string()
+}
+
+fn markdown_section(content: &str, headings: &[&str]) -> String {
+    let mut collecting = false;
+    let mut lines: Vec<String> = Vec::new();
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+        let is_heading = trimmed.starts_with('#');
+        if is_heading {
+            let title = trimmed.trim_start_matches('#').trim();
+            if collecting {
+                break;
+            }
+            collecting = headings.iter().any(|heading| title.contains(heading));
+            continue;
+        }
+        if collecting {
+            let cleaned = clean_markdown_line(trimmed);
+            if !cleaned.is_empty() {
+                lines.push(cleaned);
+            }
+            if lines.len() >= 3 {
+                break;
+            }
+        }
+    }
+
+    lines.join(" ")
+}
+
+fn first_non_empty(values: Vec<String>) -> String {
+    values
+        .into_iter()
+        .map(|value| value.trim().to_string())
+        .find(|value| !value.is_empty())
+        .unwrap_or_default()
+}
+
+fn profile_field_value(profile: &Option<Value>, key: &str) -> String {
+    profile
+        .as_ref()
+        .and_then(|json| json.pointer(&format!("/fields/{}/value", key.replace('.', "/"))))
+        .or_else(|| {
+            profile
+                .as_ref()
+                .and_then(|json| json.get("fields"))
+                .and_then(|fields| fields.get(key))
+                .and_then(|field| field.get("value"))
+        })
+        .map(value_to_profile_text)
+        .unwrap_or_default()
+}
+
+fn value_to_profile_text(value: &Value) -> String {
+    match value {
+        Value::String(text) => text.trim().to_string(),
+        Value::Array(items) => items
+            .iter()
+            .map(value_to_profile_text)
+            .filter(|text| !text.is_empty())
+            .collect::<Vec<_>>()
+            .join("、"),
+        Value::Object(_) => serde_json::to_string(value).unwrap_or_default(),
+        _ => String::new(),
+    }
+}
+
+fn project_intro_from_project_md(project_md: &str, project_name: &str) -> String {
+    let section = markdown_section(project_md, &["项目简介", "项目介绍", "概览", "Overview", "Summary"]);
+    if !section.is_empty() {
+        return section;
+    }
+
+    project_md
+        .lines()
+        .map(clean_markdown_line)
+        .find(|line| {
+            !line.is_empty()
+                && !line.starts_with('#')
+                && !line.contains("什么时候更新")
+                && !line.contains("不要写什么")
+                && !line.contains(project_name)
+        })
+        .unwrap_or_default()
+}
+
+fn build_project_profile(root: &Path, project_name: &str) -> ProjectProfile {
+    let project_md = read_text(root, "PROJECT.md");
+    let product_plan = read_text(root, "docs/PRODUCT_PLAN.md");
+    let handoff = read_text(root, "HANDOFF.md");
+    let profile_json = read_json(root.join(".project-os/project-profile.json"));
+
+    let intro = first_non_empty(vec![
+            profile_field_value(&profile_json, "identity.summary"),
+            profile_field_value(&profile_json, "identity.uniqueDescription"),
+            project_intro_from_project_md(&project_md, project_name),
+            markdown_section(&product_plan, &["项目简介", "产品简介", "Project", "Overview"]),
+        ]);
+    let long_term_goal = first_non_empty(vec![
+            profile_field_value(&profile_json, "product.longTermGoal"),
+            markdown_section(&product_plan, &["长期目标", "目标", "愿景", "Vision"]),
+            markdown_section(&project_md, &["目标", "当前目标", "项目目标"]),
+        ]);
+    let target_users = first_non_empty(vec![
+            profile_field_value(&profile_json, "product.targetUsers"),
+            markdown_section(&product_plan, &["目标用户", "用户画像", "用户", "Audience"]),
+            markdown_section(&project_md, &["目标用户", "用户画像"]),
+        ]);
+    let use_cases = first_non_empty(vec![
+            profile_field_value(&profile_json, "product.useCases"),
+            markdown_section(&product_plan, &["使用场景", "场景", "Use Cases"]),
+            markdown_section(&project_md, &["使用场景", "场景"]),
+        ]);
+    let user_preferences = first_non_empty(vec![
+            profile_field_value(&profile_json, "user.globalPreferences"),
+            profile_field_value(&profile_json, "user.communicationStyle"),
+            markdown_section(&handoff, &["用户偏好", "偏好", "User Preferences"]),
+            markdown_section(&project_md, &["用户偏好", "偏好"]),
+        ]);
+    let mut missing_fields = Vec::new();
+    for (label, value) in [
+        ("项目简介", &intro),
+        ("长期目标", &long_term_goal),
+        ("目标用户", &target_users),
+        ("使用场景", &use_cases),
+        ("用户偏好", &user_preferences),
+    ] {
+        if value.trim().is_empty() {
+            missing_fields.push(label.to_string());
+        }
+    }
+
+    ProjectProfile {
+        intro,
+        long_term_goal,
+        target_users,
+        use_cases,
+        user_preferences,
+        missing_fields,
+    }
+}
+
+fn is_profile_field_allowed(key: &str) -> bool {
+    matches!(
+        key,
+        "identity.summary"
+            | "identity.type"
+            | "identity.lifecycle"
+            | "identity.uniqueDescription"
+            | "product.longTermGoal"
+            | "product.coreValue"
+            | "product.targetUsers"
+            | "product.useCases"
+            | "product.successCriteria"
+            | "product.scope"
+            | "product.nonGoals"
+            | "user.globalPreferences"
+            | "user.skillLevel"
+            | "user.communicationStyle"
+            | "governance.routing"
+            | "governance.permissions"
+            | "governance.documentation"
+            | "engineering.architecture"
+            | "engineering.dataModel"
+            | "engineering.designSystem"
+            | "engineering.testing"
+            | "engineering.delivery"
+            | "memory.risks"
+            | "memory.decisions"
+            | "memory.lessons"
+    )
+}
+
+fn normalize_profile_status(status: &str) -> String {
+    match status {
+        "inferred" | "user_confirmed" | "document_confirmed" | "outdated" => status.to_string(),
+        _ => "unknown".to_string(),
+    }
+}
+
 fn provider_config_path(app_root: &Path) -> PathBuf {
     app_root.join(".project-os/desktop-provider.json")
 }
@@ -3373,6 +3654,7 @@ fn main() {
             merge_run_summary_to_handoff,
             list_desktop_tasks,
             save_desktop_task,
+            update_project_profile_from_conversation,
             get_model_catalog,
             get_desktop_theme,
             save_desktop_theme,

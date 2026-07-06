@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
-import { Bot, BookOpen, Brain, Check, CheckCircle2, ChevronsDownUp, ChevronsUpDown, ChevronRight, ClipboardList, Copy, Eraser, FileStack, Loader2, MoreHorizontal, Package, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, RotateCcw, Settings, ShieldCheck, Square, TerminalSquare, Wrench, X } from "lucide-react";
+import { Brain, Check, ChevronRight, ClipboardList, Copy, Eraser, Loader2, MoreHorizontal, Package, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, RotateCcw, Square, TerminalSquare, X } from "lucide-react";
 import { ChatComposer } from "./components/workbench/chat-composer";
 import { Conversation, ConversationMessage } from "./components/workbench/conversation";
 import { InfoCallout } from "./components/workbench/info-callout";
@@ -109,6 +109,14 @@ const fallbackSnapshot = {
       muted: true,
     },
   ],
+  projectProfile: {
+    intro: "",
+    longTermGoal: "",
+    targetUsers: "",
+    useCases: "",
+    userPreferences: "",
+    missingFields: ["项目简介", "长期目标", "目标用户", "使用场景", "用户偏好"],
+  },
   trace: [
     "BOOT: browser preview fallback.",
     "INDEX: waiting for Tauri Local Agent Core.",
@@ -146,285 +154,6 @@ function buildPreviewPlan(input, snapshot) {
     trace: ["PREVIEW: browser-only local plan."],
   };
 }
-
-const engineeringFlow = [
-  {
-    title: "认识项目",
-    meta: "当前",
-    icon: BookOpen,
-    description: "项目基本状态。",
-    files: ["PROJECT.md", ".project-os/state.json", "README.md"],
-    items: [
-      { title: "项目是什么", description: "名称、用途和阶段。", relatedFiles: ["PROJECT.md", ".project-os/state.json"] },
-      { title: "现在做到哪", description: "当前进度和下一步。", relatedFiles: ["PROJECT.md", "HANDOFF.md"] },
-      { title: "怎么启动", description: "本地启动方式。", relatedFiles: ["README.md", "docs/RUNBOOK.md", "docs/DESKTOP_APP.md"] },
-      { title: "有什么风险", description: "已知风险和边界。", relatedFiles: ["HANDOFF.md", "docs/LESSONS.md"] },
-      { title: "本地项目状态", description: "接入和文件状态。", relatedFiles: [".project-os/state.json", ".project-os/desktop-registry.json"] },
-    ],
-  },
-  {
-    title: "定义目标",
-    meta: "路线",
-    icon: ClipboardList,
-    description: "目标、对象和边界。",
-    files: ["docs/PRODUCT_PLAN.md", "PROJECT.md", "HANDOFF.md"],
-    items: [
-      { title: "项目目标", description: "问题和结果。", relatedFiles: ["docs/PRODUCT_PLAN.md", "PROJECT.md"] },
-      { title: "目标用户", description: "核心使用者。", relatedFiles: ["docs/PRODUCT_PLAN.md", "PROJECT.md"] },
-      { title: "使用场景", description: "主要工作流。", relatedFiles: ["docs/PRODUCT_PLAN.md", "docs/DESKTOP_APP.md"] },
-      { title: "当前范围", description: "做什么和不做什么。", relatedFiles: ["PROJECT.md", "HANDOFF.md"] },
-      { title: "成功标准", description: "完成判断标准。", relatedFiles: ["docs/PRODUCT_PLAN.md", "docs/TESTING.md", "HANDOFF.md"] },
-    ],
-  },
-  {
-    title: "工作规则",
-    meta: "规则",
-    icon: ShieldCheck,
-    description: "协作方式和权限。",
-    files: ["AGENTS.md", "docs/ROUTING.md", "docs/DOCUMENTATION.md", "docs/NAMING.md"],
-    items: [
-      { title: "角色边界", description: "谁能做什么。", relatedFiles: ["AGENTS.md"] },
-      { title: "请求路由", description: "需求处理流程。", relatedFiles: ["docs/ROUTING.md"] },
-      { title: "执行权限", description: "自动和确认边界。", relatedFiles: ["AGENTS.md", "docs/ROUTING.md"] },
-      { title: "文档规则", description: "信息归属位置。", relatedFiles: ["docs/DOCUMENTATION.md", "docs/NAMING.md"] },
-      { title: "风险约束", description: "禁止和复盘规则。", relatedFiles: ["AGENTS.md", "docs/LESSONS.md"] },
-    ],
-  },
-  {
-    title: "设计实现",
-    meta: "方案",
-    icon: Wrench,
-    description: "方案、架构和实现结构。",
-    files: ["docs/ARCHITECTURE.md", "docs/CODE_STRUCTURE.md", "docs/DESIGN_STANDARDS.md", "docs/design/tokens.md"],
-    items: [
-      { title: "方案设计", description: "整体解决方案。", relatedFiles: ["docs/PRODUCT_PLAN.md", "docs/DESKTOP_APP.md"] },
-      { title: "系统架构", description: "模块和依赖关系。", relatedFiles: ["docs/ARCHITECTURE.md"] },
-      { title: "数据模型", description: "对象、状态和关系。", relatedFiles: ["schemas/*", "docs/data/*"] },
-      { title: "界面规范", description: "组件和设计 token。", relatedFiles: ["docs/DESIGN_STANDARDS.md", "docs/design/tokens.md", "desktop/src/styles.css"] },
-      { title: "实现结构", description: "目录和模块职责。", relatedFiles: ["docs/CODE_STRUCTURE.md", "desktop/src/main.jsx", "desktop/src-tauri/src/main.rs"] },
-    ],
-  },
-  {
-    title: "验证交付",
-    meta: "检查",
-    icon: CheckCircle2,
-    description: "验收、测试和交付结果。",
-    files: ["docs/TESTING.md", "docs/RUNBOOK.md", "scripts/check-runtime.sh", "scripts/check-ai-project.sh"],
-    items: [
-      { title: "验收标准", description: "完成判断标准。", relatedFiles: ["docs/PRODUCT_PLAN.md", "docs/TESTING.md"] },
-      { title: "检查清单", description: "必须检查事项。", relatedFiles: ["docs/TESTING.md", "scripts/check-runtime.sh", "scripts/check-ai-project.sh"] },
-      { title: "测试验证", description: "功能和回归验证。", relatedFiles: ["docs/TESTING.md", "desktop/package.json"] },
-      { title: "交付产物", description: "最终交付内容。", relatedFiles: ["docs/RUNBOOK.md", "templates/*", "dist/*"] },
-      { title: "质量记录", description: "结果和遗留问题。", relatedFiles: [".project-os/runs/*", ".project-os/recommendations/recommend-next.json", "HANDOFF.md"] },
-    ],
-  },
-  {
-    title: "复盘沉淀",
-    meta: "记忆",
-    icon: Brain,
-    description: "经验和下一步。",
-    files: ["HANDOFF.md", "docs/LESSONS.md", "docs/DECISIONS.md", ".project-os/runs/*", "docs/data/knowledge-registry.json"],
-    items: [
-      { title: "当前交接", description: "继续工作上下文。", relatedFiles: ["HANDOFF.md"] },
-      { title: "经验复盘", description: "踩坑和修正。", relatedFiles: ["docs/LESSONS.md"] },
-      { title: "关键决策", description: "重要取舍记录。", relatedFiles: ["docs/DECISIONS.md", "docs/CHANGELOG.md"] },
-      { title: "运行记录", description: "任务和检查记录。", relatedFiles: [".project-os/runs/*", "docs/data/knowledge-registry.json"] },
-    ],
-  },
-];
-
-const workspaceAreas = [
-  {
-    title: "项目流程",
-    meta: "流程",
-    icon: ClipboardList,
-    description: "从理解到复盘的项目阶段。",
-    files: ["认识项目", "定义目标", "工作规则", "设计实现", "验证交付", "复盘沉淀"],
-  },
-  {
-    title: "知识记忆",
-    meta: "上下文",
-    icon: Brain,
-    description: "项目、用户、规则和会话记忆。",
-    children: [
-      {
-        title: "项目上下文",
-        meta: "项目",
-        icon: BookOpen,
-        description: "项目目标和状态。",
-        files: ["PROJECT.md", "HANDOFF.md", ".project-os/state.json", "docs/PRODUCT_PLAN.md"],
-      },
-      {
-        title: "用户偏好",
-        meta: "全局",
-        icon: Brain,
-        description: "长期工作偏好。",
-        files: ["OmniDesk global: user-profile.json", "OmniDesk global: global-preferences.json"],
-      },
-      {
-        title: "团队规则",
-        meta: "规则",
-        icon: Settings,
-        description: "长期协作规则。",
-        files: ["AGENTS.md", "docs/ROUTING.md", "docs/DOCUMENTATION.md"],
-      },
-      {
-        title: "决策记录",
-        meta: "项目",
-        icon: ClipboardList,
-        description: "关键取舍记录。",
-        files: ["docs/DECISIONS.md", "docs/LESSONS.md", "docs/CHANGELOG.md"],
-      },
-      {
-        title: "会话摘要",
-        meta: "当前",
-        icon: Brain,
-        description: "对话沉淀内容。",
-        files: [".project-os/conversations/*", ".project-os/memory/*"],
-      },
-    ],
-    files: ["项目上下文", "用户偏好", "团队规则", "决策记录", "会话摘要"],
-  },
-  {
-    title: "任务执行",
-    meta: "执行",
-    icon: TerminalSquare,
-    description: "对话、计划、待办、运行和结果。",
-    children: [
-      {
-        title: "对话",
-        meta: "当前",
-        icon: BookOpen,
-        description: "任务对话入口。",
-        files: [".project-os/conversations/*"],
-      },
-      {
-        title: "计划",
-        meta: "步骤",
-        icon: ClipboardList,
-        description: "执行步骤和范围。",
-        files: [".project-os/runs/*", ".project-os/recommendations/recommend-next.json"],
-      },
-      {
-        title: "待办",
-        meta: "队列",
-        icon: ClipboardList,
-        description: "已确认任务队列。",
-        files: [".project-os/runs/desktop-tasks/*"],
-      },
-      {
-        title: "运行记录",
-        meta: "日志",
-        icon: TerminalSquare,
-        description: "命令和工具日志。",
-        files: [".project-os/runs/*", ".project-os/runs/desktop-summary.md"],
-      },
-      {
-        title: "执行结果",
-        meta: "结果",
-        icon: CheckCircle2,
-        description: "Diff、产物和检查结果。",
-        files: [".project-os/runs/*", "HANDOFF.md"],
-      },
-    ],
-    files: ["对话", "计划", "待办", "运行记录", "执行结果"],
-  },
-  {
-    title: "工程资产",
-    meta: "资产",
-    icon: FileStack,
-    description: "文档、代码、数据契约和模板。",
-    children: [
-      {
-        title: "核心文档",
-        meta: "入口",
-        icon: BookOpen,
-        description: "项目入口文档。",
-        files: ["README.md", "PROJECT.md", "HANDOFF.md", "AGENTS.md"],
-      },
-      {
-        title: "产品文档",
-        meta: "产品",
-        icon: ClipboardList,
-        description: "计划和决策文档。",
-        files: ["docs/PRODUCT_PLAN.md", "docs/DESKTOP_APP.md", "docs/DECISIONS.md", "docs/CHANGELOG.md"],
-      },
-      {
-        title: "设计资产",
-        meta: "设计",
-        icon: Wrench,
-        description: "设计规范和 tokens。",
-        files: ["docs/DESIGN_STANDARDS.md", "docs/design/*"],
-      },
-      {
-        title: "代码结构",
-        meta: "代码",
-        icon: FileStack,
-        description: "源码和脚本结构。",
-        files: ["desktop/*", "scripts/*", "adapters/*"],
-      },
-      {
-        title: "数据契约",
-        meta: "数据",
-        icon: TerminalSquare,
-        description: "Schema 和 manifest。",
-        files: ["schemas/*", "docs/data/*"],
-      },
-      {
-        title: "模板资源",
-        meta: "模板",
-        icon: Package,
-        description: "可分发模板。",
-        files: ["templates/*", "templates/project-docs/*", "templates/report/*"],
-      },
-    ],
-    files: ["核心文档", "产品文档", "设计资产", "代码结构", "数据契约", "模板资源"],
-  },
-  {
-    title: "Agent 配置",
-    meta: "配置",
-    icon: Bot,
-    description: "模型、技能、工具和适配器。",
-    children: [
-      {
-        title: "模型配置",
-        meta: "模型",
-        icon: Settings,
-        description: "Provider 和模型。",
-        files: [".project-os/desktop-provider.json", ".project-os/model-catalog.json"],
-      },
-      {
-        title: "工具权限",
-        meta: "权限",
-        icon: ShieldCheck,
-        description: "工具调用边界。",
-        files: ["AGENTS.md", "docs/DESKTOP_APP.md", "docs/AI_SAFETY.md"],
-      },
-      {
-        title: "Skills",
-        meta: "技能",
-        icon: Bot,
-        description: "Agent 能力扩展。",
-        files: [".agents/skills/*", "docs/SKILL_ENGINEERING.md"],
-      },
-      {
-        title: "适配器",
-        meta: "适配",
-        icon: FileStack,
-        description: "工具入口适配。",
-        files: ["adapters/*", "CODEX.md", "CLAUDE.md"],
-      },
-      {
-        title: "执行边界",
-        meta: "边界",
-        icon: ShieldCheck,
-        description: "确认和禁止规则。",
-        files: ["AGENTS.md", "docs/ROUTING.md", "docs/SECURITY.md"],
-      },
-    ],
-    files: [".agents/skills/*", "AGENTS.md", "adapters/*", ".project-os/desktop-provider.json"],
-  },
-];
 
 const fallbackProvider = {
   provider: "openai-compatible",
@@ -661,17 +390,9 @@ function TopBar({
 }
 
 function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot, onSwitchProject, onPickProject, onOpenProjectFolder, onRenameProject, onRemoveProject, onSelectEngineeringFile, projectActionError, selectedEngineeringFile }) {
-  const [activeArea, setActiveArea] = useState(workspaceAreas[0].title);
-  const [activeChildByArea, setActiveChildByArea] = useState({
-    项目流程: engineeringFlow[0].title,
-    知识记忆: "项目上下文",
-  });
   const [renameProject, setRenameProject] = useState(null);
   const [renameName, setRenameName] = useState("");
   const [projectsOpen, setProjectsOpen] = useState(true);
-  const [workspaceOpen, setWorkspaceOpen] = useState(true);
-  const [nodeOpenByKey, setNodeOpenByKey] = useState({});
-  const [fileSummaryOpenByKey, setFileSummaryOpenByKey] = useState({});
 
   const openRenameDialog = (project) => {
     setRenameProject(project);
@@ -685,36 +406,6 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
     if (ok) {
       setRenameProject(null);
       setRenameName("");
-    }
-  };
-
-  const isFileSummaryOpen = (key) => fileSummaryOpenByKey[key] === true;
-  const isNodeOpen = (key) => nodeOpenByKey[key] !== false;
-  const toggleNodeOpen = (key) => {
-    setNodeOpenByKey((current) => ({
-      ...current,
-      [key]: current[key] === false,
-    }));
-  };
-  const toggleFileSummary = (key) => {
-    setFileSummaryOpenByKey((current) => ({
-      ...current,
-      [key]: current[key] !== true,
-    }));
-  };
-  const allFileSummaryKeys = [
-    ...workspaceAreas.map((item) => item.title),
-    ...workspaceAreas.flatMap((item) => {
-      const childItems = item.title === "项目流程" ? engineeringFlow : item.children || [];
-      return childItems.map((flow) => `${item.title}/${flow.title}`);
-    }),
-  ];
-  const allFileSummariesOpen = allFileSummaryKeys.every((key) => isFileSummaryOpen(key));
-  const toggleAllFileSummaries = () => {
-    const nextOpen = !allFileSummariesOpen;
-    setFileSummaryOpenByKey(Object.fromEntries(allFileSummaryKeys.map((key) => [key, nextOpen])));
-    if (nextOpen) {
-      setNodeOpenByKey(Object.fromEntries(workspaceAreas.map((item) => [item.title, true])));
     }
   };
 
@@ -756,39 +447,6 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
       </aside>
     );
   }
-
-  const renderFileSummary = (item) => {
-    const displayItems = item.items || item.files.map((file) => ({
-      title: file,
-      description: item.description,
-      relatedFiles: [file],
-    }));
-
-    return (
-    <div className="treeDetail" aria-label={`${item.title}工程事项`}>
-      <div className="treeFileList">
-        {displayItems.map((entry) => (
-          <button
-            className={`treeFile treeTopic${selectedEngineeringFile?.path === `${item.title}/${entry.title}` ? " active" : ""}`}
-            key={entry.title}
-            onClick={() => onSelectEngineeringFile({
-              path: `${item.title}/${entry.title}`,
-              group: item.title,
-              title: entry.title,
-              description: entry.description,
-              relatedFiles: entry.relatedFiles,
-              virtual: true,
-            })}
-            title={entry.description}
-            type="button"
-          >
-            {entry.title}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-  };
 
   return (
     <aside className="left">
@@ -975,6 +633,41 @@ function actionPromptsForMessage(message, intent) {
   ];
 }
 
+function profilePatchesFromMessage(message) {
+  const text = safeDisplayText(message).trim();
+  if (!text) return [];
+  const patches = [];
+  const pushPatch = (key, value, confidence = 0.75) => {
+    patches.push({
+      key,
+      value,
+      status: "user_confirmed",
+      source: "conversation",
+      confidence,
+      notes: text,
+    });
+  };
+
+  if (/技术小白|不懂技术|非技术|小白/.test(text)) {
+    pushPatch("user.skillLevel", text, 0.85);
+    pushPatch("product.targetUsers", ["技术小白"], 0.7);
+  }
+  if (/目标用户|用户画像|面向|给.*用/.test(text)) {
+    pushPatch("product.targetUsers", text, 0.75);
+  }
+  if (/长期目标|最终|北极星|愿景/.test(text)) {
+    pushPatch("product.longTermGoal", text, 0.75);
+  }
+  if (/使用场景|场景|什么时候|接手|启动|持续/.test(text)) {
+    pushPatch("product.useCases", text, 0.7);
+  }
+  if (/不要|别|少|希望|偏好|喜欢|不喜欢|自然|主流/.test(text)) {
+    pushPatch("user.globalPreferences", text, 0.8);
+  }
+
+  return patches;
+}
+
 function safeDisplayText(value, fallback = "") {
   if (typeof value === "string") return value;
   if (value == null) return fallback;
@@ -1033,6 +726,16 @@ function compactConversationText(value, maxLength) {
   return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
 }
 
+function compactModelLabel(model) {
+  const text = String(model || "").trim();
+  if (!text) return "模型";
+  const gptVersion = text.match(/^gpt[-_]?(\d+(?:\.\d+)?)/i);
+  if (gptVersion) return gptVersion[1];
+  const version = text.match(/(\d+(?:\.\d+)?)(?!.*\d)/);
+  if (version) return version[1];
+  return text.length > 6 ? `${text.slice(0, 5)}...` : text;
+}
+
 function visibleConversationPreview(conversation) {
   const title = cleanConversationText(conversation?.title);
   const preview = cleanConversationText(conversation?.preview);
@@ -1067,6 +770,97 @@ function isLowSignalConversationText(text) {
 function isNoiseTask(task) {
   const title = safeDisplayText(task?.title).trim().replace(/[。！？!?,，\s]/g, "").toLowerCase();
   return /^\d+$/.test(title) || ["hi", "hello", "hey", "你好", "您好", "哈喽", "嗨", "在吗", "在么"].includes(title);
+}
+
+function phaseLabel(phase) {
+  return {
+    init: "初始化",
+    stabilizing: "收口中",
+    shipping: "交付中",
+    maintenance: "维护中",
+    archived: "已归档",
+  }[phase] || phase || "进行中";
+}
+
+function goalStatusLabel(todos, fallbackPhase) {
+  if (!todos.length) return phaseLabel(fallbackPhase);
+  if (todos.every((todo) => todo.status === taskStatuses.done)) return "已完成";
+  if (todos.some((todo) => todo.status === taskStatuses.failed)) return "需处理";
+  if (todos.some((todo) => todo.status === taskStatuses.running)) return "进行中";
+  if (todos.some((todo) => todo.status === taskStatuses.waitingApproval)) return "待确认";
+  return phaseLabel(fallbackPhase);
+}
+
+function progressFromTodos(todos) {
+  if (!todos.length) return 0;
+  const score = todos.reduce((total, todo) => {
+    if (todo.status === taskStatuses.done) return total + 1;
+    if (todo.status === taskStatuses.running || todo.status === taskStatuses.waitingApproval) return total + 0.5;
+    return total;
+  }, 0);
+  return Math.round((score / todos.length) * 100);
+}
+
+function snapshotQueueTodos(snapshot) {
+  return (snapshot.queue || [])
+    .filter((item) => !isNoiseTask(item))
+    .map((item, index) => ({
+      description: item.body || item.projectName || "",
+      id: item.id || `snapshot-queue-${index}`,
+      status: item.status || taskStatuses.planned,
+      title: item.title || "未命名任务",
+    }));
+}
+
+function projectProfileItems(snapshot) {
+  const profile = snapshot.projectProfile || {};
+  const missingFields = new Set(profile.missingFields || []);
+  return [
+    {
+      title: "项目简介",
+      body: profile.intro,
+    },
+    {
+      title: "长期目标",
+      body: profile.longTermGoal,
+    },
+    {
+      title: "目标用户",
+      body: profile.targetUsers,
+    },
+    {
+      title: "使用场景",
+      body: profile.useCases,
+    },
+    {
+      title: "用户偏好",
+      body: profile.userPreferences,
+    },
+  ].map((item) => ({
+    ...item,
+    missing: missingFields.has(item.title) || !item.body,
+  }));
+}
+
+function taskSubtasks(task) {
+  const steps = Array.isArray(task?.plan?.steps) ? task.plan.steps : [];
+  if (steps.length) {
+    return steps.map((step, index) => ({
+      id: `${task.id || task.title}-step-${index}`,
+      status: index === 0 && task.status === taskStatuses.done ? taskStatuses.done : task.status,
+      title: step,
+    }));
+  }
+
+  if (task?.description) {
+    return [{
+      id: `${task.id || task.title}-summary`,
+      status: task.status,
+      title: task.description,
+    }];
+  }
+
+  return [];
 }
 
 const chatStarterPrompts = [
@@ -1121,6 +915,9 @@ function AgentWorkspace({
   onWriteTerminalData,
   onResizeTerminalSession,
   onRestartTerminalSession,
+  onProfileUpdated,
+  onStopPlan,
+  provider,
 }) {
   const [taskInput, setTaskInput] = useState("");
   const [attachments, setAttachments] = useState([]);
@@ -1132,6 +929,7 @@ function AgentWorkspace({
     { id: "terminal", title: "终端", kind: "terminal", closable: false },
   ]);
   const composerRef = React.useRef(null);
+  const activeRequestRef = React.useRef(null);
   const actionMode = Boolean(activeTask || readonlyPlan);
   const isConversationEmpty = !chatTurns.length && !activeTask && !readonlyPlan && !loading && !error && !pendingTurn && !chatLoading;
 
@@ -1142,6 +940,7 @@ function AgentWorkspace({
       return [];
     });
     setPendingTurn(null);
+    activeRequestRef.current = null;
     onChatTurnsChange([]);
     setActiveWorkspaceTab("plan");
       setWorkspaceTabs((current) => current.filter((tab) => tab.kind !== "file"));
@@ -1254,9 +1053,19 @@ function AgentWorkspace({
       role: "user",
       text: nextInput || "请根据截图帮我分析并修改。",
     };
+    const requestId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    activeRequestRef.current = requestId;
     setTaskInput("");
     setAttachments([]);
     onChatTurnsChange([...chatTurns, userTurn]);
+    const profilePatches = profilePatchesFromMessage(nextInput);
+    if (profilePatches.length && isTauriRuntime()) {
+      invokeWorkspaceCommand("update_project_profile_from_conversation", {
+        input: { patches: profilePatches },
+      })
+        .then((nextSnapshot) => onProfileUpdated?.(nextSnapshot))
+        .catch(() => {});
+    }
     setChatLoading(true);
 
     let chatResult;
@@ -1282,7 +1091,14 @@ function AgentWorkspace({
         shouldCreatePlan: false,
       };
     } finally {
-      setChatLoading(false);
+      if (activeRequestRef.current === requestId) {
+        setChatLoading(false);
+      }
+    }
+
+    if (activeRequestRef.current !== requestId) {
+      submittedAttachments.forEach((attachment) => URL.revokeObjectURL(attachment.url));
+      return;
     }
 
     if (!chatResult?.shouldCreatePlan) {
@@ -1312,16 +1128,26 @@ function AgentWorkspace({
         mimeType: attachment.mimeType,
         name: attachment.name,
       })),
+      requestId,
       task: nextInput || "请根据截图帮我分析并修改。",
     }).then((ok) => {
+      if (activeRequestRef.current !== requestId) return;
       if (ok) {
         setPendingTurn(null);
         submittedAttachments.forEach((attachment) => URL.revokeObjectURL(attachment.url));
       }
     }).catch(() => {
+      if (activeRequestRef.current !== requestId) return;
       setPendingTurn(null);
       submittedAttachments.forEach((attachment) => URL.revokeObjectURL(attachment.url));
     });
+  };
+
+  const stopCurrentResponse = () => {
+    activeRequestRef.current = null;
+    setChatLoading(false);
+    setPendingTurn(null);
+    onStopPlan?.();
   };
 
   return (
@@ -1433,11 +1259,6 @@ function AgentWorkspace({
               ) : null}
               <ConversationMessage className="conversationMessage-thinking" role="assistant" title="OmniDesk">
                 <span>正在思考</span>
-                <span className="thinkingDots" aria-hidden="true">
-                  <i />
-                  <i />
-                  <i />
-                </span>
               </ConversationMessage>
             </>
           ) : null}
@@ -1538,7 +1359,10 @@ function AgentWorkspace({
           onInputChange={(event) => setTaskInput(event.target.value)}
           onPaste={handlePaste}
           onRemoveAttachment={removeAttachment}
+          onStop={stopCurrentResponse}
           onSubmit={submitTask}
+          onVoiceInput={setTaskInput}
+          modelLabel={compactModelLabel(provider?.model)}
           planLoading={planLoading}
           taskInput={taskInput}
         />
@@ -1555,7 +1379,10 @@ function ChatDock({
   onInputChange,
   onPaste,
   onRemoveAttachment,
+  onStop,
   onSubmit,
+  onVoiceInput,
+  modelLabel,
   planLoading,
   taskInput,
 }) {
@@ -1564,12 +1391,15 @@ function ChatDock({
       <ChatComposer
         attachments={attachments}
         inputRef={composerRef}
-        disabled={planLoading || chatLoading}
+        disabled={false}
         onFilesSelected={onFilesSelected}
         onChange={onInputChange}
         onPaste={onPaste}
         onRemoveAttachment={onRemoveAttachment}
+        onStop={onStop}
         onSubmit={onSubmit}
+        onVoiceInput={onVoiceInput}
+        modelLabel={modelLabel}
         placeholder="问项目情况、描述想法，或说要改什么..."
         sending={planLoading || chatLoading}
         value={taskInput}
@@ -1768,7 +1598,23 @@ function EngineeringFileTab({ selectedEngineeringFile }) {
           <Badge>{selectedEngineeringFile.group}</Badge>
         </div>
         <div className="topicPreview">
-          <Notice variant="info">这些是给人看的工作事项；背后的工程文件只在需要查看时打开。</Notice>
+          <Notice variant="info">这是项目治理地图。用户只看事项，OmniDesk 在背后维护对应文件、状态来源和更新时机。</Notice>
+          {(selectedEngineeringFile.topic.statusSource || selectedEngineeringFile.topic.updatesWhen) ? (
+            <div className="topicGovernanceMeta">
+              {selectedEngineeringFile.topic.statusSource ? (
+                <div>
+                  <span>状态来源</span>
+                  <code>{selectedEngineeringFile.topic.statusSource}</code>
+                </div>
+              ) : null}
+              {selectedEngineeringFile.topic.updatesWhen ? (
+                <div>
+                  <span>更新时机</span>
+                  <p>{selectedEngineeringFile.topic.updatesWhen}</p>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           <div className="topicFileList">
             <strong>关联工程文件</strong>
             <div>
@@ -1986,20 +1832,33 @@ function RightRail({
 }) {
   const visibleTasks = tasks.filter((task) => !isNoiseTask(task));
   const conversationGroups = groupedConversations(conversations);
-  const todoMeta = visibleTasks.length || snapshot.queue.length;
-  const progressValue = Math.min(86, 48 + Math.min(snapshot.recommendationCount, 8) * 4 + Math.min(snapshot.runCount, 6) * 3);
+  const activeTask = visibleTasks.find((task) => task.id === activeTaskId);
+  const snapshotTodos = snapshotQueueTodos(snapshot);
+  const todoMeta = visibleTasks.length || snapshotTodos.length;
   const goalTodos = visibleTasks.length
     ? visibleTasks.map((task) => ({
         description: task.plan?.summary || task.projectName || "",
         id: task.id,
         status: task.status,
+        subtasks: taskSubtasks(task),
         title: task.title,
       }))
-    : [
-        { id: "goal-todo-1", status: taskStatuses.done, title: "明确目标和结构", description: "目标只讲结果。" },
-        { id: "goal-todo-2", status: taskStatuses.running, title: "拆解右侧工作流", description: "任务呈现为 todo。" },
-        { id: "goal-todo-3", status: taskStatuses.planned, title: "验证对话与背景", description: "减少干扰。" },
-      ];
+    : snapshotTodos.map((task) => ({
+        ...task,
+        subtasks: taskSubtasks(task),
+      }));
+  const progressValue = progressFromTodos(goalTodos);
+  const goalTitle = activeTask?.title || snapshot.stage || snapshot.projectName || "当前项目";
+  const goalDescription = activeTask?.plan?.summary || snapshot.projectName || "暂无目标描述。";
+  const goalMeta = goalStatusLabel(goalTodos, snapshot.phase);
+  const doneCount = goalTodos.filter((todo) => todo.status === taskStatuses.done).length;
+  const runningCount = goalTodos.filter((todo) => todo.status === taskStatuses.running || todo.status === taskStatuses.waitingApproval).length;
+  const pendingCount = Math.max(goalTodos.length - doneCount - runningCount, 0);
+  const goalSteps = goalTodos.length
+    ? [`完成 ${doneCount}`, `进行 ${runningCount}`, `待办 ${pendingCount}`]
+    : ["暂无任务", "等待拆解", "待确认"];
+  const profileItems = projectProfileItems(snapshot);
+  const recordedProfileCount = profileItems.filter((item) => !item.missing).length;
 
   if (collapsed) {
     return (
@@ -2024,39 +1883,44 @@ function RightRail({
   return (
     <aside className="right">
       <div className="rightScroll">
-        <RailDisclosure title="目标" meta="收口中">
+        <RailDisclosure title="目标" meta={goalMeta}>
           <div className="goalStack">
             <div className="goalProgress">
               <div className="goalProgressHeader">
-                <strong>打磨桌面对话体验</strong>
-                <span>普通聊天自然，任务入口清晰。</span>
+                <strong>{goalTitle}</strong>
+                <span>{goalDescription}</span>
               </div>
               <div className="goalProgressBar" aria-hidden="true">
                 <span style={{ width: `${progressValue}%` }} />
               </div>
               <div className="goalSteps">
-                <span>方向明确</span>
-                <span>界面收口</span>
-                <span>待验证</span>
+                {goalSteps.map((step) => (
+                  <span key={step}>{step}</span>
+                ))}
               </div>
             </div>
             <div className="goalTaskHeader">
               <span>任务</span>
               <span>{goalTodos.length}</span>
             </div>
-            <ol className="goalTodoList">
-              {goalTodos.map((todo, index) => (
-                <GoalTodoItem
-                  active={todo.id === activeTaskId}
-                  description={todo.description}
-                  index={index}
-                  key={todo.id}
-                  status={todo.status}
-                  title={todo.title}
-                  onSelect={visibleTasks.length ? () => onSelectTask(todo.id) : undefined}
-                />
-              ))}
-            </ol>
+            {goalTodos.length ? (
+              <ol className="goalTodoList">
+                {goalTodos.map((todo, index) => (
+                  <GoalTaskItem
+                    active={todo.id === activeTaskId}
+                    description={todo.description}
+                    index={index}
+                    key={todo.id}
+                    status={todo.status}
+                    subtasks={todo.subtasks}
+                    title={todo.title}
+                    onSelect={visibleTasks.length ? () => onSelectTask(todo.id) : undefined}
+                  />
+                ))}
+              </ol>
+            ) : (
+              <div className="goalEmpty">还没有任务拆解。说出想做的事后，这里会变成 todo。</div>
+            )}
           </div>
         </RailDisclosure>
 
@@ -2085,13 +1949,11 @@ function RightRail({
           </div>
         </RailDisclosure>
 
-        <RailDisclosure className="contextSection" title="背景" meta={snapshot.memory.length}>
-          <div className="memory">
-          {snapshot.memory.map((item) => (
-            <MemoryItem marker={item.marker} title={item.title} muted={item.muted} key={item.title}>
-              {item.body}
-            </MemoryItem>
-          ))}
+        <RailDisclosure className="contextSection" title="项目档案" meta={`${recordedProfileCount}/${profileItems.length}`}>
+          <div className="contextPack">
+            {profileItems.map((item) => (
+              <ProjectProfileItem body={item.body} missing={item.missing} title={item.title} key={item.title} />
+            ))}
           </div>
         </RailDisclosure>
       </div>
@@ -2151,20 +2013,30 @@ function ConversationHistoryItem({ conversation, active, onDeleteConversation, o
   );
 }
 
-function GoalTodoItem({ active, description, index, onSelect, status, title }) {
+function GoalStatusIcon({ status }) {
   const done = status === taskStatuses.done;
   const running = status === taskStatuses.running || status === taskStatuses.waitingApproval;
   const failed = status === taskStatuses.failed;
   const label = failed ? "失败" : running ? "进行中" : done ? "已完成" : "待开始";
+  return (
+    <span className="goalTodoStatus" aria-label={label}>
+      {done ? <Check strokeWidth={2.25} aria-hidden="true" /> : running ? <Loader2 strokeWidth={2} aria-hidden="true" /> : null}
+    </span>
+  );
+}
+
+function GoalTaskItem({ active, description, index, onSelect, status, subtasks = [], title }) {
+  const done = status === taskStatuses.done;
+  const running = status === taskStatuses.running || status === taskStatuses.waitingApproval;
+  const failed = status === taskStatuses.failed;
   const content = (
     <>
       <span className="goalTodoIndex">{index + 1}</span>
       <span className="goalTodoText">
         <span className="goalTodoTitle">{title}</span>
+        {description && !subtasks.length ? <span className="goalTodoDescription">{description}</span> : null}
       </span>
-      <span className="goalTodoStatus" aria-label={label}>
-        {done ? <Check strokeWidth={2.25} aria-hidden="true" /> : running ? <Loader2 strokeWidth={2} aria-hidden="true" /> : null}
-      </span>
+      <GoalStatusIcon status={status} />
     </>
   );
 
@@ -2177,6 +2049,16 @@ function GoalTodoItem({ active, description, index, onSelect, status, title }) {
       ) : (
         <div className="goalTodoButton">{content}</div>
       )}
+      {subtasks.length ? (
+        <ol className="goalSubtaskList">
+          {subtasks.map((subtask) => (
+            <li className={`goalSubtask${subtask.status === taskStatuses.done ? " done" : ""}`} key={subtask.id}>
+              <span>{subtask.title}</span>
+              <GoalStatusIcon status={subtask.status} />
+            </li>
+          ))}
+        </ol>
+      ) : null}
     </li>
   );
 }
@@ -2230,6 +2112,9 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
     catalogProviders[0];
   const modelOptions = detectedModels.length ? detectedModels : (activePreset?.models || [form.model]);
   const isPreview = source !== "tauri";
+  const savedProfile = profiles.find((profile) => profile.id === form.profileId);
+  const isCreatingProfile = Boolean(form.profileId) && !savedProfile;
+  const currentHasApiKey = isCreatingProfile ? Boolean(apiKey.trim()) : Boolean(savedProfile?.hasApiKey ?? provider.hasApiKey);
 
   useEffect(() => {
     setForm({
@@ -2269,7 +2154,7 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
     const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
     const preset = activePreset || catalogProviders.find((item) => item.id === "gateway") || catalogProviders[0];
     setApiKey("");
-    setCustomModel(false);
+    setCustomModel(true);
     setDetectedModels([]);
     setProbeError("");
     setModelTestMessage("");
@@ -2277,14 +2162,14 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
     setForm((current) => ({
       ...current,
       provider: preset?.provider || "openai-compatible",
-      model: preset?.models?.[0] || current.model || "gpt-4o-mini",
-      apiBase: preset?.apiBase || current.apiBase,
+      model: "",
+      apiBase: "",
       apiKeyEnv: `OMNIDESK_API_KEY_${suffix}`,
       enabled: true,
       profileId: id,
-      profileName: "新 API",
+      profileName: "",
       profileNote: "",
-      profileWebsite: preset?.website || "",
+      profileWebsite: "",
     }));
   };
 
@@ -2421,8 +2306,14 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
   };
 
   return (
-    <Panel as="form" className="providerPanel" onSubmit={submitProvider}>
-      <ProviderStatusRow enabled={provider.enabled} hasApiKey={provider.hasApiKey} />
+	    <Panel as="form" className={`providerPanel${isCreatingProfile ? " providerPanel-creating" : ""}`} onSubmit={submitProvider}>
+	      <ProviderStatusRow
+	        enabled={form.enabled}
+	        hasApiKey={currentHasApiKey}
+	        keyLabel={isCreatingProfile ? "Key 待填写" : undefined}
+	        statusLabel={isCreatingProfile ? "正在新建" : undefined}
+	        variant={isCreatingProfile ? "creating" : "default"}
+	      />
       {isPreview ? (
         <InfoCallout>当前是浏览器预览，只能查看界面。保存 Key、刷新模型和写入配置需要在桌面 App 窗口中操作。</InfoCallout>
       ) : null}
@@ -2431,6 +2322,11 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
           {({ id }) => (
             <div className="providerProfileRow">
               <Select id={id} value={form.profileId || provider.activeProfileId || ""} onChange={selectProfile}>
+                {isCreatingProfile ? (
+                  <option value={form.profileId}>
+                    {form.profileName || "新 API"} · 未保存
+                  </option>
+                ) : null}
                 {profiles.map((profile) => (
                   <option value={profile.id} key={profile.id}>
                     {profile.name}{profile.hasApiKey ? " · Key 已保存" : ""}
@@ -2456,17 +2352,17 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
           ))}
         </Select>}
       </Field>
-      <Field label={<RequiredLabel>API Key</RequiredLabel>} hint={provider.hasApiKey ? "已保存时可留空；填写新 Key 会覆盖当前档案。" : "新档案必须填写 API Key。"}>
+      <Field label={<RequiredLabel>API Key</RequiredLabel>} hint={currentHasApiKey && !isCreatingProfile ? "已保存时可留空；填写新 Key 会覆盖当前档案。" : "新档案必须填写 API Key。"}>
         {({ id }) => <Input
           id={id}
           type="password"
           value={apiKey}
           onChange={(event) => setApiKey(event.target.value)}
-          placeholder={provider.hasApiKey ? "已保存；留空则不修改" : "粘贴你的 API Key"}
+          placeholder={currentHasApiKey && !isCreatingProfile ? "已保存；留空则不修改" : "粘贴你的 API Key"}
         />}
       </Field>
       <Field label={<RequiredLabel>API 请求地址</RequiredLabel>}>
-        {({ id }) => <Input id={id} value={form.apiBase} onChange={(event) => updateField("apiBase", event.target.value)} />}
+        {({ id }) => <Input id={id} value={form.apiBase} onChange={(event) => updateField("apiBase", event.target.value)} placeholder="https://api.example.com/v1" />}
       </Field>
       <div className="providerSectionTitle">
         <span>模型</span>
@@ -2484,7 +2380,7 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
           {modelOptions.map((model) => (
             <option value={model} key={model}>{model}</option>
           ))}
-          <option value="__custom">Custom</option>
+          <option value="__custom">自定义</option>
         </Select>}
       </Field>
       {customModel || !modelOptions.includes(form.model) ? (
@@ -2493,7 +2389,7 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
             id={id}
             value={form.model}
             onChange={(event) => updateField("model", event.target.value)}
-            placeholder="your-model-name"
+            placeholder="例如：gpt-4o-mini"
           />}
         </Field>
       ) : null}
@@ -2506,9 +2402,9 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
         <Field label="档案名称">
           {({ id }) => <Input
             id={id}
-            value={form.profileName || activePreset?.label || ""}
+            value={form.profileName || (!isCreatingProfile ? activePreset?.label : "") || ""}
             onChange={(event) => updateField("profileName", event.target.value)}
-            placeholder="例如：My Codex"
+            placeholder="例如：公司 API"
           />}
         </Field>
         <Field label="备注">
@@ -2523,7 +2419,7 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
       <Field label="官网链接">
         {({ id }) => <Input
           id={id}
-          value={form.profileWebsite || activePreset?.website || ""}
+          value={form.profileWebsite || ""}
           onChange={(event) => updateField("profileWebsite", event.target.value)}
           placeholder="https://..."
         />}
@@ -2574,13 +2470,12 @@ function StatusBar({ snapshot, source }) {
   );
 }
 
-function MemoryItem({ marker, title, muted, children }) {
+function ProjectProfileItem({ body, missing, title }) {
   return (
-    <div className="memoryRow">
-      <div className={`memoryDot${muted ? " muted" : ""}`}>{marker}</div>
+    <div className={`contextItem${missing ? " missing" : ""}`}>
       <div>
         <strong>{title}</strong>
-        <p>{children}</p>
+        <p>{body || "待补充到项目文档"}</p>
       </div>
     </div>
   );
@@ -2643,6 +2538,7 @@ function App() {
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [leftWidth, setLeftWidth] = useState(sidebarSizing.leftDefault);
   const [rightWidth, setRightWidth] = useState(sidebarSizing.rightDefault);
+  const activePlanRequestRef = React.useRef(null);
 
   const beginSidebarResize = (side, event) => {
     event.preventDefault();
@@ -3018,6 +2914,8 @@ function App() {
 
   const generatePlan = async (request) => {
     const input = typeof request === "string" ? { task: request, attachments: [] } : request;
+    const requestId = input.requestId || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    activePlanRequestRef.current = requestId;
     setPlanError("");
     setPlanLoading(true);
     try {
@@ -3042,16 +2940,26 @@ function App() {
           });
         }
       }
+      if (activePlanRequestRef.current !== requestId) return false;
       const nextTask = createTaskFromPlan(plan, input.task, snapshot.projectName);
       setReadonlyPlan(plan);
       await setAndPersistTask(nextTask);
       return true;
     } catch (err) {
+      if (activePlanRequestRef.current !== requestId) return false;
       setPlanError(err instanceof Error ? err.message : String(err));
       return false;
     } finally {
-      setPlanLoading(false);
+      if (activePlanRequestRef.current === requestId) {
+        activePlanRequestRef.current = null;
+        setPlanLoading(false);
+      }
     }
+  };
+
+  const stopPlanGeneration = () => {
+    activePlanRequestRef.current = null;
+    setPlanLoading(false);
   };
 
   const runChatAction = async (action) => {
@@ -3501,6 +3409,9 @@ function App() {
           onWriteTerminalData={writeTerminalData}
           onResizeTerminalSession={resizeTerminalSession}
           onRestartTerminalSession={restartTerminalSession}
+          onProfileUpdated={applySnapshot}
+          onStopPlan={stopPlanGeneration}
+          provider={provider}
         />
         <RightRail
           collapsed={rightCollapsed}
