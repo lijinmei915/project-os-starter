@@ -1,0 +1,111 @@
+{
+  "schemaVersion": "project-os.task-backlog.v0.1",
+  "updatedAt": "2026-07-07T16:50:14.474Z",
+  "items": [
+    {
+      "id": "workspace-project-context",
+      "title": "项目切换后的真实上下文",
+      "status": "done",
+      "body": "左侧切换项目后，中间对话、右侧目标、项目档案和模型配置都明确当前项目，避免看似切换但仍读取旧项目数据。",
+      "tone": "accent",
+      "goalId": "workspace-usable-loop-20260707",
+      "updatedAt": "2026-07-07T16:50:14.474Z",
+      "completedAt": "2026-07-07T16:50:14.474Z"
+    },
+    {
+      "id": "workspace-chat-to-task",
+      "title": "对话生成任务的闭环",
+      "status": "planned",
+      "body": "用户输入一句话后，稳定完成理解意图、生成计划、用户确认、进入任务或目标的链路。",
+      "tone": "accent",
+      "goalId": "workspace-usable-loop-20260707"
+    },
+    {
+      "id": "workspace-goal-chat-link",
+      "title": "右侧目标和中间对话联动",
+      "status": "planned",
+      "body": "目标任务可打开对应对话或执行视图；对话中新产生的任务能进入目标待办。",
+      "tone": "accent",
+      "goalId": "workspace-usable-loop-20260707"
+    },
+    {
+      "id": "workspace-project-profile-fill",
+      "title": "当前项目档案自动补齐",
+      "status": "planned",
+      "body": "从现有文档读取项目名、阶段、规则、检查命令和技术栈，让用户确认或补充，减少手填。",
+      "tone": "neutral",
+      "goalId": "workspace-usable-loop-20260707"
+    },
+    {
+      "id": "workspace-action-feedback",
+      "title": "执行反馈和保存反馈",
+      "status": "planned",
+      "body": "跑检查、生成 patch、保存配置、删除连接等动作提供轻量成功/失败反馈，让用户知道操作是否生效。",
+      "tone": "neutral",
+      "goalId": "workspace-usable-loop-20260707"
+    },
+    {
+      "id": "ux-input-status",
+      "title": "打磨输入区和生成状态体验",
+      "status": "done",
+      "body": "发送、停止、继续补充、语音和附件状态统一。",
+      "tone": "accent"
+    },
+    {
+      "id": "ux-execution-feedback",
+      "title": "优化执行反馈和阶段状态",
+      "status": "done",
+      "body": "把正在思考拆成理解、计划、改动、检查、整理结果。",
+      "tone": "accent"
+    },
+    {
+      "id": "ux-right-rail-structure",
+      "title": "梳理右侧目标任务项目档案结构",
+      "status": "done",
+      "body": "目标、任务、对话、项目档案分清楚，减少重复。",
+      "tone": "accent"
+    },
+    {
+      "id": "ux-provider-config",
+      "title": "优化多 API 配置和新建状态",
+      "status": "done",
+      "body": "区分新建、编辑、已保存和启用，必填项更清楚。",
+      "tone": "neutral"
+    },
+    {
+      "id": "ux-desktop-app-polish",
+      "title": "提升桌面应用完整感",
+      "status": "done",
+      "body": "统一名称、图标、启动、版本和服务状态。",
+      "tone": "neutral"
+    },
+    {
+      "id": "ux-governance-files",
+      "title": "打通治理文件和项目体验",
+      "status": "done",
+      "body": "从文档和对话动态维护项目档案、目标、任务和上下文。",
+      "tone": "neutral"
+    },
+    {
+      "id": "goal-validation-criteria",
+      "title": "建立目标验收标准",
+      "status": "done",
+      "body": "为每个目标沉淀验收清单，覆盖功能、交互、视觉、文档和风险。",
+      "tone": "accent"
+    },
+    {
+      "id": "goal-validation-report",
+      "title": "接入目标验收报告",
+      "status": "done",
+      "body": "自动运行构建、Tauri、runtime、文档和可选视觉检查，并生成验收证据。",
+      "tone": "accent"
+    },
+    {
+      "id": "goal-signoff-history",
+      "title": "完善目标签收和追溯",
+      "status": "done",
+      "body": "支持待签收、已完成、带风险完成和失败修复任务，保留验收历史。",
+      "tone": "neutral"
+    }
+  ]
+}

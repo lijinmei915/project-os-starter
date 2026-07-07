@@ -9,7 +9,7 @@ use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::Mutex;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, State};
 
 #[derive(Serialize)]
@@ -23,10 +23,12 @@ struct TreeItem {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct QueueItem {
+    id: String,
     title: String,
     status: String,
     body: String,
     tone: String,
+    goal_id: String,
 }
 
 #[derive(Serialize)]
@@ -82,6 +84,8 @@ struct RegistryFile {
 #[serde(rename_all = "camelCase")]
 struct WorkspaceSnapshot {
     project_name: String,
+    current_project_id: String,
+    current_project_path: String,
     phase: String,
     stage: String,
     file_count: usize,
@@ -93,6 +97,10 @@ struct WorkspaceSnapshot {
     queue: Vec<QueueItem>,
     memory: Vec<MemoryItem>,
     project_profile: ProjectProfile,
+    goal_validation: Value,
+    goal_validation_report: Value,
+    goal_signoff_history: Value,
+    goals: Value,
     trace: Vec<String>,
 }
 
@@ -144,6 +152,27 @@ struct ChatWithModelInput {
     message: String,
     #[serde(default)]
     attachments: Vec<PlanAttachment>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateBacklogItemInput {
+    id: String,
+    status: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CreateGoalInput {
+    title: String,
+    #[serde(default)]
+    summary: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SwitchGoalInput {
+    id: String,
 }
 
 #[derive(Deserialize)]
@@ -476,6 +505,12 @@ struct ProviderSecretInput {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct DeleteProviderProfileInput {
+    profile_id: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct ProbeProviderModelsInput {
     api_base: String,
     api_key_env: String,
@@ -506,6 +541,25 @@ struct ProviderModelTestResult {
     model: String,
     success: bool,
     message: String,
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct ModelHealthCache {
+    schema_version: String,
+    #[serde(default)]
+    entries: Vec<ModelHealthEntry>,
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct ModelHealthEntry {
+    api_base: String,
+    api_key_env: String,
+    model: String,
+    status: String,
+    message: String,
+    checked_at: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -549,10 +603,19 @@ fn get_workspace_snapshot() -> Result<WorkspaceSnapshot, String> {
     let root = PathBuf::from(&current_project.path);
     let state = read_json(root.join(".project-os/state.json"));
     let recommendations = read_json(root.join(".project-os/recommendations/recommend-next.json"));
+    let task_backlog = read_json(root.join(".project-os/task-backlog.json"));
+    let goal_validation = read_json(root.join(".project-os/goal-validation.json"))
+        .unwrap_or_else(|| json!({ "criteria": [] }));
+    let goal_validation_report = read_json(root.join(".project-os/goal-validation-report.json"))
+        .unwrap_or_else(|| json!({ "status": "missing", "checks": [] }));
+    let goal_signoff_history = read_json(root.join(".project-os/goal-signoff-history.json"))
+        .unwrap_or_else(|| json!({ "entries": [] }));
     let run_count = count_run_records(&root);
     let (file_count, docs_count) = count_workspace_files(&root);
 
     let project_name = current_project.name.clone();
+    let goals = read_json(root.join(".project-os/goals.json"))
+        .unwrap_or_else(|| goal_stack_from_validation(&goal_validation, &goal_validation_report, &goal_signoff_history, &project_name));
     let phase = state
         .as_ref()
         .and_then(|json| json.get("phase"))
@@ -572,18 +635,23 @@ fn get_workspace_snapshot() -> Result<WorkspaceSnapshot, String> {
         .and_then(Value::as_u64)
         .unwrap_or(0) as usize;
 
-    let mut queue = recommendation_queue(&recommendations);
+    let mut queue = task_backlog_queue(&task_backlog);
+    queue.extend(recommendation_queue(&recommendations));
     if queue.is_empty() {
         queue.push(QueueItem {
+            id: "registry-next-step".to_string(),
             title: "接入本地项目 registry".to_string(),
             status: "建议下一步".to_string(),
             body: "让桌面工作台记住已接入项目，并作为后续模型计划层的入口。".to_string(),
             tone: "blue".to_string(),
+            goal_id: String::new(),
         });
     }
 
     Ok(WorkspaceSnapshot {
         project_name: project_name.clone(),
+        current_project_id: current_project.id.clone(),
+        current_project_path: current_project.path.clone(),
         phase: phase.clone(),
         stage: stage.clone(),
         file_count,
@@ -608,6 +676,10 @@ fn get_workspace_snapshot() -> Result<WorkspaceSnapshot, String> {
             },
         ],
         project_profile: build_project_profile(&root, &project_name),
+        goal_validation,
+        goal_validation_report,
+        goal_signoff_history,
+        goals,
         trace: vec![
             format!("ROOT: {}", root.display()),
             format!("REGISTRY: {} project(s)", registry.projects.len()),
@@ -619,6 +691,258 @@ fn get_workspace_snapshot() -> Result<WorkspaceSnapshot, String> {
             ),
         ],
     })
+}
+
+fn goal_stack_from_validation(
+    validation: &Value,
+    report: &Value,
+    history: &Value,
+    project_name: &str,
+) -> Value {
+    let goal_id = validation
+        .pointer("/goal/id")
+        .and_then(Value::as_str)
+        .unwrap_or("current-goal");
+    let goal_title = validation
+        .pointer("/goal/title")
+        .and_then(Value::as_str)
+        .unwrap_or("当前目标");
+    let goal_status = validation
+        .pointer("/goal/status")
+        .and_then(Value::as_str)
+        .unwrap_or("active");
+    let report_status = report
+        .get("status")
+        .and_then(Value::as_str)
+        .unwrap_or("missing");
+    let completed_at = history
+        .pointer("/entries/0/signedOffAt")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let stack_status = match goal_status {
+        "signed-off" => "done",
+        "verified" => "pending-confirm",
+        "validation-failed" => "active",
+        other => other,
+    };
+
+    json!({
+        "schemaVersion": "project-os.goals.v0.1",
+        "activeGoalId": goal_id,
+        "goals": [{
+            "id": goal_id,
+            "title": goal_title,
+            "projectName": project_name,
+            "status": stack_status,
+            "completedAt": completed_at,
+            "validationStatus": report_status,
+            "summary": if stack_status == "done" { "目标已确认完成。" } else { "当前目标。" },
+            "taskIds": []
+        }]
+    })
+}
+
+fn update_active_goal_status(
+    root: &Path,
+    status: &str,
+    validation_status: &str,
+    timestamp: &str,
+) -> Result<(), String> {
+    let goals_path = root.join(".project-os/goals.json");
+    let Some(mut goals) = read_json(goals_path.clone()) else {
+        return Ok(());
+    };
+    let active_goal_id = goals
+        .get("activeGoalId")
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    if let Some(object) = goals.as_object_mut() {
+        object.insert("updatedAt".to_string(), Value::String(timestamp.to_string()));
+        if let Some(items) = object.get_mut("goals").and_then(Value::as_array_mut) {
+            for item in items {
+                let is_active = active_goal_id
+                    .as_deref()
+                    .map(|id| item.get("id").and_then(Value::as_str) == Some(id))
+                    .unwrap_or(false);
+                if !is_active {
+                    continue;
+                }
+                if let Some(goal) = item.as_object_mut() {
+                    goal.insert("status".to_string(), Value::String(status.to_string()));
+                    goal.insert("updatedAt".to_string(), Value::String(timestamp.to_string()));
+                    goal.insert("validationStatus".to_string(), Value::String(validation_status.to_string()));
+                    if status == "done" {
+                        goal.insert("completedAt".to_string(), Value::String(timestamp.to_string()));
+                    }
+                }
+            }
+        }
+    }
+    let content = serde_json::to_string_pretty(&goals).map_err(|err| err.to_string())?;
+    fs::write(goals_path, format!("{content}\n")).map_err(|err| err.to_string())
+}
+
+fn load_or_seed_goals(root: &Path, project_name: &str) -> Value {
+    read_json(root.join(".project-os/goals.json")).unwrap_or_else(|| json!({
+        "schemaVersion": "project-os.goals.v0.1",
+        "activeGoalId": "current-goal",
+        "goals": [{
+            "id": "current-goal",
+            "title": "当前目标",
+            "projectName": project_name,
+            "status": "active",
+            "summary": "当前推进中的目标。",
+            "taskIds": []
+        }]
+    }))
+}
+
+fn write_goals(root: &Path, goals: &Value) -> Result<(), String> {
+    let path = root.join(".project-os/goals.json");
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|err| err.to_string())?;
+    }
+    let content = serde_json::to_string_pretty(goals).map_err(|err| err.to_string())?;
+    fs::write(path, format!("{content}\n")).map_err(|err| err.to_string())
+}
+
+fn goal_id_from_title(title: &str) -> String {
+    let mut id = title
+        .chars()
+        .filter_map(|ch| {
+            if ch.is_ascii_alphanumeric() {
+                Some(ch.to_ascii_lowercase())
+            } else if ch.is_whitespace() || ch == '-' || ch == '_' {
+                Some('-')
+            } else {
+                None
+            }
+        })
+        .collect::<String>();
+    while id.contains("--") {
+        id = id.replace("--", "-");
+    }
+    id = id.trim_matches('-').to_string();
+    if id.is_empty() {
+        id = "goal".to_string();
+    }
+    format!("{}-{}", id, current_timestamp_string().replace([':', '.'], "-"))
+}
+
+fn compact_goal_title(title: &str) -> String {
+    let normalized = title
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .replace(" / ", "/")
+        .replace('/', " / ");
+    let trimmed = normalized.trim();
+    if trimmed.chars().count() <= 18 {
+        return trimmed.to_string();
+    }
+    let parts: Vec<&str> = trimmed
+        .split('/')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .collect();
+    if let Some(part) = parts.iter().find(|part| part.chars().count() <= 18) {
+        return (*part).to_string();
+    }
+    let mut short = trimmed.chars().take(16).collect::<String>();
+    short.push_str("...");
+    short
+}
+
+#[tauri::command]
+fn create_goal(input: CreateGoalInput) -> Result<WorkspaceSnapshot, String> {
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let current_project = current_registry_project(&mut registry, &app_root)?;
+    let root = PathBuf::from(&current_project.path);
+    let title = input.title.trim();
+    if title.is_empty() {
+        return Err("目标名称不能为空。".to_string());
+    }
+    let now = current_timestamp_string();
+    let id = goal_id_from_title(title);
+    let mut goals = load_or_seed_goals(&root, &current_project.name);
+    if let Some(object) = goals.as_object_mut() {
+        object.insert("activeGoalId".to_string(), Value::String(id.clone()));
+        object.insert("updatedAt".to_string(), Value::String(now.clone()));
+        let items = object
+            .entry("goals".to_string())
+            .or_insert_with(|| Value::Array(Vec::new()));
+        if let Some(items) = items.as_array_mut() {
+            items.insert(0, json!({
+                "id": id,
+                "title": title,
+                "shortTitle": compact_goal_title(title),
+                "projectName": current_project.name,
+                "status": "draft",
+                "createdAt": now,
+                "summary": if input.summary.trim().is_empty() { "目标草案，等待确认。" } else { input.summary.trim() },
+                "taskIds": []
+            }));
+        }
+    }
+    write_goals(&root, &goals)?;
+    get_workspace_snapshot()
+}
+
+#[tauri::command]
+fn switch_active_goal(input: SwitchGoalInput) -> Result<WorkspaceSnapshot, String> {
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let current_project = current_registry_project(&mut registry, &app_root)?;
+    let root = PathBuf::from(&current_project.path);
+    let mut goals = load_or_seed_goals(&root, &current_project.name);
+    let exists = goals
+        .get("goals")
+        .and_then(Value::as_array)
+        .map(|items| items.iter().any(|item| item.get("id").and_then(Value::as_str) == Some(input.id.as_str())))
+        .unwrap_or(false);
+    if !exists {
+        return Err("没有找到这个目标。".to_string());
+    }
+    if let Some(object) = goals.as_object_mut() {
+        object.insert("activeGoalId".to_string(), Value::String(input.id));
+        object.insert("updatedAt".to_string(), Value::String(current_timestamp_string()));
+    }
+    write_goals(&root, &goals)?;
+    get_workspace_snapshot()
+}
+
+#[tauri::command]
+fn confirm_goal(input: SwitchGoalInput) -> Result<WorkspaceSnapshot, String> {
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let current_project = current_registry_project(&mut registry, &app_root)?;
+    let root = PathBuf::from(&current_project.path);
+    let mut goals = load_or_seed_goals(&root, &current_project.name);
+    let now = current_timestamp_string();
+    let mut found = false;
+    if let Some(object) = goals.as_object_mut() {
+        object.insert("activeGoalId".to_string(), Value::String(input.id.clone()));
+        object.insert("updatedAt".to_string(), Value::String(now.clone()));
+        if let Some(items) = object.get_mut("goals").and_then(Value::as_array_mut) {
+            for item in items {
+                if item.get("id").and_then(Value::as_str) != Some(input.id.as_str()) {
+                    continue;
+                }
+                found = true;
+                if let Some(goal) = item.as_object_mut() {
+                    goal.insert("status".to_string(), Value::String("planned".to_string()));
+                    goal.insert("confirmedAt".to_string(), Value::String(now.clone()));
+                    goal.insert("updatedAt".to_string(), Value::String(now.clone()));
+                }
+            }
+        }
+    }
+    if !found {
+        return Err("没有找到这个目标。".to_string());
+    }
+    write_goals(&root, &goals)?;
+    get_workspace_snapshot()
 }
 
 #[tauri::command]
@@ -964,6 +1288,9 @@ fn list_desktop_tasks() -> Result<Vec<Value>, String> {
         if path.extension().and_then(|value| value.to_str()) != Some("json") {
             continue;
         }
+        if path.file_name().and_then(|value| value.to_str()) == Some("manifest.json") {
+            continue;
+        }
         if let Some(task) = read_json(path) {
             tasks.push(task);
         }
@@ -1023,6 +1350,199 @@ fn save_desktop_task(input: DesktopTaskInput) -> Result<Value, String> {
     let content = serde_json::to_string_pretty(&task).map_err(|err| err.to_string())?;
     fs::write(path, format!("{content}\n")).map_err(|err| err.to_string())?;
     Ok(task)
+}
+
+#[tauri::command]
+fn run_goal_validation() -> Result<WorkspaceSnapshot, String> {
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let current_project = current_registry_project(&mut registry, &app_root)?;
+    let root = PathBuf::from(&current_project.path);
+    if !root.exists() || !root.is_dir() {
+        return Err("当前项目路径不存在或不是目录".to_string());
+    }
+
+    let check_ids = ["web-build", "cargo-check", "runtime"];
+    let mut checks = Vec::new();
+    for check_id in check_ids {
+        let spec = guarded_check_spec(check_id)
+            .ok_or_else(|| format!("不允许执行这个检查：{}", check_id))?;
+        for relative in &spec.required_paths {
+            if !root.join(relative).exists() {
+                return Err(format!("当前项目缺少检查所需文件：{}", relative));
+            }
+        }
+
+        let output = Command::new(&spec.program)
+            .args(&spec.args)
+            .current_dir(&root)
+            .output()
+            .map_err(|err| err.to_string())?;
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        checks.push(json!({
+            "id": spec.id,
+            "label": spec.label,
+            "command": spec.command,
+            "success": output.status.success(),
+            "code": output.status.code(),
+            "output": trim_runner_output(&format!("{}{}", stdout, stderr)),
+        }));
+    }
+
+    let passed = checks
+        .iter()
+        .all(|check| check.get("success").and_then(Value::as_bool).unwrap_or(false));
+    let now = current_timestamp_string();
+    let report = json!({
+        "schemaVersion": "project-os.goal-validation-report.v0.1",
+        "generatedAt": now,
+        "status": if passed { "passed" } else { "failed" },
+        "checks": checks,
+    });
+    let report_path = root.join(".project-os/goal-validation-report.json");
+    if let Some(parent) = report_path.parent() {
+        fs::create_dir_all(parent).map_err(|err| err.to_string())?;
+    }
+    let report_content = serde_json::to_string_pretty(&report).map_err(|err| err.to_string())?;
+    fs::write(report_path, format!("{report_content}\n")).map_err(|err| err.to_string())?;
+
+    let validation_path = root.join(".project-os/goal-validation.json");
+    if let Some(mut validation) = read_json(validation_path.clone()) {
+        if let Some(object) = validation.as_object_mut() {
+            object.insert("updatedAt".to_string(), Value::String(now.clone()));
+            if let Some(goal) = object.get_mut("goal").and_then(Value::as_object_mut) {
+                goal.insert(
+                    "status".to_string(),
+                    Value::String(if passed { "verified" } else { "validation-failed" }.to_string()),
+                );
+            }
+        }
+        let validation_content = serde_json::to_string_pretty(&validation).map_err(|err| err.to_string())?;
+        fs::write(validation_path, format!("{validation_content}\n")).map_err(|err| err.to_string())?;
+    }
+    update_active_goal_status(
+        &root,
+        if passed { "pending-confirm" } else { "failed" },
+        if passed { "passed" } else { "failed" },
+        &now,
+    )?;
+
+    get_workspace_snapshot()
+}
+
+#[tauri::command]
+fn sign_off_goal_validation() -> Result<WorkspaceSnapshot, String> {
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let current_project = current_registry_project(&mut registry, &app_root)?;
+    let root = PathBuf::from(&current_project.path);
+    if !root.exists() || !root.is_dir() {
+        return Err("当前项目路径不存在或不是目录".to_string());
+    }
+
+    let validation_path = root.join(".project-os/goal-validation.json");
+    let mut validation = read_json(validation_path.clone())
+        .ok_or_else(|| "未找到目标验收标准文件".to_string())?;
+    let goal_id = validation
+        .pointer("/goal/id")
+        .and_then(Value::as_str)
+        .unwrap_or("current-goal")
+        .to_string();
+    let goal_title = validation
+        .pointer("/goal/title")
+        .and_then(Value::as_str)
+        .unwrap_or("当前目标")
+        .to_string();
+    let report_status = read_json(root.join(".project-os/goal-validation-report.json"))
+        .and_then(|report| report.get("status").and_then(Value::as_str).map(str::to_string))
+        .unwrap_or_else(|| "missing".to_string());
+    if report_status != "passed" {
+        return Err("目标还没有通过验收，不能签收。".to_string());
+    }
+
+    let now = current_timestamp_string();
+    if let Some(object) = validation.as_object_mut() {
+        object.insert("updatedAt".to_string(), Value::String(now.clone()));
+        if let Some(goal) = object.get_mut("goal").and_then(Value::as_object_mut) {
+            goal.insert("status".to_string(), Value::String("signed-off".to_string()));
+        }
+    }
+    let validation_content = serde_json::to_string_pretty(&validation).map_err(|err| err.to_string())?;
+    fs::write(validation_path, format!("{validation_content}\n")).map_err(|err| err.to_string())?;
+
+    let history_path = root.join(".project-os/goal-signoff-history.json");
+    let mut history = read_json(history_path.clone()).unwrap_or_else(|| json!({
+        "schemaVersion": "project-os.goal-signoff-history.v0.1",
+        "entries": []
+    }));
+    if let Some(object) = history.as_object_mut() {
+        object.insert("updatedAt".to_string(), Value::String(now.clone()));
+        let entries = object
+            .entry("entries".to_string())
+            .or_insert_with(|| Value::Array(Vec::new()));
+        if let Some(entries) = entries.as_array_mut() {
+            entries.insert(0, json!({
+                "goalId": goal_id,
+                "goalTitle": goal_title,
+                "signedOffAt": now,
+                "reportStatus": report_status,
+                "source": "OmniDesk"
+            }));
+        }
+    }
+    if let Some(parent) = history_path.parent() {
+        fs::create_dir_all(parent).map_err(|err| err.to_string())?;
+    }
+    let history_content = serde_json::to_string_pretty(&history).map_err(|err| err.to_string())?;
+    fs::write(history_path, format!("{history_content}\n")).map_err(|err| err.to_string())?;
+    update_active_goal_status(&root, "done", &report_status, &now)?;
+
+    get_workspace_snapshot()
+}
+
+#[tauri::command]
+fn update_task_backlog_item(input: UpdateBacklogItemInput) -> Result<WorkspaceSnapshot, String> {
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let current_project = current_registry_project(&mut registry, &app_root)?;
+    let root = PathBuf::from(&current_project.path);
+    let path = root.join(".project-os/task-backlog.json");
+    let mut backlog = read_json(path.clone()).ok_or_else(|| "未找到任务池文件 .project-os/task-backlog.json".to_string())?;
+    let id = input.id.trim();
+    let status = normalize_backlog_status(&input.status);
+    if id.is_empty() {
+        return Err("任务 id 不能为空".to_string());
+    }
+    if status.is_empty() {
+        return Err("不支持这个任务状态".to_string());
+    }
+
+    let items = backlog
+        .get_mut("items")
+        .and_then(Value::as_array_mut)
+        .ok_or_else(|| "任务池 items 必须是数组".to_string())?;
+    let mut found = false;
+    for item in items {
+        if item.get("id").and_then(Value::as_str) == Some(id) {
+            if let Some(object) = item.as_object_mut() {
+                object.insert("status".to_string(), Value::String(status.clone()));
+                found = true;
+            }
+        }
+    }
+    if !found {
+        return Err(format!("没有找到任务：{}", id));
+    }
+    if let Some(object) = backlog.as_object_mut() {
+        object.insert("updatedAt".to_string(), Value::String(current_timestamp_string()));
+    }
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|err| err.to_string())?;
+    }
+    let content = serde_json::to_string_pretty(&backlog).map_err(|err| err.to_string())?;
+    fs::write(path, format!("{content}\n")).map_err(|err| err.to_string())?;
+    get_workspace_snapshot()
 }
 
 #[tauri::command]
@@ -1541,7 +2061,7 @@ async fn generate_provider_chat(
         .timeout(Duration::from_secs(45))
         .build()
         .map_err(|err| err.to_string())?;
-    let router_prompt = chat_router_prompt(project_name, stage, message, attachments);
+    let router_prompt = chat_router_prompt(project_name, stage, &provider.model, message, attachments);
     let user_content = if attachments.is_empty() {
         Value::String(router_prompt)
     } else {
@@ -1605,7 +2125,7 @@ async fn generate_provider_chat(
     Ok(result)
 }
 
-fn chat_router_prompt(project_name: &str, stage: &str, message: &str, attachments: &[PlanAttachment]) -> String {
+fn chat_router_prompt(project_name: &str, stage: &str, current_model: &str, message: &str, attachments: &[PlanAttachment]) -> String {
     let attachment_note = if attachments.is_empty() {
         "No image attachments.".to_string()
     } else {
@@ -1621,6 +2141,7 @@ fn chat_router_prompt(project_name: &str, stage: &str, message: &str, attachment
     format!(
         r#"Current project: {project_name}
 Current stage: {stage}
+Current configured model: {current_model}
 {attachment_note}
 
 User message:
@@ -1638,8 +2159,11 @@ Return strict JSON only:
 Rules:
 - Greetings, small talk, broad questions, or "what is X" shouldCreatePlan=false.
 - Questions that ask "why", "how", "what risks", "what happened", "is this ok", or "look at this" shouldCreatePlan=false and should receive a natural answer.
-- Only set shouldCreatePlan=true when the user clearly asks OmniDesk to modify files, generate a plan, create a task, apply a patch, run commands/checks, or implement/fix code.
+- Set shouldCreatePlan=true when the user clearly asks OmniDesk to solve, handle, organize, clean up, make a plan, create a task, apply a patch, run commands/checks, or implement/fix code.
+- Phrases like "帮我处理", "处理一下", "看看解决", "整理一下", "制定方案", "侧边栏这么多待办你看看解决呢" are action requests even if they contain question-like words.
+- If the user asks what model you are, mention the current configured model exactly.
 - If shouldCreatePlan=true, reply should briefly acknowledge that you will create a plan.
+- If shouldCreatePlan=false, do not suggest generating a plan, clicking buttons, or asking for confirmation unless the user's request is ambiguous.
 - Do not invent completed work.
 - Do not mention internal JSON or routing.
 "#
@@ -1650,17 +2174,17 @@ fn local_chat_result(message: &str, has_attachments: bool) -> ChatWithModelResul
     let should_create_plan = should_create_plan_for_message(message, has_attachments);
     ChatWithModelResult {
         reply: if should_create_plan {
-            "可以。我先整理下一步，等你确认后再动手。".to_string()
+            "可以，我整理成一个可执行计划。".to_string()
         } else if is_greeting_message(message) {
-            "你好，我在。你可以直接问项目情况，也可以说想改哪里。".to_string()
+            "你好，我在。".to_string()
         } else if is_question_like_message(message) {
             if message.contains("风险") {
                 "主要风险有三类：交接记录可能继续膨胀；对话和执行状态容易混在一起；模型或检查失败时反馈还不够像人话。建议先把普通问答和执行任务分开，再打磨失败提示。".to_string()
             } else {
-                "我先直接回答这个问题；需要我动手时，再说“生成计划”或“帮我改”。".to_string()
+                "可以，我直接看当前上下文来回答。".to_string()
             }
         } else {
-            "我在。你可以继续问，也可以直接说想让我改哪里。".to_string()
+            "可以，继续说。".to_string()
         },
         should_create_plan,
         intent: if should_create_plan { "task" } else { "chat" }.to_string(),
@@ -1679,10 +2203,13 @@ fn is_greeting_message(message: &str) -> bool {
 }
 
 fn should_create_plan_for_message(message: &str, has_attachments: bool) -> bool {
+    if is_task_like_message(message) {
+        return true;
+    }
     if is_question_like_message(message) {
         return false;
     }
-    is_task_like_message(message) || has_attachments
+    has_attachments
 }
 
 fn is_question_like_message(message: &str) -> bool {
@@ -1702,6 +2229,8 @@ fn is_task_like_message(message: &str) -> bool {
         "帮我改", "帮我修", "帮我优化", "帮我生成", "帮我创建", "帮我新增", "帮我删除",
         "帮我执行", "帮我跑", "开始执行", "生成计划", "创建任务", "改代码", "修复",
         "实现", "接入", "配置", "做成", "设计", "重构", "提交", "推送",
+        "帮我处理", "处理一下", "解决一下", "看看解决", "看下解决", "整理一下",
+        "梳理一下", "制定方案", "出个方案", "给个方案", "整理待办", "处理方案",
         "commit", "push", "build", "apply patch",
     ]
     .iter()
@@ -2060,6 +2589,55 @@ fn save_provider_secret(input: ProviderSecretInput) -> Result<ProviderStatus, St
 }
 
 #[tauri::command]
+fn delete_provider_profile(input: DeleteProviderProfileInput) -> Result<ProviderStatus, String> {
+    let app_root = find_workspace_root()?;
+    let mut config = load_or_seed_provider_config(&app_root)?;
+    let profile_id = input.profile_id.trim();
+
+    if profile_id.is_empty() {
+        return Err("缺少连接 ID".to_string());
+    }
+
+    let Some(removed) = config.profiles.iter().find(|profile| profile.id == profile_id).cloned() else {
+        return Err("没有找到要删除的连接".to_string());
+    };
+
+    config.profiles.retain(|profile| profile.id != profile_id);
+
+    if !removed.api_key_env.trim().is_empty()
+        && !config.profiles.iter().any(|profile| profile.api_key_env == removed.api_key_env)
+    {
+        remove_dotenv_value(&app_root, &removed.api_key_env)?;
+    }
+
+    if config.active_profile_id == profile_id {
+        if let Some(next) = config.profiles.first().cloned() {
+            config.provider = next.provider;
+            config.model = next.model;
+            config.api_base = next.api_base;
+            config.api_key_env = next.api_key_env;
+            config.active_profile_id = next.id;
+        } else {
+            config.provider = "openai-compatible".to_string();
+            config.model.clear();
+            config.api_base.clear();
+            config.api_key_env.clear();
+            config.enabled = false;
+            config.active_profile_id.clear();
+        }
+    }
+
+    save_provider_config_file(&app_root, &config)?;
+    Ok(provider_status(&config))
+}
+
+#[tauri::command]
+fn get_model_health() -> Result<ModelHealthCache, String> {
+    let app_root = find_workspace_root()?;
+    load_or_seed_model_health(&app_root)
+}
+
+#[tauri::command]
 async fn probe_provider_models(input: ProbeProviderModelsInput) -> Result<ProviderModelsProbeResult, String> {
     let app_root = find_workspace_root()?;
     let api_base = input.api_base.trim();
@@ -2184,6 +2762,48 @@ async fn test_provider_model(input: TestProviderModelInput) -> Result<ProviderMo
         success: true,
         message: format!("{} 可用：{}", model, trim_for_trace(content)),
     })
+}
+
+#[tauri::command]
+async fn test_provider_model_with_cache(input: TestProviderModelInput) -> Result<ProviderModelTestResult, String> {
+    let app_root = find_workspace_root()?;
+    let api_base = input.api_base.trim().to_string();
+    let api_key_env = input.api_key_env.trim().to_string();
+    let model = input.model.trim().to_string();
+    let mut cache = load_or_seed_model_health(&app_root)?;
+
+    match test_provider_model(input).await {
+        Ok(result) => {
+            upsert_model_health_entry(
+                &mut cache,
+                ModelHealthEntry {
+                    api_base,
+                    api_key_env,
+                    model: model.clone(),
+                    status: "available".to_string(),
+                    message: result.message.clone(),
+                    checked_at: current_unix_timestamp(),
+                },
+            );
+            save_model_health_file(&app_root, &cache)?;
+            Ok(result)
+        }
+        Err(err) => {
+            upsert_model_health_entry(
+                &mut cache,
+                ModelHealthEntry {
+                    api_base,
+                    api_key_env,
+                    model,
+                    status: "unavailable".to_string(),
+                    message: err.clone(),
+                    checked_at: current_unix_timestamp(),
+                },
+            );
+            save_model_health_file(&app_root, &cache)?;
+            Err(err)
+        }
+    }
 }
 
 #[tauri::command]
@@ -2867,12 +3487,23 @@ fn normalize_profile_status(status: &str) -> String {
     }
 }
 
+fn normalize_backlog_status(status: &str) -> String {
+    match status.trim() {
+        "planned" | "running" | "done" | "failed" | "waiting approval" => status.trim().to_string(),
+        _ => String::new(),
+    }
+}
+
 fn provider_config_path(app_root: &Path) -> PathBuf {
     app_root.join(".project-os/desktop-provider.json")
 }
 
 fn model_catalog_path(app_root: &Path) -> PathBuf {
     app_root.join(".project-os/model-catalog.json")
+}
+
+fn model_health_path(app_root: &Path) -> PathBuf {
+    app_root.join(".project-os/model-health.json")
 }
 
 fn desktop_theme_path(app_root: &Path) -> PathBuf {
@@ -3150,6 +3781,56 @@ fn save_provider_config_file(app_root: &Path, config: &ProviderConfig) -> Result
     fs::write(path, format!("{content}\n")).map_err(|err| err.to_string())
 }
 
+fn default_model_health_cache() -> ModelHealthCache {
+    ModelHealthCache {
+        schema_version: "project-os.model-health.v0.1".to_string(),
+        entries: Vec::new(),
+    }
+}
+
+fn load_or_seed_model_health(app_root: &Path) -> Result<ModelHealthCache, String> {
+    let path = model_health_path(app_root);
+    if path.exists() {
+        let content = fs::read_to_string(&path).map_err(|err| err.to_string())?;
+        let mut cache: ModelHealthCache = serde_json::from_str(&content).map_err(|err| err.to_string())?;
+        cache.schema_version = "project-os.model-health.v0.1".to_string();
+        save_model_health_file(app_root, &cache)?;
+        return Ok(cache);
+    }
+
+    let cache = default_model_health_cache();
+    save_model_health_file(app_root, &cache)?;
+    Ok(cache)
+}
+
+fn save_model_health_file(app_root: &Path, cache: &ModelHealthCache) -> Result<(), String> {
+    let path = model_health_path(app_root);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|err| err.to_string())?;
+    }
+    let content = serde_json::to_string_pretty(cache).map_err(|err| err.to_string())?;
+    fs::write(path, format!("{content}\n")).map_err(|err| err.to_string())
+}
+
+fn upsert_model_health_entry(cache: &mut ModelHealthCache, entry: ModelHealthEntry) {
+    if let Some(existing) = cache.entries.iter_mut().find(|item| {
+        item.api_base == entry.api_base
+            && item.api_key_env == entry.api_key_env
+            && item.model == entry.model
+    }) {
+        *existing = entry;
+    } else {
+        cache.entries.push(entry);
+    }
+}
+
+fn current_unix_timestamp() -> String {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs().to_string())
+        .unwrap_or_else(|_| "0".to_string())
+}
+
 fn provider_status(config: &ProviderConfig) -> ProviderStatus {
     let app_root = find_workspace_root().ok();
     let profiles = config
@@ -3329,6 +4010,29 @@ fn write_dotenv_value(root: &Path, key: &str, value: &str) -> Result<(), String>
     fs::write(path, format!("{}\n", lines.join("\n"))).map_err(|err| err.to_string())
 }
 
+fn remove_dotenv_value(root: &Path, key: &str) -> Result<(), String> {
+    let path = root.join(".env.local");
+    let Ok(content) = fs::read_to_string(&path) else {
+        return Ok(());
+    };
+    let lines = content
+        .lines()
+        .filter(|line| {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with('#') {
+                return true;
+            }
+            trimmed
+                .split_once('=')
+                .map(|(name, _)| name.trim() != key)
+                .unwrap_or(true)
+        })
+        .map(ToString::to_string)
+        .collect::<Vec<_>>();
+
+    fs::write(path, format!("{}\n", lines.join("\n"))).map_err(|err| err.to_string())
+}
+
 fn escape_dotenv_value(value: &str) -> String {
     if value
         .chars()
@@ -3478,6 +4182,37 @@ fn project_health(project: &RegistryFileProject) -> (String, String) {
     ("external".to_string(), "未初始化 · 普通项目".to_string())
 }
 
+#[tauri::command]
+fn copy_text_to_clipboard(text: String) -> Result<(), String> {
+    if text.trim().is_empty() {
+        return Err("没有可复制的内容。".to_string());
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let mut child = Command::new("pbcopy")
+            .stdin(Stdio::piped())
+            .spawn()
+            .map_err(|err| format!("复制失败：{err}"))?;
+        if let Some(stdin) = child.stdin.as_mut() {
+            stdin
+                .write_all(text.as_bytes())
+                .map_err(|err| format!("复制失败：{err}"))?;
+        }
+        let status = child.wait().map_err(|err| format!("复制失败：{err}"))?;
+        if status.success() {
+            Ok(())
+        } else {
+            Err("复制失败：系统剪贴板不可用。".to_string())
+        }
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        Err("当前桌面端复制路径暂只支持 macOS。".to_string())
+    }
+}
+
 fn normalize_project_path(path: &str) -> Result<PathBuf, String> {
     let trimmed = path.trim();
     if trimmed.is_empty() {
@@ -3598,7 +4333,13 @@ fn recommendation_queue(recommendations: &Option<Value>) -> Vec<QueueItem> {
             items
                 .iter()
                 .take(5)
-                .map(|item| QueueItem {
+                .enumerate()
+                .map(|(index, item)| QueueItem {
+                    id: item
+                        .get("id")
+                        .and_then(Value::as_str)
+                        .map(ToString::to_string)
+                        .unwrap_or_else(|| format!("recommendation-{}", index + 1)),
                     title: item
                         .get("title")
                         .or_else(|| item.get("id"))
@@ -3617,6 +4358,53 @@ fn recommendation_queue(recommendations: &Option<Value>) -> Vec<QueueItem> {
                         .unwrap_or("来自 Project OS 推荐引擎。")
                         .to_string(),
                     tone: "blue".to_string(),
+                    goal_id: String::new(),
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn task_backlog_queue(backlog: &Option<Value>) -> Vec<QueueItem> {
+    backlog
+        .as_ref()
+        .and_then(|json| json.get("items"))
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .take(12)
+                .map(|item| QueueItem {
+                    id: item
+                        .get("id")
+                        .and_then(Value::as_str)
+                        .unwrap_or("backlog-item")
+                        .to_string(),
+                    title: item
+                        .get("title")
+                        .and_then(Value::as_str)
+                        .unwrap_or("未命名任务")
+                        .to_string(),
+                    status: item
+                        .get("status")
+                        .and_then(Value::as_str)
+                        .unwrap_or("planned")
+                        .to_string(),
+                    body: item
+                        .get("body")
+                        .and_then(Value::as_str)
+                        .unwrap_or("来自 Project OS 任务池。")
+                        .to_string(),
+                    tone: item
+                        .get("tone")
+                        .and_then(Value::as_str)
+                        .unwrap_or("neutral")
+                        .to_string(),
+                    goal_id: item
+                        .get("goalId")
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .to_string(),
                 })
                 .collect()
         })
@@ -3654,15 +4442,25 @@ fn main() {
             merge_run_summary_to_handoff,
             list_desktop_tasks,
             save_desktop_task,
+            run_goal_validation,
+            sign_off_goal_validation,
+            create_goal,
+            switch_active_goal,
+            confirm_goal,
+            update_task_backlog_item,
             update_project_profile_from_conversation,
+            copy_text_to_clipboard,
             get_model_catalog,
             get_desktop_theme,
             save_desktop_theme,
             get_provider_status,
             save_provider_config,
             save_provider_secret,
+            delete_provider_profile,
+            get_model_health,
             probe_provider_models,
             test_provider_model,
+            test_provider_model_with_cache,
             read_engineering_file,
             run_guarded_check,
             run_terminal_command,

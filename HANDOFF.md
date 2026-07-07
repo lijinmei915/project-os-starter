@@ -49,6 +49,20 @@ depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
 - 桌面端任务队列 v0.1 已接入前端状态：每次生成 readonly plan 会创建本地 task，默认 `planned`；右侧 Queue 可切换任务，中心区恢复对应计划；Approve 会推进到 `waiting approval`。当前队列暂未持久化，也还没有执行 runner。
 - 桌面端受控 runner v0.1 已接入：Rust command `run_guarded_check` 只接受白名单 check id，不接受任意 shell；当前允许 `runtime`、`doc-structure`、`recommend`、`ai-project`、`web-build`、`cargo-check`。前端会根据 plan checks 展示可运行按钮，并把任务状态推进为 `running` / `done` / `failed`。
 - 桌面端 provider 配置已改为小白式表单：普通用户只选服务商、模型并粘贴 API Key；真实 key 写入 `.env.local`。`desktop-provider.json` 已支持 `profiles[]` 和 `activeProfileId`，可保存多套 OpenAI-compatible 配置，同一时间只激活一套。
+- 桌面端 provider 表单文案已从“API 档案”收口为“连接”：默认主路径保留连接选择、连接名称、服务商、API 地址、API Key、模型、启用和保存；备注、接入方式、Key 保存变量名和官网链接统一折叠到“高级设置”。连接下拉只显示用户自定义名称，模型和 Key 状态不再拼进下拉项；模型设置弹窗里的 provider 表单不再显示额外外框。
+- 桌面端模型设置已补“已保存连接”管理区：每条连接显示名称、模型、Key 状态和 Key 变量名，可点“编辑”载入表单；桌面 App 内可删除连接，删除时仅在没有其他连接复用同一 Key 变量时移除 `.env.local` 对应行。`get_model_health` 加载失败已降级为空缓存，避免旧桌面进程未注册命令时在模型设置里弹红错误。
+- 已保存连接管理区已改为类似项目区的紧凑 tile 交互：不再保留单独“连接”下拉，点击 tile 内容编辑，删除按钮只在 hover / focus 时出现，末尾用 `+` tile 新建连接；tile 内只显示连接名和 Key 状态。“测试当前”放在已保存连接标题右侧，用于测试当前选中连接的模型是否可用。左侧项目 tile 也补了 hover 移除按钮，不再只能进三点菜单移除。
+- 连接删除已补浏览器预览接口 `/__project-os/delete-provider-profile`，预览模式会更新 `.project-os/desktop-provider.json` 并在 Key 变量未被其他连接复用时清理 `.env.local`；真实 Tauri 模式使用 `delete_provider_profile` command。若旧桌面进程未重启导致 `Command delete_provider_profile not found`，前端会提示重启桌面 dev 进程。
+- Provider 高级设置里的备注、接入方式、Key 保存变量名和官网链接若来自服务商 catalog 预设，会显示“来自服务商预设”并只读；其中 Key 保存变量名会影响实际 Key 读取/保存位置，备注和官网仅展示，接入方式是当前 OpenAI-compatible 协议标识。
+- 已保存连接标题右侧按钮已从“测试当前”改为“刷新当前”，复用模型列表刷新逻辑，不再额外发起 chat/completions 测试，避免可见模型列表可读但单模型测试报错造成干扰。
+- 已保存连接 tile 去掉 Key 状态行，只保留连接名；tile 高度压缩到约 48px，网格最小宽度压到约 76px，加号 tile 同步缩小。
+- 已保存连接 tile 宽度改为按内容自适应，最大宽度约 148px，超出后省略号；短名称不再被等宽网格撑大，加号 tile 固定约 56px。
+- 模型设置闭环已补清晰反馈：顶部模型按钮显示 `连接名 / 模型名`；模型设置状态行显示启用状态、Key 状态、连接名和模型名；“测试当前”仍复用刷新模型列表逻辑，成功后会提示读取到多少模型、当前模型是否可见，若不可见会切到第一个可见模型并说明原因。
+- 新增目标 `工作区可用闭环`，状态为 `draft / 待确认`，拆成 5 个 planned 任务：项目切换后的真实上下文、对话生成任务的闭环、右侧目标和中间对话联动、当前项目档案自动补齐、执行反馈和保存反馈。右侧目标任务列表已按 `goalId/taskIds` 过滤，避免旧 backlog 的已完成任务污染当前目标进度。
+- `工作区可用闭环` 5 个任务已完成首轮实现：WorkspaceSnapshot 增加 currentProjectId/currentProjectPath；切换/添加/移除项目后清空对话、任务、文件预览和终端临时态，并按项目隔离 localStorage 对话；生成计划任务写入 projectId/projectPath，确认计划按钮改为“开始执行”并进入 running；右侧目标 backlog 任务可点击打开中间计划视图；浏览器预览会读取 `.project-os/project-profile.json`，项目档案从 0/5 变为 5/5；新增轻量 toast，用于切项目、生成计划、保存/删除连接等动作反馈。
+- 用户确认后，`工作区可用闭环` 已从 `draft` 推进到 `planned`，第一个任务 `workspace-project-context` 已标记为 `running`。右侧目标在存在 running 任务时显示“进行中”，不再展示 planned 状态下的“生成拆解”提示。浏览器预览已补 `/__project-os/switch-project`，会读取 `.project-os/desktop-registry.json` 并支持预览模式项目切换验证。
+- `workspace-project-context` 已完成验证并标记为 `done`：临时接入 `/tmp/omnidesk-context-check` 项目，切换后确认项目名、目标、任务、项目档案和对话计数都来自测试项目，旧项目目标未串入；随后切回主项目并恢复 registry。预览 snapshot 已改为通过 `/__project-os/workspace-snapshot` 按当前 registry 项目路径读取 `.project-os/*`，不再固定读取当前仓库根目录。目标进度现为完成 1 / 待办 4。
+- 左侧项目入口已从小方块 tile 改为一项目一通栏：行内显示项目名和路径，当前项目高亮，hover / focus 时只露出一个竖向三点更多按钮；查看本地文件、复制路径、修改显示名称和从工作台移除统一收进更多菜单。添加项目入口已移到“项目”标题旁，只保留加号 icon 和 hover 提示。项目行状态点已接入任务态推导：进行中显示蓝色旋转环，任务/会话中断显示红点，最近完成显示绿点，并在切换项目后保留会话内状态提示。复制路径已改走本地系统剪贴板：Tauri 使用 `copy_text_to_clipboard`，浏览器预览使用 `/__project-os/copy-text` 调 `pbcopy`。
 - 新增 `.project-os/model-catalog.json`，管理员可维护服务商、API 地址、Key 变量名和模型列表；Rust command `get_model_catalog` 会读取该文件，不存在时生成默认 catalog。前端服务商/模型下拉优先使用 catalog，读不到才回退内置默认。
 - 桌面端 provider 已新增模型探测和当前模型测试：`probe_provider_models` 调用当前网关 `/models` 获取 API Key 可见模型池；`test_provider_model` 用当前 `apiBase` / `apiKeyEnv` / `model` 发起最小 `/chat/completions`，用于判断下拉中选中的模型是否真的能用。当前 `https://aihub.firstshare.cn/v1` 返回 63 个模型，配置中的 `gpt-5.4` 已测试通过。
 - 桌面端任务队列已开始持久化：Rust command `list_desktop_tasks` / `save_desktop_task` 会把桌面任务 JSON 写入当前项目 `.project-os/runs/desktop-tasks/`；前端启动时读取最近 30 条任务，生成计划、Approve 和 Runner 结果都会回写任务记录。下一步应在这个基础上接 diff review / patch 应用确认。
@@ -71,6 +85,18 @@ depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
 - 主题设置已升级到桌面端本地配置：Rust 新增 `get_desktop_theme` / `save_desktop_theme`，配置写入 `.project-os/desktop-theme.json`；浏览器预览仍 fallback 到 `localStorage`。
 - 主题菜单已支持自定义颜色管理：用户可以通过颜色选择器添加自定义主题色，自定义色会进入 `accents[]` 并可删除；内置预设色保留不可删。
 - 自定义主题色已支持实时预览：拖动系统取色器时会立即更新界面 accent，但不会写入配置；点击“添加”后才保存到自定义色列表。
+- 右侧目标验收链路已从“签收目标”改为“待确认 / 继续打磨 / 确认完成”：验证通过后不强迫封口，用户可点“继续打磨”进入反馈输入模式，也可点“确认完成”经轻量确认弹窗后复用原目标签收记录能力。
+- 目标栈最小闭环已落地：新增 `.project-os/goals.json`，保存 `goals[]` 和 `activeGoalId`；右侧目标优先展示 active goal，已完成目标保留为历史数据。Tauri snapshot 和浏览器 fallback 都会读取该文件，验证/确认完成会同步 active goal 状态。
+- 多目标入口已接入右侧目标区：目标卡片顶部显示 `目标 x/n` 下拉，可查看目标列表并切换 active goal；下拉里已有“新目标”入口。Tauri 端新增 `create_goal` / `switch_active_goal` command，浏览器预览会先做本页状态切换。
+- 新目标入口已升级为命名弹窗：点击“新目标”后输入目标名称和可选说明，创建后自动切为 active goal；浏览器预览做本页状态更新，Tauri 模式写入 `.project-os/goals.json`。
+- 新目标确认边界已写入 `docs/PROJECT_MEMORY_AND_RUNNER.md`：系统不得静默把新目标直接设为 `active`；新目标先进入 `draft / 待确认`，用户确认目标和任务拆解后才进入 `active / 进行中`。刚才用于验证保存的 `保存验证` 测试目标已从 `.project-os/goals.json` 清理。
+- draft 目标的下一步交互已接入：右侧 active goal 为 `draft` 时显示“确认目标”，点击后写入 `planned / 待拆解`；`planned` 状态显示“生成拆解”占位，后续应接任务拆解草案和“确认拆解”。
+- 对话体验已修正行动意图识别：包含“帮我处理 / 处理一下 / 看看解决 / 整理一下 / 制定方案 / 整理待办”等表达时，即使带有“看看、呢、怎么”这类疑问词，也应进入生成计划/创建任务链路，而不是只回复一句聊天文本。前端增加本地兜底，Tauri router prompt 与本地 router 同步。
+- 体验改进已沉淀到 `.project-os/task-backlog.json`：输入区状态、执行反馈、右侧结构、多 API 配置、桌面完整感和治理文件体验会作为右侧任务来源显示；浏览器 fallback 和 Tauri snapshot 都应读取这批 backlog。
+- 目标验收重版已记入 `.project-os/task-backlog.json`，后续分阶段落地：先建立目标验收标准，再接入自动验收报告，最后完善人工签收、失败修复任务和验收历史追溯。
+- 目标验收重版第一阶段已落地：新增 `.project-os/goal-validation.json` 作为目标验收标准，右侧目标完成后显示“验收标准 6 项”；Tauri snapshot 和浏览器预览都会读取同一份文件。
+- 目标验收报告已接入：桌面端 `run_goal_validation` 会顺序运行 Web build、Cargo check 和 runtime check，写入 `.project-os/goal-validation-report.json`，并把目标状态推进到 `verified` 或 `validation-failed`。
+- 目标签收追溯已接入：桌面端 `sign_off_goal_validation` 要求验收报告 `passed` 后才能签收，签收结果写入 `.project-os/goal-signoff-history.json`，并把目标状态更新为 `signed-off`。
 
 ## 当前验证
 
@@ -94,6 +120,6 @@ bash tests/run-tests.sh
 
 ## 下一步建议
 
-1. 打磨交接状态结构化合并、冲突提示和摘要去重。
-2. 将主题设置继续打磨为更小白的品牌色入口，例如支持粘贴 HEX、命名品牌色和重置默认。
-3. 打磨任务执行记录和模型调用反馈。
+1. 在真实桌面端点一次“验证目标”和“签收目标”，确认 `.project-os/goal-validation-report.json` 与 `.project-os/goal-signoff-history.json` 的实际生成内容。
+2. 继续把失败验收拆成修复任务：当报告失败时，右侧应自动生成“修复失败检查”的待办。
+3. 再补视觉证据：把关键界面截图或像素检查纳入目标验收报告。

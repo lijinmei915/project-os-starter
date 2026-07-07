@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
-import { Brain, Check, ChevronRight, ClipboardList, Copy, Eraser, Loader2, MoreHorizontal, Package, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, RotateCcw, Square, TerminalSquare, X } from "lucide-react";
+import { Brain, Check, ChevronDown, ChevronRight, ClipboardList, Eraser, Loader2, MoreVertical, Package, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, RotateCcw, Square, TerminalSquare, X } from "lucide-react";
 import { ChatComposer } from "./components/workbench/chat-composer";
 import { Conversation, ConversationMessage } from "./components/workbench/conversation";
 import { InfoCallout } from "./components/workbench/info-callout";
@@ -63,6 +63,8 @@ class AppErrorBoundary extends React.Component {
 
 const fallbackSnapshot = {
   projectName: "project-os-starter",
+  currentProjectId: "current",
+  currentProjectPath: "/Users/heqiao/Desktop/Claude练习/project-starter-pack",
   phase: "stabilizing",
   stage: "Project OS Console 内核收口期 / Desktop v0.1 方向确认期",
   fileCount: 0,
@@ -89,10 +91,40 @@ const fallbackSnapshot = {
   ],
   queue: [
     {
-      title: "打磨右侧工作流",
-      status: "进行中",
-      body: "目标、任务、对话、背景分清楚。",
+      title: "打磨输入区和生成状态体验",
+      status: "planned",
+      body: "发送、停止、继续补充、语音和附件状态统一。",
       tone: "accent",
+    },
+    {
+      title: "优化执行反馈和阶段状态",
+      status: "planned",
+      body: "把正在思考拆成理解、计划、改动、检查、整理结果。",
+      tone: "accent",
+    },
+    {
+      title: "梳理右侧目标任务项目档案结构",
+      status: "planned",
+      body: "目标、任务、对话、项目档案分清楚，减少重复。",
+      tone: "accent",
+    },
+    {
+      title: "优化多 API 配置和新建状态",
+      status: "planned",
+      body: "区分新建、编辑、已保存和启用，必填项更清楚。",
+      tone: "neutral",
+    },
+    {
+      title: "提升桌面应用完整感",
+      status: "planned",
+      body: "统一名称、图标、启动、版本和服务状态。",
+      tone: "neutral",
+    },
+    {
+      title: "打通治理文件和项目体验",
+      status: "planned",
+      body: "从文档和对话动态维护项目档案、目标、任务和上下文。",
+      tone: "neutral",
     },
   ],
   memory: [
@@ -122,6 +154,31 @@ const fallbackSnapshot = {
     "INDEX: waiting for Tauri Local Agent Core.",
     "GUARD: write actions require diff review.",
   ],
+  goalValidation: {
+    criteria: [],
+  },
+  goalValidationReport: {
+    status: "missing",
+    checks: [],
+  },
+  goalSignoffHistory: {
+    entries: [],
+  },
+  goals: {
+    schemaVersion: "project-os.goals.v0.1",
+    activeGoalId: "desktop-v0.1-direction-confirmation",
+    goals: [
+      {
+        id: "desktop-v0.1-direction-confirmation",
+        title: "Project OS Console 内核收口期 / Desktop v0.1 方向确认期",
+        projectName: "project-os-starter",
+        status: "done",
+        validationStatus: "passed",
+        summary: "Desktop v0.1 目标验收已通过并确认完成。",
+        taskIds: [],
+      },
+    ],
+  },
 };
 
 const fallbackPlan = null;
@@ -238,11 +295,238 @@ const guardedChecks = [
 
 async function loadWorkspaceSnapshot() {
   if (!isTauriRuntime()) {
-    return fallbackSnapshot;
+    return loadPreviewWorkspaceSnapshot();
   }
 
   const { invoke } = await import("@tauri-apps/api/core");
   return invoke("get_workspace_snapshot");
+}
+
+async function runGoalValidationCheck() {
+  if (!isTauriRuntime()) {
+    const response = await fetch("/__project-os/run-goal-validation", { method: "POST" });
+    if (!response.ok) {
+      throw new Error("目标验收运行失败。");
+    }
+    await response.json();
+    return loadPreviewWorkspaceSnapshot();
+  }
+
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke("run_goal_validation");
+}
+
+async function signOffGoalValidation() {
+  if (!isTauriRuntime()) {
+    const response = await fetch("/__project-os/sign-off-goal", { method: "POST" });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.error || "目标签收失败。");
+    }
+    await response.json();
+    return loadPreviewWorkspaceSnapshot();
+  }
+
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke("sign_off_goal_validation");
+}
+
+async function createWorkspaceGoal(input) {
+  if (!isTauriRuntime()) {
+    const response = await fetch("/__project-os/create-goal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.error || "目标创建失败。");
+    }
+    await response.json();
+    return loadPreviewWorkspaceSnapshot();
+  }
+
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke("create_goal", { input });
+}
+
+async function switchWorkspaceGoal(input) {
+  if (!isTauriRuntime()) {
+    const response = await fetch("/__project-os/switch-goal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.error || "目标切换失败。");
+    }
+    await response.json();
+    return loadPreviewWorkspaceSnapshot();
+  }
+
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke("switch_active_goal", { input });
+}
+
+async function switchPreviewProject(id) {
+  const response = await fetch("/__project-os/switch-project", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || "项目切换失败。");
+  }
+  return loadPreviewWorkspaceSnapshot();
+}
+
+async function confirmWorkspaceGoal(input) {
+  if (!isTauriRuntime()) {
+    const response = await fetch("/__project-os/confirm-goal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.error || "目标确认失败。");
+    }
+    await response.json();
+    return loadPreviewWorkspaceSnapshot();
+  }
+
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke("confirm_goal", { input });
+}
+
+async function deleteProviderProfilePreview(profileId) {
+  const response = await fetch("/__project-os/delete-provider-profile", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ profileId }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || "删除连接失败。");
+  }
+  return payload;
+}
+
+async function copyTextToSystemClipboard(text) {
+  if (isTauriRuntime()) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return invoke("copy_text_to_clipboard", { text });
+  }
+
+  const response = await fetch("/__project-os/copy-text", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || "复制失败。");
+  }
+  return payload;
+}
+
+async function loadPreviewWorkspaceSnapshot() {
+  try {
+    const response = await fetch("/__project-os/workspace-snapshot");
+    if (response.ok) {
+      return {
+        ...fallbackSnapshot,
+        ...(await response.json()),
+      };
+    }
+  } catch {
+    // Older dev servers fall back to static preview files.
+  }
+  const backlog = await loadPreviewJson("/.project-os/task-backlog.json", {
+    items: fallbackSnapshot.queue,
+  });
+  const goalValidation = await loadPreviewJson("/.project-os/goal-validation.json", {
+    criteria: [],
+  });
+  const goalValidationReport = await loadPreviewJson("/.project-os/goal-validation-report.json", {
+    status: "missing",
+    checks: [],
+  });
+  const goalSignoffHistory = await loadPreviewJson("/.project-os/goal-signoff-history.json", {
+    entries: [],
+  });
+  const goals = await loadPreviewJson("/.project-os/goals.json", fallbackSnapshot.goals);
+  const registry = await loadPreviewJson("/.project-os/desktop-registry.json", {
+    currentProjectId: fallbackSnapshot.currentProjectId,
+    projects: fallbackSnapshot.projects.map((project) => ({
+      id: project.id,
+      name: project.name,
+      path: project.path,
+      phase: project.phase,
+    })),
+  });
+  const registryProjects = Array.isArray(registry.projects) ? registry.projects : [];
+  const currentProject = registryProjects.find((project) => project.id === registry.currentProjectId) || registryProjects[0] || fallbackSnapshot.projects[0];
+  const projectProfileFile = await loadPreviewJson("/.project-os/project-profile.json", null);
+  const projectProfile = previewProjectProfile(projectProfileFile);
+  const queue = Array.isArray(backlog.items) && backlog.items.length
+    ? backlog.items.map((item) => ({
+        id: item.id,
+        title: item.title || "未命名任务",
+        status: item.status || taskStatuses.planned,
+        body: item.body || "",
+        goalId: item.goalId || "",
+        tone: item.tone || "neutral",
+      }))
+    : fallbackSnapshot.queue;
+  return {
+    ...fallbackSnapshot,
+    currentProjectId: currentProject?.id || fallbackSnapshot.currentProjectId,
+    currentProjectPath: currentProject?.path || fallbackSnapshot.currentProjectPath,
+    projectName: currentProject?.name || fallbackSnapshot.projectName,
+    phase: currentProject?.phase || fallbackSnapshot.phase,
+    projects: registryProjects.length ? registryProjects.map((project) => ({
+      id: project.id,
+      isCurrent: project.id === (currentProject?.id || registry.currentProjectId),
+      name: project.name,
+      path: project.path,
+      phase: project.phase || "stabilizing",
+    })) : fallbackSnapshot.projects,
+    queue,
+    goalValidation,
+    goalValidationReport,
+    goalSignoffHistory,
+    goals,
+    projectProfile,
+  };
+}
+
+function profileFieldText(profile, key) {
+  const value = profile?.fields?.[key]?.value;
+  if (Array.isArray(value)) return value.filter(Boolean).join("、");
+  if (typeof value === "string") return value.trim();
+  return "";
+}
+
+function previewProjectProfile(profile) {
+  if (!profile?.fields) return fallbackSnapshot.projectProfile;
+  const next = {
+    intro: profileFieldText(profile, "identity.summary") || profileFieldText(profile, "identity.uniqueDescription"),
+    longTermGoal: profileFieldText(profile, "product.longTermGoal"),
+    targetUsers: profileFieldText(profile, "product.targetUsers"),
+    useCases: profileFieldText(profile, "product.useCases"),
+    userPreferences: profileFieldText(profile, "user.globalPreferences") || profileFieldText(profile, "user.communicationStyle"),
+  };
+  const missingFields = [
+    ["项目简介", next.intro],
+    ["长期目标", next.longTermGoal],
+    ["目标用户", next.targetUsers],
+    ["使用场景", next.useCases],
+    ["用户偏好", next.userPreferences],
+  ].filter(([, value]) => !value).map(([label]) => label);
+  return { ...next, missingFields };
 }
 
 async function loadProviderStatus() {
@@ -263,9 +547,39 @@ async function loadModelCatalog() {
   return invoke("get_model_catalog");
 }
 
+async function loadModelHealth() {
+  if (!isTauriRuntime()) {
+    return loadPreviewJson("/.project-os/model-health.json", {
+      schemaVersion: "project-os.model-health.v0.1",
+      entries: [],
+    });
+  }
+
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke("get_model_health");
+}
+
 async function loadDesktopTasks() {
   if (!isTauriRuntime()) {
-    return [];
+    const manifest = await loadPreviewJson(
+      "/.project-os/runs/desktop-tasks/manifest.json",
+      { tasks: [] }
+    );
+    const files = Array.isArray(manifest.tasks) ? manifest.tasks : [];
+    const records = await Promise.all(
+      files.map(async (file) => {
+        try {
+          const response = await fetch(`/.project-os/runs/desktop-tasks/${file}`);
+          return response.ok ? response.json() : null;
+        } catch {
+          return null;
+        }
+      })
+    );
+    return records
+      .filter(Boolean)
+      .sort((a, b) => String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")))
+      .slice(0, 30);
   }
 
   const { invoke } = await import("@tauri-apps/api/core");
@@ -339,9 +653,11 @@ function TopBar({
   modelCatalog,
   onSaveProvider,
   onSaveProviderSecret,
+  onDeleteProviderProfile,
   providerError,
   onStartConversation,
 }) {
+  const providerButtonLabel = `${activeProviderProfileName(provider)} / ${provider?.model || "未选模型"}`;
   return (
     <header className="topbar">
         <div className="brand">
@@ -358,7 +674,7 @@ function TopBar({
           <DialogTrigger asChild>
             <Button className="modelStatusButton" variant="subtle" type="button" aria-label="模型设置">
               <span className="dot mutedDot" />
-              {provider.profileName || provider.model || "模型设置"}
+              {providerButtonLabel}
             </Button>
           </DialogTrigger>
           <DialogContent
@@ -372,6 +688,7 @@ function TopBar({
               source={source}
               onSaveProvider={onSaveProvider}
               onSaveProviderSecret={onSaveProviderSecret}
+              onDeleteProviderProfile={onDeleteProviderProfile}
               providerError={providerError}
             />
           </DialogContent>
@@ -389,7 +706,7 @@ function TopBar({
   );
 }
 
-function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot, onSwitchProject, onPickProject, onOpenProjectFolder, onRenameProject, onRemoveProject, onSelectEngineeringFile, projectActionError, selectedEngineeringFile }) {
+function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot, tasks = [], projectActivities = {}, planLoading, terminalRunningId, onSwitchProject, onPickProject, onOpenProjectFolder, onRenameProject, onRemoveProject, onSelectEngineeringFile, onProjectActionError, onProjectPathCopied, projectActionError, selectedEngineeringFile }) {
   const [renameProject, setRenameProject] = useState(null);
   const [renameName, setRenameName] = useState("");
   const [projectsOpen, setProjectsOpen] = useState(true);
@@ -410,34 +727,100 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
   };
 
   const copyProjectPath = async (projectPath) => {
+    const fallbackCopy = () => {
+      const textarea = document.createElement("textarea");
+      textarea.value = projectPath;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.left = "-9999px";
+      document.body.appendChild(textarea);
+      textarea.select();
+      const copied = document.execCommand("copy");
+      document.body.removeChild(textarea);
+      if (!copied) throw new Error("浏览器拒绝写入剪贴板");
+    };
+
     try {
-      await navigator.clipboard.writeText(projectPath);
-      setProjectActionError("");
+      try {
+        await copyTextToSystemClipboard(projectPath);
+      } catch {
+        if (!navigator.clipboard?.writeText) {
+          fallbackCopy();
+        } else {
+          try {
+            await navigator.clipboard.writeText(projectPath);
+          } catch {
+            fallbackCopy();
+          }
+        }
+      }
+      onProjectActionError?.("");
+      onProjectPathCopied?.(projectPath);
+      return true;
     } catch (err) {
-      setProjectActionError(`复制路径失败：${err instanceof Error ? err.message : String(err)}`);
+      onProjectActionError?.(`复制路径失败：${err instanceof Error ? err.message : String(err)}`);
+      return false;
     }
   };
 
-  const projectStatusTone = (project) => {
-    if (project.health === "ready") return "success";
-    if (project.health === "missing") return "danger";
-    if (project.health === "partial") return "running";
-    return "";
+  useEffect(() => {
+    const handleCopyProjectPath = (event) => {
+      const target = event.target instanceof Element ? event.target.closest("[data-copy-project-path]") : null;
+      if (!target) return;
+      const projectPath = target.getAttribute("data-copy-project-path") || "";
+      if (!projectPath) return;
+      copyProjectPath(projectPath);
+    };
+    document.addEventListener("click", handleCopyProjectPath, true);
+    return () => document.removeEventListener("click", handleCopyProjectPath, true);
+  }, []);
+
+  const projectTasks = (project) => tasks.filter((task) => {
+    if (task.projectId && task.projectId === project.id) return true;
+    if (task.projectPath && task.projectPath === project.path) return true;
+    if (task.projectName && task.projectName === project.name) return true;
+    return false;
+  });
+
+  const projectRuntimeStatus = (project) => {
+    const relatedTasks = projectTasks(project);
+    if ((project.isCurrent && planLoading) || relatedTasks.some((task) => task.status === taskStatuses.running || task.id === terminalRunningId)) {
+      return { tone: "running", label: "进行中" };
+    }
+    if (relatedTasks.some((task) => [taskStatuses.failed, "interrupted", "canceled", "cancelled", "error"].includes(task.status))) {
+      return { tone: "danger", label: "任务或会话中断" };
+    }
+    if (relatedTasks.some((task) => task.status === taskStatuses.done)) {
+      return { tone: "success", label: "最近完成" };
+    }
+    if (projectActivities[project.id]?.tone) {
+      return projectActivities[project.id];
+    }
+    if (project.health === "ready") return { tone: "success", label: project.statusLabel || "已就绪" };
+    if (project.health === "missing") return { tone: "danger", label: project.statusLabel || "路径失效" };
+    if (project.health === "partial") return { tone: "warning", label: project.statusLabel || "缺少关键文件" };
+    return { tone: "", label: project.statusLabel || "普通项目" };
   };
 
   if (collapsed) {
     return (
       <aside className="left left-collapsed" aria-label="左侧工作区已折叠">
         <div className="collapsedRail">
-          <button className="collapsedRailItem active" type="button" onClick={onToggleCollapsed} aria-label="项目">
-            <Package strokeWidth={2.15} aria-hidden="true" />
-          </button>
-          <button className="collapsedRailItem" type="button" onClick={onToggleCollapsed} aria-label="项目流程">
-            <ClipboardList strokeWidth={2.15} aria-hidden="true" />
-          </button>
-          <button className="collapsedRailItem" type="button" onClick={onToggleCollapsed} aria-label="记忆">
-            <Brain strokeWidth={2.15} aria-hidden="true" />
-          </button>
+          <Tooltip content="项目">
+            <button className="collapsedRailItem active" type="button" onClick={onToggleCollapsed} aria-label="项目">
+              <Package strokeWidth={2.15} aria-hidden="true" />
+            </button>
+          </Tooltip>
+          <Tooltip content="项目流程">
+            <button className="collapsedRailItem" type="button" onClick={onToggleCollapsed} aria-label="项目流程">
+              <ClipboardList strokeWidth={2.15} aria-hidden="true" />
+            </button>
+          </Tooltip>
+          <Tooltip content="记忆">
+            <button className="collapsedRailItem" type="button" onClick={onToggleCollapsed} aria-label="记忆">
+              <Brain strokeWidth={2.15} aria-hidden="true" />
+            </button>
+          </Tooltip>
           <Tooltip content="展开工作区">
             <Button className="railToggleButton sideCornerButton" size="icon" variant="ghost" type="button" onClick={onToggleCollapsed} aria-label="展开工作区">
               <PanelLeftOpen strokeWidth={1.75} aria-hidden="true" />
@@ -458,37 +841,52 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
             open={projectsOpen}
             onToggle={() => setProjectsOpen((value) => !value)}
             toggleLabel={projectsOpen ? "收起项目" : "展开项目"}
+            actions={(
+              <Tooltip content="添加项目">
+                <button className="sectionIconAction projectAddHeaderButton" type="button" onClick={onPickProject} aria-label="添加项目">
+                  <Plus strokeWidth={2.25} aria-hidden="true" />
+                </button>
+              </Tooltip>
+            )}
           />
           {projectsOpen ? (
             <div className="projectList" aria-label="已接入项目">
               {snapshot.projects.map((project) => (
-                <div className="projectTileWrap" key={project.id}>
+                <div className="projectRowWrap" key={project.id}>
                   <button
-                    className={`projectTile${project.isCurrent ? " active" : ""}`}
+                    className={`projectRow${project.isCurrent ? " active" : ""}`}
                     type="button"
                     onClick={() => onSwitchProject(project.id)}
                     aria-label={`切换到项目 ${project.name}`}
                   >
-                    {projectStatusTone(project) ? <span className={`projectStatusDot projectStatusDot-${projectStatusTone(project)}`} /> : null}
-                    <span className="projectMark">{project.name.slice(0, 2).toUpperCase()}</span>
-                  </button>
-                  <div className="projectHoverCard" role="group" aria-label={`${project.name} 项目信息`}>
-                    <div className="projectHoverMain">
+                    {(() => {
+                      const runtimeStatus = projectRuntimeStatus(project);
+                      return (
+                        <span
+                          className={`projectStatusDot${runtimeStatus.tone ? ` projectStatusDot-${runtimeStatus.tone}` : " projectStatusDot-empty"}`}
+                          title={runtimeStatus.label}
+                          aria-label={runtimeStatus.label}
+                        />
+                      );
+                    })()}
+                    <span className="projectRowText">
                       <strong title={project.name}>{project.name}</strong>
                       <span title={project.path}>{project.path}</span>
-                    </div>
-                    <button className="projectCopyPath" type="button" onClick={() => copyProjectPath(project.path)} aria-label={`复制 ${project.name} 路径`} title="复制路径">
-                      <Copy strokeWidth={2.15} aria-hidden="true" />
-                    </button>
+                    </span>
+                  </button>
+                  <div className="projectRowActions" role="group" aria-label={`${project.name} 项目操作`}>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button className="projectMenuButton" size="icon" variant="ghost" type="button" aria-label={`项目菜单：${project.name}`}>
-                          <MoreHorizontal strokeWidth={2.25} aria-hidden="true" />
-                        </Button>
+                        <button className="projectMenuButton" type="button" aria-label={`项目菜单：${project.name}`}>
+                          <MoreVertical strokeWidth={2.25} aria-hidden="true" />
+                        </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent>
                         <DropdownMenuItem onSelect={() => onOpenProjectFolder(project.id)}>查看本地文件</DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => openRenameDialog(project)}>修改名称</DropdownMenuItem>
+                        <button className="uiDropdownItem" type="button" data-copy-project-path={project.path}>
+                          复制路径
+                        </button>
+                        <DropdownMenuItem onSelect={() => openRenameDialog(project)}>修改显示名称</DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem className="dangerMenuItem" onSelect={() => onRemoveProject(project.id)}>
                           从工作台移除
@@ -498,11 +896,6 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
                   </div>
                 </div>
               ))}
-              <Tooltip content="新建或添加项目">
-                <button className="projectTile projectTile-add" type="button" onClick={onPickProject} aria-label="新建或添加项目">
-                  <Plus strokeWidth={2.25} aria-hidden="true" />
-                </button>
-              </Tooltip>
             </div>
           ) : null}
           {projectActionError ? <div className="projectError">{projectActionError}</div> : null}
@@ -514,7 +907,7 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
           }
         }}>
           <DialogContent
-            title="修改项目名称"
+            title="修改显示名称"
             description="这里只修改 OmniDesk 工作台里的显示名称，不会重命名本地文件夹。"
           >
             <form className="projectRenameForm" onSubmit={submitRename}>
@@ -554,7 +947,7 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
   );
 }
 
-function createTaskFromPlan(plan, taskText, projectName) {
+function createTaskFromPlan(plan, taskText, snapshot) {
   const title = taskText?.trim() || plan?.summary || "未命名任务";
 
   return {
@@ -565,7 +958,9 @@ function createTaskFromPlan(plan, taskText, projectName) {
       hour: "2-digit",
       minute: "2-digit",
     }),
-    projectName,
+    projectId: snapshot.currentProjectId || "",
+    projectName: snapshot.projectName,
+    projectPath: snapshot.currentProjectPath || "",
     plan,
     runs: [],
   };
@@ -574,7 +969,7 @@ function createTaskFromPlan(plan, taskText, projectName) {
 function taskStatusLabel(status) {
   return {
     [taskStatuses.planned]: "待确认",
-    [taskStatuses.waitingApproval]: "待批准",
+    [taskStatuses.waitingApproval]: "已确认",
     [taskStatuses.running]: "进行中",
     [taskStatuses.done]: "已完成",
     [taskStatuses.failed]: "失败",
@@ -595,6 +990,8 @@ function previewChatResult(message, hasAttachments) {
     "帮我改", "帮我修", "帮我优化", "帮我生成", "帮我创建", "帮我新增", "帮我删除",
     "帮我执行", "帮我跑", "开始执行", "生成计划", "创建任务", "改代码", "修复",
     "实现", "接入", "配置", "做成", "设计", "push", "提交", "应用 patch",
+    "帮我处理", "处理一下", "解决一下", "看看解决", "看下解决", "整理一下",
+    "梳理一下", "制定方案", "出个方案", "给个方案", "整理待办", "处理方案",
   ].some((keyword) => lowerMessage.includes(keyword));
   const greeting = ["hi", "hello", "hey", "你好", "您好", "哈喽", "嗨", "在吗", "在么"].includes(normalized);
   const questionLike = [
@@ -606,14 +1003,26 @@ function previewChatResult(message, hasAttachments) {
   return {
     intent: shouldCreatePlan ? "task" : questionLike ? "question" : "chat",
     reply: shouldCreatePlan
-      ? "可以。我先整理下一步，等你确认后再动手。"
+      ? "可以，我整理成一个可执行计划。"
       : greeting
-        ? "你好，我在。你可以直接问项目情况，也可以说想改哪里。"
+        ? "你好，我在。"
         : riskLike
           ? "主要风险有三类：交接记录可能继续膨胀；对话和执行状态容易混在一起；模型或检查失败时反馈还不够像人话。我建议先把普通问答和执行任务彻底分开，再打磨失败提示。"
-          : "我先直接回答。需要我动手时，说“生成计划”或“帮我改”。",
+          : "可以，我直接看当前上下文来回答。",
     shouldCreatePlan,
   };
+}
+
+function isActionRequestMessage(message, hasAttachments = false) {
+  const lowerMessage = safeDisplayText(message).toLowerCase();
+  const actionLike = [
+    "帮我改", "帮我修", "帮我优化", "帮我生成", "帮我创建", "帮我新增", "帮我删除",
+    "帮我执行", "帮我跑", "开始执行", "生成计划", "创建任务", "改代码", "修复",
+    "实现", "接入", "配置", "做成", "设计", "push", "提交", "应用 patch",
+    "帮我处理", "处理一下", "解决一下", "看看解决", "看下解决", "整理一下",
+    "梳理一下", "制定方案", "出个方案", "给个方案", "整理待办", "处理方案",
+  ].some((keyword) => lowerMessage.includes(keyword));
+  return actionLike || hasAttachments;
 }
 
 function isExecutionWorkspaceTab(tab, actionMode) {
@@ -623,7 +1032,7 @@ function isExecutionWorkspaceTab(tab, actionMode) {
 
 function actionPromptsForMessage(message, intent) {
   const text = safeDisplayText(message).trim();
-  if (!text || intent === "task") return [];
+  if (!text || intent !== "task") return [];
   return [
     {
       id: "generate-plan",
@@ -682,6 +1091,11 @@ function isTauriRuntime() {
   return Boolean(window.__TAURI_INTERNALS__ || window.__TAURI__ || window.__TAURI_METADATA__);
 }
 
+function projectScopedStorageKey(snapshot, suffix) {
+  const projectKey = snapshot?.currentProjectId || snapshot?.currentProjectPath || snapshot?.projectName || "current";
+  return `omnidesk.${suffix}.${projectKey}`;
+}
+
 function cleanTerminalText(value) {
   let text = safeDisplayText(value);
   text = text
@@ -733,7 +1147,34 @@ function compactModelLabel(model) {
   if (gptVersion) return gptVersion[1];
   const version = text.match(/(\d+(?:\.\d+)?)(?!.*\d)/);
   if (version) return version[1];
-  return text.length > 6 ? `${text.slice(0, 5)}...` : text;
+  return text;
+}
+
+function providerModelKey(provider) {
+  return [provider?.apiBase || "", provider?.apiKeyEnv || "", provider?.activeProfileId || provider?.profileId || ""].join("|");
+}
+
+function modelAvailabilityKey(provider, model) {
+  return [provider?.apiBase || "", provider?.apiKeyEnv || "", model || ""].join("|");
+}
+
+function catalogModelsForProvider(provider, modelCatalog) {
+  const providers = Array.isArray(modelCatalog?.providers) ? modelCatalog.providers : [];
+  const preset =
+    providers.find((item) => item.apiBase === provider?.apiBase && item.apiKeyEnv === provider?.apiKeyEnv) ||
+    providers.find((item) => item.id === provider?.profileId || item.id === provider?.activeProfileId);
+  const models = Array.isArray(preset?.models) ? preset.models.filter(Boolean) : [];
+  const current = provider?.model ? [provider.model] : [];
+  return Array.from(new Set([...models, ...current]));
+}
+
+function activeProviderProfileName(provider) {
+  const activeProfile = provider?.profiles?.find((profile) => profile.id === provider?.activeProfileId);
+  return activeProfile?.name || provider?.profileName || provider?.apiBase || "当前 API";
+}
+
+function providerConnectionLabel(profile) {
+  return profile?.name || profile?.apiBase || "未命名连接";
 }
 
 function visibleConversationPreview(conversation) {
@@ -784,11 +1225,58 @@ function phaseLabel(phase) {
 
 function goalStatusLabel(todos, fallbackPhase) {
   if (!todos.length) return phaseLabel(fallbackPhase);
-  if (todos.every((todo) => todo.status === taskStatuses.done)) return "已完成";
+  if (todos.every((todo) => todo.status === taskStatuses.done)) return "待验证";
   if (todos.some((todo) => todo.status === taskStatuses.failed)) return "需处理";
   if (todos.some((todo) => todo.status === taskStatuses.running)) return "进行中";
   if (todos.some((todo) => todo.status === taskStatuses.waitingApproval)) return "待确认";
+  if (todos.some((todo) => todo.status === taskStatuses.planned)) return "推进中";
   return phaseLabel(fallbackPhase);
+}
+
+function activeGoalFromSnapshot(snapshot) {
+  const goals = Array.isArray(snapshot.goals?.goals) ? snapshot.goals.goals : [];
+  if (!goals.length) return null;
+  return goals.find((goal) => goal.id === snapshot.goals?.activeGoalId) || goals[0];
+}
+
+function goalValidationStatusFromActiveGoal(activeGoal, validationStatus, validationReportStatus) {
+  if (activeGoal?.status === "done") return "signed-off";
+  if (activeGoal?.status === "pending-confirm") return "verified";
+  if (activeGoal?.status === "failed") return "validation-failed";
+  return validationStatus || (validationReportStatus === "passed" ? "verified" : "");
+}
+
+function goalMetaFromStatus(status, validationReportStatus, todos, phase) {
+  if (status === "signed-off" || status === "done") return "已完成";
+  if (status === "draft" || status === "planned") return "待确认";
+  if (status === "verified" || status === "pending-confirm" || validationReportStatus === "passed") return "待确认";
+  if (status === "validation-failed" || status === "failed" || validationReportStatus === "failed") return "验收失败";
+  return goalStatusLabel(todos, phase);
+}
+
+function goalStatusLabelText(status) {
+  return {
+    active: "进行中",
+    draft: "待确认",
+    planned: "待拆解",
+    "pending-confirm": "待确认",
+    done: "已完成",
+    failed: "需处理",
+    queued: "待开始",
+    paused: "暂停",
+  }[status] || status || "进行中";
+}
+
+function compactGoalTitle(title) {
+  const normalized = safeDisplayText(title, "当前目标")
+    .replace(/\s+/g, " ")
+    .replace(/\s*\/\s*/g, " / ")
+    .trim();
+  if (normalized.length <= 18) return normalized;
+  const parts = normalized.split(/\s*\/\s*/).map((part) => part.trim()).filter(Boolean);
+  const usefulPart = parts.find((part) => part.length <= 18) || parts[parts.length - 1];
+  if (usefulPart && usefulPart.length <= 18) return usefulPart;
+  return `${normalized.slice(0, 16)}...`;
 }
 
 function progressFromTodos(todos) {
@@ -806,6 +1294,7 @@ function snapshotQueueTodos(snapshot) {
     .filter((item) => !isNoiseTask(item))
     .map((item, index) => ({
       description: item.body || item.projectName || "",
+      goalId: item.goalId || "",
       id: item.id || `snapshot-queue-${index}`,
       status: item.status || taskStatuses.planned,
       title: item.title || "未命名任务",
@@ -918,6 +1407,15 @@ function AgentWorkspace({
   onProfileUpdated,
   onStopPlan,
   provider,
+  composerModelAvailability,
+  composerModelOptions,
+  composerModelsLoading,
+  composerModelsSource,
+  composerModelTesting,
+  onLoadComposerModels,
+  onSelectComposerModel,
+  onTestComposerModel,
+  goalRefinementMode,
 }) {
   const [taskInput, setTaskInput] = useState("");
   const [attachments, setAttachments] = useState([]);
@@ -1101,7 +1599,9 @@ function AgentWorkspace({
       return;
     }
 
-    if (!chatResult?.shouldCreatePlan) {
+    const shouldCreatePlan = Boolean(chatResult?.shouldCreatePlan) || isActionRequestMessage(nextInput, submittedAttachments.length > 0);
+
+    if (!shouldCreatePlan) {
       onChatTurnsChange([
         ...chatTurns,
         userTurn,
@@ -1154,7 +1654,7 @@ function AgentWorkspace({
     <Tabs className="center" value={activeWorkspaceTab} onValueChange={setActiveWorkspaceTab}>
       <TabsList className="tabs" aria-label="工作区视图">
         {workspaceTabs.filter((tab) => isExecutionWorkspaceTab(tab, actionMode)).map((tab) => (
-          <TabsTrigger className={`tab workspaceTab ${tab.kind === "file" ? "fileTab" : ""}`} key={tab.id} value={tab.id}>
+          <TabsTrigger className={`tab workspaceTab ${tab.kind === "file" ? "fileTab" : ""}${tab.closable ? " closable" : ""}`} key={tab.id} value={tab.id}>
             <span>{tab.title}</span>
             {tab.closable ? (
               <button
@@ -1258,7 +1758,10 @@ function AgentWorkspace({
                 </ConversationMessage>
               ) : null}
               <ConversationMessage className="conversationMessage-thinking" role="assistant" title="OmniDesk">
-                <span>正在思考</span>
+                <div className="thinkingStage">
+                  <span className="thinkingStageDot" aria-hidden="true" />
+                  <span>{pendingTurn ? "整理计划" : "理解问题"}</span>
+                </div>
               </ConversationMessage>
             </>
           ) : null}
@@ -1362,7 +1865,18 @@ function AgentWorkspace({
           onStop={stopCurrentResponse}
           onSubmit={submitTask}
           onVoiceInput={setTaskInput}
-          modelLabel={compactModelLabel(provider?.model)}
+          currentModel={provider?.model}
+          modelAvailability={composerModelAvailability}
+          modelLabel={provider?.model || "模型"}
+          modelLoading={composerModelsLoading}
+          modelOptions={composerModelOptions}
+          modelProfile={activeProviderProfileName(provider)}
+          modelSource={composerModelsSource}
+          modelTesting={composerModelTesting}
+          onLoadComposerModels={onLoadComposerModels}
+          onSelectComposerModel={onSelectComposerModel}
+          onTestComposerModel={onTestComposerModel}
+          goalRefinementMode={goalRefinementMode}
           planLoading={planLoading}
           taskInput={taskInput}
         />
@@ -1382,10 +1896,25 @@ function ChatDock({
   onStop,
   onSubmit,
   onVoiceInput,
+  currentModel,
+  modelAvailability,
   modelLabel,
+  modelLoading,
+  modelOptions,
+  modelProfile,
+  modelSource,
+  modelTesting,
+  onLoadComposerModels,
+  onSelectComposerModel,
+  onTestComposerModel,
+  goalRefinementMode,
   planLoading,
   taskInput,
 }) {
+  const placeholder = goalRefinementMode
+    ? "说说哪里还不满意，比如交互、视觉、文案、流程或结果..."
+    : "问项目情况、描述想法，或说要改什么...";
+
   return (
     <section className="chatDock" aria-label="对话输入">
       <ChatComposer
@@ -1399,8 +1928,18 @@ function ChatDock({
         onStop={onStop}
         onSubmit={onSubmit}
         onVoiceInput={onVoiceInput}
+        currentModel={currentModel}
+        modelAvailability={modelAvailability}
         modelLabel={modelLabel}
-        placeholder="问项目情况、描述想法，或说要改什么..."
+        modelLoading={modelLoading}
+        modelOptions={modelOptions}
+        modelProfile={modelProfile}
+        modelSource={modelSource}
+        modelTesting={modelTesting}
+        onModelMenuOpen={onLoadComposerModels}
+        onModelSelect={onSelectComposerModel}
+        onModelTest={onTestComposerModel}
+        placeholder={placeholder}
         sending={planLoading || chatLoading}
         value={taskInput}
       />
@@ -1829,11 +2368,31 @@ function RightRail({
   onDeleteConversation,
   onSelectTask,
   onMarkTaskWaiting,
+  onValidateGoal,
+  onSignOffGoal,
+  onRefineGoal,
+  onCreateGoal,
+  onSwitchGoal,
+  onConfirmGoal,
+  validatingGoal,
+  signingGoal,
 }) {
-  const visibleTasks = tasks.filter((task) => !isNoiseTask(task));
+  const [taskFilter, setTaskFilter] = useState("todo");
+  const [confirmGoalOpen, setConfirmGoalOpen] = useState(false);
+  const [newGoalOpen, setNewGoalOpen] = useState(false);
+  const [newGoalTitle, setNewGoalTitle] = useState("");
+  const [newGoalSummary, setNewGoalSummary] = useState("");
+  const activeGoal = activeGoalFromSnapshot(snapshot);
+  const activeGoalTaskIds = new Set(Array.isArray(activeGoal?.taskIds) ? activeGoal.taskIds : []);
+  const belongsToActiveGoal = (item) => {
+    if (!activeGoal?.id) return true;
+    if (item.goalId) return item.goalId === activeGoal.id;
+    return activeGoalTaskIds.size ? activeGoalTaskIds.has(item.id) : true;
+  };
+  const visibleTasks = tasks.filter((task) => !isNoiseTask(task) && belongsToActiveGoal(task));
   const conversationGroups = groupedConversations(conversations);
   const activeTask = visibleTasks.find((task) => task.id === activeTaskId);
-  const snapshotTodos = snapshotQueueTodos(snapshot);
+  const snapshotTodos = snapshotQueueTodos(snapshot).filter(belongsToActiveGoal);
   const todoMeta = visibleTasks.length || snapshotTodos.length;
   const goalTodos = visibleTasks.length
     ? visibleTasks.map((task) => ({
@@ -1848,28 +2407,82 @@ function RightRail({
         subtasks: taskSubtasks(task),
       }));
   const progressValue = progressFromTodos(goalTodos);
-  const goalTitle = activeTask?.title || snapshot.stage || snapshot.projectName || "当前项目";
-  const goalDescription = activeTask?.plan?.summary || snapshot.projectName || "暂无目标描述。";
-  const goalMeta = goalStatusLabel(goalTodos, snapshot.phase);
   const doneCount = goalTodos.filter((todo) => todo.status === taskStatuses.done).length;
   const runningCount = goalTodos.filter((todo) => todo.status === taskStatuses.running || todo.status === taskStatuses.waitingApproval).length;
   const pendingCount = Math.max(goalTodos.length - doneCount - runningCount, 0);
+  const allGoals = Array.isArray(snapshot.goals?.goals) ? snapshot.goals.goals : [];
+  const activeGoalIndex = Math.max(allGoals.findIndex((goal) => goal.id === activeGoal?.id), 0);
+  const otherGoals = allGoals.filter((goal) => goal.id !== activeGoal?.id);
+  const activeGoals = activeGoal ? [activeGoal] : [];
+  const activeGroupTitle = activeGoal?.status === "done"
+    ? "当前"
+    : activeGoal?.status === "draft" || (activeGoal?.status === "planned" && !goalTodos.length)
+      ? "待确认"
+      : "进行中";
+  const openGoals = otherGoals.filter((goal) => goal.status !== "done" && goal.status !== "draft" && goal.status !== "planned");
+  const draftGoals = otherGoals.filter((goal) => goal.status === "draft" || goal.status === "planned");
+  const completedGoals = otherGoals.filter((goal) => goal.status === "done");
+  const goalTitle = activeTask?.title || activeGoal?.shortTitle || activeGoal?.title || snapshot.stage || snapshot.projectName || "当前项目";
+  const rawValidationStatus = snapshot.goalValidation?.goal?.status || "";
+  const validationReportStatus = snapshot.goalValidationReport?.status || "missing";
+  const validationStatus = goalValidationStatusFromActiveGoal(activeGoal, rawValidationStatus, validationReportStatus);
+  const goalMeta = runningCount || (activeGoal?.status === "planned" && goalTodos.length)
+    ? "进行中"
+    : goalMetaFromStatus(activeGoal?.status || validationStatus, validationReportStatus, goalTodos, snapshot.phase);
+  const goalCountMeta = `${allGoals.length ? activeGoalIndex + 1 : 0}/${allGoals.length || 0}`;
+  const openTodos = goalTodos.filter((todo) => todo.status !== taskStatuses.done);
+  const doneTodos = goalTodos.filter((todo) => todo.status === taskStatuses.done);
+  const displayedTodos = taskFilter === "all"
+    ? goalTodos
+    : taskFilter === "done"
+      ? doneTodos
+      : openTodos;
+  const taskFilterLabel = {
+    all: "全部",
+    done: "已完成",
+    todo: "待办",
+  }[taskFilter];
+  const taskFilterCount = displayedTodos.length;
+  const goalNeedsVerification = goalTodos.length > 0 && goalTodos.every((todo) => todo.status === taskStatuses.done);
+  const validationCriteria = Array.isArray(snapshot.goalValidation?.criteria)
+    ? snapshot.goalValidation.criteria
+    : [];
+  const goalSignedOff = validationStatus === "signed-off";
+  const goalVerified = validationStatus === "verified" || validationReportStatus === "passed";
+  const goalIsDraft = activeGoal?.status === "draft";
+  const goalIsPlanned = activeGoal?.status === "planned" && !goalTodos.length;
   const goalSteps = goalTodos.length
     ? [`完成 ${doneCount}`, `进行 ${runningCount}`, `待办 ${pendingCount}`]
     : ["暂无任务", "等待拆解", "待确认"];
   const profileItems = projectProfileItems(snapshot);
   const recordedProfileCount = profileItems.filter((item) => !item.missing).length;
+  const submitNewGoal = (event) => {
+    event.preventDefault();
+    const title = newGoalTitle.trim();
+    if (!title) return;
+    onCreateGoal?.({
+      title,
+      summary: newGoalSummary.trim(),
+    });
+    setNewGoalOpen(false);
+    setNewGoalTitle("");
+    setNewGoalSummary("");
+  };
 
   if (collapsed) {
     return (
       <aside className="right right-collapsed" aria-label="右侧状态栏已折叠">
         <div className="collapsedRail collapsedRail-right">
-          <button className="collapsedRailItem active" type="button" onClick={onToggleCollapsed} aria-label={`目标 ${progressValue}%`}>
-            <span className="collapsedProgress">{progressValue}</span>
-          </button>
-          <button className="collapsedRailItem" type="button" onClick={onToggleCollapsed} aria-label={`任务 ${todoMeta}`}>
-            <ClipboardList strokeWidth={2.15} aria-hidden="true" />
-          </button>
+          <Tooltip content={`目标 ${progressValue}%`}>
+            <button className="collapsedRailItem active" type="button" onClick={onToggleCollapsed} aria-label={`目标 ${progressValue}%`}>
+              <span className="collapsedProgress">{progressValue}</span>
+            </button>
+          </Tooltip>
+          <Tooltip content={`任务 ${todoMeta}`}>
+            <button className="collapsedRailItem" type="button" onClick={onToggleCollapsed} aria-label={`任务 ${todoMeta}`}>
+              <ClipboardList strokeWidth={2.15} aria-hidden="true" />
+            </button>
+          </Tooltip>
           <Tooltip content="展开状态栏">
             <Button className="railToggleButton sideCornerButton" size="icon" variant="ghost" type="button" onClick={onToggleCollapsed} aria-label="展开状态栏">
               <PanelRightOpen strokeWidth={1.75} aria-hidden="true" />
@@ -1883,12 +2496,37 @@ function RightRail({
   return (
     <aside className="right">
       <div className="rightScroll">
-        <RailDisclosure title="目标" meta={goalMeta}>
+        <RailDisclosure
+          title="目标"
+          meta={(
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="goalHeaderSwitcher" type="button">
+                  <span>{goalCountMeta}</span>
+                  <ChevronDown strokeWidth={2} aria-hidden="true" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="goalSwitcherMenu">
+                <GoalMenuGroup title={activeGroupTitle} goals={activeGoals} onSwitchGoal={onSwitchGoal} />
+                <GoalMenuGroup title="待确认" goals={draftGoals} onSwitchGoal={onSwitchGoal} />
+                <GoalMenuGroup title="进行中" goals={openGoals} onSwitchGoal={onSwitchGoal} />
+                <GoalMenuGroup title="已完成" goals={completedGoals} onSwitchGoal={onSwitchGoal} muted />
+                {allGoals.length ? <DropdownMenuSeparator /> : null}
+                <DropdownMenuItem className="goalMenuAction" onSelect={() => setNewGoalOpen(true)}>
+                  <Plus strokeWidth={2.1} aria-hidden="true" />
+                  <span>新目标</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        >
           <div className="goalStack">
             <div className="goalProgress">
               <div className="goalProgressHeader">
-                <strong>{goalTitle}</strong>
-                <span>{goalDescription}</span>
+                <strong>
+                  <span>{compactGoalTitle(goalTitle)}</span>
+                  <em>{goalMeta}</em>
+                </strong>
               </div>
               <div className="goalProgressBar" aria-hidden="true">
                 <span style={{ width: `${progressValue}%` }} />
@@ -1898,14 +2536,138 @@ function RightRail({
                   <span key={step}>{step}</span>
                 ))}
               </div>
+              {goalIsDraft ? (
+                <div className="goalVerifyNotice">
+                  <span>这个目标还没有确认。确认后，我会先生成任务拆解草案。</span>
+                  <div className="goalVerifyActions">
+                    <Button size="sm" variant="primary" type="button" onClick={() => activeGoal?.id && onConfirmGoal?.(activeGoal.id)}>
+                      确认目标
+                    </Button>
+                  </div>
+                </div>
+              ) : goalIsPlanned ? (
+                <div className="goalVerifyNotice">
+                  <span>目标已确认。下一步生成任务拆解草案，确认拆解后进入进行中。</span>
+                  <div className="goalVerifyActions">
+                    <Button size="sm" variant="primary" type="button">
+                      生成拆解
+                    </Button>
+                  </div>
+                </div>
+              ) : goalNeedsVerification ? (
+                <div className="goalVerifyNotice">
+                  {goalSignedOff ? (
+                    <span>这个阶段已确认完成，后续变更会进入新的打磨。</span>
+                  ) : (
+                    <>
+                      <span>
+                        {goalVerified ? "验证已通过。你可以继续打磨，也可以确认完成。" : "任务已完成，等待验收。"}
+                        {validationCriteria.length ? ` 验收标准 ${validationCriteria.length} 项。` : ""}
+                      </span>
+                      {goalVerified ? (
+                        <div className="goalVerifyActions">
+                          <Button size="sm" variant="subtle" type="button" onClick={onRefineGoal}>
+                            继续打磨
+                          </Button>
+                          <Dialog open={confirmGoalOpen} onOpenChange={setConfirmGoalOpen}>
+                            <DialogTrigger asChild>
+                              <Button size="sm" variant="primary" type="button" disabled={signingGoal}>
+                                {signingGoal ? "确认中" : "确认完成"}
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent
+                              className="goalConfirmDialog"
+                              title="确认这个阶段完成？"
+                              description="系统会记录当前验收结果和完成时间，后续工作将从新的目标或下一轮打磨继续。"
+                            >
+                              <div className="goalConfirmActions">
+                                <DialogClose asChild>
+                                  <Button size="sm" variant="default" type="button">取消</Button>
+                                </DialogClose>
+                                <Button
+                                  size="sm"
+                                  variant="primary"
+                                  type="button"
+                                  disabled={signingGoal}
+                                  onClick={async () => {
+                                    await onSignOffGoal?.();
+                                    setConfirmGoalOpen(false);
+                                  }}
+                                >
+                                  {signingGoal ? "确认中" : "确认完成"}
+                                </Button>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                        </div>
+                      ) : (
+                        <button type="button" onClick={onValidateGoal} disabled={validatingGoal}>
+                          {validatingGoal ? "验证中" : "验证目标"}
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              ) : null}
             </div>
+            <Dialog open={newGoalOpen} onOpenChange={setNewGoalOpen}>
+              <DialogContent
+                className="goalCreateDialog"
+                title="开始一个新目标"
+                description="新目标会先保存为草案，确认目标和拆解后才进入进行中。"
+              >
+                <form className="goalCreateForm" onSubmit={submitNewGoal}>
+                  <Field label="目标名称">
+                    {({ id }) => (
+                      <Input
+                        id={id}
+                        autoFocus
+                        value={newGoalTitle}
+                        onChange={(event) => setNewGoalTitle(event.target.value)}
+                        placeholder="例如：打磨对话体验"
+                      />
+                    )}
+                  </Field>
+                  <Field label="说明">
+                    {({ id }) => (
+                      <Input
+                        id={id}
+                        value={newGoalSummary}
+                        onChange={(event) => setNewGoalSummary(event.target.value)}
+                        placeholder="可选：这个阶段想达到什么结果"
+                      />
+                    )}
+                  </Field>
+                  <div className="goalConfirmActions">
+                    <DialogClose asChild>
+                      <Button size="sm" variant="default" type="button">取消</Button>
+                    </DialogClose>
+                    <Button size="sm" variant="primary" type="submit" disabled={!newGoalTitle.trim()}>
+                      创建目标
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
             <div className="goalTaskHeader">
-              <span>任务</span>
-              <span>{goalTodos.length}</span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="goalTaskFilter" type="button">
+                    <span>任务拆解 · {taskFilterLabel}</span>
+                    <ChevronDown strokeWidth={2} aria-hidden="true" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="goalTaskFilterMenu">
+                  <DropdownMenuItem onSelect={() => setTaskFilter("todo")}>待办</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setTaskFilter("all")}>全部</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setTaskFilter("done")}>已完成</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <span>{taskFilterCount}</span>
             </div>
-            {goalTodos.length ? (
+            {displayedTodos.length ? (
               <ol className="goalTodoList">
-                {goalTodos.map((todo, index) => (
+                {displayedTodos.map((todo, index) => (
                   <GoalTaskItem
                     active={todo.id === activeTaskId}
                     description={todo.description}
@@ -1914,12 +2676,12 @@ function RightRail({
                     status={todo.status}
                     subtasks={todo.subtasks}
                     title={todo.title}
-                    onSelect={visibleTasks.length ? () => onSelectTask(todo.id) : undefined}
+                    onSelect={() => onSelectTask(todo.id)}
                   />
                 ))}
               </ol>
             ) : (
-              <div className="goalEmpty">还没有任务拆解。说出想做的事后，这里会变成 todo。</div>
+              <div className="goalEmpty">{taskFilter === "done" ? "还没有完成任务。" : "当前没有待办任务。"}</div>
             )}
           </div>
         </RailDisclosure>
@@ -2013,6 +2775,20 @@ function ConversationHistoryItem({ conversation, active, onDeleteConversation, o
   );
 }
 
+function GoalMenuGroup({ goals, muted = false, onSwitchGoal, title }) {
+  if (!goals.length) return null;
+  return (
+    <>
+      <div className="goalMenuGroupTitle">{title}</div>
+      {goals.map((goal) => (
+        <DropdownMenuItem className={muted ? "goalMenuItem muted" : "goalMenuItem"} key={goal.id} onSelect={() => onSwitchGoal?.(goal.id)}>
+          <span className="goalMenuTitle">{goal.shortTitle || compactGoalTitle(goal.title)}</span>
+        </DropdownMenuItem>
+      ))}
+    </>
+  );
+}
+
 function GoalStatusIcon({ status }) {
   const done = status === taskStatuses.done;
   const running = status === taskStatuses.running || status === taskStatuses.waitingApproval;
@@ -2034,7 +2810,7 @@ function GoalTaskItem({ active, description, index, onSelect, status, subtasks =
       <span className="goalTodoIndex">{index + 1}</span>
       <span className="goalTodoText">
         <span className="goalTodoTitle">{title}</span>
-        {description && !subtasks.length ? <span className="goalTodoDescription">{description}</span> : null}
+        {!done && description && !subtasks.length ? <span className="goalTodoDescription">{description}</span> : null}
       </span>
       <GoalStatusIcon status={status} />
     </>
@@ -2049,7 +2825,7 @@ function GoalTaskItem({ active, description, index, onSelect, status, subtasks =
       ) : (
         <div className="goalTodoButton">{content}</div>
       )}
-      {subtasks.length ? (
+      {!done && subtasks.length ? (
         <ol className="goalSubtaskList">
           {subtasks.map((subtask) => (
             <li className={`goalSubtask${subtask.status === taskStatuses.done ? " done" : ""}`} key={subtask.id}>
@@ -2082,14 +2858,14 @@ function TaskQueueItem({ task, active, onSelectTask, onMarkTaskWaiting }) {
       </button>
       <div className="taskActions">
         <Button size="sm" variant="primary" type="button" onClick={() => onMarkTaskWaiting(task.id)} disabled={approveDisabled}>
-          确认计划
+          开始执行
         </Button>
       </div>
     </Panel>
   );
 }
 
-function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveProviderSecret, providerError }) {
+function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveProviderSecret, onDeleteProviderProfile, providerError }) {
   const [form, setForm] = useState(provider);
   const [apiKey, setApiKey] = useState("");
   const [customModel, setCustomModel] = useState(false);
@@ -2105,16 +2881,26 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
       : fallbackModelCatalog.providers;
   const profiles = Array.isArray(provider.profiles) ? provider.profiles : [];
   const activePreset =
+    catalogProviders.find((preset) => preset.apiBase === form.apiBase && preset.apiKeyEnv === form.apiKeyEnv) ||
     catalogProviders.find((preset) => preset.id === selectedProviderId) ||
     catalogProviders.find((preset) => preset.id === form.profileId) ||
-    catalogProviders.find((preset) => preset.apiBase === form.apiBase && preset.apiKeyEnv === form.apiKeyEnv) ||
     catalogProviders.find((preset) => preset.id === "gateway") ||
     catalogProviders[0];
-  const modelOptions = detectedModels.length ? detectedModels : (activePreset?.models || [form.model]);
+  const modelOptions = Array.from(new Set([
+    form.model,
+    ...(detectedModels.length ? detectedModels : (activePreset?.models || [])),
+  ].filter(Boolean)));
   const isPreview = source !== "tauri";
   const savedProfile = profiles.find((profile) => profile.id === form.profileId);
   const isCreatingProfile = Boolean(form.profileId) && !savedProfile;
   const currentHasApiKey = isCreatingProfile ? Boolean(apiKey.trim()) : Boolean(savedProfile?.hasApiKey ?? provider.hasApiKey);
+  const currentConnectionName = form.profileName || activeProviderProfileName(provider);
+  const usesCatalogPreset = Boolean(
+    activePreset &&
+    form.apiBase === activePreset.apiBase &&
+    form.apiKeyEnv === activePreset.apiKeyEnv
+  );
+  const advancedFieldsReadOnly = usesCatalogPreset && !isCreatingProfile;
 
   useEffect(() => {
     setForm({
@@ -2134,9 +2920,9 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
         "",
     });
     setSelectedProviderId(
+      catalogProviders.find((preset) => preset.apiBase === provider.apiBase && preset.apiKeyEnv === provider.apiKeyEnv)?.id ||
       provider.profileId ||
       provider.activeProfileId ||
-      catalogProviders.find((preset) => preset.apiBase === provider.apiBase && preset.apiKeyEnv === provider.apiKeyEnv)?.id ||
       "gateway"
     );
     setDetectedModels([]);
@@ -2178,12 +2964,12 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
     setForm((current) => ({
       ...current,
       provider: preset.provider || "openai-compatible",
-      model: preset.models[0],
+      model: preset.models.includes(current.model) ? current.model : preset.models[0],
       apiBase: preset.apiBase,
       apiKeyEnv: preset.apiKeyEnv,
       enabled: true,
-      profileId: preset.id,
-      profileName: preset.label,
+      profileId: current.profileId || provider.activeProfileId || preset.id,
+      profileName: current.profileName || preset.label,
       profileNote: preset.note || "",
       profileWebsite: preset.website || "",
     }));
@@ -2192,6 +2978,10 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
   const selectProfile = (event) => {
     const profile = profiles.find((item) => item.id === event.target.value);
     if (!profile) return;
+    editProfile(profile);
+  };
+
+  const editProfile = (profile) => {
     setSelectedProviderId(
       catalogProviders.find((preset) => preset.apiBase === profile.apiBase && preset.apiKeyEnv === profile.apiKeyEnv)?.id ||
       "gateway"
@@ -2209,6 +2999,20 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
       apiKeyEnv: profile.apiKeyEnv,
       enabled: true,
     }));
+  };
+
+  const deleteProfile = async (profile) => {
+    if (!profile || isPreview) return;
+    const confirmed = window.confirm(`删除连接「${profile.name || "未命名连接"}」？\n如果这个 Key 没有被其他连接共用，也会从 .env.local 移除。`);
+    if (!confirmed) return;
+    const ok = await onDeleteProviderProfile?.(profile.id);
+    if (ok) {
+      setApiKey("");
+      setCustomModel(false);
+      setDetectedModels([]);
+      setProbeError("");
+      setModelTestMessage("");
+    }
   };
 
   const selectPreset = (event) => {
@@ -2232,11 +3036,14 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
   const probeModels = async () => {
     if (isPreview) {
       setProbeError("");
+      setModelTestMessage("");
       return false;
     }
     setProbeError("");
+    setModelTestMessage("");
     setProbeLoading(true);
     try {
+      const previousModel = form.model;
       const result = await invokeWorkspaceCommand("probe_provider_models", {
         input: {
           apiBase: form.apiBase,
@@ -2244,10 +3051,20 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
           apiKey,
         },
       });
-      setDetectedModels(Array.isArray(result.models) ? result.models : []);
-      if (Array.isArray(result.models) && result.models.length && !result.models.includes(form.model)) {
+      const models = Array.isArray(result.models) ? result.models : [];
+      setDetectedModels(models);
+      if (models.length && previousModel && models.includes(previousModel)) {
+        setModelTestMessage(`已读取 ${models.length} 个模型，当前模型 ${previousModel} 可见。`);
+      } else if (models.length && previousModel) {
         setCustomModel(false);
-        updateField("model", result.models[0]);
+        updateField("model", models[0]);
+        setModelTestMessage(`已读取 ${models.length} 个模型，${previousModel} 不在当前 Key 可见列表中，已切到 ${models[0]}。`);
+      } else if (models.length) {
+        setCustomModel(false);
+        updateField("model", models[0]);
+        setModelTestMessage(`已读取 ${models.length} 个模型，已选择 ${models[0]}。`);
+      } else {
+        setModelTestMessage("已连接，但没有读取到可见模型。");
       }
       return true;
     } catch (err) {
@@ -2311,48 +3128,74 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
 	        enabled={form.enabled}
 	        hasApiKey={currentHasApiKey}
 	        keyLabel={isCreatingProfile ? "Key 待填写" : undefined}
+	        modelLabel={form.model || "未选模型"}
+	        profileLabel={currentConnectionName}
 	        statusLabel={isCreatingProfile ? "正在新建" : undefined}
 	        variant={isCreatingProfile ? "creating" : "default"}
 	      />
       {isPreview ? (
         <InfoCallout>当前是浏览器预览，只能查看界面。保存 Key、刷新模型和写入配置需要在桌面 App 窗口中操作。</InfoCallout>
       ) : null}
-      {profiles.length ? (
-        <Field label="API 档案">
-          {({ id }) => (
-            <div className="providerProfileRow">
-              <Select id={id} value={form.profileId || provider.activeProfileId || ""} onChange={selectProfile}>
-                {isCreatingProfile ? (
-                  <option value={form.profileId}>
-                    {form.profileName || "新 API"} · 未保存
-                  </option>
-                ) : null}
-                {profiles.map((profile) => (
-                  <option value={profile.id} key={profile.id}>
-                    {profile.name}{profile.hasApiKey ? " · Key 已保存" : ""}
-                  </option>
-                ))}
-              </Select>
-              <Button className="textAction" size="sm" variant="ghost" type="button" onClick={createProfile}>
-                新建
-              </Button>
-            </div>
-          )}
-        </Field>
-      ) : (
-        <Button className="textAction providerCreateFirst" size="sm" variant="ghost" type="button" onClick={createProfile}>
-          新建 API 档案
-        </Button>
-      )}
-      <div className="providerSectionTitle">连接设置</div>
-      <Field label={<RequiredLabel>接入预设</RequiredLabel>}>
+      <div className="providerSavedConnections" aria-label="已保存连接">
+        <div className="providerSectionTitle">
+          <span>已保存连接</span>
+          <Button className="textAction" size="sm" variant="ghost" type="button" onClick={probeModels} disabled={probeLoading || isPreview}>
+            {probeLoading ? "测试中" : "测试当前"}
+          </Button>
+        </div>
+        {profiles.length ? (
+          <div className="providerConnectionList">
+            {profiles.map((profile) => {
+              const active = profile.id === form.profileId;
+              return (
+                <div className={`providerConnectionItem${active ? " active" : ""}`} key={profile.id}>
+                  <button className="providerConnectionMain" type="button" onClick={() => editProfile(profile)}>
+                    <strong>{providerConnectionLabel(profile)}</strong>
+                  </button>
+                  <button
+                    className="tileRemoveButton providerConnectionRemove"
+                    type="button"
+                    onClick={() => deleteProfile(profile)}
+                    disabled={isPreview}
+                    aria-label={`删除连接 ${providerConnectionLabel(profile)}`}
+                    title={isPreview ? "桌面 App 中可删除" : "删除连接"}
+                  >
+                    <X strokeWidth={2.2} aria-hidden="true" />
+                  </button>
+                </div>
+              );
+            })}
+            <button className="providerConnectionItem providerConnectionAdd" type="button" onClick={createProfile} aria-label="新建连接">
+              <Plus strokeWidth={2.25} aria-hidden="true" />
+            </button>
+          </div>
+        ) : (
+          <button className="providerConnectionItem providerConnectionAdd providerConnectionAdd-empty" type="button" onClick={createProfile}>
+            <Plus strokeWidth={2.25} aria-hidden="true" />
+            <span>新建连接</span>
+          </button>
+        )}
+      </div>
+      <div className="providerSectionTitle">基础设置</div>
+      <Field label="连接名称" hint="只用于识别，不影响实际调用。">
+        {({ id }) => <Input
+          id={id}
+          value={form.profileName || ""}
+          onChange={(event) => updateField("profileName", event.target.value)}
+          placeholder="例如：公司网关、我的 OpenAI"
+        />}
+      </Field>
+      <Field label={<RequiredLabel>服务商</RequiredLabel>}>
         {({ id }) => <Select id={id} value={selectedProviderId || activePreset?.id || "gateway"} onChange={selectPreset}>
           {catalogProviders.map((preset) => (
             <option value={preset.id} key={preset.id}>{preset.label}</option>
           ))}
         </Select>}
       </Field>
-      <Field label={<RequiredLabel>API Key</RequiredLabel>} hint={currentHasApiKey && !isCreatingProfile ? "已保存时可留空；填写新 Key 会覆盖当前档案。" : "新档案必须填写 API Key。"}>
+      <Field label={<RequiredLabel>API 地址</RequiredLabel>}>
+        {({ id }) => <Input id={id} value={form.apiBase} onChange={(event) => updateField("apiBase", event.target.value)} placeholder="https://api.example.com/v1" />}
+      </Field>
+      <Field label={<RequiredLabel>API Key</RequiredLabel>} hint={currentHasApiKey && !isCreatingProfile ? "已保存，可留空；填写新 Key 会覆盖当前连接。" : "新连接需要填写 API Key。"}>
         {({ id }) => <Input
           id={id}
           type="password"
@@ -2361,17 +3204,11 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
           placeholder={currentHasApiKey && !isCreatingProfile ? "已保存；留空则不修改" : "粘贴你的 API Key"}
         />}
       </Field>
-      <Field label={<RequiredLabel>API 请求地址</RequiredLabel>}>
-        {({ id }) => <Input id={id} value={form.apiBase} onChange={(event) => updateField("apiBase", event.target.value)} placeholder="https://api.example.com/v1" />}
-      </Field>
       <div className="providerSectionTitle">
         <span>模型</span>
         <span className="modelActions">
           <Button className="textAction" size="sm" variant="ghost" type="button" onClick={probeModels} disabled={probeLoading || isPreview}>
             {probeLoading ? "检测中" : "刷新列表"}
-          </Button>
-          <Button className="textAction" size="sm" variant="ghost" type="button" onClick={testCurrentModel} disabled={modelTestLoading || isPreview || !form.model}>
-            {modelTestLoading ? "测试中" : "测试当前"}
           </Button>
         </span>
       </div>
@@ -2393,54 +3230,45 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
           />}
         </Field>
       ) : null}
-      {detectedModels.length ? (
-        <Notice className="providerHint" variant="info">已从网关读取 {detectedModels.length} 个模型。下拉列表里的是这个 API Key 当前能看到的模型池。</Notice>
-      ) : null}
       {modelTestMessage ? <Notice className="providerSuccess" variant="success">{modelTestMessage}</Notice> : null}
-      <div className="providerSectionTitle">档案信息（可选）</div>
-      <div className="providerSplit">
-        <Field label="档案名称">
-          {({ id }) => <Input
-            id={id}
-            value={form.profileName || (!isCreatingProfile ? activePreset?.label : "") || ""}
-            onChange={(event) => updateField("profileName", event.target.value)}
-            placeholder="例如：公司 API"
-          />}
-        </Field>
+      <details className="advancedProvider">
+        <summary>
+          <span>高级设置</span>
+          {usesCatalogPreset ? <small>来自服务商预设</small> : <small>自定义连接</small>}
+        </summary>
         <Field label="备注">
           {({ id }) => <Input
             id={id}
             value={form.profileNote || ""}
             onChange={(event) => updateField("profileNote", event.target.value)}
-            placeholder="例如：公司专用账号"
+            placeholder="例如：团队共用"
+            readOnly={advancedFieldsReadOnly}
           />}
         </Field>
-      </div>
-      <Field label="官网链接">
-        {({ id }) => <Input
-          id={id}
-          value={form.profileWebsite || ""}
-          onChange={(event) => updateField("profileWebsite", event.target.value)}
-          placeholder="https://..."
-        />}
-      </Field>
-      <details className="advancedProvider">
-        <summary>高级设置</summary>
         <Field className="providerReadOnly" label="接入方式">
-          {({ id }) => <Input id={id} value={form.provider} onChange={(event) => updateField("provider", event.target.value)} />}
+          {({ id }) => <Input id={id} value={form.provider} onChange={(event) => updateField("provider", event.target.value)} readOnly={advancedFieldsReadOnly} />}
         </Field>
         <Field label="Key 保存变量名">
-          {({ id }) => <Input id={id} value={form.apiKeyEnv} onChange={(event) => updateField("apiKeyEnv", event.target.value)} />}
+          {({ id }) => <Input id={id} value={form.apiKeyEnv} onChange={(event) => updateField("apiKeyEnv", event.target.value)} readOnly={advancedFieldsReadOnly} />}
+        </Field>
+        <Field label="官网链接">
+          {({ id }) => <Input
+            id={id}
+            value={form.profileWebsite || ""}
+            onChange={(event) => updateField("profileWebsite", event.target.value)}
+            placeholder="https://..."
+            readOnly={advancedFieldsReadOnly}
+          />}
         </Field>
       </details>
       <div className="toggleRow">
         <Switch
-          aria-label="启用当前 API 档案"
+          aria-label="启用当前连接"
           checked={form.enabled}
           onCheckedChange={(checked) => updateField("enabled", checked)}
         />
         <span>
-          启用当前档案
+          启用当前连接
           <small>关闭后不调用模型，改用本地规则回答。</small>
         </span>
       </div>
@@ -2511,6 +3339,12 @@ function App() {
   const [activeConversationId, setActiveConversationId] = useState(() => `conv-${Date.now()}`);
   const [provider, setProvider] = useState(fallbackProvider);
   const [modelCatalog, setModelCatalog] = useState(fallbackModelCatalog);
+  const [composerModels, setComposerModels] = useState([]);
+  const [composerModelsKey, setComposerModelsKey] = useState("");
+  const [composerModelsSource, setComposerModelsSource] = useState("");
+  const [composerModelsLoading, setComposerModelsLoading] = useState(false);
+  const [composerModelTests, setComposerModelTests] = useState({});
+  const [composerModelTesting, setComposerModelTesting] = useState(false);
   const [source, setSource] = useState("preview");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -2531,7 +3365,12 @@ function App() {
   const [applyError, setApplyError] = useState("");
   const [handoffLoading, setHandoffLoading] = useState(false);
   const [handoffError, setHandoffError] = useState("");
+  const [validatingGoal, setValidatingGoal] = useState(false);
+  const [signingGoal, setSigningGoal] = useState(false);
+  const [goalRefinementMode, setGoalRefinementMode] = useState(false);
   const [providerError, setProviderError] = useState("");
+  const [toast, setToast] = useState(null);
+  const [projectActivities, setProjectActivities] = useState({});
   const [conversationResetKey, setConversationResetKey] = useState(0);
   const [selectedEngineeringFile, setSelectedEngineeringFile] = useState(null);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
@@ -2539,6 +3378,39 @@ function App() {
   const [leftWidth, setLeftWidth] = useState(sidebarSizing.leftDefault);
   const [rightWidth, setRightWidth] = useState(sidebarSizing.rightDefault);
   const activePlanRequestRef = React.useRef(null);
+
+  const showToast = (message, variant = "success") => {
+    setToast({ id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, message, variant });
+  };
+
+  useEffect(() => {
+    if (!toast) return undefined;
+    const timer = window.setTimeout(() => setToast(null), 2200);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  useEffect(() => {
+    const projectId = snapshot.currentProjectId;
+    if (!projectId) return;
+    const relatedTasks = tasks.filter((task) => {
+      if (task.projectId && task.projectId === projectId) return true;
+      if (task.projectPath && task.projectPath === snapshot.currentProjectPath) return true;
+      return task.projectName && task.projectName === snapshot.projectName;
+    });
+    let nextActivity = null;
+    if (planLoading || relatedTasks.some((task) => task.status === taskStatuses.running || task.id === terminalRunningId)) {
+      nextActivity = { tone: "running", label: "进行中" };
+    } else if (relatedTasks.some((task) => [taskStatuses.failed, "interrupted", "canceled", "cancelled", "error"].includes(task.status))) {
+      nextActivity = { tone: "danger", label: "任务或会话中断" };
+    } else if (relatedTasks.some((task) => task.status === taskStatuses.done)) {
+      nextActivity = { tone: "success", label: "最近完成" };
+    }
+    if (!nextActivity) return;
+    setProjectActivities((current) => ({
+      ...current,
+      [projectId]: nextActivity,
+    }));
+  }, [snapshot.currentProjectId, snapshot.currentProjectPath, snapshot.projectName, tasks, planLoading, terminalRunningId]);
 
   const beginSidebarResize = (side, event) => {
     event.preventDefault();
@@ -2594,12 +3466,39 @@ function App() {
         .filter((conversation) => conversation.id !== activeConversationId && conversation.title !== title);
       const next = [record, ...merged].slice(0, 50);
       try {
-        window.localStorage?.setItem("omnidesk.conversations.v1", JSON.stringify(next));
+        window.localStorage?.setItem(projectScopedStorageKey(snapshot, "conversations.v1"), JSON.stringify(next));
       } catch {
         // localStorage may be unavailable in some embedded contexts.
       }
       return next;
     });
+  };
+
+  const resetWorkspaceEphemeralState = (nextSnapshot) => {
+    setActiveConversationId(`conv-${Date.now()}`);
+    setChatTurns([]);
+    setActiveTaskId("");
+    setReadonlyPlan(null);
+    setSelectedEngineeringFile(null);
+    setPlanError("");
+    setRunnerError("");
+    setPatchError("");
+    setApplyError("");
+    setHandoffError("");
+    setTerminalLogs([]);
+    setTerminalText("");
+    setTerminalChunks([]);
+    setTerminalSession(null);
+    setTerminalError("");
+    try {
+      const records = JSON.parse(window.localStorage?.getItem(projectScopedStorageKey(nextSnapshot, "conversations.v1")) || "[]");
+      setConversations(Array.isArray(records) ? records.slice(0, 50) : []);
+    } catch {
+      setConversations([]);
+    }
+    loadDesktopTasks()
+      .then((records) => setTasks(Array.isArray(records) ? records : []))
+      .catch(() => setTasks([]));
   };
 
   const setAndPersistTask = async (nextTask) => {
@@ -2624,6 +3523,72 @@ function App() {
     setSnapshot({ ...fallbackSnapshot, ...nextSnapshot });
     setSource(isTauriRuntime() ? "tauri" : "preview");
     setError("");
+  };
+
+  const validateGoal = async () => {
+    setValidatingGoal(true);
+    setError("");
+    try {
+      const nextSnapshot = await runGoalValidationCheck();
+      applySnapshot(nextSnapshot);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setValidatingGoal(false);
+    }
+  };
+
+  const signOffGoal = async () => {
+    setSigningGoal(true);
+    setError("");
+    try {
+      const nextSnapshot = await signOffGoalValidation();
+      applySnapshot(nextSnapshot);
+      setGoalRefinementMode(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSigningGoal(false);
+    }
+  };
+
+  const refineGoal = () => {
+    setGoalRefinementMode(true);
+  };
+
+  const createGoal = async (input) => {
+    setError("");
+    const title = input?.title?.trim() || "新的目标";
+    const summary = input?.summary?.trim() || "新的目标已开始。";
+    try {
+      const nextSnapshot = await createWorkspaceGoal({
+        title,
+        summary,
+      });
+      applySnapshot(nextSnapshot);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const switchGoal = async (id) => {
+    setError("");
+    try {
+      const nextSnapshot = await switchWorkspaceGoal({ id });
+      applySnapshot(nextSnapshot);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const confirmGoal = async (id) => {
+    setError("");
+    try {
+      const nextSnapshot = await confirmWorkspaceGoal({ id });
+      applySnapshot(nextSnapshot);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
   };
 
   useEffect(() => {
@@ -2651,15 +3616,24 @@ function App() {
   }, []);
 
   useEffect(() => {
+    const timer = window.setInterval(() => {
+      loadWorkspaceSnapshot()
+        .then((nextSnapshot) => applySnapshot(nextSnapshot))
+        .catch(() => {});
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
     try {
-      const records = JSON.parse(window.localStorage?.getItem("omnidesk.conversations.v1") || "[]");
+      const records = JSON.parse(window.localStorage?.getItem(projectScopedStorageKey(snapshot, "conversations.v1")) || "[]");
       if (Array.isArray(records)) {
         setConversations(records.slice(0, 50));
       }
     } catch {
       setConversations([]);
     }
-  }, []);
+  }, [snapshot.currentProjectId, snapshot.currentProjectPath]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2683,11 +3657,29 @@ function App() {
   useEffect(() => {
     let cancelled = false;
 
-    Promise.all([loadProviderStatus(), loadModelCatalog()])
-      .then(([status, catalog]) => {
+    Promise.all([
+      loadProviderStatus(),
+      loadModelCatalog(),
+      loadModelHealth().catch(() => ({
+        schemaVersion: "project-os.model-health.v0.1",
+        entries: [],
+      })),
+    ])
+      .then(([status, catalog, modelHealth]) => {
         if (!cancelled) {
           setProvider({ ...fallbackProvider, ...status });
           setModelCatalog({ ...fallbackModelCatalog, ...catalog });
+          const entries = Array.isArray(modelHealth?.entries) ? modelHealth.entries : [];
+          setComposerModelTests(Object.fromEntries(
+            entries.map((entry) => [
+              [entry.apiBase || entry.api_base || "", entry.apiKeyEnv || entry.api_key_env || "", entry.model || ""].join("|"),
+              {
+                checkedAt: entry.checkedAt || entry.checked_at || "",
+                message: entry.message || "",
+                status: entry.status || "unknown",
+              },
+            ])
+          ));
         }
       })
       .catch((err) => {
@@ -2762,8 +3754,12 @@ function App() {
     setLoading(true);
     setProjectActionError("");
     try {
-      const nextSnapshot = await invokeWorkspaceCommand("switch_registry_project", { id });
+      const nextSnapshot = source !== "tauri"
+        ? await switchPreviewProject(id)
+        : await invokeWorkspaceCommand("switch_registry_project", { id });
       applySnapshot(nextSnapshot);
+      resetWorkspaceEphemeralState({ ...fallbackSnapshot, ...nextSnapshot });
+      showToast(`已切换到 ${nextSnapshot.projectName || project.name}`);
     } catch (err) {
       setProjectActionError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -2777,6 +3773,8 @@ function App() {
     try {
       const nextSnapshot = await invokeWorkspaceCommand("add_registry_project", { path });
       applySnapshot(nextSnapshot);
+      resetWorkspaceEphemeralState({ ...fallbackSnapshot, ...nextSnapshot });
+      showToast(`已添加 ${nextSnapshot.projectName || "项目"}`);
       return true;
     } catch (err) {
       setProjectActionError(err instanceof Error ? err.message : String(err));
@@ -2809,9 +3807,8 @@ function App() {
     try {
       const nextSnapshot = await invokeWorkspaceCommand("remove_registry_project", { id });
       applySnapshot(nextSnapshot);
-      setActiveTaskId("");
-      setReadonlyPlan(null);
-      setSelectedEngineeringFile(null);
+      resetWorkspaceEphemeralState({ ...fallbackSnapshot, ...nextSnapshot });
+      showToast(`已移除 ${project.name}`);
     } catch (err) {
       setProjectActionError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -2941,9 +3938,10 @@ function App() {
         }
       }
       if (activePlanRequestRef.current !== requestId) return false;
-      const nextTask = createTaskFromPlan(plan, input.task, snapshot.projectName);
+      const nextTask = createTaskFromPlan(plan, input.task, snapshot);
       setReadonlyPlan(plan);
       await setAndPersistTask(nextTask);
+      showToast("已生成计划，等待确认执行。");
       return true;
     } catch (err) {
       if (activePlanRequestRef.current !== requestId) return false;
@@ -2974,7 +3972,28 @@ function App() {
   const activeTask = tasks.find((task) => task.id === activeTaskId) || null;
 
   const selectTask = (id) => {
-    const task = tasks.find((item) => item.id === id);
+    const queueItem = snapshot.queue?.find((item) => item.id === id);
+    const task = tasks.find((item) => item.id === id) || (queueItem ? {
+      createdAt: "",
+      id: queueItem.id,
+      plan: {
+        candidateChanges: [],
+        checks: [],
+        filesToRead: [],
+        guardrails: ["这是目标拆解里的待办，开始执行前仍需确认具体改动范围。"],
+        mode: "planned-task",
+        projectName: snapshot.projectName,
+        steps: [queueItem.body || "补齐任务执行方案。"],
+        summary: queueItem.body || "",
+        task: queueItem.title,
+        trace: [`GOAL_TASK: ${queueItem.goalId || "current"}`],
+      },
+      projectId: snapshot.currentProjectId || "",
+      projectName: snapshot.projectName,
+      projectPath: snapshot.currentProjectPath || "",
+      status: queueItem.status || taskStatuses.planned,
+      title: queueItem.title,
+    } : null);
     if (!task) return;
     setActiveTaskId(id);
     setReadonlyPlan(task.plan);
@@ -3000,7 +4019,7 @@ function App() {
     const nextConversations = conversations.filter((item) => item.id !== id);
     setConversations(nextConversations);
     try {
-      window.localStorage?.setItem("omnidesk.conversations.v1", JSON.stringify(nextConversations));
+      window.localStorage?.setItem(projectScopedStorageKey(snapshot, "conversations.v1"), JSON.stringify(nextConversations));
     } catch {
       // localStorage may be unavailable in some embedded contexts.
     }
@@ -3034,7 +4053,7 @@ function App() {
   const markTaskWaiting = (id) => {
     const task = tasks.find((item) => item.id === id);
     if (!task) return;
-    setAndPersistTask({ ...task, status: taskStatuses.waitingApproval });
+    setAndPersistTask({ ...task, status: taskStatuses.running });
   };
 
   const runGuardedCheck = async (taskId, checkId) => {
@@ -3316,10 +4335,94 @@ function App() {
     try {
       const status = await invokeWorkspaceCommand("save_provider_config", { input: form });
       setProvider({ ...fallbackProvider, ...status });
+      showToast("连接配置已保存。");
       return true;
     } catch (err) {
       setProviderError(err instanceof Error ? err.message : String(err));
       return false;
+    }
+  };
+
+  const loadComposerModels = async () => {
+    const key = providerModelKey(provider);
+    if (composerModelsKey === key && composerModels.length) return;
+
+    const fallbackModels = catalogModelsForProvider(provider, modelCatalog);
+    setComposerModelsLoading(true);
+    setComposerModelsSource(fallbackModels.length > 1 ? "来自本地模型列表" : "当前模型");
+    setComposerModels(fallbackModels);
+
+    if (source !== "tauri" || !provider?.apiBase || !provider?.apiKeyEnv) {
+      setComposerModelsKey(key);
+      setComposerModelsLoading(false);
+      return;
+    }
+
+    try {
+      const result = await invokeWorkspaceCommand("probe_provider_models", {
+        input: {
+          apiBase: provider.apiBase,
+          apiKeyEnv: provider.apiKeyEnv,
+          apiKey: "",
+        },
+      });
+      const models = Array.isArray(result.models) ? result.models.filter(Boolean) : [];
+      setComposerModels(models.length ? models : fallbackModels);
+      setComposerModelsSource(models.length ? "来自当前 API 可见模型" : "来自本地模型列表");
+      setComposerModelsKey(key);
+    } catch {
+      setComposerModels(fallbackModels);
+      setComposerModelsSource(fallbackModels.length > 1 ? "来自本地模型列表" : "当前模型");
+      setComposerModelsKey(key);
+    } finally {
+      setComposerModelsLoading(false);
+    }
+  };
+
+  const selectComposerModel = async (model) => {
+    if (!model || model === provider.model) return;
+    if (source !== "tauri") {
+      setProvider((current) => ({ ...current, model }));
+      return;
+    }
+    await saveProvider({ ...provider, model });
+  };
+
+  const testComposerModel = async (model) => {
+    const targetModel = model || provider?.model;
+    if (source !== "tauri" || !targetModel || !provider?.apiBase || !provider?.apiKeyEnv) return false;
+    const key = modelAvailabilityKey(provider, targetModel);
+    setComposerModelTesting(true);
+    try {
+      const result = await invokeWorkspaceCommand("test_provider_model_with_cache", {
+        input: {
+          apiBase: provider.apiBase,
+          apiKeyEnv: provider.apiKeyEnv,
+          model: targetModel,
+          apiKey: "",
+        },
+      });
+      setComposerModelTests((current) => ({
+        ...current,
+        [key]: {
+          checkedAt: Date.now(),
+          message: result.message || `${targetModel} 可用`,
+          status: "available",
+        },
+      }));
+      return true;
+    } catch (err) {
+      setComposerModelTests((current) => ({
+        ...current,
+        [key]: {
+          checkedAt: Date.now(),
+          message: err instanceof Error ? err.message : String(err),
+          status: "unavailable",
+        },
+      }));
+      return false;
+    } finally {
+      setComposerModelTesting(false);
     }
   };
 
@@ -3330,12 +4433,42 @@ function App() {
         input: { apiKeyEnv, apiKey },
       });
       setProvider({ ...fallbackProvider, ...status });
+      showToast("API Key 已保存。");
       return true;
     } catch (err) {
       setProviderError(err instanceof Error ? err.message : String(err));
       return false;
     }
   };
+
+  const deleteProviderProfile = async (profileId) => {
+    setProviderError("");
+    try {
+      const status = source !== "tauri"
+        ? await deleteProviderProfilePreview(profileId)
+        : await invokeWorkspaceCommand("delete_provider_profile", {
+            input: { profileId },
+          });
+      setProvider({ ...fallbackProvider, ...status });
+      showToast("连接已删除。");
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setProviderError(
+        message.includes("delete_provider_profile") && message.includes("not found")
+          ? "当前桌面进程还没加载删除连接命令，请重启桌面 dev 进程后再删。"
+          : message
+      );
+      return false;
+    }
+  };
+
+  const composerModelOptions = composerModels.length
+    ? composerModels
+    : catalogModelsForProvider(provider, modelCatalog);
+  const composerModelAvailability = Object.fromEntries(
+    composerModelOptions.map((model) => [model, composerModelTests[modelAvailabilityKey(provider, model)]])
+  );
 
   return (
     <TooltipProvider>
@@ -3348,6 +4481,7 @@ function App() {
         modelCatalog={modelCatalog}
         onSaveProvider={saveProvider}
         onSaveProviderSecret={saveProviderSecret}
+        onDeleteProviderProfile={deleteProviderProfile}
         providerError={providerError}
         onStartConversation={startNewConversation}
       />
@@ -3363,12 +4497,18 @@ function App() {
           onResizeStart={(event) => beginSidebarResize("left", event)}
           onToggleCollapsed={() => setLeftCollapsed((value) => !value)}
           snapshot={snapshot}
+          tasks={tasks}
+          projectActivities={projectActivities}
+          planLoading={planLoading}
+          terminalRunningId={terminalRunningId}
           onSwitchProject={switchProject}
           onPickProject={pickProject}
           onOpenProjectFolder={openProjectFolder}
           onRenameProject={renameProject}
           onRemoveProject={removeProject}
           onSelectEngineeringFile={selectEngineeringFile}
+          onProjectActionError={setProjectActionError}
+          onProjectPathCopied={() => showToast("已复制项目路径。")}
           projectActionError={projectActionError}
           selectedEngineeringFile={selectedEngineeringFile}
         />
@@ -3412,6 +4552,15 @@ function App() {
           onProfileUpdated={applySnapshot}
           onStopPlan={stopPlanGeneration}
           provider={provider}
+          composerModelAvailability={composerModelAvailability}
+          composerModelOptions={composerModelOptions}
+          composerModelsLoading={composerModelsLoading}
+          composerModelsSource={composerModelsSource}
+          composerModelTesting={composerModelTesting}
+          onLoadComposerModels={loadComposerModels}
+          onSelectComposerModel={selectComposerModel}
+          onTestComposerModel={testComposerModel}
+          goalRefinementMode={goalRefinementMode}
         />
         <RightRail
           collapsed={rightCollapsed}
@@ -3426,8 +4575,17 @@ function App() {
           onDeleteConversation={deleteConversation}
           onSelectTask={selectTask}
           onMarkTaskWaiting={markTaskWaiting}
+          onValidateGoal={validateGoal}
+          onSignOffGoal={signOffGoal}
+          onRefineGoal={refineGoal}
+          onCreateGoal={createGoal}
+          onSwitchGoal={switchGoal}
+          onConfirmGoal={confirmGoal}
+          validatingGoal={validatingGoal}
+          signingGoal={signingGoal}
         />
       </main>
+      {toast ? <div className={`appToast appToast-${toast.variant}`}>{toast.message}</div> : null}
       <StatusBar snapshot={snapshot} source={source} />
     </div>
     </TooltipProvider>

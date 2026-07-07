@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "project-os.goal-validation.v0.1",
+  "updatedAt": "2026-07-07T09:39:31.032Z",
+  "goal": {
+    "id": "desktop-v0.1-direction-confirmation",
+    "title": "Project OS Console 内核收口期 / Desktop v0.1 方向确认期",
+    "status": "signed-off"
+  },
+  "criteria": [
+    {
+      "id": "conversation-naturalness",
+      "title": "对话体验自然",
+      "body": "普通问答不暴露内部流程，只有明确任务才进入计划或执行状态。",
+      "type": "interaction",
+      "required": true
+    },
+    {
+      "id": "task-goal-linkage",
+      "title": "目标和任务拆解关系清楚",
+      "body": "目标状态由任务拆解汇总，任务可按待办、全部、已完成筛选。",
+      "type": "workflow",
+      "required": true
+    },
+    {
+      "id": "execution-feedback",
+      "title": "执行反馈可理解",
+      "body": "等待、生成、验证和失败状态有明确提示，不让用户猜系统在做什么。",
+      "type": "interaction",
+      "required": true
+    },
+    {
+      "id": "provider-model-reality",
+      "title": "模型配置基于真实可用信息",
+      "body": "模型列表来自当前 API 或本地 catalog，能力和可用性不凭空杜撰。",
+      "type": "data",
+      "required": true
+    },
+    {
+      "id": "desktop-completeness",
+      "title": "桌面应用完整感",
+      "body": "名称、图标、启动、主题、服务状态和本地安全提示保持一致。",
+      "type": "product",
+      "required": true
+    },
+    {
+      "id": "governance-traceability",
+      "title": "治理记录可追溯",
+      "body": "任务池、交接、项目状态和目标验收记录能互相对应。",
+      "type": "governance",
+      "required": true
+    }
+  ]
+}

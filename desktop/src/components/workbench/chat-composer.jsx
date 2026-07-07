@@ -1,6 +1,54 @@
 import React from "react";
-import { ArrowUp, Mic, Plus, X } from "lucide-react";
+import { ArrowUp, Check, ChevronDown, Loader2, Mic, Plus, X } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu";
 import { cn } from "../../lib/cn";
+
+function modelUsage(model) {
+  const name = String(model || "").toLowerCase();
+  if (/image|dall|flux|sdxl|stable/.test(name)) return "图像";
+  if (/codex|code|coder/.test(name)) return "编程";
+  if (/reason|thinking|r1|o1|o3|o4/.test(name)) return "推理";
+  if (/mini|nano|flash|lite|small|compact/.test(name)) return "轻量";
+  return "对话";
+}
+
+function modelDescription(model) {
+  const usage = modelUsage(model);
+  if (usage === "图像") return "图像生成";
+  if (usage === "编程") return "代码任务";
+  if (usage === "推理") return "复杂推理";
+  if (usage === "轻量") return "更快轻量";
+  return "通用对话";
+}
+
+function modelAvailabilityLabel(entry) {
+  if (entry?.status === "available") return "可用";
+  if (entry?.status === "unavailable") return "不可用";
+  return "未验证";
+}
+
+function groupedModelOptions(models, currentModel) {
+  const uniqueModels = Array.from(new Set((models || []).filter(Boolean)));
+  const preferred = uniqueModels.filter((model) => {
+    const name = String(model).toLowerCase();
+    if (model === currentModel) return true;
+    return (
+      !/image|dall|flux|sdxl|stable/.test(name) &&
+      !/-\d{4}-\d{2}-\d{2}$/.test(name) &&
+      !/preview|deprecated|legacy/.test(name) &&
+      !/nano|mini|compact/.test(name)
+    );
+  }).slice(0, 5);
+  const recommendationSet = new Set([currentModel, ...preferred].filter(Boolean));
+  const sections = [
+    { title: "推荐", models: uniqueModels.filter((model) => recommendationSet.has(model)) },
+    { title: "编程", models: uniqueModels.filter((model) => modelUsage(model) === "编程" && !recommendationSet.has(model)) },
+    { title: "轻量", models: uniqueModels.filter((model) => modelUsage(model) === "轻量" && !recommendationSet.has(model)) },
+    { title: "图像", models: uniqueModels.filter((model) => modelUsage(model) === "图像" && !recommendationSet.has(model)) },
+    { title: "其他", models: uniqueModels.filter((model) => !recommendationSet.has(model) && !["编程", "轻量", "图像"].includes(modelUsage(model))) },
+  ];
+  return sections.filter((section) => section.models.length);
+}
 
 export function ChatComposer({
   attachments = [],
@@ -11,10 +59,20 @@ export function ChatComposer({
   onFilesSelected,
   onPaste,
   onRemoveAttachment,
+  onModelMenuOpen,
+  onModelSelect,
+  onModelTest,
   onStop,
   onSubmit,
   onVoiceInput,
+  currentModel,
+  modelAvailability = {},
+  modelLoading,
   modelLabel,
+  modelOptions = [],
+  modelProfile,
+  modelSource,
+  modelTesting,
   placeholder,
   sending,
   value,
@@ -30,6 +88,14 @@ export function ChatComposer({
   const hasValue = Boolean(value?.trim()) || attachments.length > 0;
   const isDisabled = sending ? false : disabled || !hasValue;
   const voiceDisabled = disabled || !speechSupported || !onVoiceInput;
+  const modelSections = groupedModelOptions(modelOptions, currentModel);
+  const toolbarHint = sending
+    ? "正在生成，可继续补充"
+    : isListening
+      ? "正在听写"
+      : attachments.length
+        ? `${attachments.length} 张图片`
+        : "本地工作区";
 
   React.useEffect(() => {
     setSpeechSupported(Boolean(window.SpeechRecognition || window.webkitSpeechRecognition));
@@ -191,14 +257,68 @@ export function ChatComposer({
           >
             <Plus aria-hidden="true" strokeWidth={2.25} />
           </button>
-          <span className="chatComposerHint">
-            {attachments.length ? `${attachments.length} 张图片` : "本地工作区"}
-          </span>
+          <span className="chatComposerHint">{toolbarHint}</span>
         </div>
-        <div className="chatComposerStatus" aria-live="polite">
-          {sending ? <span className="chatComposerSpinner" aria-hidden="true" /> : null}
-          <span>{modelLabel || "模型"}</span>
-        </div>
+        <DropdownMenu onOpenChange={(open) => {
+          if (open) onModelMenuOpen?.();
+        }}>
+          <DropdownMenuTrigger asChild>
+            <button className="chatComposerStatus" type="button" aria-label="选择模型">
+              {sending || modelLoading ? <span className="chatComposerSpinner" aria-hidden="true" /> : null}
+              <span className="chatComposerStatusLabel">{modelLabel || "模型"}</span>
+              {modelLoading ? (
+                <Loader2 className="chatComposerStatusIcon" aria-hidden="true" strokeWidth={2} />
+              ) : (
+                <ChevronDown className="chatComposerStatusIcon" aria-hidden="true" strokeWidth={2.2} />
+              )}
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="chatComposerModelMenu" align="end">
+            <div className="chatComposerModelHeader">
+              <div className="chatComposerModelHeaderText">
+                <span>{modelProfile || "当前 API"}</span>
+                <strong>{currentModel || modelLabel || "未选择模型"}</strong>
+              </div>
+              <button
+                className="chatComposerModelTest"
+                disabled={!currentModel || modelTesting}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onModelTest?.(currentModel);
+                }}
+                type="button"
+              >
+                {modelTesting ? "测试中" : modelAvailability[currentModel]?.status === "available" ? "重新测试" : "测试"}
+              </button>
+            </div>
+            <div className="chatComposerModelSource">
+              <span>{modelSource || "当前可用模型"}</span>
+              <span>{modelOptions.length ? `${modelOptions.length} 个` : "0 个"}</span>
+            </div>
+            {modelSections.map((section) => (
+              <div className="chatComposerModelSection" key={section.title}>
+                <div className="chatComposerModelSectionTitle">{section.title}</div>
+                {section.models.map((model) => (
+                  <DropdownMenuItem
+                    className="chatComposerModelItem"
+                    key={model}
+                    onSelect={() => onModelSelect?.(model)}
+                >
+                  <span className="chatComposerModelName">{model}</span>
+                    <span className={`chatComposerModelMeta ${modelAvailability[model]?.status || ""}`}>
+                      {model === currentModel ? `当前 · ${modelAvailabilityLabel(modelAvailability[model])}` : `${modelDescription(model)} · ${modelAvailabilityLabel(modelAvailability[model])}`}
+                    </span>
+                  {model === currentModel ? <Check aria-hidden="true" strokeWidth={2.2} /> : null}
+                </DropdownMenuItem>
+                ))}
+              </div>
+            ))}
+            {!modelOptions.length ? (
+              <div className="chatComposerModelEmpty">没有读取到模型列表</div>
+            ) : null}
+          </DropdownMenuContent>
+        </DropdownMenu>
         <div className="chatComposerActions">
           <button
             aria-label={isListening ? "停止语音输入" : "语音输入"}

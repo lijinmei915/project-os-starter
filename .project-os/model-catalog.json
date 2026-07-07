@@ -50,12 +50,13 @@
       "id": "gateway",
       "label": "Gateway",
       "note": "公司或团队统一中转",
-      "website": "https://your-gateway.example",
+      "website": "https://aihub.firstshare.cn",
       "provider": "openai-compatible",
-      "apiBase": "https://your-gateway.example/v1",
+      "apiBase": "https://aihub.firstshare.cn/v1",
       "apiKeyEnv": "LLM_GATEWAY_API_KEY",
       "models": [
-        "your-model"
+        "gpt-5.5",
+        "gpt-5.4"
       ]
     }
   ]
