@@ -994,7 +994,7 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
                   }}
                   aria-label="切换到项目文件"
                 >
-                  <ArrowLeftRight strokeWidth={2.2} aria-hidden="true" />
+                  <ArrowLeftRight strokeWidth={1.5} aria-hidden="true" />
                 </Button>
               </Tooltip>
             )}
@@ -1023,7 +1023,7 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
                     }}
                     aria-label="切换到工作区"
                   >
-                    <ArrowLeftRight strokeWidth={2.2} aria-hidden="true" />
+                    <ArrowLeftRight strokeWidth={1.5} aria-hidden="true" />
                   </Button>
                 </Tooltip>
               )}

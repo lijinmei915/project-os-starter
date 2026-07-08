@@ -207,7 +207,7 @@ export function WorkspaceTree({ activeTopicPath, actions, inlineAction, onSelect
               type="button"
             >
               <span className="flowIcon" aria-hidden="true">
-                <NodeIcon strokeWidth={2.25} />
+                <NodeIcon strokeWidth={1.75} />
               </span>
               <span className="flowText">{node.title}</span>
               <span className="flowMeta">{mappedMeta(node, snapshot)}</span>
@@ -238,7 +238,7 @@ export function WorkspaceTree({ activeTopicPath, actions, inlineAction, onSelect
                           type="button"
                         >
                           <span className="flowIcon" aria-hidden="true">
-                            <ChildIcon strokeWidth={2.25} />
+                            <ChildIcon strokeWidth={1.75} />
                           </span>
                           <span className="flowText">{child.title}</span>
                           <span className="flowMeta">{mappedMeta(child, snapshot)}</span>

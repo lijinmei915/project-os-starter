@@ -15,6 +15,7 @@
   --desktop-text-secondary: #cbd3dc;
   --desktop-text-muted: #8c97a3;
   --desktop-text-soft: #69717d;
+  --desktop-text-tertiary: var(--desktop-text-soft);
   --desktop-input-placeholder: #6f7781;
   --desktop-select-chevron: #8f98a3;
   --desktop-select-chevron-hover: #bcc5cf;
@@ -43,6 +44,13 @@
   --desktop-focus-ring: 0 0 0 2px hsl(var(--desktop-theme-h) var(--desktop-theme-s) var(--desktop-theme-l) / 0.34);
   --desktop-hover-surface: rgba(255, 255, 255, 0.045);
   --desktop-active-surface: rgba(255, 255, 255, 0.075);
+  --desktop-state-hover-bg: var(--desktop-hover-surface);
+  --desktop-state-pressed-bg: var(--desktop-active-surface);
+  --desktop-state-selected-bg: rgba(255, 255, 255, 0.052);
+  --desktop-state-selected-bg-hover: rgba(255, 255, 255, 0.07);
+  --desktop-state-selected-border: var(--desktop-border-strong);
+  --desktop-state-selected-text: var(--desktop-text-primary);
+  --desktop-state-selected-indicator: var(--desktop-accent);
   --desktop-disabled-opacity: 0.56;
   --desktop-surface-page: var(--desktop-gray-900);
   --desktop-surface-panel: var(--desktop-gray-750);
@@ -59,6 +67,7 @@
   --desktop-border-strong: var(--desktop-gray-550);
   --desktop-border-accent: hsl(var(--desktop-theme-h) var(--desktop-theme-s) var(--desktop-theme-l) / 0.46);
   --desktop-state-accent-bg: hsl(var(--desktop-theme-h) var(--desktop-theme-s) var(--desktop-theme-l) / 0.08);
+  --desktop-state-accent-bg-hover: hsl(var(--desktop-theme-h) var(--desktop-theme-s) var(--desktop-theme-l) / 0.12);
   --desktop-state-accent-bg-strong: hsl(var(--desktop-theme-h) var(--desktop-theme-s) var(--desktop-theme-l) / 0.14);
   --desktop-border-brand: var(--desktop-border-accent);
   --desktop-state-brand-bg: var(--desktop-state-accent-bg);
@@ -75,19 +84,33 @@
   --radius-sm: 6px;
   --radius-full: 999px;
   --desktop-font-regular: 400;
-  --desktop-font-medium: 650;
-  --desktop-font-semibold: 750;
-  --desktop-font-bold: 850;
-  --desktop-font-heavy: 900;
+  --desktop-font-medium: 500;
+  --desktop-font-semibold: 600;
+  --desktop-font-bold: 700;
+  --desktop-text-micro: 10px;
+  --desktop-text-small: 10px;
   --desktop-text-meta: 10px;
   --desktop-text-caption: 11px;
   --desktop-text-body: 12px;
   --desktop-text-title: 14px;
-  --desktop-toolbar-control-height: 26px;
-  --desktop-toolbar-control-padding-x: 10px;
-  --desktop-toolbar-control-gap: 6px;
-  --desktop-toolbar-icon-size: 14px;
-  --desktop-layout-topbar-height: 42px;
+  --desktop-text-display: 24px;
+  --desktop-toolbar-control-height: 24px;
+  --desktop-toolbar-control-padding-x: 9px;
+  --desktop-toolbar-control-gap: 5px;
+  --desktop-toolbar-icon-size: 13px;
+  --desktop-icon-size-xs: 12px;
+  --desktop-icon-size-sm: 13px;
+  --desktop-icon-size-md: 14px;
+  --desktop-icon-size-lg: 16px;
+  --desktop-icon-stroke-muted: 1.5;
+  --desktop-icon-stroke-default: 1.75;
+  --desktop-icon-stroke-strong: 2;
+  --desktop-icon-color-muted: var(--desktop-text-soft);
+  --desktop-icon-color-default: var(--desktop-text-muted);
+  --desktop-icon-color-primary: var(--desktop-text-primary);
+  --desktop-icon-color-accent: var(--desktop-text-accent);
+  --desktop-icon-color-danger: var(--desktop-text-danger);
+  --desktop-layout-topbar-height: 36px;
   --desktop-layout-statusbar-height: 24px;
   --desktop-layout-sidebar-left: 248px;
   --desktop-layout-sidebar-right: 320px;
@@ -113,6 +136,18 @@
   --space-24: 24px;
   --space-28: 28px;
   --space-32: 32px;
+  --desktop-space-xxs: 2px;
+  --desktop-space-xs: 4px;
+  --desktop-space-sm: 6px;
+  --desktop-space-md: 8px;
+  --desktop-space-lg: 12px;
+  --desktop-space-xl: 16px;
+  --desktop-space-2xl: 24px;
+  --desktop-space-panel: var(--desktop-space-md);
+  --desktop-space-section: var(--desktop-space-md);
+  --desktop-space-control-x: var(--desktop-space-md);
+  --desktop-space-control-y: var(--desktop-space-xs);
+  --desktop-space-inline: var(--desktop-space-xs);
   --bg: var(--desktop-surface-page);
   --panel: var(--desktop-surface-panel);
   --panel-soft: var(--desktop-surface-panel-soft);
@@ -145,6 +180,7 @@
   --desktop-text-secondary: #34404b;
   --desktop-text-muted: #667382;
   --desktop-text-soft: #8a96a3;
+  --desktop-text-tertiary: var(--desktop-text-soft);
   --desktop-input-placeholder: #8a929c;
   --desktop-select-chevron: #727b86;
   --desktop-select-chevron-hover: #525c68;
@@ -163,6 +199,13 @@
   --desktop-focus-ring: 0 0 0 2px hsl(var(--desktop-theme-h) var(--desktop-theme-s) var(--desktop-theme-l) / 0.28);
   --desktop-hover-surface: rgba(0, 0, 0, 0.032);
   --desktop-active-surface: rgba(0, 0, 0, 0.055);
+  --desktop-state-hover-bg: var(--desktop-hover-surface);
+  --desktop-state-pressed-bg: var(--desktop-active-surface);
+  --desktop-state-selected-bg: rgba(0, 0, 0, 0.045);
+  --desktop-state-selected-bg-hover: rgba(0, 0, 0, 0.06);
+  --desktop-state-selected-border: var(--desktop-border-strong);
+  --desktop-state-selected-text: var(--desktop-text-primary);
+  --desktop-state-selected-indicator: var(--desktop-accent);
   --desktop-surface-rail: var(--desktop-gray-800);
   --desktop-surface-canvas: #ffffff;
   --desktop-surface-card-soft: var(--desktop-gray-850);
@@ -186,6 +229,8 @@ body,
   background: var(--bg);
   color: var(--text);
   font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
   letter-spacing: 0;
 }
 
@@ -531,8 +576,8 @@ textarea:focus-visible {
   justify-content: space-between;
   gap: var(--space-8);
   color: var(--desktop-text-strong);
-  font-size: var(--desktop-text-caption);
-  font-weight: var(--desktop-font-bold);
+  font-size: var(--desktop-text-body);
+  font-weight: var(--desktop-font-semibold);
 }
 
 .uiSectionTitle em {
@@ -541,6 +586,7 @@ textarea:focus-visible {
   color: var(--desktop-text-secondary);
   font-family: var(--mono);
   font-style: normal;
+  font-weight: var(--desktop-font-regular);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -571,7 +617,7 @@ textarea:focus-visible {
   color: var(--desktop-text-secondary);
   padding: 6px 8px;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: var(--desktop-font-semibold);
   line-height: 1;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.32);
 }
@@ -613,14 +659,14 @@ textarea:focus-visible {
   margin: 0;
   color: var(--desktop-text-strong);
   font-size: 14px;
-  font-weight: 900;
+  font-weight: var(--desktop-font-semibold);
 }
 
 .uiDialogDescription {
   margin: 0;
   color: var(--muted);
   font-size: 11px;
-  font-weight: 750;
+  font-weight: var(--desktop-font-semibold);
   line-height: 1.45;
 }
 
@@ -648,7 +694,7 @@ textarea:focus-visible {
   font-family: inherit;
   padding: 0 8px;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: var(--desktop-font-semibold);
   outline: none;
   text-align: left;
 }
@@ -682,7 +728,7 @@ textarea:focus-visible {
 .themeMenuLabel {
   color: var(--muted);
   font-size: 10px;
-  font-weight: 900;
+  font-weight: var(--desktop-font-semibold);
 }
 
 .settingsMenuList {
@@ -836,31 +882,31 @@ textarea:focus-visible {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) auto;
   align-items: center;
-  gap: var(--desktop-layout-panel-padding);
+  gap: 10px;
   border-bottom: 1px solid var(--line);
   background: var(--desktop-gray-800);
-  padding: 0 var(--desktop-layout-panel-padding);
+  padding: 0 10px;
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   min-width: 0;
 }
 
 .mark {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 27px;
+  height: 27px;
   color: var(--desktop-text-primary);
 }
 
 .markGlyph {
   display: block;
-  width: 22px;
-  height: 22px;
+  width: 23px;
+  height: 23px;
   background: currentColor;
   mask: url("./assets/logo.svg") center / contain no-repeat;
   -webkit-mask: url("./assets/logo.svg") center / contain no-repeat;
@@ -877,8 +923,9 @@ textarea:focus-visible {
   max-width: 190px;
   overflow: hidden;
   color: var(--muted);
-  font-size: 10px;
-  font-weight: var(--desktop-font-medium);
+  font-size: 8px;
+  font-weight: var(--desktop-font-regular);
+  letter-spacing: 0.1em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -887,7 +934,7 @@ textarea:focus-visible {
   width: var(--desktop-toolbar-icon-size);
   height: var(--desktop-toolbar-icon-size);
   flex: 0 0 auto;
-  stroke-width: 2.25;
+  stroke-width: var(--desktop-icon-stroke-strong);
 }
 
 .dot {
@@ -910,14 +957,6 @@ textarea:focus-visible {
   gap: var(--desktop-toolbar-control-gap);
   border-left: 0;
   padding-left: var(--desktop-toolbar-control-padding-x);
-}
-
-.modelStatusButton {
-  max-width: 180px;
-}
-
-.modelStatusButton .dot {
-  flex: 0 0 auto;
 }
 
 .providerDialog {
@@ -962,6 +1001,18 @@ textarea:focus-visible {
 .uiButton-md,
 .button {
   padding: 0 var(--desktop-toolbar-control-padding-x);
+}
+
+.uiButton.modelStatusButton {
+  max-width: 180px;
+  font-size: 10px;
+  font-weight: var(--desktop-font-regular);
+}
+
+.modelStatusButton .dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
 }
 
 .uiButton-sm {
@@ -1087,12 +1138,20 @@ textarea:focus-visible {
   border-color: var(--desktop-control-light);
   background: var(--desktop-control-light-hover);
   color: var(--desktop-control-on-light);
+  gap: 4px;
+  font-size: 11px;
 }
 
 .uiButton-primary:hover:not(:disabled),
 .button.primary:hover:not(:disabled) {
   background: var(--desktop-control-light);
   border-color: var(--desktop-control-light-hover);
+}
+
+.uiButton-primary .buttonIcon,
+.button.primary .buttonIcon {
+  width: 13px;
+  height: 13px;
 }
 
 .uiButton:active:not(:disabled),
@@ -1132,7 +1191,7 @@ textarea:focus-visible {
   background: var(--desktop-surface-panel-soft);
   color: var(--text);
   font-size: 11px;
-  font-weight: 850;
+  font-weight: var(--desktop-font-semibold);
 }
 
 .workspace {
@@ -1216,8 +1275,9 @@ textarea:focus-visible {
 
 .railToggleButton svg,
 .collapsedRailItem svg {
-  width: 16px;
-  height: 16px;
+  width: var(--desktop-icon-size-lg);
+  height: var(--desktop-icon-size-lg);
+  stroke-width: var(--desktop-icon-stroke-default);
 }
 
 .railToggleButton:hover:not(:disabled),
@@ -1236,7 +1296,7 @@ textarea:focus-visible {
 .collapsedProgress {
   color: inherit;
   font-size: var(--desktop-text-meta);
-  font-weight: var(--desktop-font-heavy);
+  font-weight: var(--desktop-font-bold);
   line-height: 1;
   text-indent: 0;
 }
@@ -1333,7 +1393,7 @@ body.isResizingSidebar {
   justify-content: space-between;
   color: var(--muted);
   font-size: var(--desktop-text-caption);
-  font-weight: var(--desktop-font-bold);
+  font-weight: var(--desktop-font-semibold);
 }
 
 .sectionTitle em {
@@ -1342,6 +1402,7 @@ body.isResizingSidebar {
   color: var(--desktop-text-secondary);
   font-family: var(--mono);
   font-style: normal;
+  font-weight: var(--desktop-font-regular);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1349,7 +1410,7 @@ body.isResizingSidebar {
 .uiSectionTitleMain {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-5);
+  gap: var(--space-3);
   min-width: 0;
 }
 
@@ -1384,7 +1445,7 @@ body.isResizingSidebar {
 .uiSectionTitleInlineAction {
   display: inline-flex;
   flex: none;
-  margin-left: 2px;
+  margin-left: 0;
 }
 
 .sectionInlineSwitch {
@@ -1397,6 +1458,7 @@ body.isResizingSidebar {
 .sectionInlineSwitch svg {
   width: 12px;
   height: 12px;
+  stroke-width: var(--desktop-icon-stroke-muted);
 }
 
 .uiSectionTitleActions {
@@ -1428,8 +1490,9 @@ body.isResizingSidebar {
 }
 
 .sectionIconAction svg {
-  width: 14px;
-  height: 14px;
+  width: var(--desktop-icon-size-md);
+  height: var(--desktop-icon-size-md);
+  stroke-width: var(--desktop-icon-stroke-default);
 }
 
 .sectionChevronAction {
@@ -1448,8 +1511,9 @@ body.isResizingSidebar {
 }
 
 .sectionChevronAction svg {
-  width: 13px;
-  height: 13px;
+  width: var(--desktop-icon-size-sm);
+  height: var(--desktop-icon-size-sm);
+  stroke-width: var(--desktop-icon-stroke-muted);
   transition: transform 120ms ease;
 }
 
@@ -1469,7 +1533,7 @@ body.isResizingSidebar {
 .leftScroll,
 .rightScroll {
   min-height: 0;
-  padding: 10px;
+  padding: var(--desktop-space-panel);
 }
 
 .leftScroll {
@@ -1483,8 +1547,8 @@ body.isResizingSidebar {
 
 .leftRailSection {
   border-bottom: 1px solid var(--line);
-  margin-bottom: 10px;
-  padding-bottom: 10px;
+  margin-bottom: var(--desktop-space-section);
+  padding-bottom: var(--desktop-space-section);
 }
 
 .rightRailHeader {
@@ -1499,8 +1563,8 @@ body.isResizingSidebar {
 
 .projectList {
   display: grid;
-  gap: 4px;
-  margin: 7px 0 2px;
+  gap: var(--desktop-space-xs);
+  margin: var(--desktop-space-sm) 0 var(--desktop-space-xxs);
   padding: 0;
 }
 
@@ -1549,7 +1613,7 @@ body.isResizingSidebar {
 .projectRow {
   position: relative;
   display: grid;
-  grid-template-columns: 8px minmax(0, 1fr);
+  grid-template-columns: 6px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
   width: 100%;
@@ -1570,14 +1634,15 @@ body.isResizingSidebar {
 .projectRow:hover,
 .projectRow:focus-visible {
   border-color: var(--desktop-border-strong);
-  background: var(--desktop-hover-surface);
+  background: var(--desktop-state-hover-bg);
   color: var(--desktop-text-primary);
 }
 
 .projectRow.active {
-  border-color: var(--desktop-border-accent);
-  background: var(--desktop-surface-panel);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--desktop-border-accent) 30%, transparent);
+  border-color: var(--desktop-state-selected-border);
+  background: var(--desktop-state-selected-bg);
+  color: var(--desktop-state-selected-text);
+  box-shadow: none;
 }
 
 .projectRowText {
@@ -1595,8 +1660,8 @@ body.isResizingSidebar {
 
 .projectRowText strong {
   color: var(--desktop-text-primary);
-  font-size: var(--desktop-text-caption);
-  font-weight: var(--desktop-font-bold);
+  font-size: var(--desktop-text-body);
+  font-weight: var(--desktop-font-regular);
   line-height: 1.25;
 }
 
@@ -1614,8 +1679,8 @@ body.isResizingSidebar {
 
 .projectStatusDot {
   position: static;
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border: 1px solid var(--desktop-surface-panel);
   border-radius: var(--radius-full);
   background: var(--desktop-text-soft);
@@ -1691,8 +1756,9 @@ body.isResizingSidebar {
 }
 
 .projectMenuButton svg {
-  width: 14px;
-  height: 14px;
+  width: var(--desktop-icon-size-md);
+  height: var(--desktop-icon-size-md);
+  stroke-width: var(--desktop-icon-stroke-default);
 }
 
 .projectMenuButton[data-state="open"] {
@@ -1739,19 +1805,19 @@ body.isResizingSidebar {
 
 .projectFileTree {
   display: grid;
-  gap: var(--space-8);
-  margin-top: var(--space-8);
+  gap: var(--desktop-space-sm);
+  margin-top: var(--desktop-space-sm);
 }
 
 .projectFileSearch input {
   width: 100%;
-  height: 32px;
+  height: 26px;
   border: 1px solid var(--desktop-border-default);
   border-radius: var(--radius);
   background: var(--desktop-surface-input);
   color: var(--desktop-text-primary);
-  font-size: 12px;
-  padding: 0 10px;
+  font-size: var(--desktop-text-caption);
+  padding: 0 var(--desktop-space-control-x);
 }
 
 .projectFileSearch input::placeholder {
@@ -1768,16 +1834,16 @@ body.isResizingSidebar {
   grid-template-columns: 16px minmax(0, 1fr);
   align-items: center;
   gap: 4px;
-  min-height: 28px;
+  min-height: 22px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--desktop-text-secondary);
   cursor: pointer;
   font: inherit;
-  font-size: 12px;
+  font-size: var(--desktop-text-caption);
   font-weight: var(--desktop-font-regular);
-  padding: 0 8px 0 calc(6px + var(--tree-depth) * 14px);
+  padding: 0 var(--desktop-space-md) 0 calc(var(--desktop-space-sm) + var(--tree-depth) * 12px);
   text-align: left;
 }
 
@@ -1790,14 +1856,14 @@ body.isResizingSidebar {
 .projectFileTreeRow.file:hover,
 .projectFileTreeRow.file:focus-visible {
   border-color: var(--desktop-border-strong);
-  background: var(--desktop-hover-surface);
+  background: var(--desktop-state-hover-bg);
   color: var(--desktop-text-primary);
 }
 
 .projectFileTreeRow.active {
-  border-color: var(--desktop-border-accent);
-  background: var(--desktop-surface-panel);
-  color: var(--desktop-text-primary);
+  border-color: var(--desktop-state-selected-border);
+  background: var(--desktop-state-selected-bg);
+  color: var(--desktop-state-selected-text);
 }
 
 .projectFileTreeChevron {
@@ -1809,8 +1875,9 @@ body.isResizingSidebar {
 }
 
 .projectFileTreeChevron svg {
-  width: 14px;
-  height: 14px;
+  width: var(--desktop-icon-size-md);
+  height: var(--desktop-icon-size-md);
+  stroke-width: var(--desktop-icon-stroke-muted);
 }
 
 .projectFileTreeName {
@@ -1899,7 +1966,7 @@ body.isResizingSidebar {
 }
 
 .flowItem:hover {
-  background: var(--desktop-hover-surface);
+  background: var(--desktop-state-hover-bg);
   color: var(--desktop-text-primary);
 }
 
@@ -1910,8 +1977,8 @@ body.isResizingSidebar {
 
 .flowItem.active {
   border-color: transparent;
-  background: var(--desktop-hover-surface);
-  color: var(--desktop-text-primary);
+  background: var(--desktop-state-selected-bg);
+  color: var(--desktop-state-selected-text);
 }
 
 .flowItem.active::before {
@@ -1921,7 +1988,7 @@ body.isResizingSidebar {
   left: 0;
   width: 2px;
   border-radius: 999px;
-  background: var(--desktop-accent);
+  background: var(--desktop-state-selected-indicator);
   content: "";
 }
 
@@ -1937,8 +2004,9 @@ body.isResizingSidebar {
 }
 
 .flowIcon svg {
-  width: 14px;
-  height: 14px;
+  width: var(--desktop-icon-size-md);
+  height: var(--desktop-icon-size-md);
+  stroke-width: var(--desktop-icon-stroke-default);
 }
 
 .flowItem.active .flowIcon {
@@ -1959,14 +2027,14 @@ body.isResizingSidebar {
 }
 
 .flowItem-compact .flowIcon svg {
-  width: 13px;
-  height: 13px;
+  width: var(--desktop-icon-size-sm);
+  height: var(--desktop-icon-size-sm);
 }
 
 .flowText {
   overflow: hidden;
-  font-size: var(--desktop-text-caption);
-  font-weight: var(--desktop-font-bold);
+  font-size: var(--desktop-text-body);
+  font-weight: var(--desktop-font-medium);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1998,7 +2066,7 @@ body.isResizingSidebar {
   color: var(--desktop-text-secondary);
   font-family: var(--mono);
   font-size: var(--desktop-text-meta);
-  font-weight: var(--desktop-font-semibold);
+  font-weight: var(--desktop-font-medium);
   padding: 4px 5px 4px 13px;
   text-align: left;
   text-overflow: ellipsis;
@@ -2018,24 +2086,24 @@ body.isResizingSidebar {
 }
 
 .treeFile:hover {
-  background: var(--desktop-hover-surface);
+  background: var(--desktop-state-hover-bg);
   color: var(--desktop-text-primary);
 }
 
 .treeFile.active {
-  background: var(--desktop-surface-card);
-  color: var(--desktop-text-primary);
+  background: var(--desktop-state-selected-bg);
+  color: var(--desktop-state-selected-text);
 }
 
 .treeFile.active::before {
-  background: var(--desktop-accent);
+  background: var(--desktop-state-selected-indicator);
 }
 
 .treeTopic {
   color: var(--desktop-text-secondary);
   font-family: inherit;
-  font-size: var(--desktop-text-caption);
-  font-weight: var(--desktop-font-bold);
+  font-size: var(--desktop-text-body);
+  font-weight: var(--desktop-font-medium);
   padding-left: 0;
 }
 
@@ -2169,7 +2237,7 @@ body.isResizingSidebar {
 
 .center {
   display: grid;
-  grid-template-rows: 38px minmax(0, 1fr) auto auto;
+  grid-template-rows: 28px minmax(0, 1fr) auto auto;
   min-height: 0;
   background: var(--desktop-surface-canvas);
 }
@@ -2186,11 +2254,13 @@ body.isResizingSidebar {
 .tabs {
   display: flex;
   align-items: end;
-  gap: 4px;
+  gap: var(--desktop-space-inline);
+  height: 28px;
+  min-height: 28px;
   border-bottom: 1px solid var(--line);
   overflow-x: auto;
   scrollbar-width: thin;
-  padding: 0 10px;
+  padding: 0 var(--desktop-space-control-x);
 }
 
 .fileTab {
@@ -2228,12 +2298,12 @@ body.isResizingSidebar {
   display: inline-flex;
   align-items: center;
   flex: 0 0 auto;
-  height: 38px;
-  border-bottom: 2px solid transparent;
+  height: 26px;
+  border-bottom: 1px solid transparent;
   color: var(--desktop-text-soft);
-  font-size: 12px;
-  font-weight: var(--desktop-font-regular);
-  padding: 0 8px;
+  font-size: var(--desktop-text-caption);
+  font-weight: var(--desktop-font-medium);
+  padding: 0 var(--desktop-space-control-x);
   white-space: nowrap;
 }
 
@@ -2279,7 +2349,7 @@ body.isResizingSidebar {
 }
 
 .workspaceTabClose:hover {
-  background: var(--desktop-hover-surface);
+  background: var(--desktop-state-hover-bg);
   color: var(--desktop-text-primary);
 }
 
@@ -2315,17 +2385,17 @@ body.isResizingSidebar {
 .conversationStart {
   display: grid;
   align-content: center;
-  gap: 22px;
+  gap: var(--desktop-space-xl);
   min-height: 100%;
-  max-width: 720px;
+  max-width: 620px;
   margin: 0 auto;
-  padding: 44px 0;
+  padding: 36px 0;
 }
 
 .conversationStart h2 {
   margin: 0;
   color: var(--desktop-text-primary);
-  font-size: 24px;
+  font-size: var(--desktop-text-display);
   font-weight: var(--desktop-font-regular);
   letter-spacing: 0;
   line-height: 1.25;
@@ -2335,19 +2405,19 @@ body.isResizingSidebar {
 .conversationStarters {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-8);
+  gap: var(--desktop-space-sm);
 }
 
 .conversationStarters button {
-  min-height: 42px;
+  min-height: 34px;
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--radius-sm);
   background: var(--desktop-surface-card);
   color: var(--desktop-text-secondary);
-  font-size: var(--desktop-text-body);
-  font-weight: var(--desktop-font-regular);
-  line-height: 1.35;
-  padding: 0 var(--space-12);
+  font-size: var(--desktop-text-caption);
+  font-weight: var(--desktop-font-medium);
+  line-height: 1.3;
+  padding: 0 var(--desktop-space-lg);
   text-align: left;
 }
 
@@ -2356,8 +2426,8 @@ body.isResizingSidebar {
 }
 
 .conversationStarters button:hover {
-  border-color: var(--desktop-border-accent);
-  background: var(--desktop-hover-surface);
+  border-color: var(--desktop-state-selected-border);
+  background: var(--desktop-state-hover-bg);
   color: var(--desktop-text-primary);
 }
 
@@ -2389,7 +2459,7 @@ body.isResizingSidebar {
   background: var(--desktop-surface-card);
   color: var(--desktop-text-muted);
   font-size: var(--desktop-text-meta);
-  font-weight: var(--desktop-font-heavy);
+  font-weight: var(--desktop-font-bold);
 }
 
 .conversationAvatar img {
@@ -2695,7 +2765,7 @@ body.isResizingSidebar {
 
 .activeTaskHeader strong {
   font-size: 13px;
-  font-weight: 900;
+  font-weight: var(--desktop-font-semibold);
 }
 
 .activeTaskHeader span {
@@ -2747,7 +2817,7 @@ body.isResizingSidebar {
 
 .planHeader strong {
   font-size: 12px;
-  font-weight: 900;
+  font-weight: var(--desktop-font-semibold);
 }
 
 .planHeader span {
@@ -2780,7 +2850,7 @@ body.isResizingSidebar {
   display: block;
   color: var(--desktop-text-primary);
   font-size: 11px;
-  font-weight: 900;
+  font-weight: var(--desktop-font-semibold);
 }
 
 .planList ul {
@@ -2853,7 +2923,7 @@ body.isResizingSidebar {
 
 .runnerHeader strong {
   font-size: 12px;
-  font-weight: 900;
+  font-weight: var(--desktop-font-semibold);
 }
 
 .runnerHeader span,
@@ -2957,7 +3027,7 @@ body.isResizingSidebar {
   color: var(--desktop-text-accent);
   font-size: 10px;
   font-style: normal;
-  font-weight: 900;
+  font-weight: var(--desktop-font-semibold);
 }
 
 .runnerResult.failed em {
@@ -2988,7 +3058,7 @@ body.isResizingSidebar {
   margin-bottom: 6px;
   color: var(--desktop-text-muted);
   font-size: 11px;
-  font-weight: 850;
+  font-weight: var(--desktop-font-semibold);
 }
 
 .terminal {
@@ -3278,7 +3348,7 @@ body.isResizingSidebar {
   overflow: hidden;
   color: var(--desktop-text-secondary);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: var(--desktop-font-medium);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -3883,8 +3953,8 @@ body.isResizingSidebar {
 
 .railSection {
   border-bottom: 1px solid var(--line);
-  padding-bottom: 10px;
-  margin-bottom: 10px;
+  padding-bottom: var(--desktop-space-section);
+  margin-bottom: var(--desktop-space-section);
 }
 
 .railSection summary {
@@ -3900,22 +3970,22 @@ body.isResizingSidebar {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-8);
-  margin: -4px -4px 0;
+  gap: var(--desktop-space-md);
+  margin: calc(var(--desktop-space-xxs) * -1) calc(var(--desktop-space-xs) * -1) 0;
   border-radius: var(--radius-xs);
   color: var(--desktop-text-strong);
-  padding: 4px;
+  padding: var(--desktop-space-xxs) var(--desktop-space-xs);
   user-select: none;
 }
 
 .railDisclosureTitle {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-5);
+  gap: var(--desktop-space-sm);
   min-width: 0;
   overflow: hidden;
-  font-size: var(--desktop-text-caption);
-  font-weight: var(--desktop-font-bold);
+  font-size: var(--desktop-text-body);
+  font-weight: var(--desktop-font-semibold);
 }
 
 .railDisclosureTitle span {
@@ -3926,14 +3996,15 @@ body.isResizingSidebar {
 
 .railDisclosureIcon {
   flex: none;
-  width: 13px;
-  height: 13px;
-  color: var(--desktop-text-soft);
+  width: var(--desktop-icon-size-sm);
+  height: var(--desktop-icon-size-sm);
+  color: var(--desktop-icon-color-muted);
+  stroke-width: var(--desktop-icon-stroke-muted);
   transition: transform 120ms ease, color 120ms ease;
 }
 
 .railDisclosure[open] .railDisclosureIcon {
-  color: var(--desktop-text-muted);
+  color: var(--desktop-icon-color-default);
   transform: rotate(90deg);
 }
 
@@ -3944,11 +4015,11 @@ body.isResizingSidebar {
   color: var(--desktop-text-secondary);
   font-family: var(--mono);
   font-size: var(--desktop-text-caption);
-  font-weight: var(--desktop-font-bold);
+  font-weight: var(--desktop-font-regular);
 }
 
 .railDisclosureBody {
-  margin-top: 8px;
+  margin-top: var(--desktop-space-sm);
 }
 
 .goalStack {
@@ -3981,8 +4052,9 @@ body.isResizingSidebar {
 }
 
 .goalHeaderSwitcher svg {
-  width: 13px;
-  height: 13px;
+  width: var(--desktop-icon-size-sm);
+  height: var(--desktop-icon-size-sm);
+  stroke-width: var(--desktop-icon-stroke-muted);
 }
 
 .goalSwitcherMenu {
@@ -4238,7 +4310,7 @@ body.isResizingSidebar {
 }
 
 .goalTodoItem.active {
-  background: var(--desktop-state-accent-bg);
+  background: var(--desktop-state-selected-bg);
 }
 
 .goalTodoItem.done {
@@ -4479,7 +4551,7 @@ button.goalTodoButton:hover {
 .providerConnectionMain strong {
   color: var(--desktop-text-primary);
   font-size: var(--desktop-text-caption);
-  font-weight: var(--desktop-font-heavy);
+  font-weight: var(--desktop-font-bold);
 }
 
 .providerConnectionRemove {
@@ -4532,7 +4604,7 @@ button.goalTodoButton:hover {
   gap: 10px;
   color: var(--desktop-text-primary);
   font-size: var(--desktop-text-caption);
-  font-weight: var(--desktop-font-heavy);
+  font-weight: var(--desktop-font-bold);
   letter-spacing: 0;
   text-transform: none;
 }
@@ -4598,7 +4670,7 @@ button.goalTodoButton:hover {
   gap: 8px;
   color: var(--desktop-text-secondary);
   font-size: var(--desktop-text-caption);
-  font-weight: var(--desktop-font-heavy);
+  font-weight: var(--desktop-font-bold);
   list-style: none;
 }
 
@@ -4689,8 +4761,8 @@ button.goalTodoButton:hover {
 }
 
 .conversationHistoryItem.active {
-  border-left-color: var(--desktop-accent);
-  background: var(--desktop-state-accent-bg);
+  border-left-color: var(--desktop-state-selected-indicator);
+  background: var(--desktop-state-selected-bg);
 }
 
 .conversationHistoryButton {
@@ -4782,8 +4854,8 @@ button.goalTodoButton:hover {
 
 .taskCard-accent,
 .queueCard.accent {
-  border-left-color: var(--desktop-accent);
-  background: var(--desktop-state-accent-bg);
+  border-left-color: var(--desktop-state-selected-indicator);
+  background: var(--desktop-state-selected-bg);
 }
 
 .taskCard-accent .uiBadge,
@@ -4802,9 +4874,9 @@ button.goalTodoButton:hover {
 }
 
 .taskQueueItem.active {
-  border-color: var(--desktop-border-accent);
-  border-left-color: var(--desktop-accent);
-  background: var(--desktop-state-accent-bg);
+  border-color: var(--desktop-state-selected-border);
+  border-left-color: var(--desktop-state-selected-indicator);
+  background: var(--desktop-state-selected-bg);
 }
 
 .taskQueueButton {
@@ -4878,8 +4950,8 @@ button.goalTodoButton:hover {
 .contextItem p {
   margin: 4px 0 0;
   color: var(--desktop-text-muted);
-  font-size: var(--desktop-text-caption);
-  line-height: 1.4;
+  font-size: var(--desktop-text-meta);
+  line-height: 1.35;
 }
 
 .contextPack {
@@ -4895,8 +4967,8 @@ button.goalTodoButton:hover {
 .contextItem strong {
   display: block;
   color: var(--desktop-text-primary);
-  font-size: var(--desktop-text-body);
-  font-weight: var(--desktop-font-semibold);
+  font-size: var(--desktop-text-caption);
+  font-weight: var(--desktop-font-medium);
 }
 
 .contextItem.missing strong {
@@ -4928,7 +5000,7 @@ button.goalTodoButton:hover {
   color: var(--desktop-text-accent);
   font-family: var(--mono);
   font-size: var(--desktop-text-caption);
-  font-weight: var(--desktop-font-heavy);
+  font-weight: var(--desktop-font-bold);
 }
 
 .memoryDot.muted {
@@ -4950,7 +5022,7 @@ button.goalTodoButton:hover {
   padding: 0 12px;
   font-family: var(--mono);
   font-size: var(--desktop-text-caption);
-  font-weight: var(--desktop-font-semibold);
+  font-weight: var(--desktop-font-medium);
 }
 
 .appToast {
