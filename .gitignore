@@ -30,9 +30,11 @@ CLAUDE.md
 .claude/settings.local.json
 .project-os/reports/
 .project-os/graph/
+.project-os/backups/
 .project-os/desktop-provider.json
 .project-os/desktop-registry.json
 .project-os/desktop-theme.json
+.project-os/model-health.json
 .project-os/recommendations/
 .project-os/runs/
 tests/screenshots/*.png

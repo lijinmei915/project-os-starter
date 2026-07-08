@@ -66,6 +66,10 @@
   --desktop-border-default: var(--desktop-gray-600);
   --desktop-border-strong: var(--desktop-gray-550);
   --desktop-border-accent: hsl(var(--desktop-theme-h) var(--desktop-theme-s) var(--desktop-theme-l) / 0.46);
+  --desktop-line-divider: var(--desktop-border-default);
+  --desktop-line-border: var(--desktop-border-strong);
+  --desktop-line-guide: color-mix(in srgb, var(--desktop-border-default) 82%, var(--desktop-text-muted));
+  --desktop-line-active: var(--desktop-accent);
   --desktop-state-accent-bg: hsl(var(--desktop-theme-h) var(--desktop-theme-s) var(--desktop-theme-l) / 0.08);
   --desktop-state-accent-bg-hover: hsl(var(--desktop-theme-h) var(--desktop-theme-s) var(--desktop-theme-l) / 0.12);
   --desktop-state-accent-bg-strong: hsl(var(--desktop-theme-h) var(--desktop-theme-s) var(--desktop-theme-l) / 0.14);
@@ -178,6 +182,10 @@
   --panel-soft: var(--desktop-surface-panel-soft);
   --line: var(--desktop-border-default);
   --line-strong: var(--desktop-border-strong);
+  --line-divider: var(--desktop-line-divider);
+  --line-border: var(--desktop-line-border);
+  --line-guide: var(--desktop-line-guide);
+  --line-active: var(--desktop-line-active);
   --text: var(--desktop-text-primary);
   --muted: var(--desktop-text-muted);
   --accent: var(--desktop-accent);
@@ -231,6 +239,10 @@
   --desktop-state-selected-border: var(--desktop-border-strong);
   --desktop-state-selected-text: var(--desktop-text-primary);
   --desktop-state-selected-indicator: var(--desktop-accent);
+  --desktop-line-divider: var(--desktop-border-default);
+  --desktop-line-border: var(--desktop-border-strong);
+  --desktop-line-guide: #dddddd;
+  --desktop-line-active: var(--desktop-accent);
   --desktop-surface-rail: var(--desktop-gray-800);
   --desktop-surface-canvas: #ffffff;
   --desktop-surface-card-soft: var(--desktop-gray-850);
@@ -1966,7 +1978,7 @@ body.isResizingSidebar {
   bottom: var(--tree-guide-bottom);
   left: var(--tree-guide-x);
   width: 1px;
-  background: var(--line);
+  background: var(--line-guide);
   content: "";
 }
 
@@ -2006,7 +2018,7 @@ body.isResizingSidebar {
 
 .flowItem.active {
   border-color: transparent;
-  background: var(--desktop-state-selected-bg);
+  background: transparent;
   color: var(--desktop-state-selected-text);
 }
 
@@ -2134,7 +2146,7 @@ body.isResizingSidebar {
   font-family: inherit;
   font-size: var(--desktop-type-nav-size);
   font-weight: var(--desktop-type-nav-weight);
-  padding-left: 0;
+  padding-left: var(--desktop-space-xs);
 }
 
 .treeTopic::before {
@@ -2312,8 +2324,13 @@ body.isResizingSidebar {
 .filePreviewPanel {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
-  height: 100%;
+  align-content: start;
+  height: auto;
   min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
 }
 
 .filePreviewPanel .engineeringFileCode {

@@ -38,11 +38,11 @@ const governanceMeta = {
 };
 
 const itemMeta = {
-  "项目是什么": { id: "project-identity", statusSource: ".project-os/state.json" },
-  "现在做到哪": { id: "project-progress", statusSource: "HANDOFF.md" },
-  "怎么启动": { id: "project-runbook", statusSource: "docs/RUNBOOK.md" },
-  "有什么风险": { id: "project-risks", statusSource: "HANDOFF.md" },
-  "本地项目状态": { id: "local-project-state", statusSource: ".project-os/state.json" },
+  "项目概览": { id: "project-identity", statusSource: ".project-os/state.json" },
+  "当前进度": { id: "project-progress", statusSource: "HANDOFF.md" },
+  "启动方式": { id: "project-runbook", statusSource: "docs/RUNBOOK.md" },
+  "风险边界": { id: "project-risks", statusSource: "HANDOFF.md" },
+  "本地状态": { id: "local-project-state", statusSource: ".project-os/state.json" },
   "项目目标": { id: "product-goal", statusSource: "docs/PRODUCT_PLAN.md" },
   "目标用户": { id: "target-users", statusSource: "docs/PRODUCT_PLAN.md" },
   "使用场景": { id: "use-cases", statusSource: "docs/PRODUCT_PLAN.md" },
@@ -109,11 +109,11 @@ export const projectGovernanceFlow = [
     icon: "book",
     description: "项目基本状态。",
     items: [
-      { title: "项目是什么", description: "名称、用途和阶段。", relatedFiles: ["PROJECT.md", ".project-os/state.json"] },
-      { title: "现在做到哪", description: "当前进度和下一步。", relatedFiles: ["PROJECT.md", "HANDOFF.md"] },
-      { title: "怎么启动", description: "本地启动方式。", relatedFiles: ["README.md", "docs/RUNBOOK.md", "docs/DESKTOP_APP.md"] },
-      { title: "有什么风险", description: "已知风险和边界。", relatedFiles: ["HANDOFF.md", "docs/LESSONS.md"] },
-      { title: "本地项目状态", description: "接入和文件状态。", relatedFiles: [".project-os/state.json", ".project-os/desktop-registry.json"] },
+      { title: "项目概览", description: "名称、用途和阶段。", relatedFiles: ["PROJECT.md", ".project-os/state.json"] },
+      { title: "当前进度", description: "当前进度和下一步。", relatedFiles: ["PROJECT.md", "HANDOFF.md"] },
+      { title: "启动方式", description: "本地启动方式。", relatedFiles: ["README.md", "docs/RUNBOOK.md", "docs/DESKTOP_APP.md"] },
+      { title: "风险边界", description: "已知风险和边界。", relatedFiles: ["HANDOFF.md", "docs/LESSONS.md"] },
+      { title: "本地状态", description: "接入和文件状态。", relatedFiles: [".project-os/state.json", ".project-os/desktop-registry.json"] },
     ],
   },
   {
