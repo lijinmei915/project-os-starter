@@ -83,11 +83,11 @@
   --desktop-text-caption: 11px;
   --desktop-text-body: 12px;
   --desktop-text-title: 14px;
-  --desktop-toolbar-control-height: 30px;
-  --desktop-toolbar-control-padding-x: 12px;
-  --desktop-toolbar-control-gap: 7px;
-  --desktop-toolbar-icon-size: 15px;
-  --desktop-layout-topbar-height: 50px;
+  --desktop-toolbar-control-height: 26px;
+  --desktop-toolbar-control-padding-x: 10px;
+  --desktop-toolbar-control-gap: 6px;
+  --desktop-toolbar-icon-size: 14px;
+  --desktop-layout-topbar-height: 42px;
   --desktop-layout-statusbar-height: 24px;
   --desktop-layout-sidebar-left: 248px;
   --desktop-layout-sidebar-right: 320px;
@@ -845,39 +845,39 @@ textarea:focus-visible {
 .brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
 }
 
 .mark {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   color: var(--desktop-text-primary);
 }
 
 .markGlyph {
   display: block;
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
   background: currentColor;
   mask: url("./assets/logo.svg") center / contain no-repeat;
   -webkit-mask: url("./assets/logo.svg") center / contain no-repeat;
 }
 
 .brandTitle {
-  font-size: var(--desktop-text-title);
+  font-size: 13px;
   font-weight: var(--desktop-font-bold);
   line-height: 1.1;
 }
 
 .brandSubtitle {
-  margin-top: 2px;
+  margin-top: 1px;
   max-width: 190px;
   overflow: hidden;
   color: var(--muted);
-  font-size: var(--desktop-text-caption);
+  font-size: 10px;
   font-weight: var(--desktop-font-medium);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3220,13 +3220,13 @@ body.isResizingSidebar {
 .chatComposerShell {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
-  grid-template-rows: auto minmax(42px, auto) auto;
+  grid-template-rows: auto minmax(28px, auto) auto;
   align-items: end;
-  gap: 12px 8px;
+  gap: 8px 0;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--desktop-surface-input);
-  padding: 14px 14px 12px;
+  padding: 10px 10px 9px;
   box-shadow: none;
   transition:
     border-color 120ms ease,
@@ -3398,7 +3398,7 @@ body.isResizingSidebar {
   grid-column: 1 / -1;
   grid-row: 2;
   width: 100%;
-  min-height: 42px;
+  min-height: 28px;
   max-height: 168px;
   resize: none;
   border: 0;
@@ -3434,11 +3434,11 @@ body.isResizingSidebar {
   grid-row: 3;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
   color: var(--desktop-text-soft);
   font-size: 11px;
-  line-height: 28px;
+  line-height: 24px;
   padding: 0;
 }
 
@@ -3449,7 +3449,9 @@ body.isResizingSidebar {
   align-items: center;
   justify-content: center;
   justify-self: end;
-  gap: 5px;
+  align-self: center;
+  gap: 4px;
+  height: 28px;
   width: auto;
   max-width: 200px;
   min-width: 0;
@@ -3462,8 +3464,8 @@ body.isResizingSidebar {
   font-family: var(--sans);
   font-size: 11px;
   font-weight: var(--desktop-font-regular);
-  line-height: 24px;
-  padding: 0 8px;
+  line-height: 1;
+  padding: 0 6px;
   white-space: nowrap;
 }
 
@@ -3645,8 +3647,8 @@ body.isResizingSidebar {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border: 0;
   border-radius: 999px;
   background: transparent;
@@ -3666,8 +3668,8 @@ body.isResizingSidebar {
 }
 
 .chatComposerTool svg {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
 }
 
 .chatComposerHint {
@@ -3684,15 +3686,16 @@ body.isResizingSidebar {
   grid-row: 3;
   display: flex;
   align-items: center;
-  gap: 6px;
+  align-self: center;
+  gap: 0;
   justify-content: flex-end;
 }
 
 .chatComposerVoice {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border: 1px solid transparent;
   border-radius: 999px;
   background: transparent;
@@ -3707,13 +3710,13 @@ body.isResizingSidebar {
 }
 
 .chatComposerVoice svg {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
 }
 
 .chatComposerVoice:hover:not(:disabled),
 .chatComposerVoice:focus-visible {
-  border-color: var(--desktop-border-default);
+  border-color: transparent;
   background: var(--desktop-hover-surface);
   color: var(--desktop-text-primary);
 }
@@ -3745,15 +3748,15 @@ body.isResizingSidebar {
   grid-row: 3;
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--desktop-surface-panel-soft);
   color: var(--desktop-text-soft);
   cursor: pointer;
   padding: 0;
-  align-self: end;
+  align-self: center;
   box-shadow: none;
   appearance: none;
   -webkit-appearance: none;
@@ -3766,8 +3769,8 @@ body.isResizingSidebar {
 }
 
 .chatComposerSend svg {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   color: currentColor;
   stroke: currentColor;
 }

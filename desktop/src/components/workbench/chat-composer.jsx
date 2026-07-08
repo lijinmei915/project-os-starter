@@ -95,7 +95,7 @@ export function ChatComposer({
       ? "正在听写"
       : attachments.length
         ? `${attachments.length} 张图片`
-        : "本地工作区";
+        : "";
 
   React.useEffect(() => {
     setSpeechSupported(Boolean(window.SpeechRecognition || window.webkitSpeechRecognition));
@@ -257,7 +257,7 @@ export function ChatComposer({
           >
             <Plus aria-hidden="true" strokeWidth={2.25} />
           </button>
-          <span className="chatComposerHint">{toolbarHint}</span>
+          {toolbarHint ? <span className="chatComposerHint">{toolbarHint}</span> : null}
         </div>
         <DropdownMenu onOpenChange={(open) => {
           if (open) onModelMenuOpen?.();
