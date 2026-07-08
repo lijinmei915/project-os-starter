@@ -61,6 +61,83 @@ function readProjectJson(relativePath, fallback) {
   }
 }
 
+function isIgnoredPreviewPath(filePath) {
+  const name = path.basename(filePath);
+  return [".git", "node_modules", "target", "dist", ".DS_Store", "__pycache__"].includes(name);
+}
+
+function buildTreePreview(projectRoot) {
+  const tree = [{
+    label: path.basename(projectRoot) || "workspace",
+    depth: 0,
+    kind: "folder",
+  }];
+
+  const append = (dir, depth) => {
+    if (depth > 4 || tree.length >= 180) return;
+    let entries = [];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    entries
+      .filter((entry) => !isIgnoredPreviewPath(path.join(dir, entry.name)))
+      .sort((a, b) => Number(b.isDirectory()) - Number(a.isDirectory()) || a.name.localeCompare(b.name))
+      .forEach((entry) => {
+        if (tree.length >= 180) return;
+        tree.push({
+          label: entry.name,
+          depth,
+          kind: entry.isDirectory() ? "folder" : "file",
+        });
+        if (entry.isDirectory()) append(path.join(dir, entry.name), depth + 1);
+      });
+  };
+
+  append(projectRoot, 1);
+  return tree;
+}
+
+function safePreviewPath(relativePath) {
+  const text = String(relativePath || "").trim();
+  if (!text || text.startsWith(".env") || text.includes("/.env") || text.includes(".project-os/desktop-provider")) return "";
+  const normalized = path.normalize(text);
+  if (path.isAbsolute(normalized) || normalized.startsWith("..") || normalized.includes(`..${path.sep}`)) return "";
+  return normalized;
+}
+
+function previewLanguage(relativePath) {
+  const ext = path.extname(relativePath).slice(1);
+  return ext || "text";
+}
+
+function readEngineeringFilePreview(input) {
+  const registry = readProjectJson(".project-os/desktop-registry.json", { projects: [], currentProjectId: "" });
+  const projects = Array.isArray(registry.projects) ? registry.projects : [];
+  const currentProject = projects.find((project) => project.id === registry.currentProjectId) || projects[0] || { path: rootDir };
+  const projectRoot = currentProject.path || rootDir;
+  const relativePath = safePreviewPath(input?.path);
+  if (!relativePath) return { error: "这个文件暂不支持预览。" };
+
+  const filePath = path.resolve(projectRoot, relativePath);
+  if (!filePath.startsWith(path.resolve(projectRoot))) return { error: "只能预览当前项目内的文件。" };
+  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) return { error: "没有找到这个文件。" };
+
+  const bytes = fs.readFileSync(filePath);
+  if ([...bytes.slice(0, 512)].some((byte) => byte === 0)) return { error: "这个文件看起来不是文本文件，暂不预览。" };
+  const maxBytes = 80 * 1024;
+  const truncated = bytes.length > maxBytes;
+  return {
+    path: relativePath,
+    name: path.basename(relativePath),
+    content: bytes.slice(0, maxBytes).toString("utf8"),
+    language: previewLanguage(relativePath),
+    truncated,
+    size: bytes.length,
+  };
+}
+
 function writeProjectJson(relativePath, value) {
   const filePath = path.join(rootDir, relativePath);
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -234,6 +311,7 @@ function workspaceSnapshotPreview() {
     projectName: state.name || currentProject.name || "project-os-starter",
     phase: state.phase || currentProject.phase || "stabilizing",
     stage: state.stage || "未读取到阶段信息",
+    tree: buildTreePreview(projectRoot),
     projects: projects.map((project) => ({
       id: project.id,
       isCurrent: project.id === currentProject.id,
@@ -574,6 +652,35 @@ function switchProjectPreview(input) {
   return registry;
 }
 
+function relocateProjectPreview(input) {
+  const id = String(input?.id || "").trim();
+  const nextPath = String(input?.path || "").trim();
+  if (!id) return { error: "缺少项目 ID。" };
+  if (!nextPath) return { error: "请选择新的项目文件夹。" };
+  const resolvedPath = path.resolve(nextPath);
+  if (!fs.existsSync(resolvedPath) || !fs.statSync(resolvedPath).isDirectory()) {
+    return { error: "新的项目路径不可访问。" };
+  }
+  const registry = readProjectJson(".project-os/desktop-registry.json", {
+    schemaVersion: "project-os.desktop-registry.v0.1",
+    currentProjectId: "current",
+    projects: [],
+  });
+  const projects = Array.isArray(registry.projects) ? registry.projects : [];
+  const project = projects.find((item) => item.id === id);
+  if (!project) return { error: "没有找到这个项目。" };
+  const state = readJsonAt(resolvedPath, ".project-os/state.json", {});
+  project.path = resolvedPath;
+  if (!project.nameLocked) {
+    project.name = path.basename(resolvedPath) || project.name;
+  }
+  project.phase = state.phase || project.phase || "external";
+  registry.currentProjectId = id;
+  registry.projects = projects;
+  writeProjectJson(".project-os/desktop-registry.json", registry);
+  return registry;
+}
+
 async function copyTextPreview(input) {
   const text = String(input?.text || "");
   if (!text) return { error: "没有可复制的内容。" };
@@ -607,6 +714,12 @@ function projectOsPreviewFiles() {
       server.middlewares.use(async (req, res, next) => {
         if (req.method === "GET" && req.url === "/__project-os/workspace-snapshot") {
           sendJson(res, 200, workspaceSnapshotPreview());
+          return;
+        }
+        if (req.method === "POST" && req.url === "/__project-os/read-engineering-file") {
+          const input = await readRequestJson(req);
+          const result = readEngineeringFilePreview(input);
+          sendJson(res, result.error ? 400 : 200, result);
           return;
         }
         if (req.method === "POST" && req.url === "/__project-os/run-goal-validation") {
@@ -646,6 +759,12 @@ function projectOsPreviewFiles() {
           const input = await readRequestJson(req);
           const result = switchProjectPreview(input);
           sendJson(res, result.error ? 404 : 200, result);
+          return;
+        }
+        if (req.method === "POST" && req.url === "/__project-os/relocate-project") {
+          const input = await readRequestJson(req);
+          const result = relocateProjectPreview(input);
+          sendJson(res, result.error ? 400 : 200, result);
           return;
         }
         if (req.method === "POST" && req.url === "/__project-os/copy-text") {

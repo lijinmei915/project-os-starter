@@ -2,7 +2,7 @@ import React from "react";
 import { ChevronRight } from "lucide-react";
 import { cn } from "../../lib/cn";
 
-export function SectionTitle({ actions, className, collapseControl, meta, onToggle, open, title, toggleLabel }) {
+export function SectionTitle({ actions, className, collapseControl, inlineAction, meta, onToggle, open, title, toggleLabel }) {
   const canToggle = typeof onToggle === "function";
   const titleContent = (
     <>
@@ -14,6 +14,7 @@ export function SectionTitle({ actions, className, collapseControl, meta, onTogg
         <span className="uiSectionTitleCollapse">{collapseControl}</span>
       ) : null}
       <span>{title}</span>
+      {inlineAction ? <span className="uiSectionTitleInlineAction">{inlineAction}</span> : null}
     </>
   );
 

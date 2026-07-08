@@ -130,16 +130,16 @@
 
 :root.theme-light {
   color-scheme: only light;
-  --desktop-gray-950: #f7f8f8;
+  --desktop-gray-950: #fafafa;
   --desktop-gray-925: #ffffff;
-  --desktop-gray-900: #f2f4f4;
+  --desktop-gray-900: #f7f7f7;
   --desktop-gray-850: #ffffff;
-  --desktop-gray-800: #eceff0;
+  --desktop-gray-800: #f4f4f4;
   --desktop-gray-750: #ffffff;
-  --desktop-gray-700: #f5f6f7;
-  --desktop-gray-650: #e8ecee;
-  --desktop-gray-600: #d8dde0;
-  --desktop-gray-550: #c7cfd4;
+  --desktop-gray-700: #fafafa;
+  --desktop-gray-650: #eeeeee;
+  --desktop-gray-600: #e3e3e3;
+  --desktop-gray-550: #d4d4d4;
   --desktop-text-strong: #101316;
   --desktop-text-primary: #161a1f;
   --desktop-text-secondary: #34404b;
@@ -161,15 +161,15 @@
   --desktop-mark-bg: #101316;
   --desktop-mark-text: #f7f8f8;
   --desktop-focus-ring: 0 0 0 2px hsl(var(--desktop-theme-h) var(--desktop-theme-s) var(--desktop-theme-l) / 0.28);
-  --desktop-hover-surface: rgba(0, 0, 0, 0.045);
-  --desktop-active-surface: rgba(0, 0, 0, 0.075);
+  --desktop-hover-surface: rgba(0, 0, 0, 0.032);
+  --desktop-active-surface: rgba(0, 0, 0, 0.055);
   --desktop-surface-rail: var(--desktop-gray-800);
-  --desktop-surface-canvas: var(--desktop-gray-900);
+  --desktop-surface-canvas: #ffffff;
   --desktop-surface-card-soft: var(--desktop-gray-850);
   --desktop-surface-code-soft: var(--desktop-gray-950);
   --desktop-surface-trace: var(--desktop-gray-800);
-  --desktop-border-default: #e4e8ea;
-  --desktop-border-strong: #dbe1e4;
+  --desktop-border-default: #eeeeee;
+  --desktop-border-strong: #e2e2e2;
 }
 
 * {
@@ -1031,13 +1031,13 @@ textarea:focus-visible {
 }
 
 :root.theme-light .uiButton-default:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--desktop-surface-panel-soft) 92%, var(--desktop-accent));
+  background: color-mix(in srgb, var(--desktop-surface-panel-soft) 94%, var(--desktop-gray-550));
   background-image: linear-gradient(
-    color-mix(in srgb, var(--desktop-surface-panel-soft) 92%, var(--desktop-accent)),
-    color-mix(in srgb, var(--desktop-surface-panel-soft) 92%, var(--desktop-accent))
+    color-mix(in srgb, var(--desktop-surface-panel-soft) 94%, var(--desktop-gray-550)),
+    color-mix(in srgb, var(--desktop-surface-panel-soft) 94%, var(--desktop-gray-550))
   );
-  border-color: var(--desktop-border-accent);
-  box-shadow: inset 0 0 0 999px color-mix(in srgb, var(--desktop-surface-panel-soft) 92%, var(--desktop-accent));
+  border-color: var(--desktop-border-strong);
+  box-shadow: inset 0 0 0 999px color-mix(in srgb, var(--desktop-surface-panel-soft) 94%, var(--desktop-gray-550));
 }
 
 .uiButton-subtle {
@@ -1381,6 +1381,24 @@ body.isResizingSidebar {
   flex: none;
 }
 
+.uiSectionTitleInlineAction {
+  display: inline-flex;
+  flex: none;
+  margin-left: 2px;
+}
+
+.sectionInlineSwitch {
+  width: 20px;
+  height: 20px;
+  min-height: 20px;
+  color: var(--desktop-text-soft);
+}
+
+.sectionInlineSwitch svg {
+  width: 12px;
+  height: 12px;
+}
+
 .uiSectionTitleActions {
   display: inline-flex;
   align-items: center;
@@ -1558,7 +1576,7 @@ body.isResizingSidebar {
 
 .projectRow.active {
   border-color: var(--desktop-border-accent);
-  background: var(--desktop-state-accent-bg);
+  background: var(--desktop-surface-panel);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--desktop-border-accent) 30%, transparent);
 }
 
@@ -1591,7 +1609,7 @@ body.isResizingSidebar {
 }
 
 .projectRow.active .projectRowText strong {
-  color: var(--desktop-text-accent);
+  color: var(--desktop-text-primary);
 }
 
 .projectStatusDot {
@@ -1717,6 +1735,89 @@ body.isResizingSidebar {
   display: flex;
   justify-content: flex-end;
   gap: var(--desktop-toolbar-control-gap);
+}
+
+.projectFileTree {
+  display: grid;
+  gap: var(--space-8);
+  margin-top: var(--space-8);
+}
+
+.projectFileSearch input {
+  width: 100%;
+  height: 32px;
+  border: 1px solid var(--desktop-border-default);
+  border-radius: var(--radius);
+  background: var(--desktop-surface-input);
+  color: var(--desktop-text-primary);
+  font-size: 12px;
+  padding: 0 10px;
+}
+
+.projectFileSearch input::placeholder {
+  color: var(--desktop-input-placeholder);
+}
+
+.projectFileTreeList {
+  display: grid;
+  gap: 1px;
+}
+
+.projectFileTreeRow {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--desktop-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: var(--desktop-font-regular);
+  padding: 0 8px 0 calc(6px + var(--tree-depth) * 14px);
+  text-align: left;
+}
+
+.projectFileTreeRow:disabled {
+  cursor: default;
+  color: var(--desktop-text-primary);
+  opacity: 1;
+}
+
+.projectFileTreeRow.file:hover,
+.projectFileTreeRow.file:focus-visible {
+  border-color: var(--desktop-border-strong);
+  background: var(--desktop-hover-surface);
+  color: var(--desktop-text-primary);
+}
+
+.projectFileTreeRow.active {
+  border-color: var(--desktop-border-accent);
+  background: var(--desktop-surface-panel);
+  color: var(--desktop-text-primary);
+}
+
+.projectFileTreeChevron {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  color: var(--desktop-text-soft);
+}
+
+.projectFileTreeChevron svg {
+  width: 14px;
+  height: 14px;
+}
+
+.projectFileTreeName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .flowNav {
@@ -1872,8 +1973,8 @@ body.isResizingSidebar {
 
 .flowMeta {
   color: var(--desktop-text-soft);
-  font-size: var(--desktop-text-meta);
-  font-weight: var(--desktop-font-semibold);
+  font-size: 10px;
+  font-weight: var(--desktop-font-regular);
 }
 
 .treeDetail {
@@ -2248,6 +2349,10 @@ body.isResizingSidebar {
   line-height: 1.35;
   padding: 0 var(--space-12);
   text-align: left;
+}
+
+:root.theme-light .conversationStarters button {
+  background: var(--desktop-gray-700);
 }
 
 .conversationStarters button:hover {
@@ -2900,8 +3005,8 @@ body.isResizingSidebar {
 }
 
 .chatDock {
-  border-top: 1px solid var(--line);
-  background: color-mix(in srgb, var(--desktop-surface-canvas) 92%, var(--desktop-surface-panel));
+  border-top: 0;
+  background: var(--desktop-surface-canvas);
   padding: 10px 18px 12px;
 }
 
@@ -3115,13 +3220,13 @@ body.isResizingSidebar {
 .chatComposerShell {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
-  grid-template-rows: auto minmax(38px, auto) auto;
+  grid-template-rows: auto minmax(42px, auto) auto;
   align-items: end;
-  gap: 6px 6px;
+  gap: 12px 8px;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--desktop-surface-input);
-  padding: 8px;
+  padding: 14px 14px 12px;
   box-shadow: none;
   transition:
     border-color 120ms ease,
@@ -3134,7 +3239,7 @@ body.isResizingSidebar {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-6);
-  padding: 2px 4px 0;
+  padding: 0;
 }
 
 .chatAttachment {
@@ -3293,13 +3398,13 @@ body.isResizingSidebar {
   grid-column: 1 / -1;
   grid-row: 2;
   width: 100%;
-  min-height: 34px;
+  min-height: 42px;
   max-height: 168px;
   resize: none;
   border: 0;
   background: transparent;
   box-shadow: none;
-  padding: 6px 10px;
+  padding: 0;
   color: var(--desktop-text-primary);
   font-size: 12px;
   line-height: 1.45;
@@ -3334,7 +3439,7 @@ body.isResizingSidebar {
   color: var(--desktop-text-soft);
   font-size: 11px;
   line-height: 28px;
-  padding: 0 2px;
+  padding: 0;
 }
 
 .chatComposerStatus {
@@ -3358,7 +3463,7 @@ body.isResizingSidebar {
   font-size: 11px;
   font-weight: var(--desktop-font-regular);
   line-height: 24px;
-  padding: 0 9px 0 10px;
+  padding: 0 8px;
   white-space: nowrap;
 }
 
@@ -3579,7 +3684,7 @@ body.isResizingSidebar {
   grid-row: 3;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   justify-content: flex-end;
 }
 

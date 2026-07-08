@@ -75,6 +75,8 @@ struct RegistryFileProject {
     name: String,
     path: String,
     phase: String,
+    #[serde(default)]
+    name_locked: bool,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -185,6 +187,13 @@ struct SwitchGoalInput {
 struct RenameRegistryProjectInput {
     id: String,
     name: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RelocateRegistryProjectInput {
+    id: String,
+    path: String,
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -961,11 +970,9 @@ fn add_registry_project(path: String) -> Result<WorkspaceSnapshot, String> {
     let mut registry = load_or_seed_registry(&app_root)?;
     let project_path = project_root.display().to_string();
     let state = read_json(project_root.join(".project-os/state.json"));
-    let name = state
-        .as_ref()
-        .and_then(|json| json.get("name"))
-        .and_then(Value::as_str)
-        .or_else(|| project_root.file_name().and_then(|name| name.to_str()))
+    let name = project_root
+        .file_name()
+        .and_then(|name| name.to_str())
         .unwrap_or("workspace")
         .to_string();
     let phase = state
@@ -977,7 +984,9 @@ fn add_registry_project(path: String) -> Result<WorkspaceSnapshot, String> {
     let id = project_id_from_path(&project_path);
 
     if let Some(project) = registry.projects.iter_mut().find(|project| project.id == id) {
-        project.name = name;
+        if !project.name_locked {
+            project.name = name;
+        }
         project.path = project_path;
         project.phase = phase;
     } else {
@@ -986,6 +995,7 @@ fn add_registry_project(path: String) -> Result<WorkspaceSnapshot, String> {
             name,
             path: project_path,
             phase,
+            name_locked: false,
         });
     }
     registry.current_project_id = id;
@@ -1023,6 +1033,49 @@ fn rename_registry_project(input: RenameRegistryProjectInput) -> Result<Workspac
         .find(|project| project.id == input.id)
         .ok_or_else(|| "未找到这个项目".to_string())?;
     project.name = next_name.to_string();
+    project.name_locked = true;
+    save_registry(&app_root, &registry)?;
+    get_workspace_snapshot()
+}
+
+#[tauri::command]
+fn relocate_registry_project(input: RelocateRegistryProjectInput) -> Result<WorkspaceSnapshot, String> {
+    let next_path = input.path.trim();
+    if next_path.is_empty() {
+        return Err("请选择新的项目文件夹。".to_string());
+    }
+
+    let next_root = PathBuf::from(next_path)
+        .canonicalize()
+        .map_err(|err| format!("无法访问新的项目路径: {}", err))?;
+    if !next_root.is_dir() {
+        return Err("请选择一个文件夹作为项目路径。".to_string());
+    }
+
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let project = registry
+        .projects
+        .iter_mut()
+        .find(|project| project.id == input.id)
+        .ok_or_else(|| "未找到这个项目".to_string())?;
+
+    let state = read_json(next_root.join(".project-os/state.json"));
+    project.path = next_root.display().to_string();
+    if !project.name_locked {
+        project.name = next_root
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or(&project.name)
+            .to_string();
+    }
+    project.phase = state
+        .as_ref()
+        .and_then(|json| json.get("phase"))
+        .and_then(Value::as_str)
+        .unwrap_or(&project.phase)
+        .to_string();
+    registry.current_project_id = input.id;
     save_registry(&app_root, &registry)?;
     get_workspace_snapshot()
 }
@@ -4182,6 +4235,7 @@ fn load_or_seed_registry(app_root: &Path) -> Result<RegistryFile, String> {
             name,
             path: current_path,
             phase,
+            name_locked: false,
         }],
     };
     save_registry(app_root, &registry)?;
@@ -4359,17 +4413,6 @@ fn walk_counts(path: &Path, depth: usize, file_count: &mut usize, docs_count: &m
 }
 
 fn build_tree_preview(root: &Path) -> Vec<TreeItem> {
-    let preferred = [
-        ("docs", "folder", 1),
-        ("docs/DESKTOP_APP.md", "file", 2),
-        ("desktop", "folder", 1),
-        ("desktop/src", "folder", 2),
-        ("desktop/src/main.jsx", "file", 3),
-        ("desktop/src-tauri", "folder", 2),
-        ("PROJECT.md", "file", 1),
-        ("HANDOFF.md", "file", 1),
-    ];
-
     let mut tree = vec![TreeItem {
         label: root
             .file_name()
@@ -4379,22 +4422,53 @@ fn build_tree_preview(root: &Path) -> Vec<TreeItem> {
         depth: 0,
         kind: "folder".to_string(),
     }];
+    append_tree_preview(root, 1, &mut tree);
+    tree
+}
 
-    for (relative, kind, depth) in preferred {
-        if root.join(relative).exists() {
-            tree.push(TreeItem {
-                label: Path::new(relative)
-                    .file_name()
-                    .and_then(|name| name.to_str())
-                    .unwrap_or(relative)
-                    .to_string(),
-                depth,
-                kind: kind.to_string(),
-            });
-        }
+fn append_tree_preview(path: &Path, depth: usize, tree: &mut Vec<TreeItem>) {
+    const MAX_TREE_ITEMS: usize = 180;
+    const MAX_TREE_DEPTH: usize = 4;
+
+    if depth > MAX_TREE_DEPTH || tree.len() >= MAX_TREE_ITEMS {
+        return;
     }
 
-    tree
+    let Ok(entries) = fs::read_dir(path) else {
+        return;
+    };
+
+    let mut entries = entries
+        .flatten()
+        .filter(|entry| !is_ignored_path(&entry.path()))
+        .collect::<Vec<_>>();
+
+    entries.sort_by(|a, b| {
+        let a_is_dir = a.path().is_dir();
+        let b_is_dir = b.path().is_dir();
+        b_is_dir
+            .cmp(&a_is_dir)
+            .then_with(|| a.file_name().cmp(&b.file_name()))
+    });
+
+    for entry in entries {
+        if tree.len() >= MAX_TREE_ITEMS {
+            break;
+        }
+        let child = entry.path();
+        let is_dir = child.is_dir();
+        let Some(label) = child.file_name().and_then(|name| name.to_str()) else {
+            continue;
+        };
+        tree.push(TreeItem {
+            label: label.to_string(),
+            depth,
+            kind: if is_dir { "folder" } else { "file" }.to_string(),
+        });
+        if is_dir {
+            append_tree_preview(&child, depth + 1, tree);
+        }
+    }
 }
 
 fn recommendation_queue(recommendations: &Option<Value>) -> Vec<QueueItem> {
@@ -4505,6 +4579,7 @@ fn main() {
             add_registry_project,
             switch_registry_project,
             rename_registry_project,
+            relocate_registry_project,
             remove_registry_project,
             open_project_folder,
             chat_with_model,

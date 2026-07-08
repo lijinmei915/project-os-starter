@@ -81,7 +81,7 @@ function mappedMeta(node, snapshot) {
   return projectMeta[node.title] || node.meta;
 }
 
-export function WorkspaceTree({ activeTopicPath, onSelectTopic, outline, snapshot }) {
+export function WorkspaceTree({ activeTopicPath, actions, inlineAction, onSelectTopic, outline, snapshot }) {
   const [sectionOpen, setSectionOpen] = useState(true);
   const firstNode = outline[0];
   const [activeNodeId, setActiveNodeId] = useState(firstNode?.id || firstNode?.title || "");
@@ -152,22 +152,26 @@ export function WorkspaceTree({ activeTopicPath, onSelectTopic, outline, snapsho
         title="工作区"
         open={sectionOpen}
         onToggle={() => setSectionOpen((value) => !value)}
+        inlineAction={inlineAction}
         toggleLabel={sectionOpen ? "收起工作区" : "展开工作区"}
         actions={(
-          <Tooltip content={allTopicsOpen ? "收起全部子项" : "展开全部子项"}>
-            <Button
-              className="sectionIconAction"
-              size="icon"
-              variant="ghost"
-              type="button"
-              onClick={toggleAllTopics}
-              aria-label={allTopicsOpen ? "收起全部子项" : "展开全部子项"}
-            >
-              {allTopicsOpen
-                ? <ChevronsDownUp strokeWidth={2.25} aria-hidden="true" />
-                : <ChevronsUpDown strokeWidth={2.25} aria-hidden="true" />}
-            </Button>
-          </Tooltip>
+          <>
+            {actions}
+            <Tooltip content={allTopicsOpen ? "收起全部子项" : "展开全部子项"}>
+              <Button
+                className="sectionIconAction"
+                size="icon"
+                variant="ghost"
+                type="button"
+                onClick={toggleAllTopics}
+                aria-label={allTopicsOpen ? "收起全部子项" : "展开全部子项"}
+              >
+                {allTopicsOpen
+                  ? <ChevronsDownUp strokeWidth={2.25} aria-hidden="true" />
+                  : <ChevronsUpDown strokeWidth={2.25} aria-hidden="true" />}
+              </Button>
+            </Tooltip>
+          </>
         )}
       />
       {sectionOpen ? (

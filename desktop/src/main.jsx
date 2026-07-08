@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
-import { Brain, Check, ChevronDown, ChevronRight, ClipboardList, Eraser, Loader2, MoreVertical, Package, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, RotateCcw, Square, TerminalSquare, X } from "lucide-react";
+import { ArrowLeftRight, Brain, Check, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, ClipboardList, Eraser, Loader2, MoreVertical, Package, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, RotateCcw, Square, TerminalSquare, X } from "lucide-react";
 import { ChatComposer } from "./components/workbench/chat-composer";
 import { Conversation, ConversationMessage } from "./components/workbench/conversation";
 import { InfoCallout } from "./components/workbench/info-callout";
@@ -382,6 +382,19 @@ async function switchPreviewProject(id) {
   return loadPreviewWorkspaceSnapshot();
 }
 
+async function relocatePreviewProject(id, path) {
+  const response = await fetch("/__project-os/relocate-project", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, path }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || "路径更新失败。");
+  }
+  return loadPreviewWorkspaceSnapshot();
+}
+
 async function confirmWorkspaceGoal(input) {
   if (!isTauriRuntime()) {
     const response = await fetch("/__project-os/confirm-goal", {
@@ -415,9 +428,14 @@ async function deleteProviderProfilePreview(profileId) {
 }
 
 async function copyTextToSystemClipboard(text) {
-  if (isTauriRuntime()) {
+  const canUseDevClipboard =
+    window.location.hostname === "127.0.0.1" ||
+    window.location.hostname === "localhost";
+
+  if (!canUseDevClipboard && isTauriRuntime()) {
     const { invoke } = await import("@tauri-apps/api/core");
-    return invoke("copy_text_to_clipboard", { text });
+    await invoke("copy_text_to_clipboard", { text });
+    return { ok: true };
   }
 
   const response = await fetch("/__project-os/copy-text", {
@@ -615,6 +633,18 @@ async function loadPreviewProviderStatus() {
 
 async function invokeWorkspaceCommand(command, payload) {
   if (!isTauriRuntime()) {
+    if (command === "read_engineering_file") {
+      const response = await fetch("/__project-os/read-engineering-file", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload?.input || payload || {}),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.error || "读取文件失败。");
+      }
+      return result;
+    }
     throw new Error("当前是浏览器预览，只能查看界面；请在桌面 App 窗口里保存配置。");
   }
 
@@ -712,10 +742,12 @@ function TopBar({
   );
 }
 
-function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot, tasks = [], projectActivities = {}, planLoading, terminalRunningId, onSwitchProject, onPickProject, onOpenProjectFolder, onRenameProject, onRemoveProject, onSelectEngineeringFile, onProjectActionError, onProjectActivitySeen, onProjectPathCopied, projectActionError, selectedEngineeringFile }) {
+function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot, tasks = [], projectActivities = {}, planLoading, terminalRunningId, onSwitchProject, onPickProject, onOpenProjectFolder, onRelocateProject, onRenameProject, onRemoveProject, onSelectEngineeringFile, onProjectActionError, onProjectActivitySeen, onProjectPathCopied, projectActionError, selectedEngineeringFile }) {
   const [renameProject, setRenameProject] = useState(null);
   const [renameName, setRenameName] = useState("");
   const [projectsOpen, setProjectsOpen] = useState(true);
+  const [sidebarView, setSidebarView] = useState("workspace");
+  const [fileTreeExpanded, setFileTreeExpanded] = useState(true);
 
   const openRenameDialog = (project) => {
     setRenameProject(project);
@@ -733,6 +765,7 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
   };
 
   const copyProjectPath = async (projectPath) => {
+    let systemCopyError = null;
     const fallbackCopy = () => {
       const textarea = document.createElement("textarea");
       textarea.value = projectPath;
@@ -749,7 +782,8 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
     try {
       try {
         await copyTextToSystemClipboard(projectPath);
-      } catch {
+      } catch (err) {
+        systemCopyError = err;
         if (!navigator.clipboard?.writeText) {
           fallbackCopy();
         } else {
@@ -764,7 +798,12 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
       onProjectPathCopied?.(projectPath);
       return true;
     } catch (err) {
-      onProjectActionError?.(`复制路径失败：${err instanceof Error ? err.message : String(err)}`);
+      const message = systemCopyError instanceof Error
+        ? systemCopyError.message
+        : err instanceof Error
+          ? err.message
+          : String(err);
+      onProjectActionError?.(`复制路径失败：${message}`);
       return false;
     }
   };
@@ -893,6 +932,7 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
                         <button className="uiDropdownItem" type="button" data-copy-project-path={project.path}>
                           复制路径
                         </button>
+                        <DropdownMenuItem onSelect={() => onRelocateProject(project.id)}>重新定位路径</DropdownMenuItem>
                         <DropdownMenuItem onSelect={() => openRenameDialog(project)}>修改显示名称</DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem className="dangerMenuItem" onSelect={() => onRemoveProject(project.id)}>
@@ -938,12 +978,81 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
           </DialogContent>
         </Dialog>
 
-        <WorkspaceTree
-          activeTopicPath={selectedEngineeringFile?.path}
-          onSelectTopic={onSelectEngineeringFile}
-          outline={projectGovernanceOutline}
-          snapshot={snapshot}
-        />
+        {sidebarView === "workspace" ? (
+          <WorkspaceTree
+            inlineAction={(
+              <Tooltip content="切换到项目文件">
+                <Button
+                  className="sectionInlineSwitch"
+                  size="icon"
+                  variant="ghost"
+                  type="button"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setSidebarView("files");
+                  }}
+                  aria-label="切换到项目文件"
+                >
+                  <ArrowLeftRight strokeWidth={2.2} aria-hidden="true" />
+                </Button>
+              </Tooltip>
+            )}
+            activeTopicPath={selectedEngineeringFile?.path}
+            onSelectTopic={onSelectEngineeringFile}
+            outline={projectGovernanceOutline}
+            snapshot={snapshot}
+          />
+        ) : (
+          <div className="leftRailSection">
+            <SectionTitle
+              title="项目文件"
+              open
+              onToggle={() => setSidebarView("workspace")}
+              inlineAction={(
+                <Tooltip content="切换到工作区">
+                  <Button
+                    className="sectionInlineSwitch"
+                    size="icon"
+                    variant="ghost"
+                    type="button"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setSidebarView("workspace");
+                    }}
+                    aria-label="切换到工作区"
+                  >
+                    <ArrowLeftRight strokeWidth={2.2} aria-hidden="true" />
+                  </Button>
+                </Tooltip>
+              )}
+              actions={(
+                <Tooltip content={fileTreeExpanded ? "收起全部子项" : "展开全部子项"}>
+                  <Button
+                    className="sectionIconAction"
+                    size="icon"
+                    variant="ghost"
+                    type="button"
+                    onClick={() => setFileTreeExpanded((value) => !value)}
+                    aria-label={fileTreeExpanded ? "收起全部子项" : "展开全部子项"}
+                  >
+                    {fileTreeExpanded
+                      ? <ChevronsDownUp strokeWidth={2.25} aria-hidden="true" />
+                      : <ChevronsUpDown strokeWidth={2.25} aria-hidden="true" />}
+                  </Button>
+                </Tooltip>
+              )}
+              toggleLabel="切换到工作区"
+            />
+            <ProjectFileTree
+              activePath={selectedEngineeringFile?.path}
+              expanded={fileTreeExpanded}
+              snapshot={snapshot}
+              onSelectFile={onSelectEngineeringFile}
+            />
+          </div>
+        )}
       </div>
       <Tooltip content="折叠工作区">
         <Button className="sideCornerButton sideCornerButton-left" size="icon" variant="ghost" type="button" onClick={onToggleCollapsed} aria-label="折叠工作区">
@@ -952,6 +1061,71 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
       </Tooltip>
       <div className="sidebarResizer sidebarResizer-left" role="separator" aria-label="拖拽调整左侧宽度" onPointerDown={onResizeStart} />
     </aside>
+  );
+}
+
+function ProjectFileTree({ activePath, expanded, snapshot, onSelectFile }) {
+  const [query, setQuery] = useState("");
+  const tree = Array.isArray(snapshot?.tree) ? snapshot.tree : [];
+  const stack = [];
+  const rows = tree.map((item, index) => {
+    const depth = Number.isFinite(item.depth) ? item.depth : 0;
+    const parentPath = depth <= 1 ? "" : stack[depth - 1] || "";
+    const path = depth === 0 ? "" : [parentPath, item.label].filter(Boolean).join("/");
+    stack[depth] = path;
+    stack.length = depth + 1;
+    return {
+      ...item,
+      depth,
+      id: `${path || item.label}-${index}`,
+      path,
+    };
+  });
+  const normalizedQuery = query.trim().toLowerCase();
+  const visibleRows = normalizedQuery
+    ? rows.filter((item) => `${item.label} ${item.path}`.toLowerCase().includes(normalizedQuery))
+    : rows.filter((item) => expanded || item.depth <= 1);
+
+  return (
+    <section className="projectFileTree" aria-label="项目文件">
+      <div className="projectFileSearch">
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="筛选文件..."
+          aria-label="筛选文件"
+        />
+      </div>
+      <div className="projectFileTreeList">
+        {visibleRows.map((item) => {
+          const isFolder = item.kind === "folder";
+          const isActive = !isFolder && activePath === item.path;
+          return (
+            <button
+              className={`projectFileTreeRow${isFolder ? " folder" : " file"}${isActive ? " active" : ""}`}
+              key={item.id}
+              type="button"
+              style={{ "--tree-depth": Math.max(item.depth - 1, 0) }}
+              disabled={item.depth === 0}
+              onClick={() => {
+                if (isFolder || !item.path) return;
+                onSelectFile?.({
+                  description: "当前项目文件",
+                  group: "项目文件",
+                  path: item.path,
+                });
+              }}
+              title={item.path || item.label}
+            >
+              <span className="projectFileTreeChevron" aria-hidden="true">
+                {isFolder ? <ChevronRight strokeWidth={2} /> : null}
+              </span>
+              <span className="projectFileTreeName">{item.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -1455,6 +1629,7 @@ function AgentWorkspace({
   onSelectComposerModel,
   onTestComposerModel,
   goalRefinementMode,
+  onSelectEngineeringFile,
 }) {
   const [taskInput, setTaskInput] = useState("");
   const [attachments, setAttachments] = useState([]);
@@ -1478,8 +1653,8 @@ function AgentWorkspace({
     });
     setPendingTurn(null);
     activeRequestRef.current = null;
-    onChatTurnsChange([]);
-    setActiveWorkspaceTab("plan");
+      onChatTurnsChange([]);
+      setActiveWorkspaceTab("plan");
       setWorkspaceTabs((current) => current.filter((tab) => tab.kind !== "file"));
     composerRef.current?.focus();
   }, [conversationResetKey]);
@@ -3952,6 +4127,30 @@ function App() {
     }
   };
 
+  const relocateProject = async (id) => {
+    const project = snapshot.projects.find((item) => item.id === id);
+    if (!project) return;
+    setProjectActionError("");
+    try {
+      const selected = await pickProjectDirectory();
+      if (!selected) return;
+      const path = Array.isArray(selected) ? selected[0] : selected;
+      setLoading(true);
+      const nextSnapshot = source !== "tauri"
+        ? await relocatePreviewProject(id, path)
+        : await invokeWorkspaceCommand("relocate_registry_project", {
+          input: { id, path },
+        });
+      applySnapshot(nextSnapshot);
+      resetWorkspaceEphemeralState({ ...fallbackSnapshot, ...nextSnapshot });
+      showToast(`已重新定位 ${project.name}`);
+    } catch (err) {
+      setProjectActionError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const removeProject = async (id) => {
     const project = snapshot.projects.find((item) => item.id === id);
     if (!project) return;
@@ -4035,15 +4234,6 @@ function App() {
           size: 0,
           truncated: false,
         },
-      });
-      return;
-    }
-
-    if (!isTauriRuntime()) {
-      setSelectedEngineeringFile({
-        ...nextFile,
-        error: "浏览器预览不能读取本地文件，请在桌面 App 窗口里查看。",
-        loading: false,
       });
       return;
     }
@@ -4715,6 +4905,7 @@ function App() {
           onSwitchProject={switchProject}
           onPickProject={pickProject}
           onOpenProjectFolder={openProjectFolder}
+          onRelocateProject={relocateProject}
           onRenameProject={renameProject}
           onRemoveProject={removeProject}
           onSelectEngineeringFile={selectEngineeringFile}
@@ -4774,6 +4965,7 @@ function App() {
           onSelectComposerModel={selectComposerModel}
           onTestComposerModel={testComposerModel}
           goalRefinementMode={goalRefinementMode}
+          onSelectEngineeringFile={selectEngineeringFile}
         />
         <RightRail
           collapsed={rightCollapsed}
