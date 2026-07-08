@@ -4003,9 +4003,9 @@ const sidebarSizing = {
   leftDefault: 248,
   leftMin: 220,
   leftMax: 420,
-  rightDefault: 320,
-  rightMin: 280,
-  rightMax: 460,
+  rightDefault: 248,
+  rightMin: 220,
+  rightMax: 420,
 };
 
 function clampSidebarWidth(value, min, max) {

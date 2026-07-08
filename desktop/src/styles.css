@@ -144,6 +144,7 @@
   --desktop-layout-sidebar-left: 248px;
   --desktop-layout-sidebar-right: 320px;
   --desktop-layout-sidebar-collapsed: 48px;
+  --desktop-layout-canvas-radius: 8px;
   --desktop-layout-column-gap: 0px;
   --desktop-layout-panel-gap: 10px;
   --desktop-layout-panel-padding: 12px;
@@ -1238,6 +1239,8 @@ textarea:focus-visible {
   display: grid;
   grid-template-columns: var(--desktop-layout-sidebar-left) minmax(500px, 1fr) var(--desktop-layout-sidebar-right);
   min-height: 0;
+  overflow: hidden;
+  background: var(--desktop-surface-rail);
   transition: grid-template-columns 160ms ease;
 }
 
@@ -2850,6 +2853,8 @@ body.isResizingSidebar {
   display: grid;
   grid-template-rows: 28px minmax(0, 1fr) auto auto;
   min-height: 0;
+  overflow: hidden;
+  border-radius: var(--desktop-layout-canvas-radius);
   background: var(--desktop-surface-canvas);
 }
 
