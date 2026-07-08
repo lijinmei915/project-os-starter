@@ -1,14 +1,13 @@
 {
-  "schemaVersion": "project-os.goals.v0.1",
-  "activeGoalId": "workspace-usable-loop-20260707",
+  "activeGoalId": "打磨对话体验-1783435178902",
   "goals": [
     {
-      "id": "workspace-usable-loop-20260707",
-      "title": "把工作区从骨架打磨成可用闭环",
-      "shortTitle": "工作区可用闭环",
-      "projectName": "project-os-starter",
-      "status": "done",
+      "confirmedAt": "2026-07-07T16:38:47.286Z",
       "createdAt": "2026-07-07T15:20:00.000Z",
+      "id": "workspace-usable-loop-20260707",
+      "projectName": "project-os-starter",
+      "shortTitle": "工作区可用闭环",
+      "status": "done",
       "summary": "围绕当前项目上下文、对话任务化、目标联动、项目档案和执行反馈，先把现有工作区串成可用闭环。",
       "taskIds": [
         "workspace-project-context",
@@ -17,32 +16,33 @@
         "workspace-project-profile-fill",
         "workspace-action-feedback"
       ],
-      "confirmedAt": "2026-07-07T16:38:47.286Z",
+      "title": "把工作区从骨架打磨成可用闭环",
       "updatedAt": "2026-07-08T05:23:16.525Z",
       "validationStatus": "signed-off"
     },
     {
-      "id": "打磨对话体验-1783435178902",
-      "title": "打磨对话体验",
-      "shortTitle": "打磨对话体验",
-      "projectName": "project-os-starter",
-      "status": "draft",
       "createdAt": "2026-07-07T14:39:38.902Z",
+      "id": "打磨对话体验-1783435178902",
+      "projectName": "project-os-starter",
+      "shortTitle": "打磨对话体验",
+      "status": "draft",
       "summary": "对齐主流",
-      "taskIds": []
+      "taskIds": [],
+      "title": "打磨对话体验"
     },
     {
-      "id": "desktop-v0.1-direction-confirmation",
-      "title": "Project OS Console 内核收口期 / Desktop v0.1 方向确认期",
-      "shortTitle": "Desktop v0.1 方向确认期",
-      "projectName": "project-os-starter",
-      "status": "done",
-      "createdAt": "2026-07-07T00:56:00.000Z",
       "completedAt": "2026-07-07T09:39:31.032Z",
-      "validationStatus": "passed",
+      "createdAt": "2026-07-07T00:56:00.000Z",
+      "id": "desktop-v0.1-direction-confirmation",
+      "projectName": "project-os-starter",
+      "shortTitle": "Desktop v0.1 方向确认期",
+      "status": "done",
       "summary": "Desktop v0.1 目标验收已通过并确认完成。",
-      "taskIds": []
+      "taskIds": [],
+      "title": "Project OS Console 内核收口期 / Desktop v0.1 方向确认期",
+      "validationStatus": "passed"
     }
   ],
-  "updatedAt": "2026-07-08T05:38:40.122Z"
+  "schemaVersion": "project-os.goals.v0.1",
+  "updatedAt": "2026-07-08T16:52:50Z"
 }
