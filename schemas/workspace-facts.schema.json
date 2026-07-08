@@ -1,0 +1,307 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-os.local/schemas/workspace-facts.schema.json",
+  "title": "Workspace Facts",
+  "description": "Workspace-level facts inferred from a local project without modifying user project files.",
+  "type": "object",
+  "required": ["schemaVersion", "project", "mode", "status", "healthScore", "governanceLevel", "summary", "evidence", "governanceDomains", "recommendations", "findings", "recommendation"],
+  "properties": {
+    "schemaVersion": {
+      "const": "project-os.workspace-facts.v0.1"
+    },
+    "generatedAt": {
+      "type": "string",
+      "description": "ISO-like timestamp for when the report was generated."
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["new-project", "existing-project", "temporary-readonly"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "needs-review", "ready-to-confirm", "connected", "preview-managed", "confirmed", "blocked"]
+    },
+    "healthScore": { "$ref": "#/$defs/healthScore" },
+    "governanceLevel": { "$ref": "#/$defs/governanceLevel" },
+    "project": {
+      "type": "object",
+      "required": ["name", "path", "kind"],
+      "properties": {
+        "name": { "type": "string" },
+        "path": { "type": "string" },
+        "kind": { "type": "string" },
+        "detectedStack": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "lifecycle": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "summary": {
+      "type": "object",
+      "required": ["overview", "currentProgress", "runbook", "riskBoundary", "localState"],
+      "properties": {
+        "overview": { "$ref": "#/$defs/factSection" },
+        "currentProgress": { "$ref": "#/$defs/factSection" },
+        "runbook": { "$ref": "#/$defs/factSection" },
+        "riskBoundary": { "$ref": "#/$defs/factSection" },
+        "localState": { "$ref": "#/$defs/factSection" }
+      },
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/evidence" }
+    },
+    "governanceDomains": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/governanceDomain" }
+    },
+    "recommendations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/governanceRecommendation" }
+    },
+    "findings": {
+      "type": "object",
+      "required": ["confirmed", "missing", "risks"],
+      "properties": {
+        "confirmed": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/finding" }
+        },
+        "missing": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/finding" }
+        },
+        "risks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/finding" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "recommendation": {
+      "type": "object",
+      "required": ["action", "confidence", "nextSteps"],
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["auto-managed", "preview-only", "confirm-workspace", "keep-readonly", "request-more-info", "block-workspace"]
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "reason": { "type": "string" },
+        "nextSteps": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "factSection": {
+      "type": "object",
+      "required": ["status", "title", "body", "sources"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["confirmed", "inferred", "missing", "stale", "conflict"]
+        },
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "sources": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["source", "kind", "status"],
+      "properties": {
+        "source": { "type": "string" },
+        "kind": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["found", "missing", "ignored", "stale"]
+        },
+        "note": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "healthScore": {
+      "type": "object",
+      "required": ["score", "status", "label", "summary", "dimensions"],
+      "properties": {
+        "score": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "status": {
+          "type": "string",
+          "enum": ["healthy", "good", "watch", "risk"]
+        },
+        "label": { "type": "string" },
+        "summary": { "type": "string" },
+        "dimensions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/healthDimension" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "healthDimension": {
+      "type": "object",
+      "required": ["id", "label", "score", "status", "reason"],
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "score": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "status": {
+          "type": "string",
+          "enum": ["healthy", "good", "watch", "risk"]
+        },
+        "reason": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "governanceLevel": {
+      "type": "object",
+      "required": ["current", "name", "description", "levels"],
+      "properties": {
+        "current": {
+          "type": "string",
+          "enum": ["L0", "L1", "L2", "L3", "L4"]
+        },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "next": {
+          "type": "string",
+          "enum": ["L0", "L1", "L2", "L3", "L4"]
+        },
+        "nextName": { "type": "string" },
+        "levels": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/governanceLevelStep" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "governanceLevelStep": {
+      "type": "object",
+      "required": ["id", "name", "description"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "enum": ["L0", "L1", "L2", "L3", "L4"]
+        },
+        "name": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "governanceDomain": {
+      "type": "object",
+      "required": ["id", "title", "description", "files"],
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "files": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "fileStatuses": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/governanceFileStatus" }
+        },
+        "statusSummary": { "$ref": "#/$defs/governanceStatusSummary" },
+        "updatesWhen": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "governanceFileStatus": {
+      "type": "object",
+      "required": ["path", "status", "previewable"],
+      "properties": {
+        "path": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["found", "missing", "changed", "stale", "generated", "ignored"]
+        },
+        "previewable": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "governanceStatusSummary": {
+      "type": "object",
+      "required": ["found", "missing", "changed", "stale", "generated", "ignored"],
+      "properties": {
+        "found": { "type": "integer", "minimum": 0 },
+        "missing": { "type": "integer", "minimum": 0 },
+        "changed": { "type": "integer", "minimum": 0 },
+        "stale": { "type": "integer", "minimum": 0 },
+        "generated": { "type": "integer", "minimum": 0 },
+        "ignored": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "governanceRecommendation": {
+      "type": "object",
+      "required": ["id", "domain", "title", "problem", "impact", "action", "severity", "files", "canPromoteToL3"],
+      "properties": {
+        "id": { "type": "string" },
+        "domain": { "type": "string" },
+        "title": { "type": "string" },
+        "problem": { "type": "string" },
+        "impact": { "type": "string" },
+        "action": { "type": "string" },
+        "severity": {
+          "type": "string",
+          "enum": ["info", "low", "medium", "high"]
+        },
+        "files": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "canPromoteToL3": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "finding": {
+      "type": "object",
+      "required": ["title", "body"],
+      "properties": {
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "severity": {
+          "type": "string",
+          "enum": ["info", "low", "medium", "high"]
+        },
+        "sources": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

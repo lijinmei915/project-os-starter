@@ -32,7 +32,7 @@ OmniDesk 是用户入口和项目治理中枢，不是 Hermes Studio 复制品�
 - 领域巡检：`scripts/check-frontend.sh`, `backend`, `testing`, `design`
 - 文档层：`AGENTS.md` / `PROJECT.md` / `HANDOFF.md` / `docs/*`
 - 报告层：`scripts/check-ai-project.sh` 准备评分数据，`schemas/ai-project-report.v0.1.json` 定义模块分组，`templates/report/ai-project-report.html` 渲染 HTML 报告
-- 接入层：`schemas/project-onboarding-report.schema.json` 定义老项目接入报告结构，`.project-os/onboarding-report.json` 保存当前项目的接入报告样例
+- 工作区事实层：`schemas/workspace-facts.schema.json` 定义工作区事实结构，`.project-os/workspace-facts.json` 保存当前项目的工作区事实
 - 组件契约：`docs/design/ai-project-assistant/*`
 - 桌面端方向：`docs/DESKTOP_APP.md` 定义 `Tauri + Local Agent Core + Workbench UI`
 - 桌面端骨架：`desktop/` Tauri v0.1 壳，使用 Vite + React 组件工程加载紧凑工作台 UI，并通过 Rust command 读取本地 `.project-os` 快照、桌面项目 registry、模型 provider 配置、model catalog 和 theme 配置；已支持系统目录选择、路径备用添加、registry 内切换当前项目、只读计划生成、本地任务队列、任务记录持久化、patch draft 生成、Diff 草案审阅、受控 Apply Patch、Apply 后自动验证、本地 run summary 写入、用户确认后合并到 `HANDOFF.md`、受控 runner、provider 小白式配置、多 profile、管理员维护模型列表、桌面端 token layer、可配置主题色 token、顶部主题菜单、自定义主题色新增和删除、主题偏好写入 `.project-os/desktop-theme.json`、Headless / shadcn-style 本地组件层、Button / Input / Select / Badge / Panel / Field / Notice / SectionTitle / Tabs / Tooltip / Dialog / DropdownMenu / Switch primitives 和交互态 token 化、Radix Label / Tabs / Tooltip / Dialog / DropdownMenu / Switch 官方 primitives、workbench pattern 起点、网关 `/models` 刷新模型池和当前模型 `/chat/completions` 可用性测试；provider 启用且环境变量 key 存在时会调用 OpenAI-compatible `/chat/completions`；已可打包为 macOS `.app` 双击启动
@@ -45,15 +45,16 @@ OmniDesk 是用户入口和项目治理中枢，不是 Hermes Studio 复制品�
 - 已完成：v1 路由契约、profile-based 安装脚本、adapter 写入、项目模板 / 全局模板、文档治理、统一 `.ai/` 目录结构、前后端与设计测试专属脚本、自动成长反思引擎、动态规则映射同步、项目关系图谱生成、知识结构化（文档 frontmatter 元数据、图谱解析、评分元数据 / 新鲜度维度、架构图读图谱自动渲染）。
 - 正在做：Project OS Console 内核 + Desktop v0.1：工作区治理、自身项目接入、老项目扫描/接入模式、桌面端信息架构、设计 token 规范、项目文件导航和 Local Agent Core 边界。
 - 暂不做：完整 IDE、开放插件市场、多 Agent 编排、远程执行、`ai-components` 运行层、工具原生 package 化。
-- 后续再做：项目接入报告、交接内容结构化合并、coding 闭环打磨和目标验收视觉证据。
+- 后续再做：工作区事实自动生成、交接内容结构化合并、coding 闭环打磨和目标验收视觉证据。
 
 ## 工作区治理口径
 
 - 新项目：由 OmniDesk 生成最小项目骨架和治理文件，从第一天开始维护项目概览、目标、任务、规则、验证和复盘。
-- 老项目：先只读扫描本地目录、README、package/git 状态和已有 `.project-os`，生成接入草案；用户确认后再写入 `.project-os/state.json` 和必要治理文件。
+- 老项目：添加到工作区后默认自动接入 OmniDesk 工作区，先只读扫描本地目录、README、package/git 状态和已有 `.project-os`；当前工程文件只做预览，不在工作区内直接编辑或改写用户工程文件。
 - 临时项目：允许只读打开，不写入治理文件；用户明确接入后再沉淀。
 - 前台展示：工作区只展示用户需要理解的菜单，如项目概览、当前进度、启动方式、风险边界、本地状态。
 - 后台维护：OmniDesk 负责关联状态来源、更新时间、可信度和对应文件，避免把内部治理负担直接暴露给用户。
+- 用户工程保护：老项目默认自动接入工作区，但不修改工程文件；扫描结果先落到 OmniDesk 工作区事实，工程文件区域当前只预览不编辑。
 
 ## 已知问题
 
@@ -65,6 +66,6 @@ OmniDesk 是用户入口和项目治理中枢，不是 Hermes Studio 复制品�
 
 ## 下一步重点
 
-1. 将 `.project-os/onboarding-report.json` 渲染到项目概览页
-2. 用 README、PROJECT、package、git 和 `.project-os` 自动生成老项目接入报告
-3. 增加“确认接入 / 保持只读”操作，并将确认结果沉淀到项目状态和档案
+1. 将 `.project-os/workspace-facts.json` 渲染为项目概览的工作区事实视图
+2. 用 README、PROJECT、package、git 和 `.project-os` 自动生成工作区事实
+3. 后续如开放编辑或写入治理文件，必须单独设计明确的写入动作和确认边界

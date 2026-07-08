@@ -77,7 +77,7 @@
     ],
     "blocked": [],
     "next": [
-      "设计老项目接入报告的数据结构和 UI",
+      "设计工作区事实的数据结构和 UI",
       "把项目概览接入 PROJECT.md、.project-os/state.json 和 project-profile 的真实事实源",
       "把当前进度接入 HANDOFF.md、git 状态和最近任务记录",
       "把启动方式接入 README、package.json、docs/RUNBOOK.md 和桌面端配置",

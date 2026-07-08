@@ -24,9 +24,10 @@ depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
 ## 最近完成
 
 - 2026-07-08 开始用 OmniDesk 自身验证工作区治理模型：工作区不再只被看作文件树或静态文档入口，而是“任意新老项目进入后，由 OmniDesk 维护项目事实、状态来源、更新时机和可信度”的项目治理层。
-- 已明确三种项目接入模式：新项目由 OmniDesk 生成最小治理骨架；老项目先只读扫描已有文件、git 状态、运行配置和 `.project-os`，生成接入草案，用户确认后再沉淀；临时项目允许只读打开，不写治理文件。
-- 已更新 `PROJECT.md`、`.project-os/state.json` 和 `.project-os/project-profile.json`，记录工作区治理口径、老项目接入流程、成功标准和当前风险。下一步应把“项目接入报告”做成真实 UI / 数据结构，并把项目概览、当前进度、启动方式、风险边界、本地状态接到真实项目事实源。
-- 老项目接入报告 v0.1 已落地为结构契约和 OmniDesk 自身样例：`schemas/project-onboarding-report.schema.json` 定义字段，`.project-os/onboarding-report.json` 记录 OmniDesk 的项目概览、当前进度、启动方式、风险边界、本地状态、证据、缺失项、风险和建议动作。下一步优先把它渲染到项目概览页。
+- 已明确三种项目进入模式：新项目由 OmniDesk 生成最小治理骨架；老项目添加到工作区后默认自动接入 OmniDesk 工作区，先只读扫描已有文件、git 状态、运行配置和 `.project-os`；临时项目允许只读打开，不写治理文件。
+- 已更新 `PROJECT.md`、`.project-os/state.json` 和 `.project-os/project-profile.json`，记录工作区治理口径、老项目接入流程、成功标准和当前风险。下一步应把项目概览、当前进度、启动方式、风险边界、本地状态接到真实项目事实源。
+- 工作区事实 v0.1 已落地为结构契约和 OmniDesk 自身样例：`schemas/workspace-facts.schema.json` 定义字段，`.project-os/workspace-facts.json` 记录 OmniDesk 的项目概览、当前进度、启动方式、风险边界、本地状态、事实来源、缺失项、风险和建议动作。
+- 产品口径已调整：项目概览前台展示“工作区事实”，项目默认自动接入 OmniDesk 工作区；当前工程文件区域只预览不编辑，不直接修改用户工程文件。后续如果开放写入治理文件或编辑工程文件，需要单独设计明确写入动作和确认边界。
 - 交互规则已统一为“主流对话优先”：默认先直接回答或处理当前问题，不主动拆任务、不展示内部路由 / Steps / Checks / 审批流；只有删除/覆盖、发布/push、批量重构、有副作用命令、需求明显不清或用户明确要求计划时，才先说明方案并等待确认。源 `AGENTS.md`、分发模板 `templates/project/AGENTS.md` 和 Codex adapter 已同步。
 - 根 `AGENTS.md` 按官方风格收口：保留 Quick Start、Commands、Working Boundaries、Routing Summary、协作边界和短引用。
 - 新增 `docs/ROUTING.md` 作为 Project OS 请求分流和固定第一响应的 SSOT；根 `AGENTS.md` 只保留摘要和链接。

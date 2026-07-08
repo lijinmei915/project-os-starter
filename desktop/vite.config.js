@@ -13,6 +13,7 @@ const previewFiles = new Map([
   ["/.project-os/model-catalog.json", path.join(rootDir, ".project-os/model-catalog.json")],
   ["/.project-os/model-health.json", path.join(rootDir, ".project-os/model-health.json")],
   ["/.project-os/project-profile.json", path.join(rootDir, ".project-os/project-profile.json")],
+  ["/.project-os/workspace-facts.json", path.join(rootDir, ".project-os/workspace-facts.json")],
   ["/.project-os/desktop-registry.json", path.join(rootDir, ".project-os/desktop-registry.json")],
   ["/.project-os/task-backlog.json", path.join(rootDir, ".project-os/task-backlog.json")],
   ["/.project-os/goals.json", path.join(rootDir, ".project-os/goals.json")],
@@ -331,6 +332,7 @@ function workspaceSnapshotPreview() {
     goalValidation: readJsonAt(projectRoot, ".project-os/goal-validation.json", { criteria: [] }),
     goalValidationReport: readJsonAt(projectRoot, ".project-os/goal-validation-report.json", { status: "missing", checks: [] }),
     goalSignoffHistory: readJsonAt(projectRoot, ".project-os/goal-signoff-history.json", { entries: [] }),
+    workspaceFacts: readJsonAt(projectRoot, ".project-os/workspace-facts.json", null),
     projectProfile: profileForPreview(readJsonAt(projectRoot, ".project-os/project-profile.json", { fields: {} }), {
       agentsMd: readTextAt(projectRoot, "AGENTS.md"),
       handoff: readTextAt(projectRoot, "HANDOFF.md"),

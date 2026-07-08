@@ -1,14 +1,15 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
+use notify::{Config as NotifyConfig, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, State};
 
@@ -104,6 +105,7 @@ struct WorkspaceSnapshot {
     queue: Vec<QueueItem>,
     memory: Vec<MemoryItem>,
     project_profile: ProjectProfile,
+    workspace_facts: Value,
     goal_validation: Value,
     goal_validation_report: Value,
     goal_signoff_history: Value,
@@ -114,6 +116,20 @@ struct WorkspaceSnapshot {
 #[derive(Default)]
 struct TerminalState {
     sessions: Mutex<HashMap<String, TerminalSession>>,
+}
+
+struct WorkspaceWatcherState {
+    watcher: Mutex<Option<RecommendedWatcher>>,
+    root: Mutex<String>,
+}
+
+impl Default for WorkspaceWatcherState {
+    fn default() -> Self {
+        Self {
+            watcher: Mutex::new(None),
+            root: Mutex::new(String::new()),
+        }
+    }
 }
 
 struct TerminalSession {
@@ -480,6 +496,13 @@ struct TerminalOutputEvent {
     data: String,
 }
 
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct WorkspaceFilesChangedEvent {
+    path: String,
+    root: String,
+}
+
 fn default_terminal_session_id() -> String {
     "main".to_string()
 }
@@ -624,6 +647,8 @@ fn get_workspace_snapshot() -> Result<WorkspaceSnapshot, String> {
         .unwrap_or_else(|| json!({ "status": "missing", "checks": [] }));
     let goal_signoff_history = read_json(root.join(".project-os/goal-signoff-history.json"))
         .unwrap_or_else(|| json!({ "entries": [] }));
+    let workspace_facts = read_json(root.join(".project-os/workspace-facts.json"))
+        .unwrap_or_else(|| json!(null));
     let run_count = count_run_records(&root);
     let (file_count, docs_count) = count_workspace_files(&root);
 
@@ -690,6 +715,7 @@ fn get_workspace_snapshot() -> Result<WorkspaceSnapshot, String> {
             },
         ],
         project_profile: build_project_profile(&root, &project_name),
+        workspace_facts,
         goal_validation,
         goal_validation_report,
         goal_signoff_history,
@@ -705,6 +731,121 @@ fn get_workspace_snapshot() -> Result<WorkspaceSnapshot, String> {
             ),
         ],
     })
+}
+
+#[tauri::command]
+fn refresh_workspace_facts_preview() -> Result<Value, String> {
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let current_project = current_registry_project(&mut registry, &app_root)?;
+    let root = PathBuf::from(&current_project.path);
+    Ok(build_workspace_facts_preview(&root, &current_project.name))
+}
+
+fn should_ignore_watch_path(path: &Path) -> bool {
+    path.components().any(|component| {
+        let name = component.as_os_str().to_string_lossy();
+        matches!(
+            name.as_ref(),
+            ".git"
+                | "node_modules"
+                | "target"
+                | "dist"
+                | "build"
+                | ".next"
+                | ".nuxt"
+                | ".vite"
+                | ".turbo"
+                | ".cache"
+                | "coverage"
+                | ".DS_Store"
+        )
+    }) || path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .map(|name| name.starts_with(".env") || name.ends_with(".lock"))
+        .unwrap_or(false)
+}
+
+fn watch_event_should_refresh(event: &Event) -> bool {
+    matches!(
+        event.kind,
+        EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_) | EventKind::Any
+    ) && event.paths.iter().any(|path| !should_ignore_watch_path(path))
+}
+
+#[tauri::command]
+fn start_workspace_file_watcher(
+    app: AppHandle,
+    state: State<WorkspaceWatcherState>,
+) -> Result<String, String> {
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let current_project = current_registry_project(&mut registry, &app_root)?;
+    let root = PathBuf::from(&current_project.path)
+        .canonicalize()
+        .map_err(|err| format!("项目目录不可访问: {}", err))?;
+    let root_text = root.to_string_lossy().to_string();
+
+    {
+        let current_root = state.root.lock().map_err(|err| err.to_string())?;
+        if *current_root == root_text {
+            return Ok(root_text);
+        }
+    }
+
+    let last_emit = Arc::new(Mutex::new(Instant::now() - Duration::from_secs(10)));
+    let emit_root = root.clone();
+    let emit_root_text = root_text.clone();
+    let emit_app = app.clone();
+    let emit_guard = Arc::clone(&last_emit);
+    let mut watcher = RecommendedWatcher::new(
+        move |result: Result<Event, notify::Error>| {
+            let Ok(event) = result else {
+                return;
+            };
+            if !watch_event_should_refresh(&event) {
+                return;
+            }
+            let Ok(mut last) = emit_guard.lock() else {
+                return;
+            };
+            if last.elapsed() < Duration::from_millis(1200) {
+                return;
+            }
+            *last = Instant::now();
+            let relative = event
+                .paths
+                .iter()
+                .find(|path| !should_ignore_watch_path(path))
+                .and_then(|path| path.strip_prefix(&emit_root).ok())
+                .map(|path| path.to_string_lossy().replace('\\', "/"))
+                .unwrap_or_else(|| "project".to_string());
+            let _ = emit_app.emit(
+                "workspace://files-changed",
+                WorkspaceFilesChangedEvent {
+                    path: relative,
+                    root: emit_root_text.clone(),
+                },
+            );
+        },
+        NotifyConfig::default(),
+    )
+    .map_err(|err| format!("无法启动工程文件监听: {}", err))?;
+    watcher
+        .watch(&root, RecursiveMode::Recursive)
+        .map_err(|err| format!("无法监听项目目录: {}", err))?;
+
+    {
+        let mut watcher_slot = state.watcher.lock().map_err(|err| err.to_string())?;
+        *watcher_slot = Some(watcher);
+    }
+    {
+        let mut current_root = state.root.lock().map_err(|err| err.to_string())?;
+        *current_root = root_text.clone();
+    }
+
+    Ok(root_text)
 }
 
 fn goal_stack_from_validation(
@@ -3575,6 +3716,644 @@ fn build_project_profile(root: &Path, project_name: &str) -> ProjectProfile {
     }
 }
 
+fn package_scripts_summary(root: &Path) -> String {
+    let package_paths = ["package.json", "desktop/package.json"];
+    let mut scripts = Vec::new();
+    for relative in package_paths {
+        let Some(package_json) = read_json(root.join(relative)) else {
+            continue;
+        };
+        if let Some(script_map) = package_json.get("scripts").and_then(Value::as_object) {
+            for key in ["dev", "web:dev", "web:build", "build", "test", "lint"] {
+                if let Some(value) = script_map.get(key).and_then(Value::as_str) {
+                    scripts.push(format!("{}: {}", key, value));
+                }
+            }
+        }
+    }
+    scripts.join("；")
+}
+
+fn detected_stack(root: &Path) -> Vec<String> {
+    let mut stack = Vec::new();
+    if root.join("desktop/src-tauri/Cargo.toml").exists() || root.join("src-tauri/Cargo.toml").exists() {
+        stack.push("Tauri".to_string());
+        stack.push("Rust".to_string());
+    }
+    for relative in ["package.json", "desktop/package.json"] {
+        let Some(package_json) = read_json(root.join(relative)) else {
+            continue;
+        };
+        let deps = ["dependencies", "devDependencies"]
+            .iter()
+            .filter_map(|key| package_json.get(key).and_then(Value::as_object))
+            .flat_map(|deps| deps.keys().cloned())
+            .collect::<Vec<_>>();
+        if deps.iter().any(|name| name == "react" || name == "react-dom") {
+            stack.push("React".to_string());
+        }
+        if deps.iter().any(|name| name == "vite" || name == "@vitejs/plugin-react") {
+            stack.push("Vite".to_string());
+        }
+    }
+    if root.join(".project-os").exists() {
+        stack.push("Project OS".to_string());
+    }
+    stack.sort();
+    stack.dedup();
+    stack
+}
+
+fn git_status_summary(root: &Path) -> String {
+    let Ok(output) = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .arg("status")
+        .arg("--short")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .output()
+    else {
+        return "未读取到 git 状态。".to_string();
+    };
+    if !output.status.success() {
+        return "当前目录可能不是 git 仓库。".to_string();
+    }
+    let text = String::from_utf8_lossy(&output.stdout);
+    let count = text.lines().filter(|line| !line.trim().is_empty()).count();
+    if count == 0 {
+        "git 工作区干净。".to_string()
+    } else {
+        format!("git 工作区有 {} 个变更项。", count)
+    }
+}
+
+fn should_skip_governance_dir(name: &str) -> bool {
+    matches!(
+        name,
+        "node_modules"
+            | "target"
+            | "dist"
+            | "build"
+            | ".git"
+            | ".next"
+            | ".nuxt"
+            | ".vite"
+            | ".turbo"
+            | ".cache"
+            | "coverage"
+    )
+}
+
+fn is_governance_text_file(path: &Path) -> bool {
+    let file_name = path.file_name().and_then(|value| value.to_str()).unwrap_or("");
+    if file_name.starts_with(".env") || file_name.ends_with(".lock") {
+        return false;
+    }
+    matches!(
+        path.extension().and_then(|value| value.to_str()),
+        Some(
+            "md" | "mdx"
+                | "txt"
+                | "json"
+                | "jsonc"
+                | "yaml"
+                | "yml"
+                | "toml"
+                | "js"
+                | "jsx"
+                | "ts"
+                | "tsx"
+                | "css"
+                | "scss"
+                | "html"
+                | "rs"
+                | "sh"
+                | "py"
+                | "sql"
+        )
+    )
+}
+
+fn collect_governance_files(root: &Path) -> Vec<String> {
+    const MAX_FILES: usize = 360;
+    const MAX_DEPTH: usize = 5;
+    let mut files = Vec::new();
+    let mut stack = vec![(root.to_path_buf(), 0usize)];
+
+    while let Some((dir, depth)) = stack.pop() {
+        if files.len() >= MAX_FILES || depth > MAX_DEPTH {
+            continue;
+        }
+        let Ok(entries) = fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let name = entry.file_name().to_string_lossy().to_string();
+            if path.is_dir() {
+                if should_skip_governance_dir(&name) {
+                    continue;
+                }
+                stack.push((path, depth + 1));
+                continue;
+            }
+            if !is_governance_text_file(&path) {
+                continue;
+            }
+            let Ok(relative) = path.strip_prefix(root) else {
+                continue;
+            };
+            let relative = relative.to_string_lossy().replace('\\', "/");
+            if relative.contains(".project-os/desktop-provider") {
+                continue;
+            }
+            files.push(relative);
+            if files.len() >= MAX_FILES {
+                break;
+            }
+        }
+    }
+
+    files.sort();
+    files
+}
+
+fn push_domain_file(domains: &mut HashMap<&'static str, Vec<String>>, domain: &'static str, file: &str) {
+    domains.entry(domain).or_default().push(file.to_string());
+}
+
+fn classify_governance_file(file: &str, domains: &mut HashMap<&'static str, Vec<String>>) {
+    let lower = file.to_lowercase();
+    if matches!(file, "PROJECT.md" | "README.md" | "HANDOFF.md")
+        || lower.contains("project-profile")
+        || lower.ends_with("state.json")
+    {
+        push_domain_file(domains, "project-identity", file);
+    }
+    if file == "HANDOFF.md" || lower.contains("goals") || lower.contains("/runs/") {
+        push_domain_file(domains, "current-progress", file);
+    }
+    if lower.ends_with("package.json")
+        || lower.contains("runbook")
+        || lower.contains("readme")
+        || lower.starts_with("scripts/")
+    {
+        push_domain_file(domains, "runbook", file);
+    }
+    if file == "AGENTS.md"
+        || lower.contains("routing")
+        || lower.contains("security")
+        || lower.contains("lesson")
+        || lower.contains("risk")
+    {
+        push_domain_file(domains, "risk-boundary", file);
+    }
+    if lower.starts_with(".project-os/") {
+        push_domain_file(domains, "local-state", file);
+    }
+    if lower.starts_with("docs/")
+        || lower.contains("architecture")
+        || lower.contains("design")
+        || lower.contains("code_structure")
+        || lower.starts_with("schemas/")
+    {
+        push_domain_file(domains, "design-implementation", file);
+    }
+    if lower.starts_with("desktop/src")
+        || lower.starts_with("desktop/src-tauri")
+        || lower.starts_with("scripts/")
+        || lower.starts_with("adapters/")
+        || lower.starts_with("templates/")
+    {
+        push_domain_file(domains, "engineering-assets", file);
+    }
+}
+
+fn domain_files(
+    domains: &HashMap<&'static str, Vec<String>>,
+    id: &'static str,
+    fallback: Vec<&str>,
+) -> Vec<String> {
+    let mut seen = HashSet::new();
+    let mut files = domains
+        .get(id)
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|file| seen.insert(file.clone()))
+        .collect::<Vec<_>>();
+    if files.is_empty() {
+        files = fallback.into_iter().map(String::from).collect();
+    }
+    files.truncate(12);
+    files
+}
+
+fn git_changed_files(root: &Path) -> HashSet<String> {
+    let Ok(output) = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .arg("status")
+        .arg("--porcelain")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .output()
+    else {
+        return HashSet::new();
+    };
+    if !output.status.success() {
+        return HashSet::new();
+    }
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter_map(|line| {
+            let path = line.get(3..)?.trim();
+            let path = path.split(" -> ").last().unwrap_or(path);
+            if path.is_empty() {
+                None
+            } else {
+                Some(path.to_string())
+            }
+        })
+        .collect()
+}
+
+fn governance_file_status(root: &Path, changed: &HashSet<String>, file: &str) -> &'static str {
+    if file.contains('*') || file.ends_with('/') {
+        return "ignored";
+    }
+    if file.starts_with(".project-os/runs/") {
+        return "generated";
+    }
+    if changed.contains(file) {
+        return "changed";
+    }
+    if root.join(file).exists() {
+        return "found";
+    }
+    "missing"
+}
+
+fn governance_file_statuses(root: &Path, changed: &HashSet<String>, files: &[String]) -> Vec<Value> {
+    files
+        .iter()
+        .map(|file| {
+            let status = governance_file_status(root, changed, file);
+            json!({
+                "path": file,
+                "status": status,
+                "previewable": status != "ignored" && root.join(file).is_file()
+            })
+        })
+        .collect()
+}
+
+fn governance_status_summary(file_statuses: &[Value]) -> Value {
+    let mut counts: HashMap<&str, usize> = HashMap::new();
+    for item in file_statuses {
+        let status = item.get("status").and_then(Value::as_str).unwrap_or("found");
+        *counts.entry(status).or_insert(0) += 1;
+    }
+    json!({
+        "found": counts.get("found").copied().unwrap_or(0),
+        "missing": counts.get("missing").copied().unwrap_or(0),
+        "changed": counts.get("changed").copied().unwrap_or(0),
+        "stale": counts.get("stale").copied().unwrap_or(0),
+        "generated": counts.get("generated").copied().unwrap_or(0),
+        "ignored": counts.get("ignored").copied().unwrap_or(0)
+    })
+}
+
+fn governance_domain_json(
+    root: &Path,
+    changed: &HashSet<String>,
+    classified: &HashMap<&'static str, Vec<String>>,
+    id: &'static str,
+    title: &'static str,
+    description: &'static str,
+    fallback: Vec<&str>,
+    updates_when: &'static str,
+) -> Value {
+    let files = domain_files(classified, id, fallback);
+    let file_statuses = governance_file_statuses(root, changed, &files);
+    let status_summary = governance_status_summary(&file_statuses);
+    json!({
+        "id": id,
+        "title": title,
+        "description": description,
+        "files": files,
+        "fileStatuses": file_statuses,
+        "statusSummary": status_summary,
+        "updatesWhen": updates_when
+    })
+}
+
+fn governance_domains_from_files(root: &Path) -> Vec<Value> {
+    let files = collect_governance_files(root);
+    let mut classified: HashMap<&'static str, Vec<String>> = HashMap::new();
+    for file in &files {
+        classify_governance_file(file, &mut classified);
+    }
+    let changed = git_changed_files(root);
+
+    vec![
+        governance_domain_json(root, &changed, &classified, "project-identity", "项目概览", "项目身份、定位、类型和生命周期。", vec!["PROJECT.md", "README.md", ".project-os/project-profile.json", ".project-os/state.json"], "项目定位、类型、阶段或工作区状态变化时自动刷新。"),
+        governance_domain_json(root, &changed, &classified, "current-progress", "当前进度", "最近完成、当前推进和下一步。", vec!["HANDOFF.md", "PROJECT.md", ".project-os/goals.json", ".project-os/state.json"], "目标任务、交接记录或 git 状态变化时自动刷新。"),
+        governance_domain_json(root, &changed, &classified, "runbook", "启动方式", "启动、构建、验证和常用脚本。", vec!["package.json", "desktop/package.json", "docs/RUNBOOK.md", "desktop/README.md"], "package scripts、运行说明或桌面端配置变化时自动刷新。"),
+        governance_domain_json(root, &changed, &classified, "risk-boundary", "风险边界", "不可随意改动的约束、风险和协作边界。", vec!["HANDOFF.md", "PROJECT.md", ".project-os/project-profile.json"], "协作规则、风险说明或项目档案变化时自动刷新。"),
+        governance_domain_json(root, &changed, &classified, "local-state", "本地状态", "Git、本地工作区、运行状态和 Project OS 状态。", vec![".project-os/state.json", ".project-os/runs/", ".project-os/desktop-registry.json"], "文件变更、git 状态或 Project OS 运行状态变化时自动刷新。"),
+        governance_domain_json(root, &changed, &classified, "design-implementation", "设计实现", "架构、界面规范、数据契约和实现结构。", vec!["docs/ARCHITECTURE.md", "docs/DESIGN_STANDARDS.md", "schemas/*", "desktop/src/*"], "架构、设计 token、schema 或源码入口变化时自动刷新。"),
+        governance_domain_json(root, &changed, &classified, "engineering-assets", "工程资产", "源码、脚本、模板和适配器。", vec!["desktop/src/*", "desktop/src-tauri/*", "scripts/*", "templates/*"], "源码、脚本、模板或适配器文件变化时自动刷新。"),
+    ]
+}
+
+fn score_from_checks(checks: &[bool]) -> i32 {
+    if checks.is_empty() {
+        return 0;
+    }
+    let passed = checks.iter().filter(|value| **value).count() as f32;
+    ((passed / checks.len() as f32) * 100.0).round() as i32
+}
+
+fn health_status(score: i32) -> &'static str {
+    if score >= 85 {
+        "healthy"
+    } else if score >= 70 {
+        "good"
+    } else if score >= 50 {
+        "watch"
+    } else {
+        "risk"
+    }
+}
+
+fn build_health_score(
+    root: &Path,
+    profile: &ProjectProfile,
+    overview: &str,
+    scripts: &str,
+    risk_boundary: &str,
+    governance_domains: &[Value],
+) -> Value {
+    let project_identity = score_from_checks(&[
+        !overview.trim().is_empty(),
+        !profile.phase_summary.trim().is_empty(),
+        !profile.architecture_summary.trim().is_empty(),
+        root.join(".project-os/project-profile.json").exists(),
+    ]);
+    let governed_file_count = governance_domains
+        .iter()
+        .filter_map(|domain| domain.get("files").and_then(Value::as_array))
+        .map(|files| files.len())
+        .sum::<usize>();
+    let engineering_files = score_from_checks(&[
+        governed_file_count >= 8,
+        root.join("PROJECT.md").exists() || root.join("README.md").exists(),
+        root.join("HANDOFF.md").exists(),
+        root.join(".project-os/state.json").exists(),
+    ]);
+    let run_validation = score_from_checks(&[
+        !scripts.trim().is_empty(),
+        scripts.contains("dev"),
+        scripts.contains("build") || !profile.check_commands.trim().is_empty(),
+        scripts.contains("test") || scripts.contains("lint") || !profile.check_commands.trim().is_empty(),
+    ]);
+    let risk_boundary_score = score_from_checks(&[
+        !risk_boundary.trim().is_empty(),
+        !profile.collaboration_rules.trim().is_empty(),
+        root.join("AGENTS.md").exists(),
+        root.join("HANDOFF.md").exists(),
+    ]);
+    let continuous_governance = score_from_checks(&[
+        root.join(".project-os").exists(),
+        root.join(".project-os/runs").exists(),
+        root.join(".project-os/workspace-facts.json").exists(),
+        root.join(".github/workflows").exists() || root.join(".gitlab-ci.yml").exists(),
+    ]);
+    let dimensions = vec![
+        ("projectIdentity", "项目身份", project_identity, "项目名、定位、生命周期和项目档案完整度。"),
+        ("engineeringFiles", "工程文件", engineering_files, "关键文件识别和治理域覆盖情况。"),
+        ("runValidation", "启动验证", run_validation, "启动、构建、测试或检查命令识别情况。"),
+        ("riskBoundary", "风险边界", risk_boundary_score, "风险说明、权限边界和协作规则完整度。"),
+        ("continuousGovernance", "持续治理", continuous_governance, "本地状态、运行记录和 CI/定期扫描入口。"),
+    ];
+    let total = (dimensions.iter().map(|(_, _, score, _)| *score).sum::<i32>() as f32
+        / dimensions.len() as f32)
+        .round() as i32;
+
+    json!({
+        "score": total,
+        "status": health_status(total),
+        "label": format!("{} / 100", total),
+        "summary": if total >= 85 {
+            "项目治理基础扎实，可以推进持续治理。"
+        } else if total >= 70 {
+            "项目已具备治理基础，建议补齐关键短板。"
+        } else if total >= 50 {
+            "项目已有部分治理信号，需要继续补齐事实源。"
+        } else {
+            "项目治理信号较弱，建议从只读体检和基础档案开始。"
+        },
+        "dimensions": dimensions.into_iter().map(|(id, label, score, reason)| json!({
+            "id": id,
+            "label": label,
+            "score": score,
+            "status": health_status(score),
+            "reason": reason
+        })).collect::<Vec<_>>()
+    })
+}
+
+fn build_workspace_facts_preview(root: &Path, project_name: &str) -> Value {
+    let state_json = read_json(root.join(".project-os/state.json"));
+    let profile = build_project_profile(root, project_name);
+    let project_md = read_text(root, "PROJECT.md");
+    let handoff = read_text(root, "HANDOFF.md");
+    let runbook = read_text(root, "docs/RUNBOOK.md");
+    let stack = detected_stack(root);
+    let scripts = package_scripts_summary(root);
+    let git_status = git_status_summary(root);
+    let governance_domains = governance_domains_from_files(root);
+    let overview = first_non_empty(vec![
+        profile.overview.clone(),
+        json_string_value(&state_json, "/description"),
+        project_intro_from_project_md(&project_md, project_name),
+    ]);
+    let current_progress = first_non_empty(vec![
+        markdown_section(&handoff, &["最近完成", "当前验证", "下一步建议"]),
+        markdown_section(&project_md, &["当前进度", "下一步重点"]),
+        git_status.clone(),
+    ]);
+    let runbook_summary = first_non_empty(vec![
+        scripts.clone(),
+        markdown_section(&runbook, &["启动", "运行", "Commands"]),
+        profile.check_commands.clone(),
+    ]);
+    let risk_boundary = first_non_empty(vec![
+        markdown_section(&handoff, &["风险与注意", "风险"]),
+        profile_field_value(&read_json(root.join(".project-os/project-profile.json")), "memory.risks"),
+        "老项目默认只读扫描，用户确认前不修改工程文件。".to_string(),
+    ]);
+    let local_state = format!(
+        "{} {}",
+        git_status,
+        if root.join(".project-os").exists() { "已发现 .project-os 工作区状态。" } else { "未发现 .project-os 工作区状态。" }
+    );
+    let health_score = build_health_score(root, &profile, &overview, &scripts, &risk_boundary, &governance_domains);
+    let now = Command::new("date")
+        .arg("+%Y-%m-%dT%H:%M:%S%z")
+        .output()
+        .ok()
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .map(|text| text.trim().to_string())
+        .unwrap_or_else(|| "unknown".to_string());
+
+    json!({
+        "schemaVersion": "project-os.workspace-facts.v0.1",
+        "generatedAt": now,
+        "mode": if root.join(".project-os").exists() { "existing-project" } else { "temporary-readonly" },
+        "status": "connected",
+        "healthScore": health_score,
+        "governanceLevel": {
+            "current": "L1",
+            "name": "治理索引",
+            "description": "项目已零侵入接入，工程文件会被自动扫描、归类和只读预览。",
+            "next": "L2",
+            "nextName": "建议修复",
+            "levels": [
+                { "id": "L0", "name": "只读体检", "description": "扫描、识别、健康检查，不改工程文件。" },
+                { "id": "L1", "name": "治理索引", "description": "建立项目档案、治理域、工程文件索引和上下文记忆。" },
+                { "id": "L2", "name": "建议修复", "description": "生成问题解释、修复建议和变更提案草稿。" },
+                { "id": "L3", "name": "受控修复", "description": "用户确认后自动改文件、运行检查并沉淀记录。" },
+                { "id": "L4", "name": "持续治理", "description": "接入 CI 或定期任务，持续扫描、提醒和复审豁免。" }
+            ]
+        },
+        "project": {
+            "name": project_name,
+            "path": root.display().to_string(),
+            "kind": profile_field_value(&read_json(root.join(".project-os/project-profile.json")), "identity.type"),
+            "detectedStack": stack,
+            "lifecycle": json_string_value(&state_json, "/phase"),
+            "description": overview
+        },
+        "summary": {
+            "overview": {
+                "status": if overview.is_empty() { "missing" } else { "confirmed" },
+                "title": "项目概览",
+                "body": if overview.is_empty() { "尚未识别到项目概览。".to_string() } else { overview.clone() },
+                "sources": ["PROJECT.md", ".project-os/state.json", ".project-os/project-profile.json"],
+                "confidence": 0.82
+            },
+            "currentProgress": {
+                "status": if current_progress.is_empty() { "missing" } else { "inferred" },
+                "title": "当前进度",
+                "body": if current_progress.is_empty() { "尚未识别到当前进度。".to_string() } else { current_progress.clone() },
+                "sources": ["HANDOFF.md", "PROJECT.md", "git status"],
+                "confidence": 0.72
+            },
+            "runbook": {
+                "status": if runbook_summary.is_empty() { "missing" } else { "confirmed" },
+                "title": "启动方式",
+                "body": if runbook_summary.is_empty() { "尚未识别到启动方式。".to_string() } else { runbook_summary.clone() },
+                "sources": ["package.json", "desktop/package.json", "docs/RUNBOOK.md"],
+                "confidence": 0.78
+            },
+            "riskBoundary": {
+                "status": if risk_boundary.is_empty() { "missing" } else { "inferred" },
+                "title": "风险边界",
+                "body": if risk_boundary.is_empty() { "尚未识别到风险边界。".to_string() } else { risk_boundary.clone() },
+                "sources": ["HANDOFF.md", ".project-os/project-profile.json"],
+                "confidence": 0.68
+            },
+            "localState": {
+                "status": "confirmed",
+                "title": "本地状态",
+                "body": local_state,
+                "sources": ["git status", ".project-os/"],
+                "confidence": 0.82
+            }
+        },
+        "evidence": [
+            { "source": "PROJECT.md", "kind": "project-status", "status": if root.join("PROJECT.md").exists() { "found" } else { "missing" }, "note": "项目状态展示层。" },
+            { "source": "HANDOFF.md", "kind": "handoff", "status": if root.join("HANDOFF.md").exists() { "found" } else { "missing" }, "note": "当前交接和风险来源。" },
+            { "source": "desktop/package.json", "kind": "run-config", "status": if root.join("desktop/package.json").exists() { "found" } else { "missing" }, "note": "桌面端启动脚本来源。" },
+            { "source": ".project-os/state.json", "kind": "project-state", "status": if root.join(".project-os/state.json").exists() { "found" } else { "missing" }, "note": "机器可读项目状态。" },
+            { "source": ".project-os/project-profile.json", "kind": "project-profile", "status": if root.join(".project-os/project-profile.json").exists() { "found" } else { "missing" }, "note": "结构化项目档案。" }
+        ],
+        "governanceDomains": governance_domains,
+        "recommendations": [
+            {
+                "id": "rec-health-score",
+                "domain": "项目概览",
+                "title": "补齐项目健康评分",
+                "problem": "当前已建立治理索引，但缺少统一健康分，用户还难以判断项目整体治理水平。",
+                "impact": "后续无法稳定比较新老项目，也难以跟踪治理改善效果。",
+                "action": "基于文档完整度、启动方式、风险边界、本地状态和验证记录生成健康分。",
+                "severity": "medium",
+                "files": ["schemas/workspace-facts.schema.json", ".project-os/workspace-facts.json"],
+                "canPromoteToL3": false
+            },
+            {
+                "id": "rec-file-status",
+                "domain": "工程资产",
+                "title": "为治理文件增加状态",
+                "problem": "工程文件已经纳入治理域，但还没有区分已识别、缺失、过期和本地变更。",
+                "impact": "用户能看到文件列表，但无法快速判断哪些文件需要处理。",
+                "action": "为每个治理文件补充 status、lastSeen、changeKind 和 sourceType。",
+                "severity": "medium",
+                "files": ["desktop/src-tauri/src/main.rs", "desktop/src/main.jsx"],
+                "canPromoteToL3": false
+            },
+            {
+                "id": "rec-ci-governance",
+                "domain": "验证交付",
+                "title": "设计持续治理入口",
+                "problem": "当前联动更新只发生在本地工作台，尚未和 CI 或定期扫描形成闭环。",
+                "impact": "项目离开本地工作台后，治理状态可能无法持续更新。",
+                "action": "增加 CI/定时扫描适配入口，先生成建议和检查清单，不直接修改流水线。",
+                "severity": "low",
+                "files": ["docs/RUNBOOK.md", "desktop/package.json"],
+                "canPromoteToL3": false
+            },
+            {
+                "id": "rec-controlled-fix-entry",
+                "domain": "受控修复",
+                "title": "准备 L3 受控修复入口",
+                "problem": "L2 建议可以解释问题，但还没有把建议转成可审核的变更提案。",
+                "impact": "用户仍需要手动判断哪些建议可以进入自动修复。",
+                "action": "为建议增加生成 patch draft 的入口，只有用户确认后才进入 L3。",
+                "severity": "low",
+                "files": ["desktop/src/main.jsx", "desktop/src-tauri/src/main.rs"],
+                "canPromoteToL3": true
+            }
+        ],
+        "findings": {
+            "confirmed": [],
+            "missing": profile.missing_fields.iter().map(|field| json!({
+                "title": format!("{}待补齐", field),
+                "body": "该字段尚未从当前事实源中稳定识别。",
+                "severity": "low",
+                "sources": [".project-os/project-profile.json"]
+            })).collect::<Vec<_>>(),
+            "risks": [
+                {
+                    "title": "默认不修改工程文件",
+                    "body": "工程文件自动纳入治理索引，但当前只做预览和归类，不在这里直接编辑或改写原工程文件。",
+                    "severity": "info",
+                    "sources": ["OmniDesk workspace"]
+                }
+            ]
+        },
+        "recommendation": {
+            "action": "auto-managed",
+            "confidence": 0.74,
+            "reason": "当前项目处于 L1 治理索引，可继续升级到 L2 建议修复。",
+            "nextSteps": ["自动维护治理索引", "在工程文件区预览来源", "生成 L2 修复建议草稿"]
+        }
+    })
+}
+
 fn is_profile_field_allowed(key: &str) -> bool {
     matches!(
         key,
@@ -4573,9 +5352,12 @@ fn is_ignored_path(path: &Path) -> bool {
 fn main() {
     tauri::Builder::default()
         .manage(TerminalState::default())
+        .manage(WorkspaceWatcherState::default())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             get_workspace_snapshot,
+            refresh_workspace_facts_preview,
+            start_workspace_file_watcher,
             add_registry_project,
             switch_registry_project,
             rename_registry_project,

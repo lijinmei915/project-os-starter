@@ -149,6 +149,7 @@ const fallbackSnapshot = {
     userPreferences: "",
     missingFields: ["项目简介", "长期目标", "目标用户", "使用场景", "用户偏好"],
   },
+  workspaceFacts: null,
   trace: [
     "BOOT: browser preview fallback.",
     "INDEX: waiting for Tauri Local Agent Core.",
@@ -300,6 +301,15 @@ async function loadWorkspaceSnapshot() {
 
   const { invoke } = await import("@tauri-apps/api/core");
   return invoke("get_workspace_snapshot");
+}
+
+async function refreshWorkspaceFactsPreview() {
+  if (!isTauriRuntime()) {
+    return loadPreviewJson("/.project-os/workspace-facts.json", null);
+  }
+
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke("refresh_workspace_facts_preview");
 }
 
 async function runGoalValidationCheck() {
@@ -489,6 +499,7 @@ async function loadPreviewWorkspaceSnapshot() {
   const currentProject = registryProjects.find((project) => project.id === registry.currentProjectId) || registryProjects[0] || fallbackSnapshot.projects[0];
   const projectProfileFile = await loadPreviewJson("/.project-os/project-profile.json", null);
   const projectProfile = previewProjectProfile(projectProfileFile);
+  const workspaceFacts = await loadPreviewJson("/.project-os/workspace-facts.json", null);
   const queue = Array.isArray(backlog.items) && backlog.items.length
     ? backlog.items.map((item) => ({
         id: item.id,
@@ -518,6 +529,7 @@ async function loadPreviewWorkspaceSnapshot() {
     goalSignoffHistory,
     goals,
     projectProfile,
+    workspaceFacts,
   };
 }
 
@@ -2026,7 +2038,7 @@ function AgentWorkspace({
         if (tab.kind === "file") {
           return (
             <TabsContent className="workspaceTabContent fileCanvas" key={tab.id} value={tab.id}>
-              <EngineeringFileTab selectedEngineeringFile={tab.file} />
+              <EngineeringFileTab selectedEngineeringFile={tab.file} snapshot={snapshot} />
             </TabsContent>
           );
         }
@@ -2378,8 +2390,385 @@ function TerminalDock({
   );
 }
 
-function EngineeringFileTab({ selectedEngineeringFile }) {
+function statusLabel(status) {
+  return {
+    confirmed: "已确认",
+    inferred: "推断",
+    missing: "缺失",
+    stale: "需更新",
+    conflict: "冲突",
+    draft: "草稿",
+    "needs-review": "待审阅",
+    connected: "已接入",
+    "preview-managed": "预览治理",
+    "ready-to-confirm": "已接入",
+    blocked: "受阻",
+  }[status] || status || "未知";
+}
+
+function actionLabel(action) {
+  return {
+    "auto-managed": "自动治理",
+    "preview-only": "仅预览",
+    "confirm-workspace": "已自动接入",
+    "keep-readonly": "仅预览",
+    "request-more-info": "需要补充信息",
+    "block-workspace": "暂不建议接入",
+  }[action] || action || "建议";
+}
+
+function governanceFileStatusLabel(status) {
+  return {
+    found: "已识别",
+    missing: "缺失",
+    changed: "有变更",
+    stale: "可能过期",
+    generated: "生成记录",
+    ignored: "规则",
+  }[status] || status || "未知";
+}
+
+function governanceStatusSummaryText(summary, fallbackCount = 0) {
+  if (!summary) return `${fallbackCount} 个文件`;
+  return [
+    summary.found ? `${summary.found} found` : "",
+    summary.changed ? `${summary.changed} changed` : "",
+    summary.missing ? `${summary.missing} missing` : "",
+    summary.generated ? `${summary.generated} generated` : "",
+    summary.ignored ? `${summary.ignored} ignored` : "",
+  ].filter(Boolean).join(" / ") || `${fallbackCount} 个文件`;
+}
+
+function WorkspaceFactsPreview({ report }) {
+  const [currentReport, setCurrentReport] = useState(report);
+  const [refreshing, setRefreshing] = useState(false);
+  const [feedback, setFeedback] = useState("");
+  const [autoRefreshKey, setAutoRefreshKey] = useState("");
+  const [openDomainId, setOpenDomainId] = useState("");
+  const [governanceFile, setGovernanceFile] = useState(null);
+  useEffect(() => {
+    setCurrentReport(report);
+  }, [report]);
+  const quickEntries = [
+    ["currentProgress", "当前进度", "进展、最近完成和下一步"],
+    ["runbook", "启动方式", "运行、构建和验证命令"],
+    ["riskBoundary", "风险边界", "约束、风险和不可触碰区"],
+    ["localState", "本地状态", "Git、工作区和本地变化"],
+  ].map(([key, fallbackTitle, description]) => ({
+    key,
+    title: currentReport?.summary?.[key]?.title || fallbackTitle,
+    description,
+    status: currentReport?.summary?.[key]?.status,
+    confidence: currentReport?.summary?.[key]?.confidence,
+    sources: currentReport?.summary?.[key]?.sources || [],
+  }));
+  const evidence = Array.isArray(currentReport?.evidence) ? currentReport.evidence : [];
+  const missing = Array.isArray(currentReport?.findings?.missing) ? currentReport.findings.missing : [];
+  const risks = Array.isArray(currentReport?.findings?.risks) ? currentReport.findings.risks : [];
+  const governanceDomains = Array.isArray(currentReport?.governanceDomains) ? currentReport.governanceDomains : [];
+  const recommendations = Array.isArray(currentReport?.recommendations) ? currentReport.recommendations : [];
+  const healthScore = currentReport?.healthScore || {};
+  const healthDimensions = Array.isArray(healthScore.dimensions) ? healthScore.dimensions : [];
+  const governanceLevel = currentReport?.governanceLevel || {};
+  const governanceLevels = Array.isArray(governanceLevel.levels) ? governanceLevel.levels : [];
+  const sourceNames = [...new Set(evidence.filter((item) => item.status === "found").map((item) => item.source))].slice(0, 6);
+  const detectedStack = (currentReport?.project?.detectedStack || []).join(" / ");
+  const metaParts = [
+    currentReport?.project?.kind,
+    currentReport?.project?.lifecycle,
+    detectedStack,
+  ].filter(Boolean);
+  const refreshFacts = async (source = "manual") => {
+      setRefreshing(true);
+      setFeedback(source === "auto" ? "正在自动更新工作区事实..." : "正在手动刷新当前项目事实...");
+      try {
+        const nextReport = await refreshWorkspaceFactsPreview();
+        if (nextReport) setCurrentReport(nextReport);
+        setFeedback(source === "auto"
+          ? "已自动更新：结果只刷新在工作区，没有写入工程文件。"
+          : "已完成手动刷新：结果只刷新在工作区，没有写入工程文件。");
+      } catch (err) {
+        setFeedback(`${source === "auto" ? "自动更新" : "手动刷新"}失败：${err?.message || err}`);
+      } finally {
+        setRefreshing(false);
+      }
+  };
+  useEffect(() => {
+    const nextKey = [report?.project?.path, report?.generatedAt].filter(Boolean).join("|");
+    if (!nextKey || nextKey === autoRefreshKey) return;
+    setAutoRefreshKey(nextKey);
+    refreshFacts("auto");
+  }, [report?.project?.path, report?.generatedAt, autoRefreshKey]);
+  const handleWorkspaceAction = async (nextMode) => {
+    if (nextMode === "refresh") {
+      await refreshFacts("manual");
+      return;
+    }
+  };
+  const previewGovernanceFile = async (path) => {
+    if (!path || path.includes("*") || path.endsWith("/")) {
+      setGovernanceFile({
+        error: "这是目录或匹配规则，暂不直接预览。请选择具体文件。",
+        path,
+      });
+      return;
+    }
+    setGovernanceFile({ loading: true, path });
+    try {
+      const preview = await invokeWorkspaceCommand("read_engineering_file", {
+        input: { path },
+      });
+      setGovernanceFile({ path, preview });
+    } catch (err) {
+      setGovernanceFile({
+        error: err instanceof Error ? err.message : String(err),
+        path,
+      });
+    }
+  };
+
+  return (
+    <div className="workspaceFacts">
+      <div className="workspaceFactsHero">
+        <div>
+          <span className="workspaceFactsKicker">工作区事实</span>
+          <h3>{currentReport?.project?.name || "当前项目"}</h3>
+          <p>{currentReport?.project?.description || "OmniDesk 已理解当前项目，并把关键事实整理到工作区视图里。"}</p>
+          {metaParts.length ? <div className="workspaceFactsMeta">{metaParts.join(" · ")}</div> : null}
+        </div>
+        <div className="workspaceFactsStatus">
+          <Badge>{statusLabel(currentReport?.status)}</Badge>
+          <span>已自动接入工作区</span>
+        </div>
+      </div>
+
+      <Notice variant="info">项目已自动接入 OmniDesk 工作区。当前工程文件仅支持预览，不会在这里直接编辑或改写你的工程文件。</Notice>
+      <div className="workspaceFactsActions" aria-label="工作区事实操作">
+        <Button size="sm" variant="subtle" type="button" disabled={refreshing} onClick={() => handleWorkspaceAction("refresh")}>{refreshing ? "更新中" : "手动刷新"}</Button>
+      </div>
+      {feedback ? <Notice variant="success">{feedback}</Notice> : null}
+
+      {Number.isFinite(healthScore.score) ? (
+        <section className="workspaceHealthScore">
+          <header>
+            <div>
+              <span>治理健康分</span>
+              <strong>{healthScore.label || `${healthScore.score} / 100`}</strong>
+              <p>{healthScore.summary}</p>
+            </div>
+            <Badge>{healthScore.status || "score"}</Badge>
+          </header>
+          {healthDimensions.length ? (
+            <div className="workspaceHealthDimensions">
+              {healthDimensions.map((dimension) => (
+                <div className="workspaceHealthDimension" key={dimension.id}>
+                  <div>
+                    <strong>{dimension.label}</strong>
+                    <span>{dimension.score}</span>
+                  </div>
+                  <meter min="0" max="100" value={dimension.score} aria-label={`${dimension.label} ${dimension.score}`} />
+                  <p>{dimension.reason}</p>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {governanceLevel.current ? (
+        <section className="workspaceGovernanceLevel">
+          <header>
+            <div>
+              <span>当前治理等级</span>
+              <strong>{governanceLevel.current} {governanceLevel.name}</strong>
+              <p>{governanceLevel.description}</p>
+            </div>
+            {governanceLevel.next ? (
+              <Badge>下一步 {governanceLevel.next} {governanceLevel.nextName}</Badge>
+            ) : null}
+          </header>
+          {governanceLevels.length ? (
+            <div className="workspaceGovernanceLevelTrack">
+              {governanceLevels.map((level) => (
+                <div
+                  className={`workspaceGovernanceLevelStep${level.id === governanceLevel.current ? " active" : ""}`}
+                  key={level.id}
+                  title={level.description}
+                >
+                  <span>{level.id}</span>
+                  <strong>{level.name}</strong>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      <div className="workspaceFactsQuickEntries" aria-label="项目治理入口">
+        {quickEntries.map((entry) => (
+          <section className="workspaceFactsQuickEntry" key={entry.key}>
+            <header>
+              <strong>{entry.title}</strong>
+              <span>{statusLabel(entry.status)}{entry.confidence ? ` · ${Math.round(entry.confidence * 100)}%` : ""}</span>
+            </header>
+            <p>{entry.description}</p>
+          </section>
+        ))}
+      </div>
+
+      <div className="workspaceFactsColumns">
+        <section>
+          <strong>工程文件如何进入治理</strong>
+          <p>OmniDesk 自动扫描项目根目录，把关键文件按职责归入治理域；这里记录路径和用途，不复制、不改写原工程文件。</p>
+          <div className="workspaceFactsSources workspaceFactsSources-plain">
+            {sourceNames.map((source) => <code key={source}>{source}</code>)}
+          </div>
+        </section>
+        <section>
+          <strong>治理域</strong>
+          <div className="workspaceFactsDomainList">
+            {governanceDomains.slice(0, 5).map((domain) => (
+              <div key={domain.id || domain.title}>
+                <span>{domain.title}</span>
+                <p>
+                  {Array.isArray(domain.files) && domain.files.length
+                    ? `${domain.files.length} 个文件：${domain.files.slice(0, 3).join("、")}`
+                    : domain.description}
+                </p>
+              </div>
+            ))}
+            {!governanceDomains.length ? [...missing, ...risks].slice(0, 3).map((item) => (
+              <div key={item.title}>
+                <span>{item.severity || "info"}</span>
+                <p>{item.title}：{item.body}</p>
+              </div>
+            )) : null}
+          </div>
+        </section>
+      </div>
+
+      {recommendations.length ? (
+        <section className="workspaceRecommendations">
+          <header>
+            <div>
+              <strong>L2 建议修复草稿</strong>
+              <p>基于当前治理事实生成建议，不直接修改工程文件。</p>
+            </div>
+            <Badge>{recommendations.length} drafts</Badge>
+          </header>
+          <div className="workspaceRecommendationList">
+            {recommendations.slice(0, 5).map((item) => (
+              <article className="workspaceRecommendationItem" key={item.id || item.title}>
+                <header>
+                  <div>
+                    <span>{item.domain}</span>
+                    <strong>{item.title}</strong>
+                  </div>
+                  <Badge>{item.severity || "info"}</Badge>
+                </header>
+                <p>{item.problem}</p>
+                <p>{item.action}</p>
+                {Array.isArray(item.files) && item.files.length ? (
+                  <div className="workspaceRecommendationFiles">
+                    {item.files.slice(0, 4).map((file) => <code key={file}>{file}</code>)}
+                  </div>
+                ) : null}
+                <div className="workspaceRecommendationMeta">
+                  <span>{item.canPromoteToL3 ? "可进入 L3 受控修复" : "先保持 L2 建议"}</span>
+                  {item.impact ? <span>{item.impact}</span> : null}
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      <section className="workspaceGovernanceFiles">
+        <header>
+          <div>
+            <strong>已纳入治理的工程文件</strong>
+            <p>按治理域查看真实文件，点击具体文件可只读预览。</p>
+          </div>
+          <Badge>{governanceDomains.reduce((total, domain) => total + (Array.isArray(domain.files) ? domain.files.length : 0), 0)} files</Badge>
+        </header>
+        <div className="workspaceGovernanceDomainRows">
+          {governanceDomains.map((domain) => {
+            const files = Array.isArray(domain.files) ? domain.files : [];
+            const fileStatuses = Array.isArray(domain.fileStatuses)
+              ? domain.fileStatuses
+              : files.map((file) => ({
+                path: file,
+                previewable: !file.includes("*") && !file.endsWith("/"),
+                status: file.includes("*") || file.endsWith("/") ? "ignored" : "found",
+              }));
+            const isOpen = openDomainId === domain.id;
+            return (
+              <div className="workspaceGovernanceDomain" key={domain.id || domain.title}>
+                <button
+                  className="workspaceGovernanceDomainButton"
+                  type="button"
+                  onClick={() => setOpenDomainId(isOpen ? "" : domain.id)}
+                >
+                  <span>{domain.title}</span>
+                  <small>{governanceStatusSummaryText(domain.statusSummary, fileStatuses.length)}</small>
+                </button>
+                {isOpen ? (
+                  <div className="workspaceGovernanceFileList">
+                    {fileStatuses.map((file) => {
+                      const path = file.path || file;
+                      const isPreviewable = file.previewable ?? (!path.includes("*") && !path.endsWith("/"));
+                      return (
+                        <button
+                          className={`workspaceGovernanceFile status-${file.status || "found"}${governanceFile?.path === path ? " active" : ""}`}
+                          disabled={!isPreviewable}
+                          key={path}
+                          type="button"
+                          onClick={() => previewGovernanceFile(path)}
+                        >
+                          <span>{path}</span>
+                          <small>{governanceFileStatusLabel(file.status)}</small>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+        {governanceFile ? (
+          <div className="workspaceGovernancePreview">
+            <div className="engineeringFileHeader">
+              <div>
+                <strong>{governanceFile.path}</strong>
+                <p>工程文件只读预览</p>
+              </div>
+              {governanceFile.preview ? <Badge>{governanceFile.preview.language}</Badge> : null}
+            </div>
+            {governanceFile.loading ? (
+              <Notice variant="info">正在读取文件内容...</Notice>
+            ) : governanceFile.error ? (
+              <Notice variant="danger">{governanceFile.error}</Notice>
+            ) : governanceFile.preview ? (
+              <>
+                <div className="engineeringFileMeta">
+                  <span>{formatBytes(governanceFile.preview.size)}</span>
+                  {governanceFile.preview.truncated ? <span>已截断</span> : <span>完整预览</span>}
+                </div>
+                <pre className="engineeringFileCode">{governanceFile.preview.content || "文件为空。"}</pre>
+              </>
+            ) : null}
+          </div>
+        ) : null}
+      </section>
+    </div>
+  );
+}
+
+function EngineeringFileTab({ selectedEngineeringFile, snapshot }) {
   if (selectedEngineeringFile.topic) {
+    const isOverviewTopic = selectedEngineeringFile.topic.id === "project-identity" || selectedEngineeringFile.topic.title === "项目概览";
+    const workspaceFacts = isOverviewTopic ? snapshot?.workspaceFacts : null;
     return (
       <Panel className="engineeringFilePreview filePreviewPanel" variant="soft">
         <div className="engineeringFileHeader">
@@ -2390,7 +2779,9 @@ function EngineeringFileTab({ selectedEngineeringFile }) {
           <Badge>{selectedEngineeringFile.group}</Badge>
         </div>
         <div className="topicPreview">
-          <Notice variant="info">这是项目治理地图。用户只看事项，OmniDesk 在背后维护对应文件、状态来源和更新时机。</Notice>
+          {workspaceFacts ? <WorkspaceFactsPreview report={workspaceFacts} /> : (
+            <Notice variant="info">这是项目治理地图。用户只看事项，OmniDesk 在背后维护对应文件、状态来源和更新时机。</Notice>
+          )}
           {(selectedEngineeringFile.topic.statusSource || selectedEngineeringFile.topic.updatesWhen) ? (
             <div className="topicGovernanceMeta">
               {selectedEngineeringFile.topic.statusSource ? (
@@ -3671,6 +4062,7 @@ function App() {
   const [leftWidth, setLeftWidth] = useState(sidebarSizing.leftDefault);
   const [rightWidth, setRightWidth] = useState(sidebarSizing.rightDefault);
   const activePlanRequestRef = React.useRef(null);
+  const workspaceWatcherRefreshRef = React.useRef(0);
 
   const showToast = (message, variant = "success") => {
     setToast({ id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, message, variant });
@@ -3866,6 +4258,49 @@ function App() {
     setSource(isTauriRuntime() ? "tauri" : "preview");
     setError("");
   };
+
+  useEffect(() => {
+    if (!isTauriRuntime()) return undefined;
+    let cancelled = false;
+    let unlisten = null;
+
+    const startWatcher = async () => {
+      try {
+        const { listen } = await import("@tauri-apps/api/event");
+        unlisten = await listen("workspace://files-changed", async (event) => {
+          const now = Date.now();
+          if (now - workspaceWatcherRefreshRef.current < 1200) return;
+          workspaceWatcherRefreshRef.current = now;
+          try {
+            const nextReport = await refreshWorkspaceFactsPreview();
+            if (cancelled || !nextReport) return;
+            setSnapshot((current) => ({
+              ...current,
+              workspaceFacts: nextReport,
+            }));
+            const path = event.payload?.path ? `：${event.payload.path}` : "";
+            showToast(`工程文件已变化，治理索引已更新${path}`, "success");
+          } catch (err) {
+            if (!cancelled) {
+              showToast(`治理索引自动更新失败：${err instanceof Error ? err.message : String(err)}`, "danger");
+            }
+          }
+        });
+        await invokeWorkspaceCommand("start_workspace_file_watcher");
+      } catch (err) {
+        if (!cancelled) {
+          showToast(`工程文件监听启动失败：${err instanceof Error ? err.message : String(err)}`, "danger");
+        }
+      }
+    };
+
+    startWatcher();
+
+    return () => {
+      cancelled = true;
+      if (unlisten) unlisten();
+    };
+  }, [snapshot.currentProjectPath]);
 
   const validateGoal = async () => {
     const feedbackKey = "validate-goal";
@@ -4235,9 +4670,12 @@ function App() {
         ...nextFile,
         loading: false,
         topic: {
+          id: file.id,
           title: file.title || file.path,
           description: file.description,
           relatedFiles: file.relatedFiles,
+          statusSource: file.statusSource,
+          updatesWhen: file.updatesWhen,
         },
       });
       return;
