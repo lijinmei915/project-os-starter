@@ -1066,6 +1066,8 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
 
 function ProjectFileTree({ activePath, expanded, snapshot, onSelectFile }) {
   const [query, setQuery] = useState("");
+  const [openFolders, setOpenFolders] = useState({});
+  const [closedFolders, setClosedFolders] = useState({});
   const tree = Array.isArray(snapshot?.tree) ? snapshot.tree : [];
   const stack = [];
   const rows = tree.map((item, index) => {
@@ -1082,9 +1084,19 @@ function ProjectFileTree({ activePath, expanded, snapshot, onSelectFile }) {
     };
   });
   const normalizedQuery = query.trim().toLowerCase();
+  const isFolderOpen = (path) => (expanded ? !closedFolders[path] : Boolean(openFolders[path]));
+  const visibleByFolder = (item) => {
+    if (item.depth <= 1) return true;
+    const parts = item.path.split("/");
+    for (let index = 1; index < parts.length; index += 1) {
+      const folderPath = parts.slice(0, index).join("/");
+      if (!isFolderOpen(folderPath)) return false;
+    }
+    return true;
+  };
   const visibleRows = normalizedQuery
     ? rows.filter((item) => `${item.label} ${item.path}`.toLowerCase().includes(normalizedQuery))
-    : rows.filter((item) => expanded || item.depth <= 1);
+    : rows.filter(visibleByFolder);
 
   return (
     <section className="projectFileTree" aria-label="项目文件">
@@ -1100,15 +1112,23 @@ function ProjectFileTree({ activePath, expanded, snapshot, onSelectFile }) {
         {visibleRows.map((item) => {
           const isFolder = item.kind === "folder";
           const isActive = !isFolder && activePath === item.path;
+          const isOpen = isFolder && isFolderOpen(item.path);
           return (
             <button
-              className={`projectFileTreeRow${isFolder ? " folder" : " file"}${isActive ? " active" : ""}`}
+              className={`projectFileTreeRow${isFolder ? " folder" : " file"}${isActive ? " active" : ""}${isOpen ? " open" : ""}`}
               key={item.id}
               type="button"
               style={{ "--tree-depth": Math.max(item.depth - 1, 0) }}
-              disabled={item.depth === 0}
               onClick={() => {
-                if (isFolder || !item.path) return;
+                if (isFolder) {
+                  if (expanded) {
+                    setClosedFolders((current) => ({ ...current, [item.path]: !current[item.path] }));
+                  } else {
+                    setOpenFolders((current) => ({ ...current, [item.path]: !current[item.path] }));
+                  }
+                  return;
+                }
+                if (!item.path) return;
                 onSelectFile?.({
                   description: "当前项目文件",
                   group: "项目文件",

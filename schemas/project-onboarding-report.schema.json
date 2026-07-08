@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-os.local/schemas/project-onboarding-report.schema.json",
+  "title": "Project Onboarding Report",
+  "description": "A read-only scan summary used before a local project is formally governed by OmniDesk.",
+  "type": "object",
+  "required": ["schemaVersion", "project", "mode", "status", "summary", "evidence", "findings", "recommendation"],
+  "properties": {
+    "schemaVersion": {
+      "const": "project-os.project-onboarding-report.v0.1"
+    },
+    "generatedAt": {
+      "type": "string",
+      "description": "ISO-like timestamp for when the report was generated."
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["new-project", "existing-project", "temporary-readonly"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "needs-review", "ready-to-confirm", "confirmed", "blocked"]
+    },
+    "project": {
+      "type": "object",
+      "required": ["name", "path", "kind"],
+      "properties": {
+        "name": { "type": "string" },
+        "path": { "type": "string" },
+        "kind": { "type": "string" },
+        "detectedStack": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "lifecycle": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "summary": {
+      "type": "object",
+      "required": ["overview", "currentProgress", "runbook", "riskBoundary", "localState"],
+      "properties": {
+        "overview": { "$ref": "#/$defs/reportSection" },
+        "currentProgress": { "$ref": "#/$defs/reportSection" },
+        "runbook": { "$ref": "#/$defs/reportSection" },
+        "riskBoundary": { "$ref": "#/$defs/reportSection" },
+        "localState": { "$ref": "#/$defs/reportSection" }
+      },
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/evidence" }
+    },
+    "findings": {
+      "type": "object",
+      "required": ["confirmed", "missing", "risks"],
+      "properties": {
+        "confirmed": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/finding" }
+        },
+        "missing": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/finding" }
+        },
+        "risks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/finding" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "recommendation": {
+      "type": "object",
+      "required": ["action", "confidence", "nextSteps"],
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["confirm-onboarding", "keep-readonly", "request-more-info", "block-onboarding"]
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "reason": { "type": "string" },
+        "nextSteps": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "reportSection": {
+      "type": "object",
+      "required": ["status", "title", "body", "sources"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["confirmed", "inferred", "missing", "stale", "conflict"]
+        },
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "sources": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["source", "kind", "status"],
+      "properties": {
+        "source": { "type": "string" },
+        "kind": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["found", "missing", "ignored", "stale"]
+        },
+        "note": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "finding": {
+      "type": "object",
+      "required": ["title", "body"],
+      "properties": {
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "severity": {
+          "type": "string",
+          "enum": ["info", "low", "medium", "high"]
+        },
+        "sources": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

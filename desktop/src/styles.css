@@ -1894,8 +1894,8 @@ body.isResizingSidebar {
   opacity: 1;
 }
 
-.projectFileTreeRow.file:hover,
-.projectFileTreeRow.file:focus-visible {
+.projectFileTreeRow:hover,
+.projectFileTreeRow:focus-visible {
   border-color: var(--desktop-border-strong);
   background: var(--desktop-state-hover-bg);
   color: var(--desktop-text-primary);
@@ -1919,6 +1919,11 @@ body.isResizingSidebar {
   width: var(--desktop-icon-size-md);
   height: var(--desktop-icon-size-md);
   stroke-width: var(--desktop-icon-stroke-muted);
+  transition: transform 120ms ease;
+}
+
+.projectFileTreeRow.open .projectFileTreeChevron svg {
+  transform: rotate(90deg);
 }
 
 .projectFileTreeName {

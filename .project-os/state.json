@@ -2,7 +2,7 @@
   "name": "project-os-starter",
   "description": "OmniDesk / Project OS Desktop：会持续学习项目的本地 AI 工程工作台，让任何新老项目都能按清晰流程被理解、治理、开发和演进",
   "phase": "stabilizing",
-  "stage": "Project OS Console 内核收口期 / Desktop v0.1 方向确认期",
+  "stage": "Project OS Console 内核收口期 / OmniDesk 工作区治理自验证期",
   "status": {
     "done": [
       "v1 路由契约",
@@ -70,25 +70,19 @@
       "Hermes 等成熟工具定位为参照系统和可接入执行器"
     ],
     "doing": [
-      "AI Engineering Kit 自身工程化补齐",
-      "工程成熟度 v0.2 校准",
-      "真实老项目质量识别校准",
-      "Desktop v0.1 diff review 设计"
+      "OmniDesk 自身工作区治理验证",
+      "老项目接入流程建模",
+      "项目概览/当前进度/启动方式/风险边界/本地状态动态化",
+      "Desktop v0.1 信息架构和设计 token 规范打磨"
     ],
     "blocked": [],
     "next": [
-      "打磨输入区和生成状态体验",
-      "优化执行反馈和阶段状态",
-      "梳理右侧目标任务项目档案结构",
-      "优化多 API 配置和新建状态",
-      "提升桌面应用完整感",
-      "打通治理文件和项目体验",
-      "真实老项目样本文档质量校准",
-      "报告数据层和评分模型对应关系校准",
-      "真实工具会话抽样复查",
-      "打磨交接状态结构化合并和冲突提示",
-      "将主题设置继续打磨为更小白的品牌色入口，例如支持粘贴 HEX、命名品牌色和重置默认",
-      "围绕参照系统文档校准 OmniDesk 工作区树、文件 tab、任务执行和项目记忆"
+      "设计老项目接入报告的数据结构和 UI",
+      "把项目概览接入 PROJECT.md、.project-os/state.json 和 project-profile 的真实事实源",
+      "把当前进度接入 HANDOFF.md、git 状态和最近任务记录",
+      "把启动方式接入 README、package.json、docs/RUNBOOK.md 和桌面端配置",
+      "把风险边界接入 HANDOFF.md、docs/LESSONS.md 和用户确认过的风险记忆",
+      "把本地状态接入 registry、git、服务、模型 provider 和最近检查结果"
     ]
   },
   "architecture": {
@@ -96,5 +90,24 @@
     "rules": "design-system",
     "execution": "frontend",
     "desktop": "Tauri + Local Agent Core"
+  },
+  "governance": {
+    "workspaceModel": {
+      "updatedAt": "2026-07-08",
+      "modes": [
+        "new-project",
+        "existing-project",
+        "temporary-readonly"
+      ],
+      "principle": "前台展示用户可理解的项目菜单，后台维护状态来源、文件映射、更新时间、可信度和更新时机。",
+      "existingProjectFlow": [
+        "选择本地项目文件夹",
+        "只读扫描已有文件、git 状态、运行配置和 .project-os",
+        "生成项目接入草案",
+        "用户确认或修正关键事实",
+        "写入 .project-os/state.json 和必要治理文件",
+        "持续维护项目概览、当前进度、启动方式、风险边界和本地状态"
+      ]
+    }
   }
 }

@@ -1,0 +1,144 @@
+{
+  "schemaVersion": "project-os.project-onboarding-report.v0.1",
+  "generatedAt": "2026-07-08T00:00:00+08:00",
+  "mode": "existing-project",
+  "status": "ready-to-confirm",
+  "project": {
+    "name": "OmniDesk",
+    "path": "/Users/heqiao/Desktop/Claude练习/OmniDesk",
+    "kind": "local-ai-workbench",
+    "detectedStack": ["Tauri", "React", "Vite", "Rust", "Project OS"],
+    "lifecycle": "stabilizing",
+    "description": "OmniDesk / Project OS Desktop 是本地 AI 工程工作台，用来让新老项目被理解、治理、开发和持续演进。"
+  },
+  "summary": {
+    "overview": {
+      "status": "confirmed",
+      "title": "项目概览",
+      "body": "OmniDesk 是 Project OS 的桌面工作台入口，聚焦项目理解、目标任务、上下文记忆、本地模型配置和受控执行，不是完整 IDE。",
+      "sources": ["PROJECT.md", ".project-os/state.json", ".project-os/project-profile.json"],
+      "confidence": 0.95
+    },
+    "currentProgress": {
+      "status": "confirmed",
+      "title": "当前进度",
+      "body": "当前处于工作区治理自验证期，正在用 OmniDesk 自身验证老项目接入、工作区菜单、设计 token、项目文件导航和治理事实源。",
+      "sources": ["PROJECT.md", "HANDOFF.md", ".project-os/state.json"],
+      "confidence": 0.88
+    },
+    "runbook": {
+      "status": "confirmed",
+      "title": "启动方式",
+      "body": "桌面端位于 desktop/，常用命令包括 npm run dev、npm run web:dev、npm run web:build 和 npm run build。",
+      "sources": ["desktop/package.json", "desktop/README.md", "docs/RUNBOOK.md"],
+      "confidence": 0.9
+    },
+    "riskBoundary": {
+      "status": "inferred",
+      "title": "风险边界",
+      "body": "主要风险是工作区菜单仍可能展示静态文案、老项目接入流程尚未形成真实 UI、目标任务对话项目档案之间仍需避免重复。",
+      "sources": ["HANDOFF.md", ".project-os/project-profile.json", "PROJECT.md"],
+      "confidence": 0.78
+    },
+    "localState": {
+      "status": "confirmed",
+      "title": "本地状态",
+      "body": "项目已有 .project-os 状态、目标、项目档案、模型 catalog、桌面 registry 和本地运行记录；当前工作区可作为正式治理项目继续推进。",
+      "sources": [".project-os/state.json", ".project-os/goals.json", ".project-os/desktop-registry.json", ".project-os/runs/"],
+      "confidence": 0.86
+    }
+  },
+  "evidence": [
+    {
+      "source": "PROJECT.md",
+      "kind": "project-status",
+      "status": "found",
+      "note": "记录项目定位、阶段、架构、当前进度和工作区治理口径。"
+    },
+    {
+      "source": "HANDOFF.md",
+      "kind": "handoff",
+      "status": "found",
+      "note": "记录最近完成、风险和下一步建议。"
+    },
+    {
+      "source": "desktop/package.json",
+      "kind": "run-config",
+      "status": "found",
+      "note": "识别到 Tauri/Vite 桌面端启动和构建命令。"
+    },
+    {
+      "source": ".project-os/state.json",
+      "kind": "project-state",
+      "status": "found",
+      "note": "已有机器可读项目状态。"
+    },
+    {
+      "source": ".project-os/project-profile.json",
+      "kind": "project-profile",
+      "status": "found",
+      "note": "已有结构化项目档案。"
+    },
+    {
+      "source": ".project-os/onboarding-report.json",
+      "kind": "onboarding-report",
+      "status": "found",
+      "note": "当前文件是 OmniDesk 自身接入报告样例。"
+    }
+  ],
+  "findings": {
+    "confirmed": [
+      {
+        "title": "已具备正式治理基础",
+        "body": "OmniDesk 已有 PROJECT、HANDOFF、project-profile、state、goals 等事实源，可以作为正式工作区项目治理。",
+        "severity": "info",
+        "sources": ["PROJECT.md", "HANDOFF.md", ".project-os/project-profile.json"]
+      },
+      {
+        "title": "桌面端入口明确",
+        "body": "desktop/ 提供 Tauri + React + Vite 工作台，已有本地项目 registry、provider、任务记录和受控执行链路。",
+        "severity": "info",
+        "sources": ["desktop/package.json", "PROJECT.md"]
+      }
+    ],
+    "missing": [
+      {
+        "title": "接入报告 UI 尚未落地",
+        "body": "项目概览页还没有直接渲染 onboarding report 的结构化字段。",
+        "severity": "medium",
+        "sources": ["desktop/src/main.jsx", "desktop/src/workspace-outline.js"]
+      },
+      {
+        "title": "扫描逻辑还未自动生成报告",
+        "body": "当前报告是样例文件，后续需要从 README、PROJECT、package、git 和 .project-os 自动生成。",
+        "severity": "medium",
+        "sources": ["PROJECT.md"]
+      }
+    ],
+    "risks": [
+      {
+        "title": "静态文案伪装动态治理",
+        "body": "如果项目概览仍只显示固定说明，会和真实项目治理状态脱节。",
+        "severity": "medium",
+        "sources": ["HANDOFF.md", ".project-os/project-profile.json"]
+      },
+      {
+        "title": "老项目写入边界需要确认",
+        "body": "老项目必须先只读扫描和用户确认，再写 .project-os 或治理文档。",
+        "severity": "high",
+        "sources": ["PROJECT.md", ".project-os/state.json"]
+      }
+    ]
+  },
+  "recommendation": {
+    "action": "confirm-onboarding",
+    "confidence": 0.86,
+    "reason": "OmniDesk 已有足够事实源，可作为正式治理项目；下一步应把接入报告接入工作区 UI，并补自动扫描生成逻辑。",
+    "nextSteps": [
+      "在项目概览页渲染 onboarding report",
+      "把 README、PROJECT、package、git 和 .project-os 扫描结果汇总为 report",
+      "增加确认接入/保持只读的操作入口",
+      "确认后沉淀到 state 和 project-profile"
+    ]
+  }
+}
