@@ -1,6 +1,6 @@
 {
   "schemaVersion": "project-os.goal-validation-report.v0.1",
-  "generatedAt": "2026-07-06T16:56:58.765Z",
+  "generatedAt": "2026-07-08T05:22:14.351Z",
   "status": "passed",
   "checks": [
     {
@@ -9,7 +9,7 @@
       "command": "cd desktop && npm run web:build",
       "success": true,
       "code": 0,
-      "output": "> omnidesk@0.1.0 web:build\n> vite build\n\nvite v7.3.6 building client environment for production...\ntransforming...\n✓ 1897 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                     0.40 kB │ gzip:   0.28 kB\ndist/assets/index-BcHg1wG7.css     89.90 kB │ gzip:  14.23 kB\ndist/assets/index-CU_haXI-.js       0.17 kB │ gzip:   0.17 kB\ndist/assets/core-BEOw45JP.js        0.20 kB │ gzip:   0.15 kB\ndist/assets/event-CStX_PX4.js       1.41 kB │ gzip:   0.69 kB\ndist/assets/index-DwJTth7O.js   1,031.31 kB │ gzip: 280.61 kB\n✓ built in 2.17s\n\n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit."
+      "output": "> omnidesk@0.1.0 web:build\n> vite build\n\nvite v7.3.6 building client environment for production...\ntransforming...\n✓ 1897 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                     0.39 kB │ gzip:   0.27 kB\ndist/assets/index-AvwkoTuH.css     94.94 kB │ gzip:  14.92 kB\ndist/assets/index-CU_haXI-.js       0.17 kB │ gzip:   0.17 kB\ndist/assets/core-BEOw45JP.js        0.20 kB │ gzip:   0.15 kB\ndist/assets/event-CStX_PX4.js       1.41 kB │ gzip:   0.69 kB\ndist/assets/index-7eJKe7tM.js   1,061.31 kB │ gzip: 287.02 kB\n✓ built in 1.84s\n\n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit."
     },
     {
       "id": "cargo-check",
@@ -17,7 +17,7 @@
       "command": "cd desktop/src-tauri && cargo check",
       "success": true,
       "code": 0,
-      "output": "Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.53s"
+      "output": "Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.55s"
     },
     {
       "id": "runtime",

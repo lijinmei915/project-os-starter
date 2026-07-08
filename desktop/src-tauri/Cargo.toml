@@ -1,9 +1,13 @@
 [package]
-name = "omnidesk"
+name = "OmniDesk"
 version = "0.1.0"
 description = "OmniDesk local AI project workbench"
 authors = ["Project OS"]
 edition = "2021"
+
+[[bin]]
+name = "OmniDesk"
+path = "src/main.rs"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

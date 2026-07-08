@@ -67,6 +67,7 @@ const itemMeta = {
   "经验复盘": { id: "lessons", statusSource: "docs/LESSONS.md" },
   "关键决策": { id: "decisions", statusSource: "docs/DECISIONS.md" },
   "运行记录": { id: "run-records", statusSource: ".project-os/runs/*" },
+  "目标历史": { id: "goal-history", statusSource: ".project-os/goals.json" },
 };
 
 function slug(value) {
@@ -276,6 +277,7 @@ export const projectGovernanceOutline = [
         description: "已确认任务队列。",
         items: [
           { title: "任务队列", description: "待执行任务。", relatedFiles: [".project-os/runs/desktop-tasks/*"] },
+          { title: "目标历史", description: "目标列表、验收报告和签收记录。", relatedFiles: [".project-os/goals.json", ".project-os/goal-validation-report.json", ".project-os/goal-signoff-history.json"] },
         ],
       },
       {

@@ -3,11 +3,11 @@ layer: knowledge
 type: guide
 last_verified: 2026-07-01
 depends_on: [../docs/DESKTOP_APP.md]
-teaches: "Project OS Desktop v0.1 的启动方式、依赖和当前边界"
+teaches: "OmniDesk Desktop v0.1 的启动方式、依赖和当前边界"
 use_when: "需要运行、调试或继续实现桌面端 Tauri 壳时"
 ---
 
-# Project OS Desktop
+# OmniDesk Desktop
 
 > 用途：记录桌面端 v0.1 壳的运行方式和当前边界。
 > 什么时候更新：桌面端启动方式、依赖、Tauri 配置或 Local Agent Core 接入方式变化时。

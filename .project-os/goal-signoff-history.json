@@ -4,10 +4,17 @@
     {
       "goalId": "desktop-v0.1-direction-confirmation",
       "goalTitle": "Project OS Console 内核收口期 / Desktop v0.1 方向确认期",
+      "signedOffAt": "2026-07-08T05:23:16.525Z",
+      "reportStatus": "passed",
+      "source": "OmniDesk Preview"
+    },
+    {
+      "goalId": "desktop-v0.1-direction-confirmation",
+      "goalTitle": "Project OS Console 内核收口期 / Desktop v0.1 方向确认期",
       "signedOffAt": "2026-07-07T09:39:31.032Z",
       "reportStatus": "passed",
       "source": "OmniDesk Preview"
     }
   ],
-  "updatedAt": "2026-07-07T09:39:31.032Z"
+  "updatedAt": "2026-07-08T05:23:16.525Z"
 }

@@ -1491,6 +1491,43 @@ body.isResizingSidebar {
   min-width: 0;
 }
 
+.tileRemoveButton {
+  position: absolute;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--desktop-state-danger-border);
+  border-radius: var(--radius-xs);
+  background: var(--desktop-surface-panel);
+  color: var(--desktop-text-danger);
+  cursor: pointer;
+  opacity: 0;
+  padding: 0;
+  pointer-events: none;
+  transform: scale(0.92);
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease,
+    background-color 120ms ease;
+}
+
+.tileRemoveButton:hover:not(:disabled) {
+  background: var(--desktop-state-danger-bg);
+}
+
+.tileRemoveButton:disabled {
+  border-color: var(--line);
+  color: var(--desktop-text-soft);
+  cursor: not-allowed;
+}
+
+.tileRemoveButton svg {
+  width: 12px;
+  height: 12px;
+}
+
 .projectRow {
   position: relative;
   display: grid;
@@ -1577,8 +1614,8 @@ body.isResizingSidebar {
 .projectStatusDot-running {
   width: 10px;
   height: 10px;
-  border: 2px solid color-mix(in srgb, var(--desktop-info) 24%, transparent);
-  border-top-color: var(--desktop-info);
+  border: 2px solid color-mix(in srgb, var(--desktop-accent) 24%, transparent);
+  border-top-color: var(--desktop-accent);
   background: transparent;
   animation: spin 900ms linear infinite;
 }
@@ -2561,6 +2598,34 @@ body.isResizingSidebar {
   color: var(--muted);
   font-family: var(--mono);
   font-size: 11px;
+}
+
+.activeTaskHeader .activeTaskSource {
+  color: var(--desktop-text-soft);
+  font-family: var(--sans);
+  font-size: var(--desktop-text-caption);
+}
+
+.activeTaskInlineActions {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 8px;
+}
+
+.activeTaskInlineActions button {
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--desktop-text-accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--desktop-text-caption);
+  font-weight: var(--desktop-font-bold);
+  padding: 4px 6px;
+}
+
+.activeTaskInlineActions button:hover {
+  background: var(--desktop-state-accent-bg);
 }
 
 .planHeader {
@@ -3827,6 +3892,10 @@ body.isResizingSidebar {
   opacity: .72;
 }
 
+.goalMenuItem.active {
+  color: var(--desktop-text-accent);
+}
+
 .goalMenuTitle {
   display: block;
 }
@@ -3837,6 +3906,26 @@ body.isResizingSidebar {
   color: var(--desktop-text-primary);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.goalMenuCurrent {
+  margin-left: auto;
+  color: var(--desktop-text-accent);
+  font-family: var(--mono);
+  font-size: var(--desktop-text-meta);
+  font-weight: var(--desktop-font-bold);
+}
+
+.goalMenuHint {
+  color: var(--desktop-text-soft);
+  cursor: default;
+  font-size: var(--desktop-text-meta);
+}
+
+.goalMenuHint:hover,
+.goalMenuHint:focus {
+  background: transparent;
+  color: var(--desktop-text-soft);
 }
 
 .goalMenuAction {
@@ -3996,6 +4085,44 @@ body.isResizingSidebar {
   color: var(--desktop-text-muted);
   font-size: var(--desktop-text-caption);
   line-height: 1.5;
+}
+
+.goalEmptyState {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border-left: 2px solid var(--line);
+  padding: 2px 2px 2px 10px;
+  color: var(--desktop-text-muted);
+  font-size: var(--desktop-text-caption);
+  line-height: 1.45;
+}
+
+.goalEmptyState span {
+  color: var(--desktop-text-muted);
+}
+
+.goalEmptyAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  border: 0;
+  background: transparent;
+  color: var(--desktop-text-accent);
+  cursor: pointer;
+  font: inherit;
+  font-weight: var(--desktop-font-semibold);
+  padding: 0;
+}
+
+.goalEmptyAction svg {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+}
+
+.goalEmptyAction:hover {
+  color: var(--desktop-text-primary);
 }
 
 .goalTodoItem {
@@ -4165,6 +4292,10 @@ button.goalTodoButton:hover {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.providerConnectionError {
+  margin-top: 2px;
 }
 
 .providerConnectionItem {
@@ -4719,6 +4850,9 @@ button.goalTodoButton:hover {
   right: 18px;
   bottom: 34px;
   z-index: 80;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   max-width: min(360px, calc(100vw - 36px));
   border: 1px solid var(--desktop-state-success-border);
   border-radius: var(--radius);
@@ -4730,10 +4864,26 @@ button.goalTodoButton:hover {
   box-shadow: var(--shadow-md);
 }
 
+.appToast-running {
+  border-color: var(--desktop-border-accent);
+  background: var(--desktop-state-accent-bg);
+  color: var(--desktop-text-accent);
+}
+
 .appToast-danger {
   border-color: var(--desktop-state-danger-border);
   background: var(--desktop-state-danger-bg);
   color: var(--desktop-text-danger);
+}
+
+.appToastIcon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+.appToast-running .appToastIcon {
+  animation: spin 0.9s linear infinite;
 }
 
 .safe {

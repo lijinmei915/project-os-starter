@@ -7,7 +7,7 @@
       "title": "把工作区从骨架打磨成可用闭环",
       "shortTitle": "工作区可用闭环",
       "projectName": "project-os-starter",
-      "status": "planned",
+      "status": "done",
       "createdAt": "2026-07-07T15:20:00.000Z",
       "summary": "围绕当前项目上下文、对话任务化、目标联动、项目档案和执行反馈，先把现有工作区串成可用闭环。",
       "taskIds": [
@@ -18,7 +18,8 @@
         "workspace-action-feedback"
       ],
       "confirmedAt": "2026-07-07T16:38:47.286Z",
-      "updatedAt": "2026-07-07T16:38:47.286Z"
+      "updatedAt": "2026-07-08T05:23:16.525Z",
+      "validationStatus": "signed-off"
     },
     {
       "id": "打磨对话体验-1783435178902",
@@ -43,5 +44,5 @@
       "taskIds": []
     }
   ],
-  "updatedAt": "2026-07-07T16:46:45.734Z"
+  "updatedAt": "2026-07-08T05:38:40.122Z"
 }

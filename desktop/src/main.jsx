@@ -512,19 +512,25 @@ function profileFieldText(profile, key) {
 
 function previewProjectProfile(profile) {
   if (!profile?.fields) return fallbackSnapshot.projectProfile;
+  const overview = profileFieldText(profile, "identity.summary") || profileFieldText(profile, "identity.uniqueDescription");
   const next = {
-    intro: profileFieldText(profile, "identity.summary") || profileFieldText(profile, "identity.uniqueDescription"),
+    overview,
+    phaseSummary: profileFieldText(profile, "identity.lifecycle"),
+    architectureSummary: profileFieldText(profile, "engineering.architecture"),
+    checkCommands: profileFieldText(profile, "engineering.testing"),
+    collaborationRules: profileFieldText(profile, "governance.permissions") || profileFieldText(profile, "user.communicationStyle"),
+    intro: overview,
     longTermGoal: profileFieldText(profile, "product.longTermGoal"),
     targetUsers: profileFieldText(profile, "product.targetUsers"),
     useCases: profileFieldText(profile, "product.useCases"),
     userPreferences: profileFieldText(profile, "user.globalPreferences") || profileFieldText(profile, "user.communicationStyle"),
   };
   const missingFields = [
-    ["项目简介", next.intro],
-    ["长期目标", next.longTermGoal],
-    ["目标用户", next.targetUsers],
-    ["使用场景", next.useCases],
-    ["用户偏好", next.userPreferences],
+    ["项目概览", next.overview],
+    ["当前阶段", next.phaseSummary],
+    ["技术架构", next.architectureSummary],
+    ["检查命令", next.checkCommands],
+    ["协作规则", next.collaborationRules],
   ].filter(([, value]) => !value).map(([label]) => label);
   return { ...next, missingFields };
 }
@@ -657,7 +663,7 @@ function TopBar({
   providerError,
   onStartConversation,
 }) {
-  const providerButtonLabel = `${activeProviderProfileName(provider)} / ${provider?.model || "未选模型"}`;
+  const providerButtonLabel = activeProviderProfileName(provider) || "连接";
   return (
     <header className="topbar">
         <div className="brand">
@@ -672,7 +678,7 @@ function TopBar({
       <div className="topActions">
         <Dialog>
           <DialogTrigger asChild>
-            <Button className="modelStatusButton" variant="subtle" type="button" aria-label="模型设置">
+            <Button className="modelStatusButton" variant="subtle" type="button" aria-label="连接设置">
               <span className="dot mutedDot" />
               {providerButtonLabel}
             </Button>
@@ -706,7 +712,7 @@ function TopBar({
   );
 }
 
-function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot, tasks = [], projectActivities = {}, planLoading, terminalRunningId, onSwitchProject, onPickProject, onOpenProjectFolder, onRenameProject, onRemoveProject, onSelectEngineeringFile, onProjectActionError, onProjectPathCopied, projectActionError, selectedEngineeringFile }) {
+function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot, tasks = [], projectActivities = {}, planLoading, terminalRunningId, onSwitchProject, onPickProject, onOpenProjectFolder, onRenameProject, onRemoveProject, onSelectEngineeringFile, onProjectActionError, onProjectActivitySeen, onProjectPathCopied, projectActionError, selectedEngineeringFile }) {
   const [renameProject, setRenameProject] = useState(null);
   const [renameName, setRenameName] = useState("");
   const [projectsOpen, setProjectsOpen] = useState(true);
@@ -790,13 +796,11 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
     if (relatedTasks.some((task) => [taskStatuses.failed, "interrupted", "canceled", "cancelled", "error"].includes(task.status))) {
       return { tone: "danger", label: "任务或会话中断" };
     }
-    if (relatedTasks.some((task) => task.status === taskStatuses.done)) {
-      return { tone: "success", label: "最近完成" };
+    const cachedActivity = projectActivities[project.id];
+    if (cachedActivity?.tone) {
+      return cachedActivity;
     }
-    if (projectActivities[project.id]?.tone) {
-      return projectActivities[project.id];
-    }
-    if (project.health === "ready") return { tone: "success", label: project.statusLabel || "已就绪" };
+    if (project.health === "ready") return { tone: "", label: project.statusLabel || "已就绪" };
     if (project.health === "missing") return { tone: "danger", label: project.statusLabel || "路径失效" };
     if (project.health === "partial") return { tone: "warning", label: project.statusLabel || "缺少关键文件" };
     return { tone: "", label: project.statusLabel || "普通项目" };
@@ -856,7 +860,10 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
                   <button
                     className={`projectRow${project.isCurrent ? " active" : ""}`}
                     type="button"
-                    onClick={() => onSwitchProject(project.id)}
+                    onClick={() => {
+                      onProjectActivitySeen?.(project.id);
+                      onSwitchProject(project.id);
+                    }}
                     aria-label={`切换到项目 ${project.name}`}
                   >
                     {(() => {
@@ -935,6 +942,7 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
           activeTopicPath={selectedEngineeringFile?.path}
           onSelectTopic={onSelectEngineeringFile}
           outline={projectGovernanceOutline}
+          snapshot={snapshot}
         />
       </div>
       <Tooltip content="折叠工作区">
@@ -947,8 +955,9 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
   );
 }
 
-function createTaskFromPlan(plan, taskText, snapshot) {
+function createTaskFromPlan(plan, taskText, snapshot, options = {}) {
   const title = taskText?.trim() || plan?.summary || "未命名任务";
+  const activeGoal = activeGoalFromSnapshot(snapshot);
 
   return {
     id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -959,6 +968,9 @@ function createTaskFromPlan(plan, taskText, snapshot) {
       minute: "2-digit",
     }),
     projectId: snapshot.currentProjectId || "",
+    conversationId: options.conversationId || "",
+    goalId: activeGoal?.id || "",
+    goalTitle: activeGoal?.shortTitle || activeGoal?.title || "",
     projectName: snapshot.projectName,
     projectPath: snapshot.currentProjectPath || "",
     plan,
@@ -1239,11 +1251,13 @@ function activeGoalFromSnapshot(snapshot) {
   return goals.find((goal) => goal.id === snapshot.goals?.activeGoalId) || goals[0];
 }
 
-function goalValidationStatusFromActiveGoal(activeGoal, validationStatus, validationReportStatus) {
+function goalValidationStatusFromActiveGoal(activeGoal, validationGoal, validationReportStatus) {
   if (activeGoal?.status === "done") return "signed-off";
   if (activeGoal?.status === "pending-confirm") return "verified";
   if (activeGoal?.status === "failed") return "validation-failed";
-  return validationStatus || (validationReportStatus === "passed" ? "verified" : "");
+  const validationBelongsToActiveGoal = Boolean(activeGoal?.id && validationGoal?.id === activeGoal.id);
+  if (!validationBelongsToActiveGoal) return "";
+  return validationGoal?.status || (validationReportStatus === "passed" ? "verified" : "");
 }
 
 function goalMetaFromStatus(status, validationReportStatus, todos, phase) {
@@ -1304,7 +1318,29 @@ function snapshotQueueTodos(snapshot) {
 function projectProfileItems(snapshot) {
   const profile = snapshot.projectProfile || {};
   const missingFields = new Set(profile.missingFields || []);
-  return [
+  const workbenchItems = [
+    {
+      title: "项目概览",
+      body: profile.overview || profile.intro,
+    },
+    {
+      title: "当前阶段",
+      body: profile.phaseSummary || snapshot.stage || snapshot.phase,
+    },
+    {
+      title: "技术架构",
+      body: profile.architectureSummary,
+    },
+    {
+      title: "检查命令",
+      body: profile.checkCommands,
+    },
+    {
+      title: "协作规则",
+      body: profile.collaborationRules || profile.userPreferences,
+    },
+  ];
+  const legacyItems = [
     {
       title: "项目简介",
       body: profile.intro,
@@ -1325,7 +1361,9 @@ function projectProfileItems(snapshot) {
       title: "用户偏好",
       body: profile.userPreferences,
     },
-  ].map((item) => ({
+  ];
+  const items = workbenchItems.some((item) => item.body) ? workbenchItems : legacyItems;
+  return items.map((item) => ({
     ...item,
     missing: missingFields.has(item.title) || !item.body,
   }));
@@ -1394,6 +1432,7 @@ function AgentWorkspace({
   conversationResetKey,
   onChatTurnsChange,
   onGeneratePlan,
+  onConfirmTask,
   onGeneratePatchDraft,
   onApplyPatchDraft,
   onMergeHandoff,
@@ -1628,11 +1667,22 @@ function AgentWorkspace({
         mimeType: attachment.mimeType,
         name: attachment.name,
       })),
+      conversationId: activeConversationId,
       requestId,
       task: nextInput || "请根据截图帮我分析并修改。",
     }).then((ok) => {
       if (activeRequestRef.current !== requestId) return;
       if (ok) {
+        onChatTurnsChange([
+          ...chatTurns,
+          userTurn,
+          {
+            id: `${Date.now()}-assistant-plan`,
+            actions: [{ id: "confirm-active-task", label: "开始执行" }],
+            role: "assistant",
+            text: "我已经生成计划并创建任务。确认后会进入执行状态。",
+          },
+        ]);
         setPendingTurn(null);
         submittedAttachments.forEach((attachment) => URL.revokeObjectURL(attachment.url));
       }
@@ -1737,6 +1787,13 @@ function AgentWorkspace({
                   ? "我整理好了下一步，详情放在「执行」里。你确认后我再继续动手。"
                   : "我整理好了下一步，详情放在「执行」里。"}
                 {planError ? <Notice className="planError" variant="danger">{planError}</Notice> : null}
+                {activeTask?.status === taskStatuses.planned ? (
+                  <div className="conversationActions">
+                    <button type="button" onClick={() => onConfirmTask?.(activeTask.id)}>
+                      开始执行
+                    </button>
+                  </div>
+                ) : null}
               </ConversationMessage>
             ) : null}
 
@@ -1816,6 +1873,7 @@ function AgentWorkspace({
                   onApplyPatchDraft={onApplyPatchDraft}
                   onMergeHandoff={onMergeHandoff}
                   onRunGuardedCheck={onRunGuardedCheck}
+                  onSelectConversation={onSelectConversation}
                 />
               ) : readonlyPlan ? (
                 <ReadonlyPlan plan={readonlyPlan} />
@@ -2209,6 +2267,7 @@ function ActiveTask({
   onApplyPatchDraft,
   onMergeHandoff,
   onRunGuardedCheck,
+  onSelectConversation,
 }) {
   const runnableChecks = checksForPlan(task.plan);
 
@@ -2218,9 +2277,23 @@ function ActiveTask({
         <div>
           <strong>{task.title}</strong>
           <span>{task.projectName} · {task.createdAt}</span>
+          {task.goalTitle || task.conversationId ? (
+            <span className="activeTaskSource">
+              {task.goalTitle ? `来自目标：${task.goalTitle}` : null}
+              {task.goalTitle && task.conversationId ? " · " : null}
+              {task.conversationId ? "来自对话" : null}
+            </span>
+          ) : null}
         </div>
         <Badge status={task.status}>{taskStatusLabel(task.status)}</Badge>
       </div>
+      {task.conversationId ? (
+        <div className="activeTaskInlineActions">
+          <button type="button" onClick={() => onSelectConversation?.(task.conversationId)}>
+            回到对话
+          </button>
+        </div>
+      ) : null}
       <ReadonlyPlan plan={task.plan} />
       <details className="executionTools">
         <summary>更多操作</summary>
@@ -2382,6 +2455,7 @@ function RightRail({
   const [newGoalOpen, setNewGoalOpen] = useState(false);
   const [newGoalTitle, setNewGoalTitle] = useState("");
   const [newGoalSummary, setNewGoalSummary] = useState("");
+  const [viewingHistoryGoalId, setViewingHistoryGoalId] = useState("");
   const activeGoal = activeGoalFromSnapshot(snapshot);
   const activeGoalTaskIds = new Set(Array.isArray(activeGoal?.taskIds) ? activeGoal.taskIds : []);
   const belongsToActiveGoal = (item) => {
@@ -2397,6 +2471,8 @@ function RightRail({
   const goalTodos = visibleTasks.length
     ? visibleTasks.map((task) => ({
         description: task.plan?.summary || task.projectName || "",
+        conversationId: task.conversationId || "",
+        goalId: task.goalId || "",
         id: task.id,
         status: task.status,
         subtasks: taskSubtasks(task),
@@ -2412,20 +2488,14 @@ function RightRail({
   const pendingCount = Math.max(goalTodos.length - doneCount - runningCount, 0);
   const allGoals = Array.isArray(snapshot.goals?.goals) ? snapshot.goals.goals : [];
   const activeGoalIndex = Math.max(allGoals.findIndex((goal) => goal.id === activeGoal?.id), 0);
-  const otherGoals = allGoals.filter((goal) => goal.id !== activeGoal?.id);
-  const activeGoals = activeGoal ? [activeGoal] : [];
-  const activeGroupTitle = activeGoal?.status === "done"
-    ? "当前"
-    : activeGoal?.status === "draft" || (activeGoal?.status === "planned" && !goalTodos.length)
-      ? "待确认"
-      : "进行中";
-  const openGoals = otherGoals.filter((goal) => goal.status !== "done" && goal.status !== "draft" && goal.status !== "planned");
-  const draftGoals = otherGoals.filter((goal) => goal.status === "draft" || goal.status === "planned");
-  const completedGoals = otherGoals.filter((goal) => goal.status === "done");
+  const completedGoals = allGoals.filter((goal) => goal.status === "done");
+  const recentCompletedGoals = completedGoals.slice(0, 3);
+  const draftGoals = allGoals.filter((goal) => goal.status === "draft" || (goal.status === "planned" && !Array.isArray(goal.taskIds)));
+  const openGoals = allGoals.filter((goal) => !["done", "draft"].includes(goal.status) && !(goal.status === "planned" && !Array.isArray(goal.taskIds)));
   const goalTitle = activeTask?.title || activeGoal?.shortTitle || activeGoal?.title || snapshot.stage || snapshot.projectName || "当前项目";
-  const rawValidationStatus = snapshot.goalValidation?.goal?.status || "";
+  const validationGoal = snapshot.goalValidation?.goal || {};
   const validationReportStatus = snapshot.goalValidationReport?.status || "missing";
-  const validationStatus = goalValidationStatusFromActiveGoal(activeGoal, rawValidationStatus, validationReportStatus);
+  const validationStatus = goalValidationStatusFromActiveGoal(activeGoal, validationGoal, validationReportStatus);
   const goalMeta = runningCount || (activeGoal?.status === "planned" && goalTodos.length)
     ? "进行中"
     : goalMetaFromStatus(activeGoal?.status || validationStatus, validationReportStatus, goalTodos, snapshot.phase);
@@ -2448,7 +2518,13 @@ function RightRail({
     ? snapshot.goalValidation.criteria
     : [];
   const goalSignedOff = validationStatus === "signed-off";
-  const goalVerified = validationStatus === "verified" || validationReportStatus === "passed";
+  const goalVerified = validationStatus === "verified";
+  const hasActiveWorkGoal = Boolean(activeGoal) && !goalSignedOff;
+  const viewingCompletedGoal = goalSignedOff && viewingHistoryGoalId === activeGoal?.id;
+  const showGoalDetail = hasActiveWorkGoal || viewingCompletedGoal;
+  const visibleGoalTodos = viewingCompletedGoal ? goalTodos : displayedTodos;
+  const visibleTaskFilterLabel = viewingCompletedGoal ? "记录" : taskFilterLabel;
+  const visibleTaskFilterCount = visibleGoalTodos.length;
   const goalIsDraft = activeGoal?.status === "draft";
   const goalIsPlanned = activeGoal?.status === "planned" && !goalTodos.length;
   const goalSteps = goalTodos.length
@@ -2464,9 +2540,15 @@ function RightRail({
       title,
       summary: newGoalSummary.trim(),
     });
+    setViewingHistoryGoalId("");
     setNewGoalOpen(false);
     setNewGoalTitle("");
     setNewGoalSummary("");
+  };
+
+  const selectGoalFromMenu = (goal) => {
+    setViewingHistoryGoalId(goal?.status === "done" ? goal.id : "");
+    onSwitchGoal?.(goal.id);
   };
 
   if (collapsed) {
@@ -2507,10 +2589,14 @@ function RightRail({
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="goalSwitcherMenu">
-                <GoalMenuGroup title={activeGroupTitle} goals={activeGoals} onSwitchGoal={onSwitchGoal} />
-                <GoalMenuGroup title="待确认" goals={draftGoals} onSwitchGoal={onSwitchGoal} />
-                <GoalMenuGroup title="进行中" goals={openGoals} onSwitchGoal={onSwitchGoal} />
-                <GoalMenuGroup title="已完成" goals={completedGoals} onSwitchGoal={onSwitchGoal} muted />
+                <GoalMenuGroup activeGoalId={showGoalDetail ? activeGoal?.id : ""} title="进行中" goals={openGoals} onSwitchGoal={selectGoalFromMenu} />
+                <GoalMenuGroup activeGoalId={showGoalDetail ? activeGoal?.id : ""} title="待确认" goals={draftGoals} onSwitchGoal={selectGoalFromMenu} />
+                <GoalMenuGroup activeGoalId={viewingCompletedGoal ? activeGoal?.id : ""} title="已完成" goals={recentCompletedGoals} onSwitchGoal={selectGoalFromMenu} muted />
+                {completedGoals.length > recentCompletedGoals.length ? (
+                  <DropdownMenuItem className="goalMenuHint" onSelect={(event) => event.preventDefault()}>
+                    更多历史在工程文件里查看
+                  </DropdownMenuItem>
+                ) : null}
                 {allGoals.length ? <DropdownMenuSeparator /> : null}
                 <DropdownMenuItem className="goalMenuAction" onSelect={() => setNewGoalOpen(true)}>
                   <Plus strokeWidth={2.1} aria-hidden="true" />
@@ -2521,95 +2607,103 @@ function RightRail({
           )}
         >
           <div className="goalStack">
-            <div className="goalProgress">
-              <div className="goalProgressHeader">
-                <strong>
-                  <span>{compactGoalTitle(goalTitle)}</span>
-                  <em>{goalMeta}</em>
-                </strong>
-              </div>
-              <div className="goalProgressBar" aria-hidden="true">
-                <span style={{ width: `${progressValue}%` }} />
-              </div>
-              <div className="goalSteps">
-                {goalSteps.map((step) => (
-                  <span key={step}>{step}</span>
-                ))}
-              </div>
-              {goalIsDraft ? (
-                <div className="goalVerifyNotice">
-                  <span>这个目标还没有确认。确认后，我会先生成任务拆解草案。</span>
-                  <div className="goalVerifyActions">
-                    <Button size="sm" variant="primary" type="button" onClick={() => activeGoal?.id && onConfirmGoal?.(activeGoal.id)}>
-                      确认目标
-                    </Button>
-                  </div>
+            {showGoalDetail ? (
+              <div className="goalProgress">
+                <div className="goalProgressHeader">
+                  <strong>
+                    <span>{compactGoalTitle(goalTitle)}</span>
+                    <em>{viewingCompletedGoal ? "已完成" : goalMeta}</em>
+                  </strong>
                 </div>
-              ) : goalIsPlanned ? (
-                <div className="goalVerifyNotice">
-                  <span>目标已确认。下一步生成任务拆解草案，确认拆解后进入进行中。</span>
-                  <div className="goalVerifyActions">
-                    <Button size="sm" variant="primary" type="button">
-                      生成拆解
-                    </Button>
-                  </div>
+                <div className="goalProgressBar" aria-hidden="true">
+                  <span style={{ width: `${progressValue}%` }} />
                 </div>
-              ) : goalNeedsVerification ? (
-                <div className="goalVerifyNotice">
-                  {goalSignedOff ? (
-                    <span>这个阶段已确认完成，后续变更会进入新的打磨。</span>
-                  ) : (
-                    <>
-                      <span>
-                        {goalVerified ? "验证已通过。你可以继续打磨，也可以确认完成。" : "任务已完成，等待验收。"}
-                        {validationCriteria.length ? ` 验收标准 ${validationCriteria.length} 项。` : ""}
-                      </span>
-                      {goalVerified ? (
-                        <div className="goalVerifyActions">
-                          <Button size="sm" variant="subtle" type="button" onClick={onRefineGoal}>
-                            继续打磨
-                          </Button>
-                          <Dialog open={confirmGoalOpen} onOpenChange={setConfirmGoalOpen}>
-                            <DialogTrigger asChild>
-                              <Button size="sm" variant="primary" type="button" disabled={signingGoal}>
+                <div className="goalSteps">
+                  {goalSteps.map((step) => (
+                    <span key={step}>{step}</span>
+                  ))}
+                </div>
+                {viewingCompletedGoal ? (
+                  <div className="goalVerifyNotice">
+                    <span>这是已完成目标的历史记录。</span>
+                  </div>
+                ) : goalIsDraft ? (
+                  <div className="goalVerifyNotice">
+                    <span>这个目标还没有确认。确认后，我会先生成任务拆解草案。</span>
+                    <div className="goalVerifyActions">
+                      <Button size="sm" variant="primary" type="button" onClick={() => activeGoal?.id && onConfirmGoal?.(activeGoal.id)}>
+                        确认目标
+                      </Button>
+                    </div>
+                  </div>
+                ) : goalIsPlanned ? (
+                  <div className="goalVerifyNotice">
+                    <span>目标已确认。下一步生成任务拆解草案，确认拆解后进入进行中。</span>
+                    <div className="goalVerifyActions">
+                      <Button size="sm" variant="primary" type="button">
+                        生成拆解
+                      </Button>
+                    </div>
+                  </div>
+                ) : goalNeedsVerification ? (
+                  <div className="goalVerifyNotice">
+                    <span>
+                      {goalVerified ? "验证已通过。你可以继续打磨，也可以确认完成。" : "任务已完成，等待验收。"}
+                      {validationCriteria.length ? ` 验收标准 ${validationCriteria.length} 项。` : ""}
+                    </span>
+                    {goalVerified ? (
+                      <div className="goalVerifyActions">
+                        <Button size="sm" variant="subtle" type="button" onClick={onRefineGoal}>
+                          继续打磨
+                        </Button>
+                        <Dialog open={confirmGoalOpen} onOpenChange={setConfirmGoalOpen}>
+                          <DialogTrigger asChild>
+                            <Button size="sm" variant="primary" type="button" disabled={signingGoal}>
+                              {signingGoal ? "确认中" : "确认完成"}
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent
+                            className="goalConfirmDialog"
+                            title="确认这个阶段完成？"
+                            description="系统会记录当前验收结果和完成时间，后续工作将从新的目标或下一轮打磨继续。"
+                          >
+                            <div className="goalConfirmActions">
+                              <DialogClose asChild>
+                                <Button size="sm" variant="default" type="button">取消</Button>
+                              </DialogClose>
+                              <Button
+                                size="sm"
+                                variant="primary"
+                                type="button"
+                                disabled={signingGoal}
+                                onClick={async () => {
+                                  await onSignOffGoal?.();
+                                  setConfirmGoalOpen(false);
+                                }}
+                              >
                                 {signingGoal ? "确认中" : "确认完成"}
                               </Button>
-                            </DialogTrigger>
-                            <DialogContent
-                              className="goalConfirmDialog"
-                              title="确认这个阶段完成？"
-                              description="系统会记录当前验收结果和完成时间，后续工作将从新的目标或下一轮打磨继续。"
-                            >
-                              <div className="goalConfirmActions">
-                                <DialogClose asChild>
-                                  <Button size="sm" variant="default" type="button">取消</Button>
-                                </DialogClose>
-                                <Button
-                                  size="sm"
-                                  variant="primary"
-                                  type="button"
-                                  disabled={signingGoal}
-                                  onClick={async () => {
-                                    await onSignOffGoal?.();
-                                    setConfirmGoalOpen(false);
-                                  }}
-                                >
-                                  {signingGoal ? "确认中" : "确认完成"}
-                                </Button>
-                              </div>
-                            </DialogContent>
-                          </Dialog>
-                        </div>
-                      ) : (
-                        <button type="button" onClick={onValidateGoal} disabled={validatingGoal}>
-                          {validatingGoal ? "验证中" : "验证目标"}
-                        </button>
-                      )}
-                    </>
-                  )}
-                </div>
-              ) : null}
-            </div>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                      </div>
+                    ) : (
+                      <button type="button" onClick={onValidateGoal} disabled={validatingGoal}>
+                        {validatingGoal ? "验证中" : "验证目标"}
+                      </button>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="goalEmptyState">
+                <span>暂无进行中目标，请&nbsp;</span>
+                <button className="goalEmptyAction" type="button" onClick={() => setNewGoalOpen(true)}>
+                  <Plus strokeWidth={2.2} aria-hidden="true" />
+                  添加目标
+                </button>
+              </div>
+            )}
             <Dialog open={newGoalOpen} onOpenChange={setNewGoalOpen}>
               <DialogContent
                 className="goalCreateDialog"
@@ -2649,40 +2743,44 @@ function RightRail({
                 </form>
               </DialogContent>
             </Dialog>
-            <div className="goalTaskHeader">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="goalTaskFilter" type="button">
-                    <span>任务拆解 · {taskFilterLabel}</span>
-                    <ChevronDown strokeWidth={2} aria-hidden="true" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="goalTaskFilterMenu">
-                  <DropdownMenuItem onSelect={() => setTaskFilter("todo")}>待办</DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setTaskFilter("all")}>全部</DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setTaskFilter("done")}>已完成</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <span>{taskFilterCount}</span>
-            </div>
-            {displayedTodos.length ? (
-              <ol className="goalTodoList">
-                {displayedTodos.map((todo, index) => (
-                  <GoalTaskItem
-                    active={todo.id === activeTaskId}
-                    description={todo.description}
-                    index={index}
-                    key={todo.id}
-                    status={todo.status}
-                    subtasks={todo.subtasks}
-                    title={todo.title}
-                    onSelect={() => onSelectTask(todo.id)}
-                  />
-                ))}
-              </ol>
-            ) : (
-              <div className="goalEmpty">{taskFilter === "done" ? "还没有完成任务。" : "当前没有待办任务。"}</div>
-            )}
+            {showGoalDetail ? (
+              <>
+                <div className="goalTaskHeader">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="goalTaskFilter" type="button">
+                        <span>任务拆解 · {visibleTaskFilterLabel}</span>
+                        <ChevronDown strokeWidth={2} aria-hidden="true" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="goalTaskFilterMenu">
+                      <DropdownMenuItem onSelect={() => setTaskFilter("todo")}>待办</DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setTaskFilter("all")}>全部</DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setTaskFilter("done")}>已完成</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <span>{visibleTaskFilterCount}</span>
+                </div>
+                {visibleGoalTodos.length ? (
+                  <ol className="goalTodoList">
+                    {visibleGoalTodos.map((todo, index) => (
+                      <GoalTaskItem
+                        active={todo.id === activeTaskId}
+                        description={todo.description}
+                        index={index}
+                        key={todo.id}
+                        status={todo.status}
+                        subtasks={todo.subtasks}
+                        title={todo.title}
+                        onSelect={() => onSelectTask(todo.id)}
+                      />
+                    ))}
+                  </ol>
+                ) : (
+                  <div className="goalEmpty">{viewingCompletedGoal ? "还没有任务记录。" : taskFilter === "done" ? "还没有完成任务。" : "当前没有待办任务。"}</div>
+                )}
+              </>
+            ) : null}
           </div>
         </RailDisclosure>
 
@@ -2775,14 +2873,15 @@ function ConversationHistoryItem({ conversation, active, onDeleteConversation, o
   );
 }
 
-function GoalMenuGroup({ goals, muted = false, onSwitchGoal, title }) {
+function GoalMenuGroup({ activeGoalId, goals, muted = false, onSwitchGoal, title }) {
   if (!goals.length) return null;
   return (
     <>
       <div className="goalMenuGroupTitle">{title}</div>
       {goals.map((goal) => (
-        <DropdownMenuItem className={muted ? "goalMenuItem muted" : "goalMenuItem"} key={goal.id} onSelect={() => onSwitchGoal?.(goal.id)}>
+        <DropdownMenuItem className={`${muted ? "goalMenuItem muted" : "goalMenuItem"}${goal.id === activeGoalId ? " active" : ""}`} key={goal.id} onSelect={() => onSwitchGoal?.(goal)}>
           <span className="goalMenuTitle">{goal.shortTitle || compactGoalTitle(goal.title)}</span>
+          {goal.id === activeGoalId ? <span className="goalMenuCurrent">当前</span> : null}
         </DropdownMenuItem>
       ))}
     </>
@@ -3002,7 +3101,7 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
   };
 
   const deleteProfile = async (profile) => {
-    if (!profile || isPreview) return;
+    if (!profile) return;
     const confirmed = window.confirm(`删除连接「${profile.name || "未命名连接"}」？\n如果这个 Key 没有被其他连接共用，也会从 .env.local 移除。`);
     if (!confirmed) return;
     const ok = await onDeleteProviderProfile?.(profile.id);
@@ -3134,7 +3233,7 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
 	        variant={isCreatingProfile ? "creating" : "default"}
 	      />
       {isPreview ? (
-        <InfoCallout>当前是浏览器预览，只能查看界面。保存 Key、刷新模型和写入配置需要在桌面 App 窗口中操作。</InfoCallout>
+        <InfoCallout>当前是浏览器预览；保存 Key、刷新模型和写入配置需要在桌面 App 窗口中操作，删除已保存连接可在预览中验证。</InfoCallout>
       ) : null}
       <div className="providerSavedConnections" aria-label="已保存连接">
         <div className="providerSectionTitle">
@@ -3156,9 +3255,7 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
                     className="tileRemoveButton providerConnectionRemove"
                     type="button"
                     onClick={() => deleteProfile(profile)}
-                    disabled={isPreview}
                     aria-label={`删除连接 ${providerConnectionLabel(profile)}`}
-                    title={isPreview ? "桌面 App 中可删除" : "删除连接"}
                   >
                     <X strokeWidth={2.2} aria-hidden="true" />
                   </button>
@@ -3175,6 +3272,7 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
             <span>新建连接</span>
           </button>
         )}
+        {providerError ? <Notice className="providerError providerConnectionError" variant="danger">{providerError}</Notice> : null}
       </div>
       <div className="providerSectionTitle">基础设置</div>
       <Field label="连接名称" hint="只用于识别，不影响实际调用。">
@@ -3274,7 +3372,6 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
       </div>
       <Button variant="primary" type="submit" disabled={isPreview}>保存并启用</Button>
       {probeError ? <Notice className="providerError" variant="danger">{probeError}</Notice> : null}
-      {providerError ? <Notice className="providerError" variant="danger">{providerError}</Notice> : null}
     </Panel>
   );
 }
@@ -3370,6 +3467,7 @@ function App() {
   const [goalRefinementMode, setGoalRefinementMode] = useState(false);
   const [providerError, setProviderError] = useState("");
   const [toast, setToast] = useState(null);
+  const [actionFeedback, setActionFeedback] = useState(null);
   const [projectActivities, setProjectActivities] = useState({});
   const [conversationResetKey, setConversationResetKey] = useState(0);
   const [selectedEngineeringFile, setSelectedEngineeringFile] = useState(null);
@@ -3383,11 +3481,39 @@ function App() {
     setToast({ id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, message, variant });
   };
 
+  const beginActionFeedback = (key, message) => {
+    setActionFeedback({
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      key,
+      message,
+      status: "running",
+    });
+  };
+
+  const finishActionFeedback = (key, status, message) => {
+    setActionFeedback((current) => {
+      if (current?.key && current.key !== key) return current;
+      return {
+        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        key,
+        message,
+        status,
+      };
+    });
+    showToast(message, status === "failed" ? "danger" : "success");
+  };
+
   useEffect(() => {
     if (!toast) return undefined;
     const timer = window.setTimeout(() => setToast(null), 2200);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    if (!actionFeedback || actionFeedback.status === "running") return undefined;
+    const timer = window.setTimeout(() => setActionFeedback(null), 3200);
+    return () => window.clearTimeout(timer);
+  }, [actionFeedback]);
 
   useEffect(() => {
     const projectId = snapshot.currentProjectId;
@@ -3402,15 +3528,23 @@ function App() {
       nextActivity = { tone: "running", label: "进行中" };
     } else if (relatedTasks.some((task) => [taskStatuses.failed, "interrupted", "canceled", "cancelled", "error"].includes(task.status))) {
       nextActivity = { tone: "danger", label: "任务或会话中断" };
-    } else if (relatedTasks.some((task) => task.status === taskStatuses.done)) {
-      nextActivity = { tone: "success", label: "最近完成" };
     }
-    if (!nextActivity) return;
     setProjectActivities((current) => ({
       ...current,
-      [projectId]: nextActivity,
+      ...(nextActivity ? { [projectId]: nextActivity } : {}),
     }));
   }, [snapshot.currentProjectId, snapshot.currentProjectPath, snapshot.projectName, tasks, planLoading, terminalRunningId]);
+
+  const markProjectActivitySeen = (projectId) => {
+    if (!projectId) return;
+    setProjectActivities((current) => {
+      const activity = current[projectId];
+      if (activity?.tone !== "success") return current;
+      const next = { ...current };
+      delete next[projectId];
+      return next;
+    });
+  };
 
   const beginSidebarResize = (side, event) => {
     event.preventDefault();
@@ -3512,6 +3646,19 @@ function App() {
     if (nextTask.plan) {
       setReadonlyPlan(nextTask.plan);
     }
+    if (nextTask.status === taskStatuses.done) {
+      const projectId = nextTask.projectId || snapshot.currentProjectId;
+      if (projectId) {
+        setProjectActivities((current) => ({
+          ...current,
+          [projectId]: {
+            tone: "success",
+            label: "有新完成结果",
+            taskId: nextTask.id,
+          },
+        }));
+      }
+    }
     try {
       await persistDesktopTask(nextTask);
     } catch (err) {
@@ -3526,27 +3673,37 @@ function App() {
   };
 
   const validateGoal = async () => {
+    const feedbackKey = "validate-goal";
+    beginActionFeedback(feedbackKey, "正在验证目标...");
     setValidatingGoal(true);
     setError("");
     try {
       const nextSnapshot = await runGoalValidationCheck();
       applySnapshot(nextSnapshot);
+      finishActionFeedback(feedbackKey, "success", "目标验收已完成。");
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+      finishActionFeedback(feedbackKey, "failed", `目标验收失败：${message}`);
     } finally {
       setValidatingGoal(false);
     }
   };
 
   const signOffGoal = async () => {
+    const feedbackKey = "signoff-goal";
+    beginActionFeedback(feedbackKey, "正在确认完成...");
     setSigningGoal(true);
     setError("");
     try {
       const nextSnapshot = await signOffGoalValidation();
       applySnapshot(nextSnapshot);
       setGoalRefinementMode(false);
+      finishActionFeedback(feedbackKey, "success", "目标已确认完成。");
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
+      finishActionFeedback(feedbackKey, "failed", `确认完成失败：${message}`);
     } finally {
       setSigningGoal(false);
     }
@@ -3912,7 +4069,9 @@ function App() {
   const generatePlan = async (request) => {
     const input = typeof request === "string" ? { task: request, attachments: [] } : request;
     const requestId = input.requestId || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const feedbackKey = `generate-plan-${requestId}`;
     activePlanRequestRef.current = requestId;
+    beginActionFeedback(feedbackKey, "正在生成计划...");
     setPlanError("");
     setPlanLoading(true);
     try {
@@ -3938,14 +4097,18 @@ function App() {
         }
       }
       if (activePlanRequestRef.current !== requestId) return false;
-      const nextTask = createTaskFromPlan(plan, input.task, snapshot);
+      const nextTask = createTaskFromPlan(plan, input.task, snapshot, {
+        conversationId: input.conversationId || activeConversationId,
+      });
       setReadonlyPlan(plan);
       await setAndPersistTask(nextTask);
-      showToast("已生成计划，等待确认执行。");
+      finishActionFeedback(feedbackKey, "success", "已生成计划，等待确认执行。");
       return true;
     } catch (err) {
       if (activePlanRequestRef.current !== requestId) return false;
-      setPlanError(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      setPlanError(message);
+      finishActionFeedback(feedbackKey, "failed", `生成计划失败：${message}`);
       return false;
     } finally {
       if (activePlanRequestRef.current === requestId) {
@@ -3961,6 +4124,12 @@ function App() {
   };
 
   const runChatAction = async (action) => {
+    if (action?.id === "confirm-active-task") {
+      const targetTask = tasks.find((task) => task.id === activeTaskId);
+      if (!targetTask) return false;
+      markTaskWaiting(targetTask.id);
+      return true;
+    }
     if (action?.id !== "generate-plan" || !action.task) return false;
     const ok = await generatePlan({ task: action.task, attachments: [] });
     if (ok) {
@@ -3995,6 +4164,7 @@ function App() {
       title: queueItem.title,
     } : null);
     if (!task) return;
+    markProjectActivitySeen(task.projectId || snapshot.currentProjectId);
     setActiveTaskId(id);
     setReadonlyPlan(task.plan);
     setSelectedEngineeringFile(null);
@@ -4003,6 +4173,7 @@ function App() {
   const selectConversation = (id) => {
     const conversation = conversations.find((item) => item.id === id);
     if (!conversation) return;
+    markProjectActivitySeen(snapshot.currentProjectId);
     setActiveConversationId(id);
     setChatTurns(Array.isArray(conversation.turns) ? conversation.turns : []);
     setActiveTaskId("");
@@ -4057,6 +4228,9 @@ function App() {
   };
 
   const runGuardedCheck = async (taskId, checkId) => {
+    const feedbackKey = `check-${taskId}-${checkId}`;
+    const checkLabel = guardedChecks.find((check) => check.id === checkId)?.label || checkId;
+    beginActionFeedback(feedbackKey, `正在运行检查：${checkLabel}`);
     setRunnerError("");
     setRunnerLoadingId(checkId);
     setTasks((current) =>
@@ -4082,20 +4256,27 @@ function App() {
           runs: [finishedRun, ...(task.runs || [])],
         });
       }
+      finishActionFeedback(
+        feedbackKey,
+        result.success ? "success" : "failed",
+        result.success ? `${checkLabel} 通过。` : `${checkLabel} 失败。`
+      );
       return true;
     } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
       appendTerminalLog({
         id: checkId,
         command: guardedChecks.find((check) => check.id === checkId)?.command || checkId,
-        output: err instanceof Error ? err.message : String(err),
+        output: message,
         success: false,
       });
-      setRunnerError(err instanceof Error ? err.message : String(err));
+      setRunnerError(message);
       setTasks((current) =>
         current.map((task) =>
           task.id === taskId ? { ...task, status: taskStatuses.failed } : task
         )
       );
+      finishActionFeedback(feedbackKey, "failed", `${checkLabel} 失败：${message}`);
       return false;
     } finally {
       setRunnerLoadingId("");
@@ -4218,6 +4399,8 @@ function App() {
     const task = tasks.find((item) => item.id === taskId);
     if (!task) return false;
 
+    const feedbackKey = `patch-${taskId}`;
+    beginActionFeedback(feedbackKey, "正在生成改动草稿...");
     setPatchError("");
     setPatchLoading(true);
     try {
@@ -4229,9 +4412,12 @@ function App() {
         status: taskStatuses.waitingApproval,
         patchDraft,
       });
+      finishActionFeedback(feedbackKey, "success", "改动草稿已生成。");
       return true;
     } catch (err) {
-      setPatchError(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      setPatchError(message);
+      finishActionFeedback(feedbackKey, "failed", `生成改动失败：${message}`);
       return false;
     } finally {
       setPatchLoading(false);
@@ -4242,6 +4428,8 @@ function App() {
     const task = tasks.find((item) => item.id === taskId);
     if (!task) return false;
 
+    const feedbackKey = `apply-${taskId}`;
+    beginActionFeedback(feedbackKey, "正在应用改动并验证...");
     setApplyError("");
     setRunnerError("");
     setApplyLoading(true);
@@ -4266,6 +4454,7 @@ function App() {
           input: { task: doneTask },
         });
         await setAndPersistTask({ ...doneTask, runSummary });
+        finishActionFeedback(feedbackKey, "success", "改动已应用，已写入运行摘要。");
         return true;
       }
 
@@ -4293,6 +4482,11 @@ function App() {
         input: { task: verifiedTask },
       });
       await setAndPersistTask({ ...verifiedTask, runSummary });
+      finishActionFeedback(
+        feedbackKey,
+        allPassed ? "success" : "failed",
+        allPassed ? "改动已应用，自动验证通过。" : "改动已应用，但自动验证有失败项。"
+      );
       return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -4300,6 +4494,7 @@ function App() {
       setRunnerError(message);
       const failedTask = tasks.find((item) => item.id === taskId) || task;
       await setAndPersistTask({ ...failedTask, status: taskStatuses.failed });
+      finishActionFeedback(feedbackKey, "failed", `应用改动失败：${message}`);
       return false;
     } finally {
       setApplyLoading(false);
@@ -4311,6 +4506,8 @@ function App() {
     const task = tasks.find((item) => item.id === taskId);
     if (!task) return false;
 
+    const feedbackKey = `handoff-${taskId}`;
+    beginActionFeedback(feedbackKey, "正在更新交接...");
     setHandoffError("");
     setHandoffLoading(true);
     try {
@@ -4321,9 +4518,12 @@ function App() {
         ...task,
         handoffMerge,
       });
+      finishActionFeedback(feedbackKey, "success", "交接已更新。");
       return true;
     } catch (err) {
-      setHandoffError(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      setHandoffError(message);
+      finishActionFeedback(feedbackKey, "failed", `更新交接失败：${message}`);
       return false;
     } finally {
       setHandoffLoading(false);
@@ -4331,14 +4531,18 @@ function App() {
   };
 
   const saveProvider = async (form) => {
+    const feedbackKey = "save-provider";
+    beginActionFeedback(feedbackKey, "正在保存连接...");
     setProviderError("");
     try {
       const status = await invokeWorkspaceCommand("save_provider_config", { input: form });
       setProvider({ ...fallbackProvider, ...status });
-      showToast("连接配置已保存。");
+      finishActionFeedback(feedbackKey, "success", "连接配置已保存。");
       return true;
     } catch (err) {
-      setProviderError(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      setProviderError(message);
+      finishActionFeedback(feedbackKey, "failed", `保存连接失败：${message}`);
       return false;
     }
   };
@@ -4427,21 +4631,27 @@ function App() {
   };
 
   const saveProviderSecret = async (apiKeyEnv, apiKey) => {
+    const feedbackKey = "save-provider-secret";
+    beginActionFeedback(feedbackKey, "正在保存 API Key...");
     setProviderError("");
     try {
       const status = await invokeWorkspaceCommand("save_provider_secret", {
         input: { apiKeyEnv, apiKey },
       });
       setProvider({ ...fallbackProvider, ...status });
-      showToast("API Key 已保存。");
+      finishActionFeedback(feedbackKey, "success", "API Key 已保存。");
       return true;
     } catch (err) {
-      setProviderError(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      setProviderError(message);
+      finishActionFeedback(feedbackKey, "failed", `保存 API Key 失败：${message}`);
       return false;
     }
   };
 
   const deleteProviderProfile = async (profileId) => {
+    const feedbackKey = "delete-provider";
+    beginActionFeedback(feedbackKey, "正在删除连接...");
     setProviderError("");
     try {
       const status = source !== "tauri"
@@ -4450,15 +4660,16 @@ function App() {
             input: { profileId },
           });
       setProvider({ ...fallbackProvider, ...status });
-      showToast("连接已删除。");
+      finishActionFeedback(feedbackKey, "success", "连接已删除。");
       return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      setProviderError(
+      const displayMessage =
         message.includes("delete_provider_profile") && message.includes("not found")
           ? "当前桌面进程还没加载删除连接命令，请重启桌面 dev 进程后再删。"
-          : message
-      );
+          : message;
+      setProviderError(displayMessage);
+      finishActionFeedback(feedbackKey, "failed", `删除连接失败：${displayMessage}`);
       return false;
     }
   };
@@ -4508,6 +4719,7 @@ function App() {
           onRemoveProject={removeProject}
           onSelectEngineeringFile={selectEngineeringFile}
           onProjectActionError={setProjectActionError}
+          onProjectActivitySeen={markProjectActivitySeen}
           onProjectPathCopied={() => showToast("已复制项目路径。")}
           projectActionError={projectActionError}
           selectedEngineeringFile={selectedEngineeringFile}
@@ -4539,6 +4751,7 @@ function App() {
           conversationResetKey={conversationResetKey}
           onChatTurnsChange={updateChatTurns}
           onGeneratePlan={generatePlan}
+          onConfirmTask={markTaskWaiting}
           onGeneratePatchDraft={generatePatchDraft}
           onApplyPatchDraft={applyPatchDraft}
           onMergeHandoff={mergeHandoff}
@@ -4585,10 +4798,23 @@ function App() {
           signingGoal={signingGoal}
         />
       </main>
-      {toast ? <div className={`appToast appToast-${toast.variant}`}>{toast.message}</div> : null}
+      {actionFeedback ? <ActionFeedbackToast feedback={actionFeedback} /> : null}
+      {!actionFeedback && toast ? <div className={`appToast appToast-${toast.variant}`}>{toast.message}</div> : null}
       <StatusBar snapshot={snapshot} source={source} />
     </div>
     </TooltipProvider>
+  );
+}
+
+function ActionFeedbackToast({ feedback }) {
+  const variant = feedback.status === "failed" ? "danger" : feedback.status === "running" ? "running" : "success";
+  return (
+    <div className={`appToast appToast-${variant}`} role="status" aria-live="polite">
+      {feedback.status === "running" ? <Loader2 className="appToastIcon" aria-hidden="true" /> : null}
+      {feedback.status === "success" ? <Check className="appToastIcon" aria-hidden="true" /> : null}
+      {feedback.status === "failed" ? <X className="appToastIcon" aria-hidden="true" /> : null}
+      <span>{feedback.message}</span>
+    </div>
   );
 }
 

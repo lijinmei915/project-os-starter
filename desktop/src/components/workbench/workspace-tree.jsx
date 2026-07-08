@@ -44,7 +44,44 @@ function collectTopicKeys(outline) {
   });
 }
 
-export function WorkspaceTree({ activeTopicPath, onSelectTopic, outline }) {
+function compactMeta(value, fallback = "") {
+  const text = String(value || fallback || "").trim();
+  return text.length > 8 ? `${text.slice(0, 8)}...` : text;
+}
+
+function goalCounts(snapshot) {
+  const goals = Array.isArray(snapshot?.goals?.goals) ? snapshot.goals.goals : [];
+  return {
+    completed: goals.filter((goal) => goal.status === "done").length,
+    draft: goals.filter((goal) => goal.status === "draft" || goal.status === "planned").length,
+    open: goals.filter((goal) => !["done", "draft", "planned"].includes(goal.status)).length,
+    total: goals.length,
+  };
+}
+
+function mappedMeta(node, snapshot) {
+  const counts = goalCounts(snapshot);
+  const reportStatus = snapshot?.goalValidationReport?.status;
+  const profileFields = Array.isArray(snapshot?.projectProfile?.missingFields)
+    ? 5 - snapshot.projectProfile.missingFields.length
+    : null;
+  const architecture = snapshot?.projectProfile?.architectureSummary || "";
+  const projectMeta = {
+    "认识项目": profileFields == null ? compactMeta(snapshot?.phase, node.meta) : `${profileFields}/5`,
+    "定义目标": counts.open ? `${counts.open} 进行中` : counts.draft ? `${counts.draft} 待确认` : counts.completed ? `${counts.completed} 历史` : "待添加",
+    "工作规则": snapshot?.projectProfile?.collaborationRules ? "已接入" : node.meta,
+    "设计实现": architecture ? "已识别" : node.meta,
+    "验证交付": reportStatus === "passed" ? "passed" : reportStatus === "failed" ? "failed" : node.meta,
+    "复盘沉淀": counts.completed ? `${counts.completed} 历史` : node.meta,
+    "项目状态": compactMeta(snapshot?.phase, node.meta),
+    "任务执行": counts.open || counts.draft ? `${counts.open + counts.draft} 活跃` : "空",
+    "工程资产": `${snapshot?.docsCount || 0} docs`,
+    "Agent 配置": snapshot?.projectName ? "本地" : node.meta,
+  };
+  return projectMeta[node.title] || node.meta;
+}
+
+export function WorkspaceTree({ activeTopicPath, onSelectTopic, outline, snapshot }) {
   const [sectionOpen, setSectionOpen] = useState(true);
   const firstNode = outline[0];
   const [activeNodeId, setActiveNodeId] = useState(firstNode?.id || firstNode?.title || "");
@@ -169,7 +206,7 @@ export function WorkspaceTree({ activeTopicPath, onSelectTopic, outline }) {
                 <NodeIcon strokeWidth={2.25} />
               </span>
               <span className="flowText">{node.title}</span>
-              <span className="flowMeta">{node.meta}</span>
+              <span className="flowMeta">{mappedMeta(node, snapshot)}</span>
             </button>
             {showChildren ? (
               <div className="inlineFlowDetail treeChildren">
@@ -200,7 +237,7 @@ export function WorkspaceTree({ activeTopicPath, onSelectTopic, outline }) {
                             <ChildIcon strokeWidth={2.25} />
                           </span>
                           <span className="flowText">{child.title}</span>
-                          <span className="flowMeta">{child.meta}</span>
+                          <span className="flowMeta">{mappedMeta(child, snapshot)}</span>
                         </button>
                         {showTopics ? (
                           <div className="flowNodeDetail treeChildren">

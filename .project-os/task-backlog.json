@@ -1,6 +1,6 @@
 {
   "schemaVersion": "project-os.task-backlog.v0.1",
-  "updatedAt": "2026-07-07T16:50:14.474Z",
+  "updatedAt": "2026-07-08T05:24:00.000Z",
   "items": [
     {
       "id": "workspace-project-context",
@@ -15,34 +15,42 @@
     {
       "id": "workspace-chat-to-task",
       "title": "对话生成任务的闭环",
-      "status": "planned",
+      "status": "done",
       "body": "用户输入一句话后，稳定完成理解意图、生成计划、用户确认、进入任务或目标的链路。",
       "tone": "accent",
-      "goalId": "workspace-usable-loop-20260707"
+      "goalId": "workspace-usable-loop-20260707",
+      "updatedAt": "2026-07-08T04:44:16.488Z",
+      "completedAt": "2026-07-08T04:44:16.488Z"
     },
     {
       "id": "workspace-goal-chat-link",
       "title": "右侧目标和中间对话联动",
-      "status": "planned",
+      "status": "done",
       "body": "目标任务可打开对应对话或执行视图；对话中新产生的任务能进入目标待办。",
       "tone": "accent",
-      "goalId": "workspace-usable-loop-20260707"
+      "goalId": "workspace-usable-loop-20260707",
+      "updatedAt": "2026-07-08T05:00:02.262Z",
+      "completedAt": "2026-07-08T05:00:02.262Z"
     },
     {
       "id": "workspace-project-profile-fill",
       "title": "当前项目档案自动补齐",
-      "status": "planned",
+      "status": "done",
       "body": "从现有文档读取项目名、阶段、规则、检查命令和技术栈，让用户确认或补充，减少手填。",
       "tone": "neutral",
-      "goalId": "workspace-usable-loop-20260707"
+      "goalId": "workspace-usable-loop-20260707",
+      "updatedAt": "2026-07-08T05:10:00.000Z",
+      "completedAt": "2026-07-08T05:10:00.000Z"
     },
     {
       "id": "workspace-action-feedback",
       "title": "执行反馈和保存反馈",
-      "status": "planned",
+      "status": "done",
       "body": "跑检查、生成 patch、保存配置、删除连接等动作提供轻量成功/失败反馈，让用户知道操作是否生效。",
       "tone": "neutral",
-      "goalId": "workspace-usable-loop-20260707"
+      "goalId": "workspace-usable-loop-20260707",
+      "updatedAt": "2026-07-08T05:24:00.000Z",
+      "completedAt": "2026-07-08T05:24:00.000Z"
     },
     {
       "id": "ux-input-status",

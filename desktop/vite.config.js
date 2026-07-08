@@ -75,6 +75,46 @@ function readJsonAt(projectRoot, relativePath, fallback) {
   }
 }
 
+function readTextAt(projectRoot, relativePath) {
+  try {
+    return fs.readFileSync(path.join(projectRoot, relativePath), "utf8");
+  } catch {
+    return "";
+  }
+}
+
+function cleanMarkdownLine(line) {
+  return line
+    .trim()
+    .replace(/^[-*> ]+/, "")
+    .replace(/^`+|`+$/g, "")
+    .trim();
+}
+
+function markdownSection(content, headings) {
+  let collecting = false;
+  const lines = [];
+  for (const line of content.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("#")) {
+      const title = trimmed.replace(/^#+/, "").trim();
+      if (collecting) break;
+      collecting = headings.some((heading) => title.includes(heading));
+      continue;
+    }
+    if (collecting) {
+      const cleaned = cleanMarkdownLine(trimmed);
+      if (cleaned) lines.push(cleaned);
+      if (lines.length >= 3) break;
+    }
+  }
+  return lines.join(" ");
+}
+
+function firstText(...values) {
+  return values.map((value) => String(value || "").trim()).find(Boolean) || "";
+}
+
 function profileText(profile, key) {
   const value = profile?.fields?.[key]?.value;
   if (Array.isArray(value)) return value.filter(Boolean).join("、");
@@ -82,20 +122,83 @@ function profileText(profile, key) {
   return "";
 }
 
-function profileForPreview(profile) {
+function projectIntroFromProjectMd(projectMd, projectName) {
+  const section = markdownSection(projectMd, ["项目简介", "项目介绍", "概览", "Overview", "Summary"]);
+  if (section) return section;
+  return projectMd
+    .split(/\r?\n/)
+    .map(cleanMarkdownLine)
+    .find((line) => line
+      && !line.startsWith("#")
+      && !line.includes("什么时候更新")
+      && !line.includes("不要写什么")
+      && !line.includes(projectName)) || "";
+}
+
+function projectChecksFromAgents(agentsMd) {
+  const commands = markdownSection(agentsMd, ["Commands"]);
+  const matches = [...commands.matchAll(/\bbash\s+([^\s`]+)/g)]
+    .map((match) => `bash ${match[1]}`)
+    .slice(0, 4);
+  return matches.join("、");
+}
+
+function profileForPreview(profile, context = {}) {
+  const {
+    agentsMd = "",
+    handoff = "",
+    productPlan = "",
+    projectMd = "",
+    projectName = "",
+    state = {},
+  } = context;
+  const overview = firstText(
+    profileText(profile, "identity.summary"),
+    profileText(profile, "identity.uniqueDescription"),
+    state.description,
+    projectIntroFromProjectMd(projectMd, projectName),
+    markdownSection(productPlan, ["项目简介", "产品简介", "Project", "Overview"]),
+  );
+  const phaseSummary = firstText(
+    profileText(profile, "identity.lifecycle"),
+    state.stage,
+    state.phase,
+    markdownSection(projectMd, ["当前阶段", "当前进度"]),
+  );
+  const architectureSummary = firstText(
+    profileText(profile, "engineering.architecture"),
+    [state.architecture?.desktop, state.architecture?.entry, state.architecture?.rules].filter(Boolean).join(" / "),
+    markdownSection(projectMd, ["当前架构", "技术架构", "Architecture"]),
+  );
+  const checkCommands = firstText(
+    profileText(profile, "engineering.testing"),
+    projectChecksFromAgents(agentsMd),
+    markdownSection(projectMd, ["当前验证", "验证", "检查"]),
+  );
+  const collaborationRules = firstText(
+    profileText(profile, "governance.permissions"),
+    profileText(profile, "user.communicationStyle"),
+    markdownSection(agentsMd, ["协作规则", "Working Boundaries"]),
+    markdownSection(handoff, ["风险与注意"]),
+  );
   const next = {
-    intro: profileText(profile, "identity.summary") || profileText(profile, "identity.uniqueDescription"),
+    overview,
+    phaseSummary,
+    architectureSummary,
+    checkCommands,
+    collaborationRules,
+    intro: overview,
     longTermGoal: profileText(profile, "product.longTermGoal"),
     targetUsers: profileText(profile, "product.targetUsers"),
     useCases: profileText(profile, "product.useCases"),
     userPreferences: profileText(profile, "user.globalPreferences") || profileText(profile, "user.communicationStyle"),
   };
   next.missingFields = [
-    ["项目简介", next.intro],
-    ["长期目标", next.longTermGoal],
-    ["目标用户", next.targetUsers],
-    ["使用场景", next.useCases],
-    ["用户偏好", next.userPreferences],
+    ["项目概览", next.overview],
+    ["当前阶段", next.phaseSummary],
+    ["技术架构", next.architectureSummary],
+    ["检查命令", next.checkCommands],
+    ["协作规则", next.collaborationRules],
   ].filter(([, value]) => !value).map(([label]) => label);
   return next;
 }
@@ -150,7 +253,14 @@ function workspaceSnapshotPreview() {
     goalValidation: readJsonAt(projectRoot, ".project-os/goal-validation.json", { criteria: [] }),
     goalValidationReport: readJsonAt(projectRoot, ".project-os/goal-validation-report.json", { status: "missing", checks: [] }),
     goalSignoffHistory: readJsonAt(projectRoot, ".project-os/goal-signoff-history.json", { entries: [] }),
-    projectProfile: profileForPreview(readJsonAt(projectRoot, ".project-os/project-profile.json", { fields: {} })),
+    projectProfile: profileForPreview(readJsonAt(projectRoot, ".project-os/project-profile.json", { fields: {} }), {
+      agentsMd: readTextAt(projectRoot, "AGENTS.md"),
+      handoff: readTextAt(projectRoot, "HANDOFF.md"),
+      productPlan: readTextAt(projectRoot, "docs/PRODUCT_PLAN.md"),
+      projectMd: readTextAt(projectRoot, "PROJECT.md"),
+      projectName: state.name || currentProject.name || "project-os-starter",
+      state,
+    }),
     trace: [
       `ROOT: ${projectRoot}`,
       `REGISTRY: ${projects.length} project(s)`,
@@ -203,7 +313,31 @@ async function runGoalValidationPreview() {
     status: passed ? "verified" : "validation-failed",
   };
   writeProjectJson(".project-os/goal-validation.json", validation);
+  updateActiveGoalStatusPreview(passed ? "pending-confirm" : "failed", passed ? "passed" : "failed", now);
   return report;
+}
+
+function updateActiveGoalStatusPreview(status, validationStatus, updatedAt) {
+  const goals = readProjectJson(".project-os/goals.json", {
+    schemaVersion: "project-os.goals.v0.1",
+    activeGoalId: "",
+    goals: [],
+  });
+  const items = Array.isArray(goals.goals) ? goals.goals : [];
+  const activeGoalId = goals.activeGoalId || items[0]?.id || "";
+  goals.updatedAt = updatedAt;
+  goals.goals = items.map((goal) => (
+    goal.id === activeGoalId
+      ? {
+          ...goal,
+          status,
+          validationStatus,
+          updatedAt,
+        }
+      : goal
+  ));
+  writeProjectJson(".project-os/goals.json", goals);
+  return goals;
 }
 
 function signOffGoalValidationPreview() {
@@ -219,6 +353,7 @@ function signOffGoalValidationPreview() {
     status: "signed-off",
   };
   writeProjectJson(".project-os/goal-validation.json", validation);
+  updateActiveGoalStatusPreview("done", "signed-off", now);
 
   const history = readProjectJson(".project-os/goal-signoff-history.json", {
     schemaVersion: "project-os.goal-signoff-history.v0.1",

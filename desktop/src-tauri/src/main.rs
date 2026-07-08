@@ -43,6 +43,11 @@ struct MemoryItem {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ProjectProfile {
+    overview: String,
+    phase_summary: String,
+    architecture_summary: String,
+    check_commands: String,
+    collaboration_rules: String,
     intro: String,
     long_term_goal: String,
     target_users: String,
@@ -1704,7 +1709,7 @@ fn write_run_summary(input: WriteRunSummaryInput) -> Result<RunSummaryResult, St
     }
 
     let existing = fs::read_to_string(&path).unwrap_or_else(|_| {
-        "# Desktop Run Summary\n\n> Project OS Desktop 自动生成的任务摘要。\n\n".to_string()
+        "# Desktop Run Summary\n\n> OmniDesk 自动生成的任务摘要。\n\n".to_string()
     });
     let content = format!("{}{}\n", existing.trim_end(), summary);
     fs::write(&path, content).map_err(|err| err.to_string())?;
@@ -1745,7 +1750,7 @@ fn merge_run_summary_to_handoff(input: MergeRunSummaryToHandoffInput) -> Result<
 
 ## Desktop 合并记录 - {}
 
-> 来源：Project OS Desktop 用户确认合并。
+> 来源：OmniDesk 用户确认合并。
 
 {}
 "#,
@@ -1938,7 +1943,7 @@ async fn generate_provider_plan(context: &PlanContext) -> Result<ReadonlyPlan, S
             "messages": [
                 {
                     "role": "system",
-                    "content": "You are Project OS Desktop Local Agent Core. Return only strict JSON matching the requested schema. Do not include markdown."
+                    "content": "You are OmniDesk Local Agent Core. Return only strict JSON matching the requested schema. Do not include markdown."
                 },
                 {
                     "role": "user",
@@ -2009,7 +2014,7 @@ async fn generate_provider_patch_draft(
             "messages": [
                 {
                     "role": "system",
-                    "content": "You are Project OS Desktop Local Agent Core. Return only strict JSON. Do not include markdown fences."
+                    "content": "You are OmniDesk Local Agent Core. Return only strict JSON. Do not include markdown fences."
                 },
                 {
                     "role": "user",
@@ -3360,6 +3365,15 @@ fn profile_field_value(profile: &Option<Value>, key: &str) -> String {
         .unwrap_or_default()
 }
 
+fn json_string_value(json: &Option<Value>, pointer: &str) -> String {
+    json.as_ref()
+        .and_then(|value| value.pointer(pointer))
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .trim()
+        .to_string()
+}
+
 fn value_to_profile_text(value: &Value) -> String {
     match value {
         Value::String(text) => text.trim().to_string(),
@@ -3372,6 +3386,27 @@ fn value_to_profile_text(value: &Value) -> String {
         Value::Object(_) => serde_json::to_string(value).unwrap_or_default(),
         _ => String::new(),
     }
+}
+
+fn project_checks_from_agents(agents_md: &str) -> String {
+    let commands = markdown_section(agents_md, &["Commands"]);
+    let checks = commands
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .windows(2)
+        .filter_map(|window| {
+            if window[0] == "bash" {
+                Some(format!("bash {}", window[1].trim_matches('`')))
+            } else {
+                None
+            }
+        })
+        .take(4)
+        .collect::<Vec<_>>();
+    if checks.is_empty() {
+        return String::new();
+    }
+    checks.join("、")
 }
 
 fn project_intro_from_project_md(project_md: &str, project_name: &str) -> String {
@@ -3397,13 +3432,46 @@ fn build_project_profile(root: &Path, project_name: &str) -> ProjectProfile {
     let project_md = read_text(root, "PROJECT.md");
     let product_plan = read_text(root, "docs/PRODUCT_PLAN.md");
     let handoff = read_text(root, "HANDOFF.md");
+    let agents_md = read_text(root, "AGENTS.md");
+    let state_json = read_json(root.join(".project-os/state.json"));
     let profile_json = read_json(root.join(".project-os/project-profile.json"));
 
     let intro = first_non_empty(vec![
             profile_field_value(&profile_json, "identity.summary"),
             profile_field_value(&profile_json, "identity.uniqueDescription"),
+            json_string_value(&state_json, "/description"),
             project_intro_from_project_md(&project_md, project_name),
             markdown_section(&product_plan, &["项目简介", "产品简介", "Project", "Overview"]),
+        ]);
+    let phase_summary = first_non_empty(vec![
+            profile_field_value(&profile_json, "identity.lifecycle"),
+            json_string_value(&state_json, "/stage"),
+            json_string_value(&state_json, "/phase"),
+            markdown_section(&project_md, &["当前阶段", "当前进度"]),
+        ]);
+    let architecture_summary = first_non_empty(vec![
+            profile_field_value(&profile_json, "engineering.architecture"),
+            format!(
+                "{} / {} / {}",
+                json_string_value(&state_json, "/architecture/desktop"),
+                json_string_value(&state_json, "/architecture/entry"),
+                json_string_value(&state_json, "/architecture/rules")
+            )
+            .trim_matches([' ', '/'])
+            .trim()
+            .to_string(),
+            markdown_section(&project_md, &["当前架构", "技术架构", "Architecture"]),
+        ]);
+    let check_commands = first_non_empty(vec![
+            profile_field_value(&profile_json, "engineering.testing"),
+            project_checks_from_agents(&agents_md),
+            markdown_section(&project_md, &["当前验证", "验证", "检查"]),
+        ]);
+    let collaboration_rules = first_non_empty(vec![
+            profile_field_value(&profile_json, "governance.permissions"),
+            profile_field_value(&profile_json, "user.communicationStyle"),
+            markdown_section(&agents_md, &["协作规则", "Working Boundaries"]),
+            markdown_section(&handoff, &["风险与注意"]),
         ]);
     let long_term_goal = first_non_empty(vec![
             profile_field_value(&profile_json, "product.longTermGoal"),
@@ -3428,11 +3496,11 @@ fn build_project_profile(root: &Path, project_name: &str) -> ProjectProfile {
         ]);
     let mut missing_fields = Vec::new();
     for (label, value) in [
-        ("项目简介", &intro),
-        ("长期目标", &long_term_goal),
-        ("目标用户", &target_users),
-        ("使用场景", &use_cases),
-        ("用户偏好", &user_preferences),
+        ("项目概览", &intro),
+        ("当前阶段", &phase_summary),
+        ("技术架构", &architecture_summary),
+        ("检查命令", &check_commands),
+        ("协作规则", &collaboration_rules),
     ] {
         if value.trim().is_empty() {
             missing_fields.push(label.to_string());
@@ -3440,6 +3508,11 @@ fn build_project_profile(root: &Path, project_name: &str) -> ProjectProfile {
     }
 
     ProjectProfile {
+        overview: intro.clone(),
+        phase_summary,
+        architecture_summary,
+        check_commands,
+        collaboration_rules,
         intro,
         long_term_goal,
         target_users,
@@ -4470,5 +4543,5 @@ fn main() {
             stop_terminal_session
         ])
         .run(tauri::generate_context!())
-        .expect("failed to run Project OS Desktop");
+        .expect("failed to run OmniDesk");
 }
