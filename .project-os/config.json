@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "project-os.config.v0.1",
+  "cli": {
+    "defaultPersist": "auto",
+    "defaultOutput": "file",
+    "lockWrites": true,
+    "staleLockSeconds": 900
+  },
+  "retention": {
+    "entryContexts": 50,
+    "runs": 20
+  }
+}

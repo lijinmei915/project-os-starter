@@ -122,11 +122,15 @@ for file in README.md AGENTS.md PROJECT.md HANDOFF.md INSTALL.md CLAUDE.md docs/
   check_guidance_header "$file"
 done
 
-for file in scripts/check-runtime.sh scripts/check-all.sh scripts/check-frontmatter.sh scripts/check-file-contracts.sh scripts/check-doc-structure.sh scripts/check-secrets.sh scripts/check-ai-project.sh scripts/project-runner.sh scripts/ai-project.sh scripts/add-project-docs.sh scripts/build-project-graph.sh; do
+for file in scripts/check-runtime.sh scripts/check-all.sh scripts/check-frontmatter.sh scripts/check-file-contracts.sh scripts/check-doc-structure.sh scripts/check-secrets.sh scripts/check-ai-project.sh scripts/project-runner.sh scripts/ai-project.sh scripts/prune-project-os-artifacts.sh scripts/build-project-os-cli.sh scripts/add-project-docs.sh scripts/build-project-graph.sh; do
   if ! has_file "$file"; then
     warn "missing Project OS runtime helper: $file"
   fi
 done
+
+if ! has_file "schemas/entry-context.schema.json"; then
+  warn "missing Entry Context schema: schemas/entry-context.schema.json"
+fi
 
 if has_file "scripts/add-project-docs.sh" && [ ! -d "templates/project-docs" ]; then
   warn "missing add-project-docs template directory: templates/project-docs"
@@ -140,6 +144,31 @@ fi
 
 if [ "$is_source_repo" -eq 1 ] && ! has_file "scripts/install-project-os.sh"; then
   warn "missing source installer: scripts/install-project-os.sh"
+fi
+
+if [ "$is_source_repo" -eq 1 ]; then
+  for file in cli/Cargo.toml cli/src/main.rs; do
+    if ! has_file "$file"; then
+      warn "missing native Project OS CLI source: $file"
+    fi
+  done
+  if has_file "scripts/ai-project.sh"; then
+    shell_commands="$(awk '
+      /^case "\$command" in/ { in_case = 1; next }
+      in_case && /^[[:space:]]*[a-zA-Z0-9_-]+\)/ {
+        line = $1
+        sub(/\).*/, "", line)
+        print line
+      }
+      in_case && /^[[:space:]]*esac/ { in_case = 0 }
+    ' scripts/ai-project.sh | sort -u)"
+    unexpected_shell_commands="$(printf '%s\n' "$shell_commands" | grep -Ev '^(context|scan|check|report|recommend|run|install)$' || true)"
+    if [ -n "$unexpected_shell_commands" ]; then
+      error "scripts/ai-project.sh contains unsupported shell command fallback(s): $(printf '%s' "$unexpected_shell_commands" | tr '\n' ' ')"
+      echo "      Add new Project OS commands in cli/src/main.rs first; keep scripts/ai-project.sh as a thin dispatcher/compatibility wrapper."
+      echo "      Allowed legacy fallback commands: context, scan, check, report, recommend, run, install."
+    fi
+  fi
 fi
 
 if [ "$has_docs" -eq 1 ]; then

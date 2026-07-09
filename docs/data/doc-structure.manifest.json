@@ -49,7 +49,7 @@
       "file": "docs/ARCHITECTURE.md",
       "responsibility": "系统边界、模块职责、运行路径和架构约束",
       "ssotFor": ["架构和模块职责是什么"],
-      "requiredSections": ["当前定位", "核心层次", "运行路径", "模块职责"],
+      "requiredSections": ["当前定位", "整体架构分层", "入口层方案", "仓库实现层次", "运行路径", "模块职责"],
       "forbiddenOverlap": ["完整目录树", "测试命令细节"]
     },
     {

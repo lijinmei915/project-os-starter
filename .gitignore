@@ -10,6 +10,8 @@
 node_modules/
 dist/
 build/
+target/
+bin/project-os
 .cache/
 *.log
 
@@ -37,6 +39,7 @@ CLAUDE.md
 .project-os/model-health.json
 .project-os/recommendations/
 .project-os/runs/
+.project-os/state-bundles/
 tests/screenshots/*.png
 tests/screenshots/current/
 tests/screenshots/diff/

@@ -1,7 +1,7 @@
 ---
 layer: knowledge
 type: status
-last_verified: 2026-07-08
+last_verified: 2026-07-09
 teaches: "项目当前所处阶段、架构全貌、进度和下一步重点"
 use_when: "AI 需要判断当前该做什么、项目处于什么状态、或向用户汇报进度时"
 depends_on: [AGENTS.md, docs/PRODUCT_PLAN.md]
@@ -23,6 +23,10 @@ OmniDesk 是用户入口和项目治理中枢，不是 Hermes Studio 复制品�
 
 ## 当前架构
 
+- 整体分层：自下而上为 `接入层 -> 元数据层 -> 核心内核层 -> 治理服务层 -> 工作台应用层 -> 入口层`；底层解决“接得进来”，上层解决“治得好”，完整口径见 `docs/ARCHITECTURE.md`
+- 入口层方案：先定稿 `Entry Context` 标准，所有 Web / Desktop、IDE、CLI、CI、API 入口都汇入 Gateway；Gateway 负责鉴权、参数标准化、日志链路、限流、异常封装和路由分发；当前 `scripts/ai-project.sh` 是过渡 wrapper，长期要迁到原生 CLI / core library，Web / CI / Desktop 复用同一执行底座而不是另写一套
+- 原生 CLI 起点：`cli/` 提供 Rust `project-os` binary，当前支持 `config` / `state` / `context` / `scan` / `check` / `report` / `recommend` / `run`；`context` 已由原生 CLI 写入 Entry Context，`state sync` 已作为 `.project-os/state.json` 的受控写入入口，其余治理命令暂委托 legacy shell runner；已支持 `project-os config init --global`、用户全局 config + 仓库 `.project-os/config.json` 统一配置、命令行参数 > 仓库 config > 用户全局 config > 环境变量的配置优先级、配置 schema 启动校验、结构化输出里的 `config.values` / `config.sources`、`--persist auto|none|full`、`--output report` 内嵌报告 stdout、`--stale-lock-seconds` 单次覆盖、写入锁、陈旧锁自动清理和 `scripts/exec` / `scripts/validate` / `scripts/cleanup` 分层 wrapper
+- 入口层降噪和维护：支持纯本地扫描跳过空 provider key warning、截图回归显式跳过 bitmap capture、`.project-os/entry-contexts` / `runs` 历史产物按保留策略自动清理，CI 已加入 native CLI 结构化输出示例
 - 检查层：`scripts/check-ai-project.sh`
 - 推荐层：`scripts/recommend-next.sh`
 - 安装层：`scripts/install-project-os.sh`
@@ -43,8 +47,8 @@ OmniDesk 是用户入口和项目治理中枢，不是 Hermes Studio 复制品�
 ## 当前进度
 
 - 已完成：v1 路由契约、profile-based 安装脚本、adapter 写入、项目模板 / 全局模板、文档治理、统一 `.ai/` 目录结构、前后端与设计测试专属脚本、自动成长反思引擎、动态规则映射同步、项目关系图谱生成、知识结构化（文档 frontmatter 元数据、图谱解析、评分元数据 / 新鲜度维度、架构图读图谱自动渲染）。
-- 正在做：Project OS Console 内核 + Desktop v0.1：工作区治理、自身项目接入、老项目扫描/接入模式、桌面端信息架构、设计 token 规范、项目文件导航和 Local Agent Core 边界。
-- 暂不做：完整 IDE、开放插件市场、多 Agent 编排、远程执行、`ai-components` 运行层、工具原生 package 化。
+- 正在做：Project OS Console 内核 + Desktop v0.1：工作区治理、自身项目接入、老项目扫描/接入模式、桌面端信息架构、设计 token 规范、项目文件导航、Local Agent Core 边界和原生 CLI 底座迁移。
+- 暂不做：完整 IDE、开放插件市场、多 Agent 编排、远程执行、`ai-components` 运行层、工具原生 package 化；但入口层已明确 Shell 只是过渡态，后续需要原生 CLI 底座。
 - 后续再做：工作区事实自动生成、交接内容结构化合并、coding 闭环打磨和目标验收视觉证据。
 
 ## 工作区治理口径
@@ -63,6 +67,7 @@ OmniDesk 是用户入口和项目治理中枢，不是 Hermes Studio 复制品�
 - **v0.3 成熟度模型对非 JS/TS 项目（如纯 Shell 项目）的 Lint/Test 检测仍有待适配更多包管理器。**
 - 老项目接入流程仍处于产品建模阶段，需要把“只读扫描 -> 接入草案 -> 用户确认 -> 治理沉淀”落成真实 UI 和数据结构。
 - 工作区治理视图已经开始映射项目状态，但项目概览、当前进度、启动方式、风险边界、本地状态还需要从真实项目事实动态生成。
+- 统一入口当前仍是 Shell wrapper，跨平台、结构化错误、进程间调用和 Gateway / CI / Desktop 联动能力有限；长期需要原生 CLI / core library 承接。
 
 ## 下一步重点
 

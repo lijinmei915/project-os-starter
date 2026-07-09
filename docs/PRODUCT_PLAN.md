@@ -1,7 +1,7 @@
 ---
 layer: knowledge
 type: spec
-last_verified: 2026-07-03
+last_verified: 2026-07-09
 depends_on: [PRODUCT.md, docs/DESKTOP_APP.md, docs/REFERENCE_SYSTEMS.md]
 teaches: "产品的阶段划分、各阶段目标、成功标准和演进路线"
 use_when: "AI 需要判断当前该做哪个阶段的事、或评估某个需求是否在当前阶段范围内时"
@@ -51,6 +51,390 @@ Project OS Console 内核收口期 / Desktop v0.1 方向确认期
 - 推荐项能解释 reason、evidence、confidence、riskIfSkipped 和 check
 - 用户能看懂为什么推荐、可以跳过、可以确认生成
 - 生成后能跑检查，并把结果写回交接状态
+
+---
+
+## 规划索引目录
+
+当前规划按模块维护，避免把入口、治理、桌面 UI、CLI、模型和长期平台能力堆在一张待办里。
+
+| 模块 | 负责问题 | 当前状态 | 主要文档 |
+|------|----------|----------|----------|
+| [M1 接入层](#m1-接入层) | 新老项目如何进入 OmniDesk | 已有基础，继续收口 | `docs/DESKTOP_APP.md`、`docs/ARCHITECTURE.md` |
+| [M2 元数据层](#m2-元数据层) | 项目事实、状态和运行产物放在哪里 | 正在统一真相源 | `schemas/*`、`.project-os/*` |
+| [M3 核心内核层](#m3-核心内核层) | CLI/Core 如何稳定执行治理动作 | 原生 CLI 起点已落地 | `cli/`、`scripts/exec/` |
+| [M4 治理服务层](#m4-治理服务层) | 扫描、推荐、报告、验收和复盘闭环 | 当前重点 | `docs/RECOMMENDATION_ENGINE.md`、`docs/TESTING.md` |
+| [M5 工作台应用层](#m5-工作台应用层) | 桌面 UI 如何让用户完成治理动作 | Desktop v0.1 打磨中 | `docs/DESKTOP_APP.md` |
+| [M6 入口层 / Gateway](#m6-入口层--gateway) | CLI、Desktop、CI、Web、API 如何统一入口 | Gateway 前置收口 | `docs/ARCHITECTURE.md` |
+| [M7 模型与连接](#m7-模型与连接) | 本地模型配置、Provider 和模型健康 | 首版可用 | `.project-os/model-catalog.json` |
+| [M8 安全与执行边界](#m8-安全与执行边界) | 哪些动作可执行、怎么确认和回滚 | 白名单优先 | `docs/SECURITY.md`、`docs/AI_SAFETY.md` |
+| [M9 分发与对外交付](#m9-分发与对外交付) | 如何安装、升级、打包和跨平台交付 | 后续阶段 | `INSTALL.md`、`docs/RUNBOOK.md` |
+| [M10 长期治理平台](#m10-长期治理平台) | 多项目、组织级、远程同步和 Agent 编排 | 长期路线 | `docs/REFERENCE_SYSTEMS.md` |
+
+阅读顺序：
+
+1. 当前要做产品功能时，先看 M1-M6。
+2. 涉及执行风险时，同时看 M8。
+3. 涉及发布、安装、打包时，看 M9。
+4. 长期平台化讨论放到 M10，不挤占当前收口期。
+
+---
+
+## 模块化规划
+
+### M1 接入层
+
+目标：
+
+- 让新项目、老项目和临时项目都能进入 OmniDesk 工作区
+- 用户不需要先理解目录、脚本或治理文件，系统先只读识别项目状态
+
+已完成：
+
+- 桌面端 registry 支持添加、切换、移除和重命名工作台显示名
+- 老项目默认自动接入工作区，但不直接改写工程文件
+- 当前项目 snapshot 已包含项目路径、项目档案、目标、任务和治理文件映射
+
+规划功能：
+
+| 功能 | 阶段 | 状态 | 说明 |
+|------|------|------|------|
+| 项目添加与切换 | Desktop v0.1 | 已完成首版 | 支持系统目录选择和路径备用添加 |
+| 老项目只读扫描 | Desktop v0.1 | 已完成首版 | 只读读取 README、PROJECT、package、git 和 `.project-os` |
+| 接入草案确认 | Desktop v0.2 | 待做 | 老项目先生成接入草案，用户确认后再沉淀治理文件 |
+| 临时项目模式 | Desktop v0.2 | 待做 | 只读查看，不写 `.project-os` |
+| 多项目健康总览 | Desktop v0.3 | 待做 | 首页展示多个项目的治理状态和风险 |
+
+边界：
+
+- 不静默修改用户工程文件
+- 本地文件夹重命名必须作为独立高风险动作，二次确认
+
+### M2 元数据层
+
+目标：
+
+- 统一 `.project-os/` 作为本地状态和治理产物目录
+- 明确哪些数据是事实源、哪些只是展示层或运行产物
+
+已完成：
+
+- `.project-os/state.json` 作为机器可读项目状态
+- `.project-os/workspace-facts.json` 作为工作区事实展示数据
+- `.project-os/goals.json`、`.project-os/task-backlog.json`、`.project-os/runs/` 支撑目标、任务和运行记录
+- `state sync` 已作为受控状态写入入口
+
+规划功能：
+
+| 功能 | 阶段 | 状态 | 说明 |
+|------|------|------|------|
+| 统一真相源 | Gateway 前置 | 已完成首版 | `.project-os/state.json` 写入走 `project-os state sync` |
+| 状态回流 bundles | Gateway 前置 | 已完成首版 | `.project-os/state-bundles/*.json` 支持 CI / 本地回流骨架 |
+| 工作区事实自动刷新 | Desktop v0.1 | 已完成首版 | 页面刷新和治理动作后重新读取 facts |
+| 治理骨架监听刷新 | Desktop v0.1 | 已完成首版 | Tauri 监听 `.project-os` 变化后刷新完整 snapshot |
+| 运行历史索引 | Desktop v0.2 | 待做 | 从 `.project-os/runs/` 形成可筛选历史列表 |
+| 元数据 schema 注册表 | Desktop v0.3 | 待做 | 所有 `.project-os/*.json` 对应 schema 和用途可查 |
+
+边界：
+
+- `PROJECT.md` 是人类可读展示层，和 `state.json` 冲突时以 `state.json` 为准
+- 临时运行产物需要进入清理策略，不能无限堆积
+
+### M3 核心内核层
+
+目标：
+
+- 把长期能力迁到原生 CLI / core library
+- Shell wrapper 只保留兼容和调度，不继续承载复杂业务逻辑
+
+已完成：
+
+- `cli/` 原生 Rust CLI 起点，二进制名 `project-os`
+- 支持 `config` / `state` / `context` / `scan` / `check` / `report` / `recommend` / `run`
+- 支持 Entry Context、结构化输出、写入锁、陈旧锁清理和配置优先级
+
+规划功能：
+
+| 功能 | 阶段 | 状态 | 说明 |
+|------|------|------|------|
+| 原生 CLI 起点 | Gateway 前置 | 已完成首版 | 复杂能力逐步从 shell 迁移 |
+| `state sync` | Gateway 前置 | 已完成首版 | 受控写入状态和生成 bundle |
+| `config get/set` | Gateway 前置 | 记录，暂不做 | 减少手动编辑 JSON |
+| 普通文本配置溯源 | Gateway 前置 | 记录，暂不做 | 非 JSON 模式也能排查配置来源 |
+| 多套全局配置切换 | Gateway 前置 | 记录，暂不做 | 支持多仓库、多团队、多环境 |
+| Core library 抽取 | Gateway 阶段 | 待做 | Desktop / Gateway / CI 共享执行底座 |
+
+边界：
+
+- 新增治理能力必须优先考虑 CLI/Core，而不是继续堆到 Shell
+- 命令执行必须有结构化输出、错误码和离线降级路径
+
+### M4 治理服务层
+
+目标：
+
+- 把扫描、推荐、报告、验收、复盘和记忆沉淀做成闭环
+- 用户看到的是下一步动作和风险，系统维护背后的证据链
+
+已完成：
+
+- 推荐引擎输出 evidence / signals / gaps / recommendations / checks
+- `check-ai-project.sh`、`recommend-next.sh`、`report`、目标验收报告已接入
+- 清理脚本可删除过期 Entry Context、runs 和 state bundles
+
+规划功能：
+
+| 功能 | 阶段 | 状态 | 说明 |
+|------|------|------|------|
+| 项目扫描 | Desktop v0.1 | 已接入页面动作 | `scan` 写入报告、推荐和 runs |
+| 优化建议 | Desktop v0.1 | 已接入页面动作 | `recommend` 写入 recommendations |
+| 修复草案报告 | Desktop v0.1 | 已接入页面动作 | `report --output report --persist full` |
+| 过期产物清理 | Desktop v0.1 | 已接入页面动作 | `prune-project-os-artifacts` |
+| 治理文件风险筛选 | Desktop v0.2 | 待做 | 按风险、状态、来源过滤文件 |
+| 变更历史视图 | Desktop v0.2 | 待做 | 从 `.project-os/runs/` 展示历史 |
+| 失败验收生成修复任务 | Desktop v0.2 | 待做 | 验收失败后自动生成待办 |
+| 定时治理 L2 | Desktop v0.3 | 待做 | 从 `.project-os/config.json` 读取定时策略 |
+
+边界：
+
+- 页面动作只调用白名单 CLI/Core，不拼接任意 shell
+- 治理服务可以写 `.project-os/`，写工程文件必须进入明确确认流程
+
+### M5 工作台应用层
+
+目标：
+
+- Desktop UI 不是静态预览，而是项目治理工作台
+- 用户能在页面里完成“理解 -> 操作 -> 反馈 -> 验收”的最小闭环
+
+已完成：
+
+- Tauri + React 工作台骨架
+- 项目切换、目标栈、任务队列、对话、受控 runner、patch draft、apply patch 和 run summary
+- 项目概览页面内治理动作入口：一键扫描、生成优化建议、批量修复草案、清理过期产物
+
+规划功能：
+
+| 功能 | 阶段 | 状态 | 说明 |
+|------|------|------|------|
+| 工作区事实视图 | Desktop v0.1 | 已完成首版 | 项目概览展示事实、健康分和治理等级 |
+| 页面内治理动作 | Desktop v0.1 | 已完成首版 | 项目概览 action bar 已接入 CLI/Core |
+| 同步治理状态 | Desktop v0.1 | 已完成首版 | 项目概览可手动触发 `project-os state sync` |
+| 轻量轮询刷新 | Desktop v0.1 | 已完成首版 | 浏览器预览每 30s 轻量读取 snapshot，补齐非 Tauri 场景 |
+| 治理文件预览 | Desktop v0.1 | 已完成首版 | 工程文件只读预览 |
+| 治理文件过滤 | Desktop v0.2 | 待做 | 风险、状态、来源筛选 |
+| Patch draft 列表 L3 | Desktop v0.2 | 待做 | 草案列表、确认、apply 和验证 |
+| 视觉证据验收 | Desktop v0.2 | 待做 | 关键界面截图或像素检查写入验收报告 |
+| 多项目控制台 | Desktop v0.3 | 待做 | 多项目状态、风险和下一步聚合 |
+
+工作区菜单职责：
+
+| 一级菜单 | 二级菜单 | 放什么 | 不放什么 |
+|----------|----------|--------|----------|
+| 项目流程 | 认识项目 / 定义目标 / 工作规则 / 设计实现 / 验证交付 / 复盘沉淀 | 项目生命周期和治理主线 | 模型配置、工程文件列表、原始运行日志 |
+| 任务执行 | 当前任务 / 任务队列 / Patch 草案 / 执行终端 / 执行结果 | 当下行动、执行队列、草案和结果 | 长期知识、产品路线、静态文档目录 |
+| 知识记忆 | 项目事实 / 用户偏好 / 长期记忆 / 会话摘要 | 可复用上下文和沉淀记忆 | 当前任务执行状态、报告产物 |
+| 工程资产 | 工程文件 / 治理文件 / 报告产物 / Schema / 脚本模板 | 文件、文档、产物和结构化资产 | 工作流阶段、模型连接、执行权限说明 |
+| Agent 配置 | 模型连接 / 工具白名单 / Skill 能力 / 适配器 / 安全边界 | Agent 能力、工具、模型和安全配置 | 项目目标、当前进度、交付报告 |
+
+菜单规则：
+
+- 一级菜单表达工作区能力，不表达内部实现模块。
+- 二级菜单表达用户可进入的工作面，不暴露字段级表单项。
+- 同一信息只能有一个主入口，其他页面只能做摘要、跳转或引用。
+- `项目概览` 是总览驾驶舱，只汇总 `当前进度`、`启动方式`、`风险边界`、`本地状态`，不重复承载完整内容。
+
+Agent 开发优先级：
+
+| 优先级 | 优化点 | 当前落点 | 成功判断 |
+|--------|--------|----------|----------|
+| P0 | 任务执行闭环 | `任务执行` 工作面展示当前任务、队列、Patch 草案、终端和执行结果状态 | 用户能知道 Agent 当前在做什么、下一步该确认什么 |
+| P0 | 项目概览驾驶舱 | `项目概览` 保持摘要、健康分、快捷治理动作和核心文件入口 | 用户第一眼能看到健康状态、风险和推荐动作 |
+| P0 | Agent 配置状态 | `Agent 配置` 工作面展示模型连接、工具白名单、Skill 能力和安全边界 | 用户能判断 Agent 是否可用、能跑什么、为什么不能跑 |
+| P1 | 失败反馈机制 | 任务执行和治理动作失败时输出影响、原因和建议下一步 | 用户不用读原始命令也能理解失败 |
+| P1 | 记忆沉淀规则 | `知识记忆` 区分项目事实、用户偏好、长期记忆和会话摘要 | 信息沉淀不污染任务执行和工程资产 |
+
+边界：
+
+- UI 使用现有 token 和组件 primitive，不做营销页式重设计
+- 当前工程文件区域仍以预览为主，写入能力必须显式确认
+
+### M6 入口层 / Gateway
+
+目标：
+
+- 在启动 Gateway 开发前，把本地 CLI、CI 和 Desktop 复用的入口语义稳定下来
+- 让配置、鉴权、产物、兼容策略都有明确演进位置，避免继续堆到 Shell wrapper
+- 当前只规划，不继续扩功能；具体实现等 Gateway 或对外交付阶段再启动
+
+已完成基础：
+
+- 原生 `project-os` CLI 起点
+- Entry Context 标准
+- `--persist auto|none|full`
+- `--output json|report`
+- `.project-os/config.json` 与用户全局 config
+- config schema 校验和 `config.values` / `config.sources`
+- stale lock 清理和 `--stale-lock-seconds`
+- Shell fallback 白名单
+
+规划功能：
+
+| 功能 | 阶段 | 状态 | 说明 |
+|------|------|------|------|
+| Entry Context 标准 | Gateway 前置 | 已完成首版 | CLI / Desktop / CI 统一请求语义 |
+| Shell wrapper 白名单 | Gateway 前置 | 已完成首版 | 旧入口继续兼容但不扩业务命令 |
+| Desktop 动作入口 | Desktop v0.1 | 已完成首版 | 页面动作进入白名单 `run_project_os_action` |
+| Gateway 鉴权和限流 | Gateway 阶段 | 待做 | 统一身份、权限、限流和异常封装 |
+| 内外 API 隔离 | Gateway 阶段 | 待做 | 内部 core API 和外部调用协议分层 |
+| 标准化产物上报 | 长期治理平台 | 待做 | 本地、CI、Desktop、云端双向同步 |
+
+### Gateway 启动前完成清单
+
+- 统一真相源架构改造
+  - 所有本地 / CI / Desktop 操作读写唯一数据源 `.project-os/` 骨架目录
+  - `.project-os/state.json` 的写入必须走 `project-os state sync`
+  - Desktop 前端只读渲染状态，变更请求转发 CLI/Core
+  - CI 产物通过 `.project-os/state-bundles/*.json` 回流到本地骨架目录
+- `project-os config get` / `project-os config set`
+  - 支持命令行直接读写配置
+  - 避免用户手动编辑 JSON
+  - 必须继续遵守配置优先级：命令行参数 > 仓库 config > 用户全局 config > 环境变量 > 默认值
+- 普通文本配置溯源输出
+  - 非 JSON 模式也能显示精简配置来源
+  - 用于排查覆盖冲突，不要求用户必须切到 `--output json`
+- 多套全局配置环境切换
+  - 通过参数快速加载不同全局配置文件
+  - 支持多仓库、多团队或多环境复用统一规则
+- Desktop 页面内治理闭环
+  - 项目概览提供一键扫描、生成优化建议、批量生成修复草案和清理过期骨架产物入口
+  - 所有页面动作必须走 CLI/Core 白名单，不允许前端拼接任意 shell 命令
+  - 动作完成后刷新当前 snapshot / workspace facts，并把结果落回 `.project-os/`
+  - 治理文件视图后续补风险 / 状态 / 来源筛选，并从 `.project-os/runs/` 展示变更历史
+  - L2 定时治理读取 `.project-os/config.json`；L3 patch draft 列表通过 CLI/Core 执行确认和 apply
+
+### M7 模型与连接
+
+目标：
+
+- 让用户以低心智成本配置模型连接
+- 模型能力可探测、可缓存、可显示当前连接状态
+
+已完成：
+
+- `.project-os/model-catalog.json` 管理服务商、API 地址、Key 变量名和模型列表
+- Provider 支持多 profile、启用状态、API Key 保存和模型列表刷新
+- 模型健康缓存可记录当前模型可用性
+
+规划功能：
+
+| 功能 | 阶段 | 状态 | 说明 |
+|------|------|------|------|
+| Provider 多连接 | Desktop v0.1 | 已完成首版 | 支持保存、编辑、删除连接 |
+| 模型列表刷新 | Desktop v0.1 | 已完成首版 | 读取 `/models` 并提示当前模型是否可见 |
+| 模型健康缓存 | Desktop v0.1 | 已完成首版 | 记录模型可用性和检查时间 |
+| 连接诊断向导 | Desktop v0.2 | 待做 | 把 Key、API Base、模型不可用拆成可理解提示 |
+| 多模型任务路由 | Desktop v0.3 | 待做 | 不同任务选择不同模型能力 |
+
+边界：
+
+- API Key 只保存在本地 `.env.local` 或用户指定环境变量
+- 不把真实 Key 写入仓库、日志或报告
+
+### M8 安全与执行边界
+
+目标：
+
+- 明确 AI 能读什么、写什么、跑什么，以及失败后如何恢复
+- 在 P3 操作工程前提前埋好安全契约
+
+已完成：
+
+- `run_guarded_check` 白名单检查
+- `run_project_os_action` 白名单治理动作
+- `apply_patch_draft` 先 `git apply --check`，再 apply
+- 安全检查脚本和 provider key 扫描
+
+规划功能：
+
+| 功能 | 阶段 | 状态 | 说明 |
+|------|------|------|------|
+| 命令白名单 | Desktop v0.1 | 已完成首版 | 检查和治理动作均不接受任意 shell |
+| Patch apply 确认 | Desktop v0.1 | 已完成首版 | unified diff 校验通过后才可 apply |
+| 高风险写入二次确认 | Desktop v0.2 | 待做 | 文件夹重命名、批量写入、删除类动作必须二次确认 |
+| 回滚记录 | Desktop v0.2 | 待做 | Apply 前后记录可恢复信息 |
+| 正式安全契约 | P3 操作工程 | 待做 | 明确生产 DB、远程工具、权限边界和审计 |
+
+边界：
+
+- 不允许页面直接传任意命令给后端执行
+- 不允许默认远程执行或接生产资源
+
+### M9 分发与对外交付
+
+目标：
+
+- 让 Project OS 从本仓库自用工具，逐步变成可安装、可升级、可分发的本地产品
+
+规划功能：
+
+| 功能 | 阶段 | 状态 | 说明 |
+|------|------|------|------|
+| 安装脚本和模板同步 | 当前阶段 | 已完成首版 | `install-project-os.sh`、模板和 adapter 已有回归 |
+| macOS 桌面 App 打包 | Desktop v0.1 | 已完成基础 | `.app` 可双击启动，dmg 仍需继续稳定 |
+| CLI 多平台预编译包 | 对外交付阶段 | 待做 | Windows / macOS / Linux 压缩包 |
+| 版本升级机制 | 对外交付阶段 | 待做 | 升级、备份、兼容和废弃策略 |
+| 发布前 checklist | 对外交付阶段 | 待做 | 版本号、CHANGELOG、模板同步、截图验收 |
+
+边界：
+
+- 当前收口期不追求 marketplace 级分发
+- 分发前必须保证安装、模板、adapter 和安全检查可复现
+
+### M10 长期治理平台
+
+目标：
+
+- 从单项目本地治理，逐步走向多项目、组织级、远程同步和 Agent 编排
+- 先把单项目闭环跑稳，再谈组织级平台
+
+规划功能：
+
+| 功能 | 阶段 | 状态 | 说明 |
+|------|------|------|------|
+| 标准化产物上报 | 长期治理平台 | 待做 | 本地 CLI、CI、Desktop 和云端双向同步 |
+| 旧兼容语法清理 | 长期治理平台 | 待做 | 梳理旧参数并制定版本废弃计划 |
+| Skill 标准 I/O | P2 主动专家 | 待做 | 让专家能力可注册、可调用、可观测 |
+| 接真实工具 | P3 操作工程 | 待做 | GitHub、Jira、数据库、远程 MCP 等 |
+| 多 Agent 编排 | P4 编排成 Agent | 待做 | 多技能、多步骤、多人协作流程 |
+
+边界：
+
+- 组织级是分发和同步问题，不提前侵入当前本地内核
+- P3 前必须先完成安全契约
+
+---
+
+## 阶段落地清单
+
+### 对外交付阶段
+
+- CI 自动打包流水线
+  - 产出 Windows / macOS / Linux 多平台预编译二进制压缩包
+  - 支持免源码安装
+- CLI 调用身份和权限校验入参
+  - 预留 Gateway 鉴权体系扩展字段
+  - 不在当前本地-only 阶段强行接入完整鉴权
+
+### 长期治理平台
+
+- 标准化产物上报协议
+  - 打通本地 CLI、CI、OmniDesk Desktop 和云端数据双向同步
+  - 对齐报告、推荐、run record、patch draft 和人工确认状态
+- 旧兼容语法清理计划
+  - 梳理全部兼容参数和旧 Shell fallback
+  - 制定版本废弃计划
+  - 分阶段清理存量兼容代码，精简分支逻辑
 
 ---
 

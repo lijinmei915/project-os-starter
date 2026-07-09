@@ -317,6 +317,12 @@ struct RunGuardedCheckInput {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct RunProjectOsActionInput {
+    action_id: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct RunTerminalCommandInput {
     command: String,
 }
@@ -460,6 +466,17 @@ struct HandoffMergeResult {
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct GuardedCheckResult {
+    id: String,
+    label: String,
+    command: String,
+    success: bool,
+    code: Option<i32>,
+    output: String,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct ProjectOsActionResult {
     id: String,
     label: String,
     command: String,
@@ -743,6 +760,12 @@ fn refresh_workspace_facts_preview() -> Result<Value, String> {
 }
 
 fn should_ignore_watch_path(path: &Path) -> bool {
+    if !path
+        .components()
+        .any(|component| component.as_os_str() == ".project-os")
+    {
+        return true;
+    }
     path.components().any(|component| {
         let name = component.as_os_str().to_string_lossy();
         matches!(
@@ -759,11 +782,13 @@ fn should_ignore_watch_path(path: &Path) -> bool {
                 | ".cache"
                 | "coverage"
                 | ".DS_Store"
+                | "entry-contexts"
+                | "locks"
         )
     }) || path
         .file_name()
         .and_then(|value| value.to_str())
-        .map(|name| name.starts_with(".env") || name.ends_with(".lock"))
+        .map(|name| name.starts_with(".env") || name.ends_with(".lock") || name == "desktop-theme.json")
         .unwrap_or(false)
 }
 
@@ -3043,6 +3068,43 @@ fn run_guarded_check(input: RunGuardedCheckInput) -> Result<GuardedCheckResult, 
 }
 
 #[tauri::command]
+fn run_project_os_action(input: RunProjectOsActionInput) -> Result<ProjectOsActionResult, String> {
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let current_project = current_registry_project(&mut registry, &app_root)?;
+    let root = PathBuf::from(&current_project.path);
+    if !root.exists() || !root.is_dir() {
+        return Err("当前项目路径不存在或不是目录".to_string());
+    }
+
+    let spec = project_os_action_spec(&input.action_id, &app_root)
+        .ok_or_else(|| format!("不允许执行这个治理动作：{}", input.action_id))?;
+    for relative in &spec.required_paths {
+        if !app_root.join(relative).exists() && !root.join(relative).exists() {
+            return Err(format!("缺少治理动作所需文件：{}", relative));
+        }
+    }
+
+    let output = Command::new(&spec.program)
+        .args(&spec.args)
+        .current_dir(&root)
+        .output()
+        .map_err(|err| err.to_string())?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let combined = trim_runner_output(&format!("{}{}", stdout, stderr));
+
+    Ok(ProjectOsActionResult {
+        id: spec.id.to_string(),
+        label: spec.label.to_string(),
+        command: spec.command,
+        success: output.status.success(),
+        code: output.status.code(),
+        output: combined,
+    })
+}
+
+#[tauri::command]
 fn run_terminal_command(input: RunTerminalCommandInput) -> Result<TerminalCommandResult, String> {
     let app_root = find_workspace_root()?;
     let mut registry = load_or_seed_registry(&app_root)?;
@@ -3293,6 +3355,15 @@ struct GuardedCheckSpec {
     required_paths: Vec<&'static str>,
 }
 
+struct ProjectOsActionSpec {
+    id: &'static str,
+    label: &'static str,
+    command: String,
+    program: String,
+    args: Vec<String>,
+    required_paths: Vec<&'static str>,
+}
+
 fn guarded_check_spec(id: &str) -> Option<GuardedCheckSpec> {
     match id {
         "runtime" => Some(GuardedCheckSpec {
@@ -3355,6 +3426,90 @@ fn guarded_check_spec(id: &str) -> Option<GuardedCheckSpec> {
                 "desktop/src-tauri/Cargo.toml".to_string(),
             ],
             required_paths: vec!["desktop/src-tauri/Cargo.toml"],
+        }),
+        _ => None,
+    }
+}
+
+fn project_os_action_spec(id: &str, app_root: &Path) -> Option<ProjectOsActionSpec> {
+    let cli_bin = app_root.join("bin").join("project-os");
+    let runtime_root = app_root.to_string_lossy().to_string();
+    let cli_program = cli_bin.to_string_lossy().to_string();
+    let cli_command = |command: &str, extra: &[&str]| {
+        let mut args = vec![
+            command.to_string(),
+            ".".to_string(),
+            "--runtime-root".to_string(),
+            runtime_root.clone(),
+            "--trigger-source".to_string(),
+            "desktop".to_string(),
+        ];
+        args.extend(extra.iter().map(|item| item.to_string()));
+        args
+    };
+
+    match id {
+        "scan" => Some(ProjectOsActionSpec {
+            id: "scan",
+            label: "一键扫描",
+            command: format!(
+                "{} scan . --runtime-root {} --trigger-source desktop --persist full --output json",
+                cli_program, runtime_root
+            ),
+            program: cli_program,
+            args: cli_command("scan", &["--persist", "full", "--output", "json"]),
+            required_paths: vec!["bin/project-os"],
+        }),
+        "recommend" => Some(ProjectOsActionSpec {
+            id: "recommend",
+            label: "生成优化建议",
+            command: format!(
+                "{} recommend . --runtime-root {} --trigger-source desktop --persist full --output json",
+                cli_program, runtime_root
+            ),
+            program: cli_program,
+            args: cli_command("recommend", &["--persist", "full", "--output", "json"]),
+            required_paths: vec!["bin/project-os"],
+        }),
+        "report" => Some(ProjectOsActionSpec {
+            id: "report",
+            label: "批量生成修复草案",
+            command: format!(
+                "{} report . --runtime-root {} --trigger-source desktop --output report --persist full",
+                cli_program, runtime_root
+            ),
+            program: cli_program,
+            args: cli_command("report", &["--output", "report", "--persist", "full"]),
+            required_paths: vec!["bin/project-os"],
+        }),
+        "prune" => Some(ProjectOsActionSpec {
+            id: "prune",
+            label: "清理过期骨架产物",
+            command: "bash scripts/prune-project-os-artifacts.sh .".to_string(),
+            program: "bash".to_string(),
+            args: vec![
+                app_root
+                    .join("scripts")
+                    .join("prune-project-os-artifacts.sh")
+                    .to_string_lossy()
+                    .to_string(),
+                ".".to_string(),
+            ],
+            required_paths: vec!["scripts/prune-project-os-artifacts.sh"],
+        }),
+        "sync" => Some(ProjectOsActionSpec {
+            id: "sync",
+            label: "同步治理状态",
+            command: format!("{} state sync . --output json", cli_program),
+            program: cli_program,
+            args: vec![
+                "state".to_string(),
+                "sync".to_string(),
+                ".".to_string(),
+                "--output".to_string(),
+                "json".to_string(),
+            ],
+            required_paths: vec!["bin/project-os"],
         }),
         _ => None,
     }
@@ -5393,6 +5548,7 @@ fn main() {
             test_provider_model_with_cache,
             read_engineering_file,
             run_guarded_check,
+            run_project_os_action,
             run_terminal_command,
             start_terminal_session,
             write_terminal_session,

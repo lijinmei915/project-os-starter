@@ -114,10 +114,7 @@ function previewLanguage(relativePath) {
 }
 
 function readEngineeringFilePreview(input) {
-  const registry = readProjectJson(".project-os/desktop-registry.json", { projects: [], currentProjectId: "" });
-  const projects = Array.isArray(registry.projects) ? registry.projects : [];
-  const currentProject = projects.find((project) => project.id === registry.currentProjectId) || projects[0] || { path: rootDir };
-  const projectRoot = currentProject.path || rootDir;
+  const { projectRoot } = currentPreviewProject();
   const relativePath = safePreviewPath(input?.path);
   if (!relativePath) return { error: "这个文件暂不支持预览。" };
 
@@ -139,10 +136,93 @@ function readEngineeringFilePreview(input) {
   };
 }
 
+function currentPreviewProject() {
+  const registry = readProjectJson(".project-os/desktop-registry.json", {
+    currentProjectId: "current",
+    projects: [{
+      id: "current",
+      name: "project-os-starter",
+      path: rootDir,
+      phase: "stabilizing",
+    }],
+  });
+  const projects = Array.isArray(registry.projects) ? registry.projects : [];
+  const currentProject = projects.find((project) => project.id === registry.currentProjectId) || projects[0] || {
+    id: "current",
+    name: "project-os-starter",
+    path: rootDir,
+    phase: "stabilizing",
+  };
+  return {
+    registry,
+    projects,
+    currentProject,
+    projectRoot: currentProject.path || rootDir,
+  };
+}
+
 function writeProjectJson(relativePath, value) {
   const filePath = path.join(rootDir, relativePath);
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function desktopTasksDir(projectRoot) {
+  return path.join(projectRoot, ".project-os/runs/desktop-tasks");
+}
+
+function safeTaskFileName(id) {
+  return `${String(id || "").replace(/[^a-zA-Z0-9._-]/g, "-")}.json`;
+}
+
+function listDesktopTasksPreview() {
+  const { projectRoot } = currentPreviewProject();
+  const dir = desktopTasksDir(projectRoot);
+  let files = [];
+  const manifest = readJsonAt(projectRoot, ".project-os/runs/desktop-tasks/manifest.json", null);
+  if (Array.isArray(manifest?.tasks)) {
+    files = manifest.tasks.filter((file) => String(file || "").endsWith(".json"));
+  } else {
+    try {
+      files = fs.readdirSync(dir).filter((file) => file.endsWith(".json") && file !== "manifest.json");
+    } catch {
+      files = [];
+    }
+  }
+  return files
+    .map((file) => readJsonAt(projectRoot, `.project-os/runs/desktop-tasks/${file}`, null))
+    .filter(Boolean)
+    .sort((a, b) => String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")))
+    .slice(0, 30);
+}
+
+function saveDesktopTaskPreview(input) {
+  const task = input?.task;
+  if (!task?.id) return { error: "缺少任务 id。" };
+  const { projectRoot } = currentPreviewProject();
+  const dir = desktopTasksDir(projectRoot);
+  fs.mkdirSync(dir, { recursive: true });
+  const now = new Date().toISOString();
+  const nextTask = {
+    schemaVersion: "project-os.desktop-task.v0.1",
+    ...task,
+    updatedAt: now,
+  };
+  const fileName = safeTaskFileName(task.id);
+  fs.writeFileSync(path.join(dir, fileName), `${JSON.stringify(nextTask, null, 2)}\n`);
+  const manifestPath = path.join(dir, "manifest.json");
+  const manifest = readJsonAt(projectRoot, ".project-os/runs/desktop-tasks/manifest.json", {
+    schemaVersion: "project-os.desktop-task-manifest.v0.1",
+    tasks: [],
+  });
+  const tasks = Array.isArray(manifest.tasks) ? manifest.tasks : [];
+  const nextManifest = {
+    ...manifest,
+    updatedAt: now,
+    tasks: [fileName, ...tasks.filter((file) => file !== fileName)],
+  };
+  fs.writeFileSync(manifestPath, `${JSON.stringify(nextManifest, null, 2)}\n`);
+  return nextTask;
 }
 
 function readJsonAt(projectRoot, relativePath, fallback) {
@@ -282,23 +362,7 @@ function profileForPreview(profile, context = {}) {
 }
 
 function workspaceSnapshotPreview() {
-  const registry = readProjectJson(".project-os/desktop-registry.json", {
-    currentProjectId: "current",
-    projects: [{
-      id: "current",
-      name: "project-os-starter",
-      path: rootDir,
-      phase: "stabilizing",
-    }],
-  });
-  const projects = Array.isArray(registry.projects) ? registry.projects : [];
-  const currentProject = projects.find((project) => project.id === registry.currentProjectId) || projects[0] || {
-    id: "current",
-    name: "project-os-starter",
-    path: rootDir,
-    phase: "stabilizing",
-  };
-  const projectRoot = currentProject.path || rootDir;
+  const { projects, currentProject, projectRoot } = currentPreviewProject();
   const state = readJsonAt(projectRoot, ".project-os/state.json", {});
   const backlog = readJsonAt(projectRoot, ".project-os/task-backlog.json", { items: [] });
   const goals = readJsonAt(projectRoot, ".project-os/goals.json", {
@@ -709,6 +773,87 @@ async function copyTextPreview(input) {
   }
 }
 
+function projectOsActionSpec(actionId) {
+  const cliBin = path.join(rootDir, "bin/project-os");
+  const cliBase = ["--runtime-root", rootDir, "--trigger-source", "desktop"];
+  const cliCommand = (command, extra = []) => [command, ".", ...cliBase, ...extra];
+  const specs = {
+    scan: {
+      id: "scan",
+      label: "一键扫描",
+      program: cliBin,
+      args: cliCommand("scan", ["--persist", "full", "--output", "json"]),
+      command: `${cliBin} scan . --runtime-root ${rootDir} --trigger-source desktop --persist full --output json`,
+      requiredPath: cliBin,
+    },
+    recommend: {
+      id: "recommend",
+      label: "生成优化建议",
+      program: cliBin,
+      args: cliCommand("recommend", ["--persist", "full", "--output", "json"]),
+      command: `${cliBin} recommend . --runtime-root ${rootDir} --trigger-source desktop --persist full --output json`,
+      requiredPath: cliBin,
+    },
+    report: {
+      id: "report",
+      label: "批量生成修复草案",
+      program: cliBin,
+      args: cliCommand("report", ["--output", "report", "--persist", "full"]),
+      command: `${cliBin} report . --runtime-root ${rootDir} --trigger-source desktop --output report --persist full`,
+      requiredPath: cliBin,
+    },
+    prune: {
+      id: "prune",
+      label: "清理过期骨架产物",
+      program: "bash",
+      args: [path.join(rootDir, "scripts/prune-project-os-artifacts.sh"), "."],
+      command: "bash scripts/prune-project-os-artifacts.sh .",
+      requiredPath: path.join(rootDir, "scripts/prune-project-os-artifacts.sh"),
+    },
+    sync: {
+      id: "sync",
+      label: "同步治理状态",
+      program: cliBin,
+      args: ["state", "sync", ".", "--output", "json"],
+      command: `${cliBin} state sync . --output json`,
+      requiredPath: cliBin,
+    },
+  };
+  return specs[actionId] || null;
+}
+
+async function runProjectOsActionPreview(input) {
+  const actionId = String(input?.actionId || input?.action_id || "").trim();
+  const spec = projectOsActionSpec(actionId);
+  if (!spec) return { error: `不允许执行这个治理动作：${actionId}` };
+  if (!fs.existsSync(spec.requiredPath)) return { error: `缺少治理动作所需文件：${path.relative(rootDir, spec.requiredPath)}` };
+
+  const { projectRoot } = currentPreviewProject();
+  try {
+    const result = await execFileAsync(spec.program, spec.args, {
+      cwd: projectRoot,
+      maxBuffer: 1024 * 1024 * 8,
+    });
+    return {
+      id: spec.id,
+      label: spec.label,
+      command: spec.command,
+      success: true,
+      code: 0,
+      output: `${result.stdout || ""}${result.stderr || ""}`.trim().slice(0, 6000),
+    };
+  } catch (err) {
+    return {
+      id: spec.id,
+      label: spec.label,
+      command: spec.command,
+      success: false,
+      code: err.code ?? null,
+      output: `${err.stdout || ""}${err.stderr || err.message || ""}`.trim().slice(0, 6000),
+    };
+  }
+}
+
 function projectOsPreviewFiles() {
   return {
     name: "project-os-preview-files",
@@ -716,6 +861,16 @@ function projectOsPreviewFiles() {
       server.middlewares.use(async (req, res, next) => {
         if (req.method === "GET" && req.url === "/__project-os/workspace-snapshot") {
           sendJson(res, 200, workspaceSnapshotPreview());
+          return;
+        }
+        if (req.method === "GET" && req.url === "/__project-os/desktop-tasks") {
+          sendJson(res, 200, listDesktopTasksPreview());
+          return;
+        }
+        if (req.method === "POST" && req.url === "/__project-os/save-desktop-task") {
+          const input = await readRequestJson(req);
+          const result = saveDesktopTaskPreview(input);
+          sendJson(res, result.error ? 400 : 200, result);
           return;
         }
         if (req.method === "POST" && req.url === "/__project-os/read-engineering-file") {
@@ -726,6 +881,12 @@ function projectOsPreviewFiles() {
         }
         if (req.method === "POST" && req.url === "/__project-os/run-goal-validation") {
           sendJson(res, 200, await runGoalValidationPreview());
+          return;
+        }
+        if (req.method === "POST" && req.url === "/__project-os/run-project-os-action") {
+          const input = await readRequestJson(req);
+          const result = await runProjectOsActionPreview(input);
+          sendJson(res, result.error ? 400 : 200, result);
           return;
         }
         if (req.method === "POST" && req.url === "/__project-os/sign-off-goal") {

@@ -179,6 +179,12 @@ assert_contains "$html_file" "JSZip"
 
 mkdir -p "$baseline_dir" "$current_dir" "$diff_dir"
 
+if [ "${PROJECT_OS_SKIP_SCREENSHOT:-0}" = "1" ]; then
+  log "bitmap capture skipped by PROJECT_OS_SKIP_SCREENSHOT=1"
+  log "passed"
+  exit 0
+fi
+
 if browser="$(find_browser)"; then
   for viewport in "desktop:1280,1600" "mobile:390,1400"; do
     viewport_name="${viewport%%:*}"

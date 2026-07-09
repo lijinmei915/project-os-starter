@@ -57,7 +57,7 @@ log "template sync strict"
 bash "$root/scripts/check-template-sync.sh" "$root" --strict
 
 log "secret safety check"
-bash "$root/scripts/check-secrets.sh" "$root"
+PROJECT_OS_ALLOW_EMPTY_PROVIDER_KEYS=1 bash "$root/scripts/check-secrets.sh" "$root"
 
 log "score schema"
 assert_file "$root/schemas/ai-project-score.schema.json"
@@ -67,6 +67,7 @@ grep -q '"version": "0.2"' "$root/schemas/ai-project-score.v0.2.json"
 assert_file "$root/schemas/ai-project-report.schema.json"
 assert_file "$root/schemas/ai-project-report.v0.1.json"
 assert_file "$root/schemas/project-run.schema.json"
+assert_file "$root/schemas/project-os-config.schema.json"
 grep -q '"modelId": "ai-project-engineering-report"' "$root/schemas/ai-project-report.v0.1.json"
 grep -q '"version": "0.1"' "$root/schemas/ai-project-report.v0.1.json"
 
@@ -92,6 +93,129 @@ cat > "$runner_fixture/README.md" <<'EOF'
 
 Small fixture for Project OS runner tests.
 EOF
+mkdir -p "$runner_fixture/.project-os"
+cat > "$runner_fixture/.project-os/state.json" <<'EOF'
+{
+  "name": "runner-fixture",
+  "phase": "init",
+  "stage": "Fixture",
+  "status": {
+    "done": [],
+    "doing": [],
+    "blocked": [],
+    "next": []
+  }
+}
+EOF
+if command -v cargo >/dev/null 2>&1; then
+  cargo run --quiet --manifest-path "$root/cli/Cargo.toml" -- state sync "$runner_fixture" --set phase=stabilizing --set stage=Synced --output json >/tmp/project-os-state-sync.log
+  if command -v node >/dev/null 2>&1; then
+    node -e 'const fs=require("fs"); const r=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); if(r.schemaVersion!=="project-os.state-sync-result.v0.1" || r.status!=="passed" || !r.bundle) process.exit(1); const s=JSON.parse(fs.readFileSync(process.argv[2],"utf8")); if(s.phase!=="stabilizing" || s.stage!=="Synced") process.exit(1); if(!fs.existsSync(r.bundle)) process.exit(1);' /tmp/project-os-state-sync.log "$runner_fixture/.project-os/state.json"
+  fi
+  cp "$runner_fixture/.project-os/state.json" "$runner_fixture/.project-os/state.valid.json"
+  node -e 'const fs=require("fs"); const s=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); s.phase="wrong"; fs.writeFileSync(process.argv[1], JSON.stringify(s, null, 2));' "$runner_fixture/.project-os/state.json"
+  set +e
+  cargo run --quiet --manifest-path "$root/cli/Cargo.toml" -- state sync "$runner_fixture" >/tmp/project-os-state-invalid.log 2>/tmp/project-os-state-invalid.err
+  state_invalid_exit=$?
+  set -e
+  if [ "$state_invalid_exit" -eq 0 ] || ! grep -q "phase must" /tmp/project-os-state-invalid.err; then
+    echo "ERROR: invalid state should fail state sync"
+    exit 1
+  fi
+  mv "$runner_fixture/.project-os/state.valid.json" "$runner_fixture/.project-os/state.json"
+fi
+bash "$root/scripts/ai-project.sh" report "$runner_fixture" >/dev/null
+entry_context="$(find "$runner_fixture/.project-os/entry-contexts" -maxdepth 1 -name '*.json' -print -quit)"
+assert_file "$entry_context"
+if command -v node >/dev/null 2>&1; then
+  node -e 'const fs=require("fs"); const c=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); if(c.schemaVersion!=="project-os.entry-context.v0.1") process.exit(1); if(c.entry!=="cli" || c.intent!=="report" || c.mode!=="readonly") process.exit(1); if(!c.request?.id || !c.project?.path || c.trigger?.source!=="manual-cli") process.exit(1);' "$entry_context"
+fi
+if command -v cargo >/dev/null 2>&1; then
+  cargo run --quiet --manifest-path "$root/cli/Cargo.toml" -- context "$runner_fixture" --runtime-root "$root" --trigger-source desktop --output json >/tmp/project-os-native-context.log
+  if command -v node >/dev/null 2>&1; then
+    node -e 'const fs=require("fs"); const r=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); if(r.schemaVersion!=="project-os.cli-result.v0.1" || r.command!=="context" || r.triggerSource!=="desktop" || !r.entryContext) process.exit(1);' /tmp/project-os-native-context.log
+  fi
+  native_context="$(python3 - "$runner_fixture/.project-os/entry-contexts" <<'PY'
+import json
+import pathlib
+import sys
+
+context_dir = pathlib.Path(sys.argv[1])
+for path in sorted(context_dir.glob("*.json")):
+    data = json.loads(path.read_text())
+    if data.get("request", {}).get("source") == "project-os" and data.get("trigger", {}).get("source") == "desktop":
+        print(path)
+        raise SystemExit(0)
+raise SystemExit(1)
+PY
+)"
+  assert_file "$native_context"
+  if command -v node >/dev/null 2>&1; then
+    node -e 'const fs=require("fs"); const c=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); if(c.schemaVersion!=="project-os.entry-context.v0.1") process.exit(1); if(c.entry!=="cli" || c.intent!=="scan" || c.request?.source!=="project-os" || c.trigger?.source!=="desktop") process.exit(1);' "$native_context"
+  fi
+else
+  echo "[test] cargo not found; skipped native project-os CLI"
+fi
+bash "$root/scripts/exec/project-os.sh" context "$runner_fixture" --output json --persist none >/tmp/project-os-layered-context.log
+if command -v node >/dev/null 2>&1; then
+  node -e 'const fs=require("fs"); const r=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); if(r.schemaVersion!=="project-os.cli-result.v0.1" || r.persist!=="none" || r.entryContext!==null) process.exit(1);' /tmp/project-os-layered-context.log
+fi
+mkdir -p "$runner_fixture/.project-os"
+global_config_dir="$tmp_dir/global-config"
+mkdir -p "$global_config_dir"
+cargo run --quiet --manifest-path "$root/cli/Cargo.toml" -- config init --global --path "$global_config_dir/init-config.json" >/tmp/project-os-config-init.log
+assert_file "$global_config_dir/init-config.json"
+assert_contains "$global_config_dir/init-config.json" '"schemaVersion": "project-os.config.v0.1"'
+cat > "$global_config_dir/config.json" <<'EOF'
+{
+  "schemaVersion": "project-os.config.v0.1",
+  "cli": {
+    "defaultPersist": "none",
+    "defaultOutput": "json",
+    "lockWrites": true,
+    "staleLockSeconds": 600
+  }
+}
+EOF
+PROJECT_OS_GLOBAL_CONFIG="$global_config_dir/config.json" cargo run --quiet --manifest-path "$root/cli/Cargo.toml" -- context "$runner_fixture" --runtime-root "$root" >/tmp/project-os-global-config.log
+if command -v node >/dev/null 2>&1; then
+  node -e 'const fs=require("fs"); const r=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); if(r.schemaVersion!=="project-os.cli-result.v0.1" || r.persist!=="none" || r.outputMode!=="json" || r.entryContext!==null || r.config?.sources?.persist!=="global-config" || r.config?.sources?.outputMode!=="global-config") process.exit(1);' /tmp/project-os-global-config.log
+fi
+cat > "$global_config_dir/bad-config.json" <<'EOF'
+{
+  "schemaVersion": "project-os.config.v0.1",
+  "cli": {
+    "defaultPersist": "sometimes"
+  }
+}
+EOF
+set +e
+PROJECT_OS_GLOBAL_CONFIG="$global_config_dir/bad-config.json" cargo run --quiet --manifest-path "$root/cli/Cargo.toml" -- context "$runner_fixture" --runtime-root "$root" --output json >/tmp/project-os-bad-global.log 2>/tmp/project-os-bad-global.err
+bad_global_exit=$?
+set -e
+if [ "$bad_global_exit" -eq 0 ] || ! grep -q "cli.defaultPersist" /tmp/project-os-bad-global.err; then
+  echo "ERROR: invalid global Project OS config should fail fast"
+  exit 1
+fi
+cat > "$runner_fixture/.project-os/config.json" <<'EOF'
+{
+  "schemaVersion": "project-os.config.v0.1",
+  "cli": {
+    "defaultPersist": "full",
+    "defaultOutput": "json",
+    "lockWrites": true,
+    "staleLockSeconds": 1
+  }
+}
+EOF
+PROJECT_OS_PERSIST=none PROJECT_OS_OUTPUT=file cargo run --quiet --manifest-path "$root/cli/Cargo.toml" -- context "$runner_fixture" --runtime-root "$root" >/tmp/project-os-config-priority.log
+if command -v node >/dev/null 2>&1; then
+  node -e 'const fs=require("fs"); const r=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); if(r.schemaVersion!=="project-os.cli-result.v0.1" || r.persist!=="full" || r.outputMode!=="json" || !r.entryContext || r.config?.sources?.persist!=="project-config") process.exit(1);' /tmp/project-os-config-priority.log
+fi
+cargo run --quiet --manifest-path "$root/cli/Cargo.toml" -- context "$runner_fixture" --runtime-root "$root" --output json --persist none >/tmp/project-os-cli-priority.log
+if command -v node >/dev/null 2>&1; then
+  node -e 'const fs=require("fs"); const r=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); if(r.persist!=="none" || r.entryContext!==null || r.config?.sources?.persist!=="command-line" || r.config?.sources?.outputMode!=="command-line") process.exit(1);' /tmp/project-os-cli-priority.log
+fi
 bash "$root/scripts/project-runner.sh" "$runner_fixture" --source local >/tmp/project-runner-test.log
 runner_record="$(find "$runner_fixture/.project-os/runs" -maxdepth 1 -name '*.json' -print -quit)"
 assert_file "$runner_record"
@@ -99,6 +223,48 @@ assert_file "$runner_fixture/.project-os/reports/ai-project-report.json"
 assert_file "$runner_fixture/.project-os/recommendations/recommend-next.json"
 if command -v node >/dev/null 2>&1; then
   node -e 'const fs=require("fs"); const r=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); if(r.schemaVersion!=="project-os.project-run.v0.1") process.exit(1); if(!Array.isArray(r.commands) || r.commands.length < 3) process.exit(1); if(!r.outputs?.runRecord || !r.next?.requiresHumanConfirmation) process.exit(1);' "$runner_record"
+fi
+if command -v cargo >/dev/null 2>&1; then
+  cargo run --quiet --manifest-path "$root/cli/Cargo.toml" -- report "$runner_fixture" --runtime-root "$root" --output report --persist none >/tmp/project-os-report-output.log
+  if command -v node >/dev/null 2>&1; then
+    node -e 'const fs=require("fs"); const r=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); if(r.schemaVersion!=="project-os.cli-result.v0.1" || r.outputMode!=="report" || r.persist!=="none" || !r.embedded?.reportJson?.scores) process.exit(1);' /tmp/project-os-report-output.log
+  fi
+  mkdir -p "$runner_fixture/.project-os/locks"
+  printf 'pid=test\n' > "$runner_fixture/.project-os/locks/project-os.lock"
+  set +e
+  cargo run --quiet --manifest-path "$root/cli/Cargo.toml" -- report "$runner_fixture" --runtime-root "$root" --output json --persist none >/tmp/project-os-lock-out.log 2>/tmp/project-os-lock-err.log
+  lock_exit=$?
+  set -e
+  rm -f "$runner_fixture/.project-os/locks/project-os.lock"
+  if [ "$lock_exit" -eq 0 ] || ! grep -q "project is locked" /tmp/project-os-lock-err.log; then
+    echo "ERROR: project-os lock should reject concurrent writer"
+    exit 1
+  fi
+  printf 'pid=stale\n' > "$runner_fixture/.project-os/locks/project-os.lock"
+  touch -t 200001010000 "$runner_fixture/.project-os/locks/project-os.lock"
+  cargo run --quiet --manifest-path "$root/cli/Cargo.toml" -- report "$runner_fixture" --runtime-root "$root" --output json --persist none --stale-lock-seconds 1 >/tmp/project-os-stale-lock.log
+  if command -v node >/dev/null 2>&1; then
+    node -e 'const fs=require("fs"); const r=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); if(r.schemaVersion!=="project-os.cli-result.v0.1" || r.status!=="passed") process.exit(1);' /tmp/project-os-stale-lock.log
+  fi
+fi
+
+log "artifact pruning"
+prune_fixture="$tmp_dir/prune-fixture"
+mkdir -p "$prune_fixture/.project-os/entry-contexts" "$prune_fixture/.project-os/runs/logs" "$prune_fixture/.project-os/state-bundles"
+for index in 01 02 03 04 05; do
+  printf '{}\n' > "$prune_fixture/.project-os/entry-contexts/$index.json"
+  printf '{}\n' > "$prune_fixture/.project-os/runs/$index.json"
+  printf '{}\n' > "$prune_fixture/.project-os/state-bundles/$index.json"
+  mkdir -p "$prune_fixture/.project-os/runs/logs/$index"
+done
+PROJECT_OS_RETENTION_ENTRY_CONTEXTS=2 PROJECT_OS_RETENTION_RUNS=2 bash "$root/scripts/prune-project-os-artifacts.sh" "$prune_fixture" >/dev/null
+entry_count="$(find "$prune_fixture/.project-os/entry-contexts" -maxdepth 1 -name '*.json' | wc -l | tr -d ' ')"
+run_count="$(find "$prune_fixture/.project-os/runs" -maxdepth 1 -name '*.json' | wc -l | tr -d ' ')"
+state_bundle_count="$(find "$prune_fixture/.project-os/state-bundles" -maxdepth 1 -name '*.json' | wc -l | tr -d ' ')"
+log_count="$(find "$prune_fixture/.project-os/runs/logs" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
+if [ "$entry_count" != "2" ] || [ "$run_count" != "2" ] || [ "$state_bundle_count" != "2" ] || [ "$log_count" != "2" ]; then
+  echo "ERROR: artifact pruning failed"
+  exit 1
 fi
 
 log "recommendation engine"

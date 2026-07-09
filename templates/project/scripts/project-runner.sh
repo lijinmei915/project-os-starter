@@ -172,4 +172,8 @@ NODE
 
 rm -f "$commands_file"
 
+if [ -f "$runtime_root/scripts/prune-project-os-artifacts.sh" ]; then
+  bash "$runtime_root/scripts/prune-project-os-artifacts.sh" "$target_abs" >/dev/null 2>&1 || true
+fi
+
 echo "Project run complete: $run_file"

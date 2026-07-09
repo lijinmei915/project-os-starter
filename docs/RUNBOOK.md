@@ -1,7 +1,7 @@
 ---
 layer: knowledge
 type: guide
-last_verified: 2026-06-04
+last_verified: 2026-07-09
 teaches: "常用操作命令、检查流程、发布步骤和故障处理手册"
 use_when: "AI 需要执行日常运维操作、排查故障、或指导用户完成发布流程时"
 ---
@@ -31,6 +31,12 @@ bash tests/screenshot-regression.sh
 Result: completed with 0 warning(s).
 AI 工程上下文完整度：.../100
 AI 工程成熟度：.../100
+```
+
+本地纯扫描降噪：
+
+```bash
+PROJECT_OS_ALLOW_EMPTY_PROVIDER_KEYS=1 PROJECT_OS_SKIP_SCREENSHOT=1 bash tests/run-tests.sh
 ```
 
 ## 同步模板
@@ -84,6 +90,7 @@ GitHub 上的 CI 会在 push 和 pull request 时自动运行：
 ```
 
 当前 CI 会执行 shell 语法检查、JSON 解析、`tests/run-tests.sh`、报告生成和 tracked files 变更检查。
+CI 还会运行原生 `project-os` CLI，生成 `Entry Context` 并验证 `project-os.cli-result.v0.1` 结构化输出。
 如果运行环境提供可用浏览器，截图回归会额外生成报告页截图。
 如果仓库存在截图 baseline，截图回归会继续做真实像素 diff。
 报告页模板位于 `templates/report/ai-project-report.html`，如果 HTML 报告生成失败，优先检查该模板是否随 `core` profile 一起安装。
@@ -176,6 +183,60 @@ bash scripts/build-project-graph.sh .
 - 为后续影响分析提供机器可读输入
 
 关系图是本地生成物，不替代 `docs/ARCHITECTURE.md`、`PROJECT.md` 或人工 review。
+
+### 清理 Project OS 历史产物
+
+多次运行 `scan` / `report` 后，`.project-os/entry-contexts/`、`.project-os/runs/` 和 run logs 会持续增长。
+入口脚本和 runner 会自动按默认策略清理，也可以手动执行：
+
+```bash
+bash scripts/prune-project-os-artifacts.sh .
+```
+
+也可以使用分层清理入口：
+
+```bash
+bash scripts/cleanup/prune-project-os-artifacts.sh .
+```
+
+调整保留数量：
+
+```bash
+PROJECT_OS_RETENTION_ENTRY_CONTEXTS=20 \
+PROJECT_OS_RETENTION_RUNS=10 \
+bash scripts/prune-project-os-artifacts.sh .
+```
+
+如果要给 CI / Gateway / Desktop 捕获一次完整报告而不生成新的 Entry Context，可使用：
+
+```bash
+bash scripts/build-project-os-cli.sh
+bin/project-os report . --runtime-root . --output report --persist none
+```
+
+如果看到 `.project-os/locks/project-os.lock` 存在，说明另一个 Project OS 写入流程正在运行，或上一次进程异常退出。CLI 启动时会按配置里的 `cli.staleLockSeconds` 自动清理超时残留锁，也可以单次覆盖：
+
+```bash
+bin/project-os report . --stale-lock-seconds 30
+```
+
+如果仍被拒绝，先确认没有 Project OS 进程仍在运行，再删除该 lock 文件重试。
+
+### 初始化全局配置
+
+多仓库复用统一 Project OS 规则时，可以先初始化用户全局配置：
+
+```bash
+project-os config init --global
+```
+
+如果 CLI 启动时报 `invalid Project OS config`，先检查错误里指出的字段，例如 `cli.defaultPersist`、`cli.defaultOutput` 或 `cli.staleLockSeconds`。需要排查覆盖来源时，用结构化输出查看：
+
+```bash
+bin/project-os context . --output json --persist none
+```
+
+返回里的 `config.sources` 会标明参数来自 `command-line`、`project-config`、`global-config`、`environment` 或 `default`。
 
 工程成熟度低时，优先补：
 

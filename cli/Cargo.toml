@@ -1,0 +1,12 @@
+[package]
+name = "project-os-cli"
+version = "0.1.0"
+edition = "2021"
+description = "Native Project OS CLI entrypoint"
+
+[[bin]]
+name = "project-os"
+path = "src/main.rs"
+
+[dependencies]
+serde_json = "1"

@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-os.local/schemas/project-os-config.schema.json",
+  "title": "Project OS Local Config",
+  "description": "Local Project OS runtime configuration used by CLI, scripts, CI, and desktop entrypoints.",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "const": "project-os.config.v0.1"
+    },
+    "cli": {
+      "type": "object",
+      "properties": {
+        "defaultPersist": {
+          "type": "string",
+          "enum": ["auto", "none", "full"]
+        },
+        "defaultOutput": {
+          "type": "string",
+          "enum": ["file", "json", "both", "report"]
+        },
+        "lockWrites": {
+          "type": "boolean"
+        },
+        "staleLockSeconds": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "retention": {
+      "type": "object",
+      "properties": {
+        "entryContexts": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "runs": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

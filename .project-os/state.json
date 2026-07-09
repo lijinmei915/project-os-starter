@@ -1,9 +1,170 @@
 {
-  "name": "project-os-starter",
+  "architecture": {
+    "desktop": "Tauri + Local Agent Core",
+    "entry": "project-setup",
+    "entryLayer": {
+      "apiBoundary": "内部服务 API 暴露全量能力；对外开放 API 仅暴露稳定原子能力并严格版本化。",
+      "capabilityAdmission": [
+        "CLI command",
+        "Gateway standard API",
+        "CI automation adapter",
+        "offline fallback",
+        "Desktop/Web reviewable artifact"
+      ],
+      "cliReuse": "本地离线直接调用 CLI；Web / CI 在线调用 Gateway 标准接口，Gateway 内部复用 CLI 内核逻辑。",
+      "cliTransition": "当前 scripts/ai-project.sh 是 Shell 过渡 wrapper；长期入口层需要迁到原生 CLI / core library，Shell wrapper 仅保留兼容和 fallback。",
+      "contextSchema": "schemas/entry-context.schema.json",
+      "dataLoop": "CLI / CI 生成的 report、patch 和修复草案同步到 Desktop / Web 查看与审核。",
+      "gatewayResponsibilities": [
+        "auth",
+        "parameter-normalization",
+        "trace-logging",
+        "rate-limit",
+        "error-wrapping",
+        "routing"
+      ],
+      "nativeCli": {
+        "binary": "project-os",
+        "commands": [
+          "config",
+          "state",
+          "context",
+          "scan",
+          "check",
+          "report",
+          "recommend",
+          "run"
+        ],
+        "legacyDelegation": [
+          "scan",
+          "check",
+          "report",
+          "recommend",
+          "run"
+        ],
+        "nativeCapabilities": [
+          "entry-context",
+          "state-sync",
+          "state-validation",
+          "state-bundle",
+          "config-init",
+          "config-validation",
+          "config-read",
+          "config-precedence",
+          "config-source-trace",
+          "persist-mode",
+          "structured-report-output",
+          "write-lock",
+          "stale-lock-cleanup"
+        ],
+        "outputModes": [
+          "file",
+          "json",
+          "both",
+          "report"
+        ],
+        "path": "cli/",
+        "persistModes": [
+          "auto",
+          "none",
+          "full"
+        ],
+        "status": "initial",
+        "structuredStdout": "project-os.cli-result.v0.1",
+        "triggerSources": [
+          "desktop",
+          "manual-cli",
+          "ci",
+          "gateway",
+          "api",
+          "ide",
+          "automation"
+        ],
+        "validatesEntryContextOnWrite": true
+      },
+      "nativeCliRationale": [
+        "Windows native cmd/PowerShell compatibility",
+        "typed arguments and error codes",
+        "structured logs",
+        "stable process interface for Gateway/CI/Desktop",
+        "cross-platform filesystem behavior"
+      ],
+      "noiseControl": {
+        "allowEmptyProviderKeys": "PROJECT_OS_ALLOW_EMPTY_PROVIDER_KEYS=1",
+        "artifactPruneScript": "scripts/prune-project-os-artifacts.sh",
+        "ciNativeCliExample": ".github/workflows/ci.yml",
+        "entryContextRetentionDefault": 50,
+        "runRetentionDefault": 20,
+        "skipBitmapScreenshots": "PROJECT_OS_SKIP_SCREENSHOT=1"
+      },
+      "principle": "用户在哪，治理能力就在哪；所有入口先标准化为 Entry Context，再进入 Gateway 和治理内核。"
+    },
+    "execution": "frontend",
+    "layers": [
+      {
+        "name": "入口层",
+        "purpose": "用户在哪，治理能力就在哪",
+        "scope": "Web / IDE 插件 / CLI / CI / API"
+      },
+      {
+        "name": "工作台应用层",
+        "purpose": "面向不同角色的功能界面",
+        "scope": "大盘 / 单项目 / 规则 / 知识"
+      },
+      {
+        "name": "治理服务层",
+        "purpose": "可插拔的治理能力集",
+        "scope": "质量 / 依赖 / 架构 / 安全 / 文档"
+      },
+      {
+        "name": "核心内核层",
+        "purpose": "所有项目共用的治理大脑",
+        "scope": "规则引擎 + AI 引擎 + 执行引擎"
+      },
+      {
+        "name": "元数据层",
+        "purpose": "先摸清家底，再谈治理",
+        "scope": "项目画像 + 资产建模 + 关系图谱"
+      },
+      {
+        "name": "接入层",
+        "purpose": "零侵入对接所有新老项目",
+        "scope": "Git / 本地目录 / CI / 制品库 / IDE"
+      }
+    ],
+    "rules": "design-system"
+  },
   "description": "OmniDesk / Project OS Desktop：会持续学习项目的本地 AI 工程工作台，让任何新老项目都能按清晰流程被理解、治理、开发和演进",
+  "governance": {
+    "workspaceModel": {
+      "existingProjectFlow": [
+        "选择本地项目文件夹",
+        "只读扫描已有文件、git 状态、运行配置和 .project-os",
+        "生成项目接入草案",
+        "用户确认或修正关键事实",
+        "写入 .project-os/state.json 和必要治理文件",
+        "持续维护项目概览、当前进度、启动方式、风险边界和本地状态"
+      ],
+      "modes": [
+        "new-project",
+        "existing-project",
+        "temporary-readonly"
+      ],
+      "principle": "前台展示用户可理解的项目菜单，后台维护状态来源、文件映射、更新时间、可信度和更新时机。",
+      "updatedAt": "2026-07-08"
+    }
+  },
+  "name": "project-os-starter",
   "phase": "stabilizing",
   "stage": "Project OS Console 内核收口期 / OmniDesk 工作区治理自验证期",
   "status": {
+    "blocked": [],
+    "doing": [
+      "OmniDesk 自身工作区治理验证",
+      "老项目接入流程建模",
+      "项目概览/当前进度/启动方式/风险边界/本地状态动态化",
+      "Desktop v0.1 信息架构和设计 token 规范打磨"
+    ],
     "done": [
       "v1 路由契约",
       "INSTALL FLOW",
@@ -67,15 +228,13 @@
       "desktop/ 主题设置 Rust 本地配置持久化",
       "desktop/ 自定义主题色新增和删除",
       "OmniDesk 北极星目标确认：用户入口 + 项目治理中枢 + 本地项目记忆",
-      "Hermes 等成熟工具定位为参照系统和可接入执行器"
+      "Hermes 等成熟工具定位为参照系统和可接入执行器",
+      "入口层中优补齐：.project-os/config.json、scripts 分层 wrapper、CLI report stdout 嵌入、写入锁",
+      "入口层高优补齐：陈旧锁自动清理、配置优先级固化、Shell 命令 fallback 白名单",
+      "入口层分层优化：--stale-lock-seconds 单次覆盖、用户全局 config、Shell 白名单清晰指引",
+      "入口层配置诊断：project-os config init --global、config schema 启动校验、config.values/config.sources 结构化输出",
+      "统一真相源首版：project-os state sync 受控写入 state.json、状态 schema 校验、state-bundles 回流骨架"
     ],
-    "doing": [
-      "OmniDesk 自身工作区治理验证",
-      "老项目接入流程建模",
-      "项目概览/当前进度/启动方式/风险边界/本地状态动态化",
-      "Desktop v0.1 信息架构和设计 token 规范打磨"
-    ],
-    "blocked": [],
     "next": [
       "设计工作区事实的数据结构和 UI",
       "把项目概览接入 PROJECT.md、.project-os/state.json 和 project-profile 的真实事实源",
@@ -84,30 +243,5 @@
       "把风险边界接入 HANDOFF.md、docs/LESSONS.md 和用户确认过的风险记忆",
       "把本地状态接入 registry、git、服务、模型 provider 和最近检查结果"
     ]
-  },
-  "architecture": {
-    "entry": "project-setup",
-    "rules": "design-system",
-    "execution": "frontend",
-    "desktop": "Tauri + Local Agent Core"
-  },
-  "governance": {
-    "workspaceModel": {
-      "updatedAt": "2026-07-08",
-      "modes": [
-        "new-project",
-        "existing-project",
-        "temporary-readonly"
-      ],
-      "principle": "前台展示用户可理解的项目菜单，后台维护状态来源、文件映射、更新时间、可信度和更新时机。",
-      "existingProjectFlow": [
-        "选择本地项目文件夹",
-        "只读扫描已有文件、git 状态、运行配置和 .project-os",
-        "生成项目接入草案",
-        "用户确认或修正关键事实",
-        "写入 .project-os/state.json 和必要治理文件",
-        "持续维护项目概览、当前进度、启动方式、风险边界和本地状态"
-      ]
-    }
   }
 }

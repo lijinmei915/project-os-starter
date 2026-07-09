@@ -114,6 +114,62 @@
       "status": "done",
       "body": "支持待签收、已完成、带风险完成和失败修复任务，保留验收历史。",
       "tone": "neutral"
+    },
+    {
+      "id": "entry-config-get-set",
+      "title": "入口层配置读写子命令",
+      "status": "planned",
+      "body": "后续补充 `project-os config get` / `project-os config set`，支持命令行直接读写配置，减少手动编辑 JSON。用户已明确暂时不做，只记录。",
+      "tone": "neutral",
+      "updatedAt": "2026-07-09T00:00:00.000Z"
+    },
+    {
+      "id": "entry-config-text-trace",
+      "title": "普通文本配置溯源输出",
+      "status": "planned",
+      "body": "后续在非 JSON 输出模式下展示精简配置来源信息，让用户不用切到 json 也能排查命令行、仓库配置、全局配置和环境变量覆盖关系。用户已明确暂时不做，只记录。",
+      "tone": "neutral",
+      "updatedAt": "2026-07-09T00:00:00.000Z"
+    },
+    {
+      "id": "entry-global-config-profiles",
+      "title": "多套全局配置环境切换",
+      "status": "planned",
+      "body": "后续支持通过参数快速加载不同全局配置文件，便于多仓库或多环境复用统一规则。用户已明确暂时不做，只记录。",
+      "tone": "neutral",
+      "updatedAt": "2026-07-09T00:00:00.000Z"
+    },
+    {
+      "id": "entry-ci-binary-packaging",
+      "title": "CI 多平台预编译二进制包",
+      "status": "planned",
+      "body": "中期搭建 CI 自动打包流水线，产出 Windows / macOS / Linux 多平台预编译二进制压缩包，支持免源码安装。用户已明确暂时不做，只记录。",
+      "tone": "neutral",
+      "updatedAt": "2026-07-09T00:00:00.000Z"
+    },
+    {
+      "id": "entry-identity-permission-params",
+      "title": "CLI 调用身份和权限校验入参",
+      "status": "planned",
+      "body": "中期为 CLI 增加调用身份、权限校验入参，预留对接 Gateway 鉴权体系的扩展字段。用户已明确暂时不做，只记录。",
+      "tone": "neutral",
+      "updatedAt": "2026-07-09T00:00:00.000Z"
+    },
+    {
+      "id": "entry-artifact-sync-protocol",
+      "title": "标准化产物上报协议",
+      "status": "planned",
+      "body": "长期设计标准化产物上报协议，打通本地 CLI、CI、OmniDesk 桌面云端数据双向同步。用户已明确暂时不做，只记录。",
+      "tone": "neutral",
+      "updatedAt": "2026-07-09T00:00:00.000Z"
+    },
+    {
+      "id": "entry-compat-cleanup-plan",
+      "title": "旧兼容语法清理计划",
+      "status": "planned",
+      "body": "长期梳理全部旧兼容语法，制定版本废弃计划，分阶段清理存量兼容代码并精简分支逻辑。用户已明确暂时不做，只记录。",
+      "tone": "neutral",
+      "updatedAt": "2026-07-09T00:00:00.000Z"
     }
   ]
 }

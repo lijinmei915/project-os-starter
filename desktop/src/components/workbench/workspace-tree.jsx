@@ -198,6 +198,7 @@ export function WorkspaceTree({ activeTopicPath, actions, inlineAction, onSelect
                     const keys = node.items.map((item) => topicKey([node.title, item.title]));
                     const nextOpen = !keys.every((key) => isTopicOpen(key));
                     setTopicOpenByKey((current) => ({ ...current, ...Object.fromEntries(keys.map((key) => [key, nextOpen])) }));
+                    if (nextOpen) openTopic({ item: node.items[0], node });
                   }
                   return;
                 }
@@ -230,10 +231,12 @@ export function WorkspaceTree({ activeTopicPath, actions, inlineAction, onSelect
                             if (childActive) {
                               const nextOpen = !childTopicKeys.every((key) => isTopicOpen(key));
                               setTopicOpenByKey((current) => ({ ...current, ...Object.fromEntries(childTopicKeys.map((key) => [key, nextOpen])) }));
+                              if (child.items?.length) openTopic({ child, item: child.items[0], node });
                               return;
                             }
                             setActiveChildByNode((current) => ({ ...current, [nodeId]: childId }));
                             setTopicOpenByKey((current) => ({ ...current, ...Object.fromEntries(childTopicKeys.map((key) => [key, true])) }));
+                            if (child.items?.length) openTopic({ child, item: child.items[0], node });
                           }}
                           type="button"
                         >

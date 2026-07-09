@@ -1,7 +1,7 @@
 ---
 layer: knowledge
 type: spec
-last_verified: 2026-06-04
+last_verified: 2026-07-09
 teaches: "本地开发环境配置、依赖安装、环境变量和外部服务对接"
 use_when: "AI 需要帮用户启动项目、排查环境问题、或配置新的外部依赖时"
 ---
@@ -78,6 +78,46 @@ bash "$tmp_dir/target/scripts/check-runtime.sh" "$tmp_dir/target"
 | `VISUAL_DIFF_THRESHOLD` | 视觉 diff 允许的像素变化比例，默认 `0.01` |
 | `VISUAL_DIFF_PIXEL_DELTA` | 单像素差异敏感度，默认 `16` |
 | `BROWSER_SCREENSHOT_TIMEOUT` | 浏览器截图命令超时时间，默认 `30` 秒 |
+| `PROJECT_OS_ALLOW_EMPTY_PROVIDER_KEYS` | 设置为 `1` 时，允许纯本地扫描跳过空 provider key warning |
+| `PROJECT_OS_SKIP_SCREENSHOT` | 设置为 `1` 时，截图回归只做 HTML marker 检查，不尝试 bitmap capture |
+| `PROJECT_OS_RETENTION_ENTRY_CONTEXTS` | Entry Context 保留数量，默认 `50` |
+| `PROJECT_OS_RETENTION_RUNS` | Runner 记录和日志保留数量，默认 `20` |
+| `PROJECT_OS_GLOBAL_CONFIG` | 可选。指定用户全局 Project OS 配置文件；不设置时默认读取 `$HOME/.project-os/config.json` |
+
+Project OS 支持两层长期配置：
+
+- 用户全局配置：`$PROJECT_OS_GLOBAL_CONFIG` 指向的文件，或默认 `$HOME/.project-os/config.json`
+- 仓库本地配置：当前项目的 `.project-os/config.json`
+
+配置适合放长期稳定的 CLI 默认行为，例如：
+
+- `cli.defaultPersist`: `auto` / `none` / `full`
+- `cli.defaultOutput`: `file` / `json` / `both` / `report`
+- `cli.lockWrites`: 是否启用 `.project-os/locks/project-os.lock`
+- `cli.staleLockSeconds`: 残留锁自动清理阈值，`0` 表示不自动清理
+- `retention.entryContexts` / `retention.runs`: 历史产物保留数量
+
+优先级固定为：命令行参数 > 仓库 `.project-os/config.json` > 用户全局 config > `PROJECT_OS_*` 环境变量 > 内置默认值。环境变量仍可用于一次性覆盖或 CI 降噪，但不再作为长期配置的唯一入口。
+
+初始化用户全局配置：
+
+```bash
+project-os config init --global
+```
+
+也可以显式指定路径：
+
+```bash
+project-os config init --global --path "$HOME/.project-os/config.json"
+```
+
+CLI 启动时会校验用户全局 config 和仓库 config 的格式；配置错误会立即失败并指出具体字段。结构化输出会包含 `config.values` 和 `config.sources`，用于排查某个参数来自命令行、仓库配置、用户全局配置还是环境变量。
+
+单次覆盖 lock 超时时间：
+
+```bash
+bin/project-os report . --stale-lock-seconds 30
+```
 
 本地密钥使用方式：
 
@@ -91,6 +131,12 @@ cp .env.example .env.local
 
 ```bash
 bash scripts/check-secrets.sh .
+```
+
+如果只是本地纯扫描，不需要模型 provider，可降噪运行：
+
+```bash
+PROJECT_OS_ALLOW_EMPTY_PROVIDER_KEYS=1 bash scripts/check-secrets.sh .
 ```
 
 ## 外部服务

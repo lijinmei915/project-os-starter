@@ -2235,6 +2235,144 @@ body.isResizingSidebar {
   gap: var(--space-12);
 }
 
+.agentTopicStack {
+  display: grid;
+  gap: var(--space-10);
+}
+
+.agentTopicPanel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-8);
+}
+
+.agentTopicCard {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: var(--space-10);
+  background: var(--surface-raised);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.agentTopicCard span {
+  color: var(--desktop-text-tertiary);
+  font-size: var(--desktop-text-meta);
+}
+
+.agentTopicCard strong {
+  color: var(--desktop-text-primary);
+  font-size: var(--desktop-text-caption);
+  font-weight: var(--desktop-font-semibold);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.agentTopicDetail,
+.agentPatchItem {
+  display: grid;
+  gap: var(--space-10);
+  min-width: 0;
+  padding: var(--space-10);
+  background: var(--desktop-surface-page);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.agentTopicDetailHeader,
+.agentPatchItemHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-10);
+  min-width: 0;
+}
+
+.agentTopicDetailHeader div,
+.agentPatchItemHeader div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.agentTopicDetailHeader strong,
+.agentPatchItemHeader strong {
+  color: var(--desktop-text-primary);
+  font-size: var(--desktop-text-caption);
+  font-weight: var(--desktop-font-semibold);
+  overflow-wrap: anywhere;
+}
+
+.agentTopicDetailHeader span,
+.agentPatchItemHeader span,
+.agentPatchItem p {
+  color: var(--desktop-text-tertiary);
+  font-size: var(--desktop-text-meta);
+  line-height: 1.5;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.agentExecutionGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-8);
+}
+
+.agentExecutionGrid > div {
+  display: grid;
+  align-content: start;
+  gap: var(--space-6);
+  min-width: 0;
+  padding: var(--space-8);
+  background: var(--surface-raised);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.agentExecutionGrid span {
+  color: var(--desktop-text-tertiary);
+  font-size: var(--desktop-text-meta);
+}
+
+.agentExecutionGrid ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 15px;
+}
+
+.agentExecutionGrid li {
+  color: var(--desktop-text-secondary);
+  font-size: var(--desktop-text-meta);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.agentTopicStatusLine {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+}
+
+.agentTopicStatusLine span {
+  max-width: 100%;
+  padding: 3px 7px;
+  color: var(--desktop-text-secondary);
+  font-size: var(--desktop-text-meta);
+  line-height: 1.4;
+  background: var(--desktop-state-accent-bg);
+  border: 1px solid var(--desktop-border-accent);
+  border-radius: var(--radius-xs);
+  overflow-wrap: anywhere;
+}
+
+.agentTopicList {
+  display: grid;
+  gap: var(--space-8);
+}
+
 .topicFileList {
   display: grid;
   gap: var(--space-8);
@@ -2619,6 +2757,95 @@ body.isResizingSidebar {
   gap: var(--desktop-space-xs);
 }
 
+.workspaceGovernanceHealthGrid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--desktop-space-xs);
+}
+
+.workspaceGovernanceHealthCard {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: var(--desktop-space-sm);
+  background: var(--desktop-surface-panel-soft);
+  border: 1px solid var(--line-divider);
+  border-radius: var(--radius-sm);
+  color: inherit;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
+.workspaceGovernanceHealthCard span {
+  color: var(--desktop-type-meta-color);
+  font-size: var(--desktop-type-meta-size);
+  font-weight: var(--desktop-type-meta-weight);
+}
+
+.workspaceGovernanceHealthCard strong {
+  color: var(--desktop-text-primary);
+  font-size: var(--desktop-text-caption);
+  font-weight: var(--desktop-font-semibold);
+}
+
+.workspaceGovernanceHealthCard:hover:not(:disabled),
+.workspaceGovernanceHealthCard.active {
+  background: var(--desktop-state-selected-bg);
+  border-color: var(--desktop-state-selected-indicator);
+}
+
+.workspaceGovernanceHealthCard:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+
+.workspaceGovernanceHealthCard.status-changed,
+.workspaceGovernanceHealthCard.status-stale {
+  border-color: var(--desktop-border-accent);
+  background: var(--desktop-state-accent-bg);
+}
+
+.workspaceGovernanceHealthCard.status-missing {
+  border-color: var(--desktop-danger-border, var(--line-divider));
+  background: var(--desktop-danger-bg, var(--desktop-surface-panel-soft));
+}
+
+.workspaceGovernanceActions {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--desktop-space-md);
+  padding: var(--desktop-space-sm) var(--desktop-space-md);
+  background: var(--desktop-surface-panel-soft);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.workspaceGovernanceActions div {
+  min-width: 0;
+}
+
+.workspaceGovernanceActions strong {
+  color: var(--desktop-type-section-color);
+  font-size: var(--desktop-type-section-size);
+  font-weight: var(--desktop-type-section-weight);
+}
+
+.workspaceGovernanceActions p {
+  margin: 4px 0 0;
+  color: var(--desktop-type-body-secondary-color);
+  font-size: var(--desktop-type-body-size);
+  line-height: 1.5;
+}
+
+.workspaceGovernanceActionButtons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--desktop-space-xs);
+}
+
 .workspaceGovernanceDomain {
   display: grid;
   gap: var(--desktop-space-xs);
@@ -2823,6 +3050,7 @@ body.isResizingSidebar {
 }
 
 @media (max-width: 760px) {
+  .agentExecutionGrid,
   .workspaceFactsHero,
   .workspaceFactsQuickEntries,
   .workspaceFactsColumns,

@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-os.local/schemas/entry-context.schema.json",
+  "title": "Project OS Entry Context",
+  "description": "Unified request context emitted by Desktop/Web, IDE, CLI, CI, and API entry points before routing into Gateway and governance core.",
+  "type": "object",
+  "required": ["schemaVersion", "entry", "mode", "intent", "actor", "project", "request"],
+  "properties": {
+    "schemaVersion": {
+      "const": "project-os.entry-context.v0.1"
+    },
+    "entry": {
+      "type": "string",
+      "enum": ["desktop", "web", "ide", "cli", "ci", "api"]
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["readonly", "draft", "apply"]
+    },
+    "intent": {
+      "type": "string",
+      "enum": ["scan", "check", "recommend", "report", "plan", "draft", "apply", "validate"]
+    },
+    "actor": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["user", "automation", "ci", "service"]
+        },
+        "id": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "project": {
+      "type": "object",
+      "required": ["path"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "repo": { "type": "string" },
+        "branch": { "type": "string" },
+        "commit": { "type": "string" },
+        "workspaceId": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "request": {
+      "type": "object",
+      "required": ["id", "createdAt"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "parentId": { "type": "string" },
+        "source": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "trigger": {
+      "type": "object",
+      "required": ["source"],
+      "properties": {
+        "source": {
+          "type": "string",
+          "enum": ["desktop", "manual-cli", "ci", "gateway", "api", "ide", "automation"]
+        },
+        "channel": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "permissions": {
+      "type": "object",
+      "required": ["allowRead", "allowWrite", "allowNetwork", "allowShell"],
+      "properties": {
+        "allowRead": { "type": "boolean" },
+        "allowWrite": { "type": "boolean" },
+        "allowNetwork": { "type": "boolean" },
+        "allowShell": { "type": "boolean" },
+        "policy": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "input": {
+      "type": "object",
+      "properties": {
+        "message": { "type": "string" },
+        "changedFiles": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "flags": {
+          "type": "object",
+          "additionalProperties": {
+            "type": ["string", "number", "boolean"]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "limits": {
+      "type": "object",
+      "properties": {
+        "timeoutMs": { "type": "integer", "minimum": 1 },
+        "maxFiles": { "type": "integer", "minimum": 1 },
+        "allowNetwork": { "type": "boolean" },
+        "allowWrite": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "trace": {
+      "type": "object",
+      "properties": {
+        "gatewayRequestId": { "type": "string" },
+        "ciRunId": { "type": "string" },
+        "sessionId": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

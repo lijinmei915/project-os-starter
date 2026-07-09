@@ -84,10 +84,18 @@ command_success() {
 }
 
 get_ssot_ratio() {
+  if [ ! -d "docs" ]; then
+    echo "100"
+    return
+  fi
+
   total_docs=$(find docs -maxdepth 1 -name "*.md" | wc -l | tr -d ' ')
   if [ "$total_docs" -eq 0 ]; then echo "100"; return; fi
 
-  mapped_rules=$(find .ai/rules -name "*.md" -type l | wc -l | tr -d ' ')
+  mapped_rules=0
+  if [ -d ".ai/rules" ]; then
+    mapped_rules=$(find .ai/rules -name "*.md" -type l | wc -l | tr -d ' ')
+  fi
   # 计算百分比
   echo $((mapped_rules * 100 / total_docs))
 }

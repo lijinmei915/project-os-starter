@@ -20,6 +20,24 @@ use_when: "AI 需要理解某个架构选择的背景、或面临类似决策需
 
 ### Project OS
 
+#### D018 — Shell 统一入口只是过渡形态，长期迁到原生 CLI
+
+**决定**: `scripts/ai-project.sh` 继续作为当前最小统一入口和兼容 wrapper，但长期入口层必须抽出原生 CLI 程序和可复用 core library。Gateway、CI、Desktop 后续应调用标准接口或原生 CLI / library core，不直接绑定一组分散 Shell 脚本。
+
+**放弃**: 不把 Shell 脚本当成长期入口层底座；不让 Web / CI / Desktop 各自复制一套治理逻辑；不在 Shell 中继续堆复杂鉴权、限流、结构化日志、错误码和跨平台进程协议。
+
+**原因**:
+- Windows 原生 `cmd` / PowerShell 场景对 Shell 依赖不友好，常需要 Git Bash / WSL。
+- Shell 对参数标准化、结构化日志、异常封装和错误码治理较脆弱。
+- Gateway / CI / Desktop 需要稳定的进程间接口和结构化返回，文件 + shell 进程只能支撑过渡期。
+- Entry Context、报告、推荐、patch、run record 已经进入结构化阶段，执行底座也应该逐步结构化。
+
+**影响**:
+- 当前 `ai-project.sh` 只定义命令语义和过渡执行，不代表最终技术形态。
+- 新增复杂治理能力必须同时考虑 CLI binary / core library 的迁移路径。
+- 后续应设计 `project-os` 原生命令：`scan`、`check`、`recommend`、`report`、`plan`、`draft`、`validate`。
+- Shell wrapper 应在原生 CLI 可用后优先委托给 binary，不可用时再 fallback 到 legacy shell flow。
+
 #### D001 — Project OS 先做纯内置闭环
 
 **决定**: v1 只包含 `project-setup`、`design-system`、`frontend`、references、tests、registry、changelog。

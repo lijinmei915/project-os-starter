@@ -1,7 +1,7 @@
 ---
 layer: knowledge
 type: status
-last_verified: 2026-07-02
+last_verified: 2026-07-09
 teaches: "当前交接上下文、风险点和下一步建议"
 use_when: "新的 AI 会话接手工作、需要了解最近做了什么和接下来该做什么时"
 depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
@@ -20,9 +20,25 @@ depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
 - 结构性历史看 `docs/CHANGELOG.md`，决策原因看 `docs/DECISIONS.md`。
 - 当前仓库有较多未提交改动和未跟踪文件，继续工作时不要回滚非本轮改动。
 - 当前产品定位已推进为 `Project OS Desktop / Console`：先稳定项目理解、推荐补齐、跑检查、维护交接状态，再通过 Tauri + Local Agent Core 做本地 coding 工作台；暂时不要把它做成完整 IDE、开放插件市场或通用 Hermes Studio 复制品。
+- 整体架构分层已确认并写入 `docs/ARCHITECTURE.md`：自下而上为 `接入层 -> 元数据层 -> 核心内核层 -> 治理服务层 -> 工作台应用层 -> 入口层`；底层解决“接得进来”，上层解决“治得好”。
+- 入口层已补架构约束：第一周前置定稿 `Entry Context` JSON 标准；Gateway 承担鉴权、参数标准化、日志链路、限流、异常封装和路由分发；CLI 是离线能力内核，Web / CI 通过 Gateway 复用 CLI 逻辑；新增能力必须同时具备 CLI、Gateway、CI 和离线降级路径。
+- 注意：当前 `scripts/ai-project.sh` 只是 Shell 过渡 wrapper。长期入口层必须迁到原生 CLI / core library，否则会限制 Windows 原生运行、结构化日志/错误码、Gateway / CI / Desktop 进程间调用和复杂路由。
 
 ## 最近完成
 
+- 2026-07-09 根据用户确认的架构图，记录 OmniDesk / Project OS 的 6 层整体架构：入口层、工作台应用层、治理服务层、核心内核层、元数据层、接入层。`docs/ARCHITECTURE.md` 是完整 SSOT，`PROJECT.md` 和 `.project-os/state.json` 保留摘要。
+- 2026-07-09 根据用户补充的入口层要求，补齐 `docs/ARCHITECTURE.md` 的入口层方案，并新增 `schemas/entry-context.schema.json`。入口层正式约束包括 Entry Context 前置标准化、Gateway 完整职责、CLI 复用架构、CLI/CI/Desktop 三端数据闭环、内外 API 隔离、新能力准入标准和离线降级方案。
+- 2026-07-09 入口层最小 CLI 已跑通：`scripts/ai-project.sh` 增加 `scan` / `run` 统一入口，并在 `check` / `report` / `recommend` / `scan` / `run` 前写入 `.project-os/entry-contexts/*.json`，作为 Gateway 未落地前的 CLI Entry Context 产物。
+- 2026-07-09 根据用户指出的核心短板，明确 Shell 入口只是过渡形态；已在 `docs/ARCHITECTURE.md` 和 `docs/DECISIONS.md` 记录长期迁移到原生 CLI / core library 的决策。后续新增复杂治理能力不能只堆在 Shell 脚本里。
+- 2026-07-09 新增 `cli/` 原生 Rust CLI 起点，二进制名 `project-os`。当前支持 `context` / `scan` / `check` / `report` / `recommend` / `run`，其中 `context` 原生写 Entry Context，其余命令先委托 legacy shell runner。`scripts/ai-project.sh` 支持通过 `PROJECT_OS_CLI_BIN` 优先委托 native CLI。
+- 2026-07-09 入口层继续补主动调用能力：Entry Context schema 增加 `trigger.source` 区分 `desktop` / `manual-cli` / `ci` / `gateway` 等来源；native CLI 增加 `--output json` 输出 `project-os.cli-result.v0.1` 结构化 stdout；native CLI 和 shell wrapper 都在生成 Entry Context 后立即做基础校验。
+- 2026-07-09 补齐入口层次要隐患：`check-secrets.sh` 支持 `PROJECT_OS_ALLOW_EMPTY_PROVIDER_KEYS=1` 纯本地扫描降噪；截图回归支持 `PROJECT_OS_SKIP_SCREENSHOT=1`；新增 `scripts/prune-project-os-artifacts.sh` 自动清理 Entry Context、run records 和 logs；GitHub Actions CI 增加 native CLI 结构化输出示例。
+- 2026-07-09 入口层中优项已补齐首版：新增 `.project-os/config.json` 和 `schemas/project-os-config.schema.json` 作为统一配置入口；Rust CLI 支持 `--persist auto|none|full`、`--output report` 内嵌机器报告 stdout 和 `.project-os/locks/project-os.lock` 写入锁；新增 `scripts/exec` / `scripts/validate` / `scripts/cleanup` 分层 wrapper，旧脚本路径继续兼容。
+- 2026-07-09 入口层高优优化已补齐首版：Rust CLI 启动时会按 `cli.staleLockSeconds` 自动清理陈旧 lock；配置优先级固化为命令行参数 > `.project-os/config.json` > `PROJECT_OS_*` 环境变量 > 内置默认值；`check-runtime.sh` 增加 Shell 命令白名单，约束 `scripts/ai-project.sh` 不再新增业务命令 fallback。
+- 2026-07-09 入口层分层优化继续补齐：Rust CLI 新增 `--stale-lock-seconds` 单次覆盖；支持用户全局配置 `$PROJECT_OS_GLOBAL_CONFIG` 或 `$HOME/.project-os/config.json`，优先级调整为命令行参数 > 仓库 `.project-os/config.json` > 用户全局 config > `PROJECT_OS_*` 环境变量 > 内置默认值；Shell 白名单报错文案已改为清晰引导去 `cli/src/main.rs` 新增命令。
+- 2026-07-09 Gateway 启动前配置诊断项已补齐：新增原生 `project-os config init --global [--path]`，会生成符合 `schemas/project-os-config.schema.json` 的配置模板；CLI 启动时会校验用户全局 config / 仓库 config，格式错误立即失败；结构化 stdout 增加 `config.values` 和 `config.sources`，便于排查命令行、仓库配置、全局配置和环境变量的覆盖关系。
+- 2026-07-09 用户补充一组入口层后续优化，已明确“暂时不做，只记录”：后续可补 `config get` / `config set` 子命令，支持命令行直接读写配置；普通文本输出模式展示精简配置溯源信息；支持多套全局配置环境切换；中期仍保留 CI 多平台预编译二进制包和调用身份/权限校验入参；长期保留标准化产物上报协议和旧兼容语法清理计划。
+- 2026-07-09 统一真相源模块已落首版：新增原生 `project-os state sync [target] [--set key=value] [--output json]`，受控校验和写入 `.project-os/state.json`，支持 `name` / `description` / `phase` / `stage` 字段更新；写入复用 `.project-os/locks/project-os.lock`，生成 `.project-os/state-bundles/*.json` 作为 CI / 本地回流骨架产物；`.gitignore` 和 prune 脚本已纳入 state-bundles。
 - 2026-07-08 开始用 OmniDesk 自身验证工作区治理模型：工作区不再只被看作文件树或静态文档入口，而是“任意新老项目进入后，由 OmniDesk 维护项目事实、状态来源、更新时机和可信度”的项目治理层。
 - 已明确三种项目进入模式：新项目由 OmniDesk 生成最小治理骨架；老项目添加到工作区后默认自动接入 OmniDesk 工作区，先只读扫描已有文件、git 状态、运行配置和 `.project-os`；临时项目允许只读打开，不写治理文件。
 - 已更新 `PROJECT.md`、`.project-os/state.json` 和 `.project-os/project-profile.json`，记录工作区治理口径、老项目接入流程、成功标准和当前风险。下一步应把项目概览、当前进度、启动方式、风险边界、本地状态接到真实项目事实源。
@@ -112,11 +128,27 @@ depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
 - 目标验收重版第一阶段已落地：新增 `.project-os/goal-validation.json` 作为目标验收标准，右侧目标完成后显示“验收标准 6 项”；Tauri snapshot 和浏览器预览都会读取同一份文件。
 - 目标验收报告已接入：桌面端 `run_goal_validation` 会顺序运行 Web build、Cargo check 和 runtime check，写入 `.project-os/goal-validation-report.json`，并把目标状态推进到 `verified` 或 `validation-failed`。
 - 目标签收追溯已接入：桌面端 `sign_off_goal_validation` 要求验收报告 `passed` 后才能签收，签收结果写入 `.project-os/goal-signoff-history.json`，并把目标状态更新为 `signed-off`。
+- 桌面端项目概览已补页面内治理闭环入口：`run_project_os_action` 只允许 `scan` / `recommend` / `report` / `prune` 四个白名单动作；Tauri 和浏览器预览都走同一动作语义，执行后刷新工作区事实视图，结果继续落在 `.project-os/`。后续治理文件筛选、`.project-os/runs/` 历史、L2 定时治理和 L3 patch draft 列表已记入 `docs/PRODUCT_PLAN.md`，本轮不扩。
+- 桌面端页面数据刷新机制已补三层保障：Tauri watcher 收窄为监听 `.project-os` 治理骨架变更并触发完整 snapshot 刷新；项目概览新增 `同步治理状态`，底层调用 `project-os state sync . --output json`；浏览器预览增加 30s 轻量 snapshot 轮询，适配非 Tauri 场景。
+- 工作区导航信息架构已收口：一级菜单固定为 `项目流程 -> 任务执行 -> 知识记忆 -> 工程资产 -> Agent 配置`；二级菜单改为能力级工作面，不再暴露 `目标用户`、`使用场景` 等字段级入口；`项目概览` 定义为总览驾驶舱，只做摘要、跳转和快捷操作，不重复承载 `当前进度`、`启动方式`、`风险边界`、`本地状态` 的完整内容。
+- Agent 开发优先级已开始落地到工作面：`任务执行` 的 `当前任务 / 任务队列 / Patch 草案 / 执行终端 / 执行结果` 和 `Agent 配置` 的 `模型连接 / 工具白名单 / 安全边界` 会在中间区域显示状态卡，而不是只展示治理文件说明；产品规划已记录 P0 优先级为任务执行闭环、项目概览驾驶舱和 Agent 配置状态。
 
 ## 当前验证
 
 - `bash scripts/check-runtime.sh .` 已通过，0 warning。
 - `bash tests/run-tests.sh` 已通过；其中 `.env.local` 的 `DEEPSEEK_API_KEY` 为空是安全检查 warning，不影响测试结果。
+- 2026-07-09 桌面治理入口补齐后已验证：`cargo check --manifest-path desktop/src-tauri/Cargo.toml`、`npm --prefix desktop run web:build`、`cargo check --manifest-path cli/Cargo.toml`、`bash scripts/check-runtime.sh .`、`bash scripts/check-doc-structure.sh .`、`bash scripts/check-template-sync.sh . --strict`、`PROJECT_OS_ALLOW_EMPTY_PROVIDER_KEYS=1 PROJECT_OS_SKIP_SCREENSHOT=1 bash tests/run-tests.sh` 均通过；浏览器预览里 `scan` / `recommend` / `report` / `prune` 均能返回结构化结果，项目概览 action bar 可见且点击 `清理过期产物` 后显示成功反馈。
+- 2026-07-09 页面刷新机制补齐后已验证：重新构建 `bin/project-os` 后，`run-project-os-action` 的 `sync` 返回 `project-os.state-sync-result.v0.1` 且生成 `.project-os/state-bundles/*.json`；浏览器页面可见 `同步治理状态` 按钮，点击后显示成功反馈。
+- 2026-07-09 工作区导航收口后已验证：`npm --prefix desktop run web:build`、`bash scripts/check-runtime.sh .`、`bash scripts/check-doc-structure.sh .` 通过；浏览器预览里一级菜单顺序正确，字段级 `目标用户` / `使用场景` 不再显示在左侧导航。
+- 2026-07-09 Agent 工作面首版验证：浏览器预览点击 `任务执行 -> 当前任务` 可见当前任务、任务状态和下一步状态卡；点击 `Agent 配置 -> 模型连接` 可见当前连接、启用状态、当前模型和模型状态卡。
+- 2026-07-09 任务执行闭环 1.0 已继续补齐首批工作面：`当前任务` 增加计划步骤、候选改动、验证检查和 Patch / 应用 / 验证状态骨架；`Patch 草案` 增加集中列表，展示草案文件、应用状态、验证摘要、run summary 和交接状态；`执行结果` 增加最近完成 / 失败任务列表和空态。左侧工作区能力菜单点击时会自动打开对应工作面的第一个事项，避免只高亮菜单但中间区不切换。
+- 2026-07-09 任务执行闭环 1.1 已把 `当前任务` / `Patch 草案` 工作面接入现有操作链：工作面内可直接打开任务、生成 Patch 草案、应用并自动验证、运行检查、更新交接；空任务时显示禁用动作条和创建任务提示，避免用户不知道下一步。所有动作仍复用既有受控 command 和白名单边界，不新增任意命令执行入口。
+- 2026-07-09 任务失败闭环首版已接入 `执行结果` 工作面：失败任务会展示失败摘要、失败检查项，并提供打开任务、重跑失败检查和生成修复任务入口；修复任务以普通 `planned` 桌面任务写入，继承原任务检查和候选改动，仍需用户确认后才进入 Patch / Apply / 验证链路。
+- 2026-07-09 已用 OmniDesk 自身做任务失败闭环 smoke 验证：补齐浏览器预览的 `desktop-tasks` 读写端点后，临时注入 `codex-failure-loop-smoke` 失败任务，确认 `执行结果` 能显示失败摘要、失败检查、重跑失败检查和生成修复任务；点击生成修复任务后确认写入 `planned` 修复任务并继承原检查项。测试任务和修复任务已清理，manifest 已恢复。
+- 2026-07-09 治理文件健康状态首版已落地：从 `workspaceFacts.governanceDomains[].fileStatuses` 聚合 `正常 / 有本地变更 / 缺失 / 可能过期 / 生成产物 / 规则目录` 统计；`项目概览` 显示健康摘要，`工程资产 -> 治理文件` 显示专属治理文件健康视图和按治理域展开的只读预览入口，避免和项目概览重复。
+- 2026-07-09 根据用户反馈“看了后能干嘛”，治理文件健康视图已从只读统计升级为可行动视图：状态卡可点击筛选对应文件，`缺失` 会直接聚焦缺失治理文件并展开首个命中治理域；新增“建议处理顺序”，按缺失、本地变更、过期和规则目录给出处理优先级。
+- 2026-07-09 治理文件健康视图已接入任务生成：筛选 `缺失 / 有本地变更 / 可能过期` 后可生成补齐、审阅或同步任务；任务以 `planned` 桌面任务写入，携带命中文件、治理域、检查项和安全边界，后续进入既有 Patch / Apply / 验证闭环。已用 OmniDesk 自身验证 `缺失 -> 生成补齐任务`，确认任务包含 `package.json`、`templates/project-docs/PROJECT.md` 和治理检查项；验证任务已清理。
+- 已知残余：`cargo fmt --manifest-path desktop/src-tauri/Cargo.toml --check` 仍会对既有 `desktop/src-tauri/src/main.rs` 给出大范围格式化 diff，本轮未执行全文件格式化，避免把历史格式 churn 混入当前功能改动。
 - 因为改过可分发页面并同步过模板，收尾前仍应确认：
 
 ```bash

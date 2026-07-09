@@ -597,25 +597,9 @@ async function loadModelHealth() {
 
 async function loadDesktopTasks() {
   if (!isTauriRuntime()) {
-    const manifest = await loadPreviewJson(
-      "/.project-os/runs/desktop-tasks/manifest.json",
-      { tasks: [] }
-    );
-    const files = Array.isArray(manifest.tasks) ? manifest.tasks : [];
-    const records = await Promise.all(
-      files.map(async (file) => {
-        try {
-          const response = await fetch(`/.project-os/runs/desktop-tasks/${file}`);
-          return response.ok ? response.json() : null;
-        } catch {
-          return null;
-        }
-      })
-    );
-    return records
-      .filter(Boolean)
-      .sort((a, b) => String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")))
-      .slice(0, 30);
+    const response = await fetch("/__project-os/desktop-tasks");
+    if (!response.ok) return [];
+    return response.json();
   }
 
   const { invoke } = await import("@tauri-apps/api/core");
@@ -657,6 +641,18 @@ async function invokeWorkspaceCommand(command, payload) {
       }
       return result;
     }
+    if (command === "run_project_os_action") {
+      const response = await fetch("/__project-os/run-project-os-action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload?.input || payload || {}),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.error || "治理动作执行失败。");
+      }
+      return result;
+    }
     throw new Error("当前是浏览器预览，只能查看界面；请在桌面 App 窗口里保存配置。");
   }
 
@@ -675,7 +671,16 @@ function readFileAsDataUrl(file) {
 
 async function persistDesktopTask(task) {
   if (!isTauriRuntime()) {
-    return task;
+    const response = await fetch("/__project-os/save-desktop-task", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ task }),
+    });
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}));
+      throw new Error(result.error || "保存任务失败。");
+    }
+    return response.json();
   }
   return invokeWorkspaceCommand("save_desktop_task", { input: { task } });
 }
@@ -1625,6 +1630,7 @@ function AgentWorkspace({
   error,
   readonlyPlan,
   activeTask,
+  tasks,
   planLoading,
   planError,
   runnerLoadingId,
@@ -1662,6 +1668,10 @@ function AgentWorkspace({
   onTestComposerModel,
   goalRefinementMode,
   onSelectEngineeringFile,
+  onSelectConversation,
+  onSelectTask,
+  onCreateRepairTask,
+  onCreateGovernanceTask,
 }) {
   const [taskInput, setTaskInput] = useState("");
   const [attachments, setAttachments] = useState([]);
@@ -2038,7 +2048,24 @@ function AgentWorkspace({
         if (tab.kind === "file") {
           return (
             <TabsContent className="workspaceTabContent fileCanvas" key={tab.id} value={tab.id}>
-              <EngineeringFileTab selectedEngineeringFile={tab.file} snapshot={snapshot} />
+              <EngineeringFileTab
+                selectedEngineeringFile={tab.file}
+                snapshot={snapshot}
+                tasks={tasks}
+                provider={provider}
+                composerModelAvailability={composerModelAvailability}
+                runnerLoadingId={runnerLoadingId}
+                patchLoading={patchLoading}
+                applyLoading={applyLoading}
+                handoffLoading={handoffLoading}
+                onGeneratePatchDraft={onGeneratePatchDraft}
+                onApplyPatchDraft={onApplyPatchDraft}
+                onMergeHandoff={onMergeHandoff}
+                onRunGuardedCheck={onRunGuardedCheck}
+                onSelectTask={onSelectTask}
+                onCreateRepairTask={onCreateRepairTask}
+                onCreateGovernanceTask={onCreateGovernanceTask}
+              />
             </TabsContent>
           );
         }
@@ -2428,6 +2455,43 @@ function governanceFileStatusLabel(status) {
   }[status] || status || "未知";
 }
 
+function governanceFileHealthLabel(status) {
+  return {
+    found: "正常",
+    missing: "缺失",
+    changed: "有本地变更",
+    stale: "可能过期",
+    generated: "生成产物",
+    ignored: "规则/目录",
+  }[status] || "待确认";
+}
+
+function governanceFileHealthSummary(domains = []) {
+  const counts = { found: 0, missing: 0, changed: 0, stale: 0, generated: 0, ignored: 0, total: 0 };
+  domains.forEach((domain) => {
+    const files = Array.isArray(domain.files) ? domain.files : [];
+    const fileStatuses = Array.isArray(domain.fileStatuses)
+      ? domain.fileStatuses
+      : files.map((file) => ({
+        path: file,
+        previewable: !file.includes("*") && !file.endsWith("/"),
+        status: file.includes("*") || file.endsWith("/") ? "ignored" : "found",
+      }));
+    fileStatuses.forEach((file) => {
+      const status = file.status || "found";
+      counts[status] = (counts[status] || 0) + 1;
+      counts.total += 1;
+    });
+  });
+  const riskCount = counts.missing + counts.changed + counts.stale;
+  return {
+    ...counts,
+    riskCount,
+    status: riskCount ? "watch" : "healthy",
+    label: riskCount ? `${riskCount} 项需关注` : "治理文件正常",
+  };
+}
+
 function governanceStatusSummaryText(summary, fallbackCount = 0) {
   if (!summary) return `${fallbackCount} 个文件`;
   return [
@@ -2439,13 +2503,209 @@ function governanceStatusSummaryText(summary, fallbackCount = 0) {
   ].filter(Boolean).join(" / ") || `${fallbackCount} 个文件`;
 }
 
-function WorkspaceFactsPreview({ report }) {
-  const [currentReport, setCurrentReport] = useState(report);
-  const [refreshing, setRefreshing] = useState(false);
-  const [feedback, setFeedback] = useState("");
-  const [autoRefreshKey, setAutoRefreshKey] = useState("");
+function GovernanceFilesHealthSection({ onCreateGovernanceTask, report }) {
   const [openDomainId, setOpenDomainId] = useState("");
   const [governanceFile, setGovernanceFile] = useState(null);
+  const [activeStatusFilter, setActiveStatusFilter] = useState("");
+  const governanceDomains = Array.isArray(report?.governanceDomains) ? report.governanceDomains : [];
+  const health = governanceFileHealthSummary(governanceDomains);
+  const fileStatusesForDomain = (domain) => {
+    const files = Array.isArray(domain.files) ? domain.files : [];
+    return Array.isArray(domain.fileStatuses)
+      ? domain.fileStatuses
+      : files.map((file) => ({
+        path: file,
+        previewable: !file.includes("*") && !file.endsWith("/"),
+        status: file.includes("*") || file.endsWith("/") ? "ignored" : "found",
+      }));
+  };
+  const selectStatusFilter = (status) => {
+    const nextStatus = activeStatusFilter === status ? "" : status;
+    setActiveStatusFilter(nextStatus);
+    setGovernanceFile(null);
+    if (!nextStatus) return;
+    const firstDomain = governanceDomains.find((domain) =>
+      fileStatusesForDomain(domain).some((file) => (file.status || "found") === nextStatus)
+    );
+    if (firstDomain) setOpenDomainId(firstDomain.id);
+  };
+  const actionHints = [
+    health.missing ? `先补 ${health.missing} 个缺失文件` : "",
+    health.changed ? `再审阅 ${health.changed} 个本地变更` : "",
+    health.stale ? `复查 ${health.stale} 个可能过期文件` : "",
+    health.ignored ? `${health.ignored} 个规则/目录通常只需确认边界` : "",
+  ].filter(Boolean);
+  const selectedFileStatuses = governanceDomains.flatMap((domain) =>
+    fileStatusesForDomain(domain)
+      .filter((file) => !activeStatusFilter || (file.status || "found") === activeStatusFilter)
+      .map((file) => ({
+        domainId: domain.id,
+        domainTitle: domain.title,
+        path: file.path || file,
+        previewable: file.previewable,
+        status: file.status || "found",
+      }))
+  );
+  const canCreateTask = ["missing", "changed", "stale"].includes(activeStatusFilter) && selectedFileStatuses.length > 0;
+  const createTaskLabel = {
+    changed: "生成审阅任务",
+    missing: "生成补齐任务",
+    stale: "生成同步任务",
+  }[activeStatusFilter] || "生成处理任务";
+  const previewGovernanceFile = async (path) => {
+    if (!path || path.includes("*") || path.endsWith("/")) {
+      setGovernanceFile({
+        error: "这是目录或匹配规则，暂不直接预览。请选择具体文件。",
+        path,
+      });
+      return;
+    }
+    setGovernanceFile({ loading: true, path });
+    try {
+      const preview = await invokeWorkspaceCommand("read_engineering_file", {
+        input: { path },
+      });
+      setGovernanceFile({ path, preview });
+    } catch (err) {
+      setGovernanceFile({
+        error: err instanceof Error ? err.message : String(err),
+        path,
+      });
+    }
+  };
+
+  return (
+    <section className="workspaceGovernanceFiles">
+      <header>
+        <div>
+          <strong>治理文件健康状态</strong>
+          <p>按治理域查看真实文件状态，优先处理缺失、过期和本地变更。</p>
+        </div>
+        <Badge>{health.label}</Badge>
+      </header>
+      <div className="workspaceGovernanceHealthGrid">
+        {[
+          ["found", "正常"],
+          ["changed", "有本地变更"],
+          ["missing", "缺失"],
+          ["stale", "可能过期"],
+          ["generated", "生成产物"],
+          ["ignored", "规则/目录"],
+        ].map(([status, label]) => (
+          <button
+            className={`workspaceGovernanceHealthCard status-${status}${activeStatusFilter === status ? " active" : ""}`}
+            disabled={!health[status]}
+            key={status}
+            type="button"
+            onClick={() => selectStatusFilter(status)}
+          >
+            <span>{label}</span>
+            <strong>{health[status] || 0}</strong>
+          </button>
+        ))}
+      </div>
+      <div className="workspaceGovernanceActions">
+        <div>
+          <strong>建议处理顺序</strong>
+          <p>{actionHints.length ? actionHints.join("，") : "当前治理文件状态稳定，保持同步即可。"}</p>
+        </div>
+        {activeStatusFilter ? (
+          <div className="workspaceGovernanceActionButtons">
+            {canCreateTask ? (
+              <Button
+                size="sm"
+                variant="primary"
+                type="button"
+                onClick={() => onCreateGovernanceTask?.({
+                  files: selectedFileStatuses,
+                  status: activeStatusFilter,
+                })}
+              >
+                {createTaskLabel}
+              </Button>
+            ) : null}
+            <Button size="sm" variant="subtle" type="button" onClick={() => setActiveStatusFilter("")}>
+              查看全部
+            </Button>
+          </div>
+        ) : null}
+      </div>
+      <div className="workspaceGovernanceDomainRows">
+        {governanceDomains.map((domain) => {
+          const fileStatuses = fileStatusesForDomain(domain);
+          const visibleFileStatuses = activeStatusFilter
+            ? fileStatuses.filter((file) => (file.status || "found") === activeStatusFilter)
+            : fileStatuses;
+          if (activeStatusFilter && !visibleFileStatuses.length) return null;
+          const isOpen = openDomainId === domain.id;
+          return (
+            <div className="workspaceGovernanceDomain" key={domain.id || domain.title}>
+              <button
+                className="workspaceGovernanceDomainButton"
+                type="button"
+                onClick={() => setOpenDomainId(isOpen ? "" : domain.id)}
+              >
+                <span>{domain.title}</span>
+                  <small>{governanceStatusSummaryText(domain.statusSummary, fileStatuses.length)}</small>
+                </button>
+                {isOpen ? (
+                  <div className="workspaceGovernanceFileList">
+                  {visibleFileStatuses.map((file) => {
+                    const path = file.path || file;
+                    const isPreviewable = file.previewable ?? (!path.includes("*") && !path.endsWith("/"));
+                    return (
+                      <button
+                        className={`workspaceGovernanceFile status-${file.status || "found"}${governanceFile?.path === path ? " active" : ""}`}
+                        disabled={!isPreviewable}
+                        key={path}
+                        type="button"
+                        onClick={() => previewGovernanceFile(path)}
+                      >
+                        <span>{path}</span>
+                        <small>{governanceFileHealthLabel(file.status)}</small>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+      {governanceFile ? (
+        <div className="workspaceGovernancePreview">
+          <div className="engineeringFileHeader">
+            <div>
+              <strong>{governanceFile.path}</strong>
+              <p>工程文件只读预览</p>
+            </div>
+            {governanceFile.preview ? <Badge>{governanceFile.preview.language}</Badge> : null}
+          </div>
+          {governanceFile.loading ? (
+            <Notice variant="info">正在读取文件内容...</Notice>
+          ) : governanceFile.error ? (
+            <Notice variant="danger">{governanceFile.error}</Notice>
+          ) : governanceFile.preview ? (
+            <>
+              <div className="engineeringFileMeta">
+                <span>{formatBytes(governanceFile.preview.size)}</span>
+                {governanceFile.preview.truncated ? <span>已截断</span> : <span>完整预览</span>}
+              </div>
+              <pre className="engineeringFileCode">{governanceFile.preview.content || "文件为空。"}</pre>
+            </>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function WorkspaceFactsPreview({ onCreateGovernanceTask, report }) {
+  const [currentReport, setCurrentReport] = useState(report);
+  const [refreshing, setRefreshing] = useState(false);
+  const [runningAction, setRunningAction] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const [autoRefreshKey, setAutoRefreshKey] = useState("");
   useEffect(() => {
     setCurrentReport(report);
   }, [report]);
@@ -2471,6 +2731,13 @@ function WorkspaceFactsPreview({ report }) {
   const healthDimensions = Array.isArray(healthScore.dimensions) ? healthScore.dimensions : [];
   const governanceLevel = currentReport?.governanceLevel || {};
   const governanceLevels = Array.isArray(governanceLevel.levels) ? governanceLevel.levels : [];
+  const governanceActions = [
+    { id: "scan", label: "一键扫描" },
+    { id: "recommend", label: "生成优化建议" },
+    { id: "report", label: "批量修复草案" },
+    { id: "prune", label: "清理过期产物" },
+    { id: "sync", label: "同步治理状态" },
+  ];
   const sourceNames = [...new Set(evidence.filter((item) => item.status === "found").map((item) => item.source))].slice(0, 6);
   const detectedStack = (currentReport?.project?.detectedStack || []).join(" / ");
   const metaParts = [
@@ -2504,29 +2771,28 @@ function WorkspaceFactsPreview({ report }) {
       await refreshFacts("manual");
       return;
     }
-  };
-  const previewGovernanceFile = async (path) => {
-    if (!path || path.includes("*") || path.endsWith("/")) {
-      setGovernanceFile({
-        error: "这是目录或匹配规则，暂不直接预览。请选择具体文件。",
-        path,
-      });
-      return;
-    }
-    setGovernanceFile({ loading: true, path });
+    const action = governanceActions.find((item) => item.id === nextMode);
+    if (!action) return;
+    setRunningAction(action.id);
+    setFeedback(`正在执行：${action.label}...`);
     try {
-      const preview = await invokeWorkspaceCommand("read_engineering_file", {
-        input: { path },
+      const result = await invokeWorkspaceCommand("run_project_os_action", {
+        input: { actionId: action.id },
       });
-      setGovernanceFile({ path, preview });
+      const nextReport = await refreshWorkspaceFactsPreview();
+      if (nextReport) setCurrentReport(nextReport);
+      window.dispatchEvent(new CustomEvent("project-os:snapshot-refresh-requested", {
+        detail: { source: action.id },
+      }));
+      setFeedback(result?.success
+        ? `已完成：${action.label}。结果已写入 .project-os，并刷新当前视图。`
+        : `${action.label} 未通过：${result?.output || "请查看终端输出。"}`);
     } catch (err) {
-      setGovernanceFile({
-        error: err instanceof Error ? err.message : String(err),
-        path,
-      });
+      setFeedback(`${action.label} 失败：${err?.message || err}`);
+    } finally {
+      setRunningAction("");
     }
   };
-
   return (
     <div className="workspaceFacts">
       <div className="workspaceFactsHero">
@@ -2544,7 +2810,19 @@ function WorkspaceFactsPreview({ report }) {
 
       <Notice variant="info">项目已自动接入 OmniDesk 工作区。当前工程文件仅支持预览，不会在这里直接编辑或改写你的工程文件。</Notice>
       <div className="workspaceFactsActions" aria-label="工作区事实操作">
-        <Button size="sm" variant="subtle" type="button" disabled={refreshing} onClick={() => handleWorkspaceAction("refresh")}>{refreshing ? "更新中" : "手动刷新"}</Button>
+        {governanceActions.map((action) => (
+          <Button
+            key={action.id}
+            size="sm"
+            variant={action.id === "scan" ? "primary" : "subtle"}
+            type="button"
+            disabled={refreshing || Boolean(runningAction)}
+            onClick={() => handleWorkspaceAction(action.id)}
+          >
+            {runningAction === action.id ? "执行中" : action.label}
+          </Button>
+        ))}
+        <Button size="sm" variant="subtle" type="button" disabled={refreshing || Boolean(runningAction)} onClick={() => handleWorkspaceAction("refresh")}>{refreshing ? "更新中" : "手动刷新"}</Button>
       </div>
       {feedback ? <Notice variant="success">{feedback}</Notice> : null}
 
@@ -2683,92 +2961,366 @@ function WorkspaceFactsPreview({ report }) {
         </section>
       ) : null}
 
-      <section className="workspaceGovernanceFiles">
-        <header>
-          <div>
-            <strong>已纳入治理的工程文件</strong>
-            <p>按治理域查看真实文件，点击具体文件可只读预览。</p>
-          </div>
-          <Badge>{governanceDomains.reduce((total, domain) => total + (Array.isArray(domain.files) ? domain.files.length : 0), 0)} files</Badge>
-        </header>
-        <div className="workspaceGovernanceDomainRows">
-          {governanceDomains.map((domain) => {
-            const files = Array.isArray(domain.files) ? domain.files : [];
-            const fileStatuses = Array.isArray(domain.fileStatuses)
-              ? domain.fileStatuses
-              : files.map((file) => ({
-                path: file,
-                previewable: !file.includes("*") && !file.endsWith("/"),
-                status: file.includes("*") || file.endsWith("/") ? "ignored" : "found",
-              }));
-            const isOpen = openDomainId === domain.id;
-            return (
-              <div className="workspaceGovernanceDomain" key={domain.id || domain.title}>
-                <button
-                  className="workspaceGovernanceDomainButton"
-                  type="button"
-                  onClick={() => setOpenDomainId(isOpen ? "" : domain.id)}
-                >
-                  <span>{domain.title}</span>
-                  <small>{governanceStatusSummaryText(domain.statusSummary, fileStatuses.length)}</small>
-                </button>
-                {isOpen ? (
-                  <div className="workspaceGovernanceFileList">
-                    {fileStatuses.map((file) => {
-                      const path = file.path || file;
-                      const isPreviewable = file.previewable ?? (!path.includes("*") && !path.endsWith("/"));
-                      return (
-                        <button
-                          className={`workspaceGovernanceFile status-${file.status || "found"}${governanceFile?.path === path ? " active" : ""}`}
-                          disabled={!isPreviewable}
-                          key={path}
-                          type="button"
-                          onClick={() => previewGovernanceFile(path)}
-                        >
-                          <span>{path}</span>
-                          <small>{governanceFileStatusLabel(file.status)}</small>
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
-        {governanceFile ? (
-          <div className="workspaceGovernancePreview">
-            <div className="engineeringFileHeader">
-              <div>
-                <strong>{governanceFile.path}</strong>
-                <p>工程文件只读预览</p>
-              </div>
-              {governanceFile.preview ? <Badge>{governanceFile.preview.language}</Badge> : null}
-            </div>
-            {governanceFile.loading ? (
-              <Notice variant="info">正在读取文件内容...</Notice>
-            ) : governanceFile.error ? (
-              <Notice variant="danger">{governanceFile.error}</Notice>
-            ) : governanceFile.preview ? (
-              <>
-                <div className="engineeringFileMeta">
-                  <span>{formatBytes(governanceFile.preview.size)}</span>
-                  {governanceFile.preview.truncated ? <span>已截断</span> : <span>完整预览</span>}
-                </div>
-                <pre className="engineeringFileCode">{governanceFile.preview.content || "文件为空。"}</pre>
-              </>
-            ) : null}
-          </div>
-        ) : null}
-      </section>
+      <GovernanceFilesHealthSection onCreateGovernanceTask={onCreateGovernanceTask} report={currentReport} />
     </div>
   );
 }
 
-function EngineeringFileTab({ selectedEngineeringFile, snapshot }) {
+function AgentTopicPanel({
+  provider,
+  topic,
+  tasks = [],
+  snapshot,
+  composerModelAvailability = {},
+  runnerLoadingId,
+  patchLoading,
+  applyLoading,
+  handoffLoading,
+  onGeneratePatchDraft,
+  onApplyPatchDraft,
+  onMergeHandoff,
+  onRunGuardedCheck,
+  onSelectTask,
+  onCreateRepairTask,
+  onCreateGovernanceTask,
+}) {
+  const id = topic?.id || "";
+  const visibleTasks = tasks.filter((task) => !isNoiseTask(task));
+  const activeTasks = visibleTasks.filter((task) => ![taskStatuses.done, taskStatuses.failed].includes(task.status));
+  const patchTasks = visibleTasks.filter((task) => task.patchDraft);
+  const doneTasks = visibleTasks.filter((task) => task.status === taskStatuses.done);
+  const failedTasks = visibleTasks.filter((task) => task.status === taskStatuses.failed);
+  const currentTask = activeTasks[0] || visibleTasks[0];
+  const recentResultTasks = [...doneTasks, ...failedTasks].slice(0, 5);
+  const providerName = activeProviderProfileName(provider) || "未命名连接";
+  const modelStatus = composerModelAvailability?.[provider?.model]?.status || (provider?.model ? "未测试" : "未选择");
+  const modelEnabled = provider?.enabled ? "已启用" : "未启用";
+  const currentPlan = currentTask?.plan || {};
+  const currentChecks = checksForPlan(currentPlan);
+  const previewItems = (items = [], limit = 3) => items.filter(Boolean).slice(0, limit);
+  const formatDraftFiles = (draft) => {
+    const files = draft?.files || [];
+    if (!files.length) return "未标注文件";
+    return files.slice(0, 3).join(" / ") + (files.length > 3 ? ` 等 ${files.length} 个` : "");
+  };
+  const applyStatusLabel = (task) => {
+    if (task.applyResult?.success) return "已应用";
+    if (task.applyResult) return "应用失败";
+    return "待应用";
+  };
+  const verifyStatusLabel = (task) => {
+    if (task.verificationSummary) return task.verificationSummary;
+    if (task.status === taskStatuses.done) return "已完成";
+    if (task.status === taskStatuses.failed) return "有失败项";
+    return "待验证";
+  };
+  const runChecksForTask = async (task) => {
+    if (!task) return false;
+    const checks = checksForPlan(task.plan);
+    if (!checks.length) return false;
+    for (const check of checks) {
+      const ok = await onRunGuardedCheck?.(task.id, check.id);
+      if (!ok) return false;
+    }
+    return true;
+  };
+  const failedRunsForTask = (task) => (task?.runs || []).filter((run) => run && run.success === false);
+  const failureSummaryForTask = (task) => {
+    const failedRuns = failedRunsForTask(task);
+    if (task?.applyResult && !task.applyResult.success) return task.applyResult.message || "应用改动失败";
+    if (failedRuns.length) return failedRuns[0].output || `${failedRuns[0].label || failedRuns[0].id || "检查"} 失败`;
+    return task?.verificationSummary || "任务失败，等待定位原因";
+  };
+  const rerunFailedChecks = async (task) => {
+    const failedRuns = failedRunsForTask(task);
+    const checkIds = failedRuns.map((run) => run.id).filter(Boolean);
+    const fallbackIds = checksForPlan(task?.plan).map((check) => check.id);
+    const ids = [...new Set(checkIds.length ? checkIds : fallbackIds)];
+    if (!task || !ids.length) return false;
+    for (const checkId of ids) {
+      const ok = await onRunGuardedCheck?.(task.id, checkId);
+      if (!ok) return false;
+    }
+    return true;
+  };
+  const actionsForTask = (task, scope = "task") => {
+    if (!task) return [];
+    const checks = checksForPlan(task.plan);
+    return [
+      {
+        key: `${scope}-open`,
+        label: "打开任务",
+        onClick: () => onSelectTask?.(task.id),
+      },
+      {
+        disabled: patchLoading,
+        key: `${scope}-generate-patch`,
+        label: patchLoading ? "生成中" : task.patchDraft ? "重新生成草案" : "生成 Patch 草案",
+        onClick: () => onGeneratePatchDraft?.(task.id),
+      },
+      {
+        disabled: applyLoading || !task.patchDraft,
+        key: `${scope}-apply`,
+        label: applyLoading ? "应用中" : "应用并自动验证",
+        onClick: () => onApplyPatchDraft?.(task.id),
+        variant: "primary",
+      },
+      {
+        disabled: Boolean(runnerLoadingId) || !checks.length,
+        key: `${scope}-verify`,
+        label: runnerLoadingId ? "验证中" : "运行检查",
+        onClick: () => runChecksForTask(task),
+      },
+      {
+        disabled: handoffLoading || !task.runSummary || Boolean(task.handoffMerge),
+        key: `${scope}-handoff`,
+        label: handoffLoading ? "更新中" : task.handoffMerge ? "已更新交接" : "更新交接",
+        onClick: () => onMergeHandoff?.(task.id),
+      },
+    ];
+  };
+  const emptyTaskActions = [
+    { disabled: true, key: "empty-open", label: "打开任务" },
+    { disabled: true, key: "empty-generate-patch", label: "生成 Patch 草案" },
+    { disabled: true, key: "empty-apply", label: "应用并自动验证", variant: "primary" },
+    { disabled: true, key: "empty-verify", label: "运行检查" },
+    { disabled: true, key: "empty-handoff", label: "更新交接" },
+  ];
+  const cardsByTopic = {
+    "active-task": [
+      ["当前任务", currentTask?.title || "暂无进行中的任务"],
+      ["任务状态", currentTask ? taskStatusLabel(currentTask.status) : "空"],
+      ["下一步", currentTask?.status === taskStatuses.planned ? "点击右侧任务或对话里的开始执行" : "生成计划后会进入执行链路"],
+    ],
+    "task-queue": [
+      ["任务总数", `${visibleTasks.length}`],
+      ["活跃任务", `${activeTasks.length}`],
+      ["失败任务", `${failedTasks.length}`],
+    ],
+    "patch-drafts": [
+      ["草案数量", `${patchTasks.length}`],
+      ["最近草案", patchTasks[0]?.title || "暂无 Patch 草案"],
+      ["下一步", patchTasks.length ? "打开任务查看 diff、确认 apply、自动验证" : "先从当前任务生成改动"],
+    ],
+    "execution-terminal": [
+      ["运行记录", `${snapshot?.runCount || 0}`],
+      ["可用入口", "终端 tab / 受控检查 / 白名单命令"],
+      ["边界", "不直接执行任意高风险命令"],
+    ],
+    "execution-results": [
+      ["已完成任务", `${doneTasks.length}`],
+      ["失败任务", `${failedTasks.length}`],
+      ["最近结果", doneTasks[0]?.title || failedTasks[0]?.title || "暂无执行结果"],
+    ],
+    "model-connections": [
+      ["当前连接", providerName],
+      ["启用状态", modelEnabled],
+      ["当前模型", provider?.model || "未选择"],
+      ["模型状态", modelStatus],
+    ],
+    "tool-allowlist": [
+      ["受控检查", "runtime / docs / recommend / web-build / cargo-check"],
+      ["治理动作", "scan / recommend / report / prune / sync"],
+      ["执行方式", "Tauri command 白名单"],
+    ],
+    "security-boundary": [
+      ["写入边界", "工程文件写入必须经确认"],
+      ["命令边界", "页面不传任意 shell"],
+      ["密钥边界", "API Key 只保存在本地环境"],
+    ],
+  };
+  const cards = cardsByTopic[id];
+  if (!cards) return null;
+
+  return (
+    <div className="agentTopicStack" aria-label={`${topic.title}状态`}>
+      <div className="agentTopicPanel">
+        {cards.map(([label, value]) => (
+          <div className="agentTopicCard" key={label}>
+            <span>{label}</span>
+            <strong>{value}</strong>
+          </div>
+        ))}
+      </div>
+
+      {id === "active-task" ? (
+        <div className="agentTopicDetail">
+          <div className="agentTopicDetailHeader">
+            <div>
+              <strong>{currentTask?.title || "暂无当前任务"}</strong>
+              <span>{currentTask?.goalTitle ? `目标：${currentTask.goalTitle}` : "生成计划后会绑定目标、对话和执行状态。"}</span>
+            </div>
+            <Badge status={currentTask?.status}>{currentTask ? taskStatusLabel(currentTask.status) : "空"}</Badge>
+          </div>
+          <div className="agentExecutionGrid">
+            <div>
+              <span>计划步骤</span>
+              <ul>
+                {previewItems(currentPlan.steps).map((step) => <li key={step}>{step}</li>)}
+                {!previewItems(currentPlan.steps).length ? <li>暂无步骤</li> : null}
+              </ul>
+            </div>
+            <div>
+              <span>候选改动</span>
+              <ul>
+                {previewItems(currentPlan.candidateChanges).map((item) => <li key={item}>{item}</li>)}
+                {!previewItems(currentPlan.candidateChanges).length ? <li>暂无候选改动</li> : null}
+              </ul>
+            </div>
+            <div>
+              <span>验证检查</span>
+              <ul>
+                {currentChecks.slice(0, 3).map((check) => <li key={check.id}>{check.label}</li>)}
+                {!currentChecks.length ? <li>暂无可运行检查</li> : null}
+              </ul>
+            </div>
+          </div>
+          <div className="agentTopicStatusLine">
+            <span>{currentTask?.patchDraft ? `已有 Patch 草案：${formatDraftFiles(currentTask.patchDraft)}` : "尚未生成 Patch 草案"}</span>
+            <span>{currentTask ? applyStatusLabel(currentTask) : "待应用"}</span>
+            <span>{currentTask ? verifyStatusLabel(currentTask) : "待验证"}</span>
+          </div>
+          <TaskCommandBar
+            actions={currentTask ? actionsForTask(currentTask, "active") : emptyTaskActions}
+            meta={currentTask
+              ? "操作会复用受控任务链路，写入前仍走既有确认和白名单边界。"
+              : "先通过对话或右侧待办创建任务，操作链路才会启用。"}
+          />
+        </div>
+      ) : null}
+
+      {id === "patch-drafts" ? (
+        <div className="agentTopicList">
+          {patchTasks.length ? patchTasks.map((task) => (
+            <div className="agentPatchItem" key={task.id}>
+              <div className="agentPatchItemHeader">
+                <div>
+                  <strong>{task.title}</strong>
+                  <span>{formatDraftFiles(task.patchDraft)}</span>
+                </div>
+                <Badge status={task.status}>{taskStatusLabel(task.status)}</Badge>
+              </div>
+              <div className="agentTopicStatusLine">
+                <span>{applyStatusLabel(task)}</span>
+                <span>{verifyStatusLabel(task)}</span>
+                <span>{task.runSummary?.path ? `Run summary：${task.runSummary.path}` : "待写入 run summary"}</span>
+                <span>{task.handoffMerge?.path ? "已更新交接" : "待更新交接"}</span>
+              </div>
+              <TaskCommandBar
+                actions={actionsForTask(task, `patch-${task.id}`)}
+                meta={task.patchDraft?.files?.length ? `${task.patchDraft.files.length} 个文件` : "草案未标注文件。"}
+              />
+              {task.patchDraft?.summary ? <p>{task.patchDraft.summary}</p> : null}
+            </div>
+          )) : (
+            <Notice variant="info">还没有 Patch 草案。先在当前任务里生成改动，草案会集中出现在这里。</Notice>
+          )}
+        </div>
+      ) : null}
+
+      {id === "execution-results" ? (
+        <div className="agentTopicList">
+          {recentResultTasks.length ? recentResultTasks.map((task) => (
+            <div className="agentPatchItem" key={task.id}>
+              <div className="agentPatchItemHeader">
+                <div>
+                  <strong>{task.title}</strong>
+                  <span>{task.runSummary?.path || task.createdAt || "暂无 run summary"}</span>
+                </div>
+                <Badge status={task.status}>{taskStatusLabel(task.status)}</Badge>
+              </div>
+              <div className="agentTopicStatusLine">
+                <span>{task.verificationSummary || "未记录验证摘要"}</span>
+                <span>{task.handoffMerge ? "交接已更新" : "交接未更新"}</span>
+              </div>
+              {task.status === taskStatuses.failed ? (
+                <div className="agentFailureBox">
+                  <strong>失败摘要</strong>
+                  <p>{failureSummaryForTask(task)}</p>
+                  <div className="agentTopicStatusLine">
+                    {failedRunsForTask(task).length ? failedRunsForTask(task).slice(0, 3).map((run) => (
+                      <span key={`${task.id}-${run.id}-${run.finishedAt || run.command}`}>{run.label || run.id || run.command || "失败检查"}</span>
+                    )) : <span>暂无失败检查明细</span>}
+                  </div>
+                </div>
+              ) : null}
+              <TaskCommandBar
+                actions={[
+                  {
+                    key: `result-open-${task.id}`,
+                    label: "打开任务",
+                    onClick: () => onSelectTask?.(task.id),
+                  },
+                  {
+                    disabled: task.status !== taskStatuses.failed || Boolean(runnerLoadingId),
+                    key: `result-rerun-${task.id}`,
+                    label: runnerLoadingId ? "重跑中" : "重跑失败检查",
+                    onClick: () => rerunFailedChecks(task),
+                  },
+                  {
+                    disabled: task.status !== taskStatuses.failed,
+                    key: `result-repair-${task.id}`,
+                    label: "生成修复任务",
+                    variant: "primary",
+                    onClick: () => onCreateRepairTask?.(task.id),
+                  },
+                ]}
+                meta={task.status === taskStatuses.failed ? "失败任务可生成修复任务，进入同一套受控 Patch 和验证链路。" : "已完成任务保留结果追溯。"}
+              />
+            </div>
+          )) : (
+            <Notice variant="info">暂无已完成或失败的执行结果。</Notice>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function EngineeringFileTab({
+  selectedEngineeringFile,
+  snapshot,
+  tasks = [],
+  provider,
+  composerModelAvailability = {},
+  runnerLoadingId,
+  patchLoading,
+  applyLoading,
+  handoffLoading,
+  onGeneratePatchDraft,
+  onApplyPatchDraft,
+  onMergeHandoff,
+  onRunGuardedCheck,
+  onSelectTask,
+  onCreateRepairTask,
+  onCreateGovernanceTask,
+}) {
   if (selectedEngineeringFile.topic) {
     const isOverviewTopic = selectedEngineeringFile.topic.id === "project-identity" || selectedEngineeringFile.topic.title === "项目概览";
+    const isGovernanceFilesTopic = selectedEngineeringFile.topic.id === "governance-files" || selectedEngineeringFile.topic.title === "治理文件";
     const workspaceFacts = isOverviewTopic ? snapshot?.workspaceFacts : null;
+    const governanceFilesPanel = isGovernanceFilesTopic && snapshot?.workspaceFacts
+      ? <GovernanceFilesHealthSection onCreateGovernanceTask={onCreateGovernanceTask} report={snapshot.workspaceFacts} />
+      : null;
+    const agentTopic = (
+      <AgentTopicPanel
+        composerModelAvailability={composerModelAvailability}
+        provider={provider}
+        snapshot={snapshot}
+        tasks={tasks}
+        topic={selectedEngineeringFile.topic}
+        runnerLoadingId={runnerLoadingId}
+        patchLoading={patchLoading}
+        applyLoading={applyLoading}
+        handoffLoading={handoffLoading}
+        onGeneratePatchDraft={onGeneratePatchDraft}
+        onApplyPatchDraft={onApplyPatchDraft}
+        onMergeHandoff={onMergeHandoff}
+        onRunGuardedCheck={onRunGuardedCheck}
+        onSelectTask={onSelectTask}
+        onCreateRepairTask={onCreateRepairTask}
+      />
+    );
     return (
       <Panel className="engineeringFilePreview filePreviewPanel" variant="soft">
         <div className="engineeringFileHeader">
@@ -2779,7 +3331,7 @@ function EngineeringFileTab({ selectedEngineeringFile, snapshot }) {
           <Badge>{selectedEngineeringFile.group}</Badge>
         </div>
         <div className="topicPreview">
-          {workspaceFacts ? <WorkspaceFactsPreview report={workspaceFacts} /> : (
+          {workspaceFacts ? <WorkspaceFactsPreview onCreateGovernanceTask={onCreateGovernanceTask} report={workspaceFacts} /> : governanceFilesPanel || agentTopic || (
             <Notice variant="info">这是项目治理地图。用户只看事项，OmniDesk 在背后维护对应文件、状态来源和更新时机。</Notice>
           )}
           {(selectedEngineeringFile.topic.statusSource || selectedEngineeringFile.topic.updatesWhen) ? (
@@ -4259,6 +4811,12 @@ function App() {
     setError("");
   };
 
+  const refreshSnapshotFromSource = async () => {
+    const nextSnapshot = await loadWorkspaceSnapshot();
+    applySnapshot(nextSnapshot);
+    return nextSnapshot;
+  };
+
   useEffect(() => {
     if (!isTauriRuntime()) return undefined;
     let cancelled = false;
@@ -4272,17 +4830,13 @@ function App() {
           if (now - workspaceWatcherRefreshRef.current < 1200) return;
           workspaceWatcherRefreshRef.current = now;
           try {
-            const nextReport = await refreshWorkspaceFactsPreview();
-            if (cancelled || !nextReport) return;
-            setSnapshot((current) => ({
-              ...current,
-              workspaceFacts: nextReport,
-            }));
+            await refreshSnapshotFromSource();
+            if (cancelled) return;
             const path = event.payload?.path ? `：${event.payload.path}` : "";
-            showToast(`工程文件已变化，治理索引已更新${path}`, "success");
+            showToast(`治理骨架已变化，页面已同步${path}`, "success");
           } catch (err) {
             if (!cancelled) {
-              showToast(`治理索引自动更新失败：${err instanceof Error ? err.message : String(err)}`, "danger");
+              showToast(`治理状态自动同步失败：${err instanceof Error ? err.message : String(err)}`, "danger");
             }
           }
         });
@@ -4299,6 +4853,48 @@ function App() {
     return () => {
       cancelled = true;
       if (unlisten) unlisten();
+    };
+  }, [snapshot.currentProjectPath]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const handleRefreshRequest = async () => {
+      const now = Date.now();
+      if (now - workspaceWatcherRefreshRef.current < 800) return;
+      workspaceWatcherRefreshRef.current = now;
+      try {
+        await refreshSnapshotFromSource();
+      } catch (err) {
+        if (!cancelled) {
+          showToast(`治理状态刷新失败：${err instanceof Error ? err.message : String(err)}`, "danger");
+        }
+      }
+    };
+    window.addEventListener("project-os:snapshot-refresh-requested", handleRefreshRequest);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("project-os:snapshot-refresh-requested", handleRefreshRequest);
+    };
+  }, [snapshot.currentProjectPath]);
+
+  useEffect(() => {
+    if (isTauriRuntime()) return undefined;
+    let cancelled = false;
+    const timer = window.setInterval(async () => {
+      const now = Date.now();
+      if (now - workspaceWatcherRefreshRef.current < 30000) return;
+      workspaceWatcherRefreshRef.current = now;
+      try {
+        await refreshSnapshotFromSource();
+      } catch (err) {
+        if (!cancelled) {
+          showToast(`治理状态轮询失败：${err instanceof Error ? err.message : String(err)}`, "danger");
+        }
+      }
+    }, 30000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
     };
   }, [snapshot.currentProjectPath]);
 
@@ -4712,6 +5308,114 @@ function App() {
         loading: false,
       });
     }
+  };
+
+  const createRepairTask = async (failedTaskId) => {
+    const failedTask = tasks.find((task) => task.id === failedTaskId);
+    if (!failedTask) return false;
+    const failedRuns = (failedTask.runs || []).filter((run) => run && run.success === false);
+    const failedLabels = failedRuns.map((run) => run.label || run.id || run.command).filter(Boolean);
+    const failureSummary =
+      failedTask.applyResult?.message ||
+      failedRuns[0]?.output ||
+      failedTask.verificationSummary ||
+      "失败原因待进一步定位。";
+    const sourceTitle = failedTask.title || "失败任务";
+    const repairPlan = {
+      candidateChanges: failedTask.plan?.candidateChanges || [],
+      checks: failedTask.plan?.checks || [],
+      filesToRead: [
+        ...(failedTask.plan?.filesToRead || []),
+        ".project-os/runs/desktop-summary.md",
+        "HANDOFF.md",
+      ].filter(Boolean),
+      guardrails: [
+        "先定位失败原因，再生成 Patch 草案。",
+        "不要绕过原任务的验证检查。",
+        "修复任务仍需用户确认后才应用改动。",
+      ],
+      mode: "repair-task",
+      projectName: failedTask.projectName || snapshot.projectName,
+      steps: [
+        `复盘失败任务：${sourceTitle}`,
+        failedLabels.length ? `定位失败检查：${failedLabels.slice(0, 3).join("、")}` : "定位失败检查或应用错误。",
+        "生成最小修复方案。",
+        "重新运行失败检查并更新执行结果。",
+      ],
+      summary: `修复失败任务：${sourceTitle}`,
+      task: `修复失败任务：${sourceTitle}`,
+      trace: [
+        `REPAIR_SOURCE_TASK: ${failedTask.id}`,
+        `FAILURE_SUMMARY: ${String(failureSummary).slice(0, 240)}`,
+      ],
+    };
+    const repairTask = {
+      ...createTaskFromPlan(repairPlan, `修复失败任务：${sourceTitle}`, snapshot, {
+        conversationId: failedTask.conversationId || activeConversationId,
+      }),
+      repairOfTaskId: failedTask.id,
+      repairSourceTitle: sourceTitle,
+    };
+    await setAndPersistTask(repairTask);
+    showToast("已生成修复任务，等待确认执行。", "success");
+    return true;
+  };
+
+  const createGovernanceTask = async ({ files = [], status = "" } = {}) => {
+    const actionableFiles = files.filter((file) => file?.path);
+    if (!actionableFiles.length) return false;
+    const statusTitle = {
+      changed: "审阅本地变更治理文件",
+      missing: "补齐缺失治理文件",
+      stale: "同步可能过期治理文件",
+    }[status] || "处理治理文件";
+    const statusAction = {
+      changed: "逐个审阅本地变更，确认是否需要同步到项目状态或交接记录。",
+      missing: "确认缺失是否合理，必要时生成补齐方案。",
+      stale: "复查文件内容是否过期，必要时同步到最新项目状态。",
+    }[status] || "确认治理文件状态并给出处理方案。";
+    const fileList = actionableFiles.map((file) => file.path);
+    const domainNames = [...new Set(actionableFiles.map((file) => file.domainTitle).filter(Boolean))];
+    const governancePlan = {
+      candidateChanges: status === "missing"
+        ? fileList.map((file) => `必要时补齐 ${file}`)
+        : fileList.map((file) => `必要时同步 ${file}`),
+      checks: [
+        "bash scripts/check-runtime.sh .",
+        "bash scripts/check-doc-structure.sh .",
+      ],
+      filesToRead: fileList,
+      guardrails: [
+        "先只读确认问题，不自动写文件。",
+        "缺失文件需要判断是否确实属于当前项目。",
+        "有本地变更的治理文件要保留用户已有改动。",
+        "进入 Apply 前必须生成 Patch 草案并由用户确认。",
+      ],
+      mode: "governance-file-task",
+      projectName: snapshot.projectName,
+      steps: [
+        `聚焦治理域：${domainNames.slice(0, 4).join("、") || "治理文件"}`,
+        statusAction,
+        "生成最小处理方案和 Patch 草案。",
+        "运行治理检查并更新执行结果。",
+      ],
+      summary: `${statusTitle}：${fileList.slice(0, 3).join("、")}${fileList.length > 3 ? ` 等 ${fileList.length} 个文件` : ""}`,
+      task: statusTitle,
+      trace: [
+        `GOVERNANCE_FILE_STATUS: ${status || "all"}`,
+        `GOVERNANCE_FILE_COUNT: ${fileList.length}`,
+      ],
+    };
+    const task = createTaskFromPlan(governancePlan, statusTitle, snapshot, {
+      conversationId: activeConversationId,
+    });
+    await setAndPersistTask({
+      ...task,
+      governanceFileStatus: status,
+      governanceFiles: actionableFiles,
+    });
+    showToast(`已生成治理文件任务：${statusTitle}`, "success");
+    return true;
   };
 
   const generatePlan = async (request) => {
@@ -5387,6 +6091,7 @@ function App() {
           error={error}
           readonlyPlan={readonlyPlan}
           activeTask={activeTask}
+          tasks={tasks}
           planLoading={planLoading}
           planError={planError}
           runnerLoadingId={runnerLoadingId}
@@ -5424,6 +6129,10 @@ function App() {
           onTestComposerModel={testComposerModel}
           goalRefinementMode={goalRefinementMode}
           onSelectEngineeringFile={selectEngineeringFile}
+          onSelectConversation={selectConversation}
+          onSelectTask={selectTask}
+          onCreateRepairTask={createRepairTask}
+          onCreateGovernanceTask={createGovernanceTask}
         />
         <RightRail
           collapsed={rightCollapsed}
