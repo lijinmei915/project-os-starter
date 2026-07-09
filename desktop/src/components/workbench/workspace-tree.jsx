@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Bot, BookOpen, Brain, CheckCircle2, ChevronsDownUp, ChevronsUpDown, ClipboardList, FileStack, Package, Settings, ShieldCheck, TerminalSquare, Wrench } from "lucide-react";
 import { Button } from "../ui/button";
-import { SectionTitle } from "../ui/section-title";
+import { SectionGroup } from "../ui/section-title";
 import { Tooltip } from "../ui/tooltip";
 
 const iconMap = {
@@ -110,7 +110,10 @@ export function WorkspaceTree({ activeTopicPath, actions, inlineAction, onSelect
     onSelectTopic({
       description: item.description,
       group: child?.title || node.title,
+      governanceRole: item.governanceRole || child?.governanceRole || node.governanceRole,
       id: item.id,
+      maturity: item.maturity || child?.maturity || node.maturity,
+      nextAction: item.nextAction || child?.nextAction || node.nextAction,
       path,
       statusSource: item.statusSource || child?.statusSource || node.statusSource,
       updatesWhen: item.updatesWhen || child?.updatesWhen || node.updatesWhen,
@@ -147,8 +150,8 @@ export function WorkspaceTree({ activeTopicPath, actions, inlineAction, onSelect
   };
 
   return (
-    <div className="leftRailSection">
-      <SectionTitle
+    <SectionGroup
+      className="leftRailSection"
         title="工作区"
         open={sectionOpen}
         onToggle={() => setSectionOpen((value) => !value)}
@@ -167,14 +170,13 @@ export function WorkspaceTree({ activeTopicPath, actions, inlineAction, onSelect
                 aria-label={allTopicsOpen ? "收起全部子项" : "展开全部子项"}
               >
                 {allTopicsOpen
-                  ? <ChevronsDownUp strokeWidth={2.25} aria-hidden="true" />
-                  : <ChevronsUpDown strokeWidth={2.25} aria-hidden="true" />}
+                  ? <ChevronsDownUp strokeWidth={1.75} aria-hidden="true" />
+                  : <ChevronsUpDown strokeWidth={1.75} aria-hidden="true" />}
               </Button>
             </Tooltip>
           </>
         )}
-      />
-      {sectionOpen ? (
+      >
       <nav className="flowNav workspaceTree" aria-label="工作区">
       {outline.map((node) => {
         const NodeIcon = iconFor(node);
@@ -265,7 +267,6 @@ export function WorkspaceTree({ activeTopicPath, actions, inlineAction, onSelect
         );
       })}
       </nav>
-      ) : null}
-    </div>
+    </SectionGroup>
   );
 }

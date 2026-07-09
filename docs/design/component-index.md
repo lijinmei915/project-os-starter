@@ -92,6 +92,13 @@
 |----------|------|------|--------------|
 | `NewProjectWorkbench` | Composition | 新项目初始化工作台 | `ProductHeader`、`SegmentedSwitch`、`SectionHeading`、`SectionBlock`、`DocumentGrid`、`OptionCard`、`ChecklistItem`、`AddItemCard`、`WritePlanPanel`、`Button` |
 | `OldProjectAuditWorkbench` | Composition | 老项目体检工作台 | `ProductHeader`、`SegmentedSwitch`、`SectionHeading`、`SectionBlock`、`TextField`、`ChecklistItem`、`Button` |
+| `ProgressSurface` | Composition | 当前进度、当前目标、验收报告等进度型工作面 | `Panel`、`Badge`、`TaskCommandBar`、`Notice` |
+| `TaskSurface` | Composition | 当前任务、任务详情、Patch 草案和执行结果 | `Panel`、`Badge`、`TaskCommandBar`、`Notice` |
+| `HealthSurface` | Composition | 治理文件、设计实现、Schema、报告产物等健康状态工作面 | `Panel`、`Badge`、`Button`、`Notice` |
+| `ConfigurationSurface` | Composition | 模型连接、工具白名单、Skill、适配器和安全边界 | `Panel`、`Field`、`Button`、`Badge`、`Switch` |
+| `MemorySurface` | Composition | 项目事实、用户偏好、长期记忆和会话摘要 | `Panel`、`Badge`、`Notice` |
+
+工作区菜单可视化结构见 `docs/design/workbench-visualization.md`。
 
 ## 兼容别名
 

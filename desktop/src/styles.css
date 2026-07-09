@@ -618,6 +618,7 @@ textarea:focus-visible {
   color: var(--desktop-type-section-color);
   font-size: var(--desktop-type-section-size);
   font-weight: var(--desktop-type-section-weight);
+  padding: 0;
 }
 
 .uiSectionTitle em {
@@ -774,7 +775,7 @@ textarea:focus-visible {
 
 .settingsMenuList {
   display: grid;
-  gap: 2px;
+  gap: 4px;
 }
 
 .settingsMenuItem {
@@ -1028,7 +1029,7 @@ textarea:focus-visible {
   background: var(--panel-soft);
   color: var(--text);
   font-size: var(--desktop-text-body);
-  font-weight: var(--desktop-font-bold);
+  font-weight: var(--desktop-font-semibold);
   line-height: 1;
   transition:
     background-color 120ms ease,
@@ -1453,7 +1454,7 @@ body.isResizingSidebar {
 .uiSectionTitleMain {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: 4px;
   min-width: 0;
 }
 
@@ -1492,16 +1493,29 @@ body.isResizingSidebar {
 }
 
 .sectionInlineSwitch {
-  width: 20px;
-  height: 20px;
-  min-height: 20px;
+  display: inline-grid;
+  place-items: center;
+  width: var(--desktop-icon-size-sm);
+  height: var(--desktop-icon-size-sm);
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--desktop-text-soft);
+  cursor: pointer;
+  padding: 0;
 }
 
 .sectionInlineSwitch svg {
   width: 12px;
   height: 12px;
   stroke-width: var(--desktop-icon-stroke-muted);
+}
+
+.sectionInlineSwitch:hover {
+  background: transparent;
+  color: var(--desktop-text-muted);
 }
 
 .uiSectionTitleActions {
@@ -1517,10 +1531,12 @@ body.isResizingSidebar {
 .sectionIconAction {
   display: inline-grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
+  width: var(--desktop-icon-size-md);
+  height: var(--desktop-icon-size-md);
+  min-width: 0;
+  min-height: 0;
   border: 0;
-  border-radius: var(--radius-xs);
+  border-radius: 0;
   background: transparent;
   color: var(--desktop-text-muted);
   cursor: pointer;
@@ -1528,7 +1544,7 @@ body.isResizingSidebar {
 }
 
 .sectionIconAction:hover:not(:disabled) {
-  background: var(--desktop-hover-surface);
+  background: transparent;
   color: var(--desktop-text-primary);
 }
 
@@ -1539,9 +1555,9 @@ body.isResizingSidebar {
 }
 
 .sectionChevronAction {
-  width: 18px;
-  height: 18px;
-  border-radius: var(--radius-xs);
+  width: var(--desktop-icon-size-md);
+  height: var(--desktop-icon-size-md);
+  border-radius: 0;
   color: var(--desktop-text-soft);
 }
 
@@ -1554,9 +1570,9 @@ body.isResizingSidebar {
 }
 
 .sectionChevronAction svg {
-  width: var(--desktop-icon-size-sm);
-  height: var(--desktop-icon-size-sm);
-  stroke-width: var(--desktop-icon-stroke-muted);
+  width: var(--desktop-icon-size-md);
+  height: var(--desktop-icon-size-md);
+  stroke-width: var(--desktop-icon-stroke-default);
   transition: transform 120ms ease;
 }
 
@@ -1565,7 +1581,7 @@ body.isResizingSidebar {
 }
 
 .sectionChevronAction:hover:not(:disabled) {
-  background: var(--desktop-hover-surface);
+  background: transparent;
   color: var(--desktop-text-muted);
 }
 
@@ -1656,16 +1672,16 @@ body.isResizingSidebar {
 .projectRow {
   position: relative;
   display: grid;
-  grid-template-columns: 6px minmax(0, 1fr);
+  grid-template-columns: 22px minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
+  gap: var(--space-3);
   width: 100%;
   min-height: 42px;
-  border: 1px solid transparent;
+  border: 0;
   border-radius: var(--radius);
   background: transparent;
   color: var(--desktop-text-secondary);
-  padding: 6px 36px 6px 8px;
+  padding: 6px 36px 6px 0;
   text-align: left;
   transition:
     background-color 120ms ease,
@@ -1676,13 +1692,16 @@ body.isResizingSidebar {
 
 .projectRow:hover,
 .projectRow:focus-visible {
-  border-color: var(--desktop-border-strong);
   background: var(--desktop-state-hover-bg);
   color: var(--desktop-text-primary);
 }
 
+.projectRow:focus-visible {
+  outline: 1px solid var(--desktop-border-accent);
+  outline-offset: -1px;
+}
+
 .projectRow.active {
-  border-color: var(--desktop-state-selected-border);
   background: var(--desktop-state-selected-bg);
   color: var(--desktop-state-selected-text);
   box-shadow: none;
@@ -1723,9 +1742,12 @@ body.isResizingSidebar {
 
 .projectStatusDot {
   position: static;
-  width: 6px;
-  height: 6px;
-  border: 1px solid var(--desktop-surface-panel);
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  width: 7px;
+  height: 7px;
+  justify-self: center;
+  border: 0;
   border-radius: var(--radius-full);
   background: var(--desktop-text-soft);
 }
@@ -1753,6 +1775,7 @@ body.isResizingSidebar {
 
 .projectStatusDot-empty {
   opacity: 0;
+  visibility: hidden;
 }
 
 .projectRowActions {
@@ -1762,22 +1785,33 @@ body.isResizingSidebar {
   z-index: 4;
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 6px;
   border-radius: var(--radius-xs);
   background: transparent;
   padding: 0;
-  opacity: 0;
-  pointer-events: none;
+  opacity: 1;
+  pointer-events: auto;
   transform: translateY(-50%);
   transition:
     opacity 120ms ease,
     background-color 120ms ease;
 }
 
-.projectRowWrap:hover .projectRowActions,
-.projectRowWrap:focus-within .projectRowActions {
+.projectRowActions .projectMenuButton {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.94);
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease,
+    background-color 120ms ease;
+}
+
+.projectRowWrap:hover .projectRowActions .projectMenuButton,
+.projectRowWrap:focus-within .projectRowActions .projectMenuButton {
   opacity: 1;
   pointer-events: auto;
+  transform: scale(1);
 }
 
 .projectMenuButton {
@@ -1949,17 +1983,13 @@ body.isResizingSidebar {
 .workspaceTree {
   --tree-guide-bottom: 8px;
   --tree-guide-top: 0;
-  --tree-guide-x: 16px;
+  --tree-guide-x: 17.5px;
   gap: 1px;
 }
 
 .flowTreeNode {
   display: grid;
   gap: 1px;
-}
-
-.flowNodeDetail {
-  padding-left: 16px;
 }
 
 .workspaceGroup {
@@ -1975,6 +2005,7 @@ body.isResizingSidebar {
 }
 
 .flowNodeDetail {
+  --tree-guide-x: 15.5px;
   position: relative;
   padding-left: calc(var(--tree-guide-x) + 16px);
 }
@@ -1999,7 +2030,7 @@ body.isResizingSidebar {
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 7px;
+  gap: 4px;
   min-height: 30px;
   width: 100%;
   border: 1px solid transparent;
@@ -2028,17 +2059,6 @@ body.isResizingSidebar {
   border-color: transparent;
   background: transparent;
   color: var(--desktop-state-selected-text);
-}
-
-.flowItem.active::before {
-  position: absolute;
-  top: 7px;
-  bottom: 7px;
-  left: 0;
-  width: 2px;
-  border-radius: 999px;
-  background: var(--desktop-state-selected-indicator);
-  content: "";
 }
 
 .flowIcon {
@@ -2145,10 +2165,6 @@ body.isResizingSidebar {
   color: var(--desktop-state-selected-text);
 }
 
-.treeFile.active::before {
-  background: var(--desktop-state-selected-indicator);
-}
-
 .treeTopic {
   color: var(--desktop-type-nav-color);
   font-family: inherit;
@@ -2176,6 +2192,21 @@ body.isResizingSidebar {
 
 .engineeringFileHeader > div {
   min-width: 0;
+}
+
+.progressTopicHeader {
+  align-items: center;
+}
+
+.topicBreadcrumb {
+  flex: 0 0 auto;
+  max-width: 180px;
+  overflow: hidden;
+  color: var(--desktop-type-meta-color);
+  font-size: var(--desktop-type-meta-size);
+  font-weight: var(--desktop-type-meta-weight);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .engineeringFilePreview strong {
@@ -2486,6 +2517,390 @@ body.isResizingSidebar {
   height: 24px;
   padding: 0 var(--desktop-space-md);
   font-size: var(--desktop-type-label-size);
+}
+
+.currentProgressBoard {
+  display: grid;
+  gap: var(--desktop-space-xl);
+}
+
+.currentProgressHero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--desktop-space-xl);
+  align-items: start;
+  padding-bottom: var(--desktop-space-lg);
+  border-bottom: 1px solid var(--line-divider);
+}
+
+.currentProgressHero span,
+.currentProgressStats span,
+.currentProgressStageMeta span,
+.currentProgressAside strong,
+.currentProgressFiles small,
+.currentProgressList small,
+.currentProgressTimeline small {
+  color: var(--desktop-type-meta-color);
+  font-size: var(--desktop-type-meta-size);
+  font-weight: var(--desktop-type-meta-weight);
+}
+
+.currentProgressHero strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--desktop-type-title-color);
+  font-size: var(--desktop-type-title-size);
+}
+
+.currentProgressHero p,
+.currentProgressStats p {
+  margin: 6px 0 0;
+  color: var(--desktop-type-body-secondary-color);
+  font-size: var(--desktop-type-body-size);
+  line-height: 1.55;
+}
+
+.currentProgressHero p {
+  display: -webkit-box;
+  max-width: 720px;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.currentProgressScore {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+}
+
+.currentProgressScore strong {
+  margin: 0;
+  color: var(--desktop-accent);
+  font-size: 28px;
+  line-height: 1;
+}
+
+.currentProgressStage {
+  display: grid;
+  gap: var(--desktop-space-sm);
+}
+
+.currentProgressStageTrack {
+  height: 6px;
+  overflow: hidden;
+  background: var(--desktop-surface-panel-soft);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-xs);
+}
+
+.currentProgressStageTrack span {
+  display: block;
+  height: 100%;
+  background: var(--desktop-accent);
+}
+
+.currentProgressStageMeta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--desktop-space-sm);
+}
+
+.currentProgressStageMeta strong {
+  color: var(--desktop-text-secondary);
+  font-size: var(--desktop-text-meta);
+}
+
+.currentProgressStats {
+  display: grid;
+  gap: var(--desktop-space-sm);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.currentProgressStats > div,
+.currentProgressStats > button {
+  display: grid;
+  gap: var(--desktop-space-sm);
+  min-width: 0;
+  padding: var(--desktop-space-sm) 0;
+  background: transparent;
+  border: 1px solid var(--line-subtle);
+  border-width: 0 0 1px;
+  border-radius: var(--radius-sm);
+}
+
+.currentProgressStats > button {
+  width: 100%;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.currentProgressStats > button:hover,
+.currentProgressStats > button.active {
+  border-bottom-color: var(--desktop-border-accent);
+  background: var(--desktop-state-accent-bg);
+}
+
+.currentProgressStats strong {
+  color: var(--desktop-type-title-color);
+  font-size: var(--desktop-type-label-size);
+}
+
+.currentProgressSurface {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(280px, .85fr);
+  gap: var(--desktop-space-lg);
+}
+
+.currentProgressPrimary,
+.currentProgressAside section {
+  display: grid;
+  align-content: start;
+  gap: var(--desktop-space-md);
+  min-width: 0;
+  padding: var(--desktop-space-md);
+  background: var(--surface-raised);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.currentProgressPrimary header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--desktop-space-md);
+}
+
+.currentProgressPrimary header > div {
+  min-width: 0;
+}
+
+.currentProgressPrimary header span {
+  color: var(--desktop-type-meta-color);
+  font-size: var(--desktop-type-meta-size);
+}
+
+.currentProgressPrimary header strong {
+  display: block;
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--desktop-text-primary);
+  font-size: var(--desktop-text-title);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.currentProgressPrimary header p {
+  margin: 5px 0 0;
+  color: var(--desktop-text-tertiary);
+  font-size: var(--desktop-text-caption);
+}
+
+.currentProgressAside {
+  display: grid;
+  align-content: start;
+  gap: var(--desktop-space-md);
+  min-width: 0;
+}
+
+.currentProgressList {
+  display: grid;
+  gap: var(--desktop-space-xs);
+}
+
+.currentProgressList button {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  padding: var(--desktop-space-sm);
+  color: var(--desktop-type-body-secondary-color);
+  text-align: left;
+  background: var(--desktop-surface-panel-soft);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-xs);
+}
+
+.currentProgressList button:not(:disabled):hover {
+  color: var(--desktop-text-primary);
+  border-color: var(--desktop-border-accent);
+  background: var(--desktop-state-accent-bg);
+}
+
+.currentProgressList button:disabled {
+  cursor: default;
+}
+
+.currentProgressList span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.currentProgressTimeline {
+  display: grid;
+  gap: var(--desktop-space-xs);
+}
+
+.currentProgressTimeline button {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  padding: var(--desktop-space-xs) 0 var(--desktop-space-xs) var(--desktop-space-md);
+  color: var(--desktop-text-secondary);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-left: 1px solid var(--line-divider);
+}
+
+.currentProgressTimeline button:not(:disabled):hover {
+  color: var(--desktop-text-primary);
+  border-left-color: var(--desktop-border-accent);
+}
+
+.currentProgressFiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--desktop-space-xs);
+}
+
+.currentProgressFiles > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 4px 7px;
+  color: var(--desktop-text-secondary);
+  font-family: var(--mono);
+  font-size: var(--desktop-text-meta);
+  background: var(--desktop-surface-panel-soft);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-xs);
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.currentProgressFiles > button:hover,
+.currentProgressFiles > button.active {
+  color: var(--desktop-text-primary);
+  border-color: var(--desktop-border-accent);
+  background: var(--desktop-state-accent-bg);
+}
+
+.currentProgressFiles > button.status-changed,
+.currentProgressFiles > button.status-stale {
+  border-color: var(--desktop-state-selected-indicator);
+}
+
+.currentProgressFiles > button.status-missing,
+.currentProgressFiles > button.status-failed {
+  border-color: var(--desktop-danger-border, var(--line-divider));
+}
+
+.runbookSurface,
+.reportSurface {
+  display: grid;
+  gap: var(--desktop-space-lg);
+}
+
+.runbookHero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--desktop-space-lg);
+  padding-bottom: var(--desktop-space-md);
+  border-bottom: 1px solid var(--line-divider);
+}
+
+.runbookHero span,
+.runbookCommand header span,
+.reportArtifactItem header span {
+  color: var(--desktop-type-meta-color);
+  font-size: var(--desktop-type-meta-size);
+  font-weight: var(--desktop-type-meta-weight);
+}
+
+.runbookHero strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--desktop-type-title-color);
+  font-size: var(--desktop-type-title-size);
+}
+
+.runbookHero p {
+  max-width: 760px;
+  margin: 6px 0 0;
+  color: var(--desktop-type-body-secondary-color);
+  font-size: var(--desktop-type-body-size);
+  line-height: 1.55;
+}
+
+.runbookCommandGrid,
+.reportArtifactList {
+  display: grid;
+  gap: var(--desktop-space-sm);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.runbookCommand,
+.reportArtifactItem {
+  display: grid;
+  gap: var(--desktop-space-sm);
+  min-width: 0;
+  padding: var(--desktop-space-md);
+  background: var(--surface-raised);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.runbookCommand header,
+.reportArtifactItem header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--desktop-space-sm);
+  min-width: 0;
+}
+
+.runbookCommand header div,
+.reportArtifactItem header div {
+  min-width: 0;
+}
+
+.runbookCommand header strong,
+.reportArtifactItem header strong {
+  display: block;
+  margin-top: 3px;
+  overflow: hidden;
+  color: var(--desktop-text-primary);
+  font-size: var(--desktop-text-caption);
+  font-weight: var(--desktop-font-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runbookCommand code {
+  display: block;
+  overflow: auto;
+  padding: 7px 8px;
+  color: var(--desktop-text-secondary);
+  font-family: var(--mono);
+  font-size: var(--desktop-text-meta);
+  line-height: 1.55;
+  background: var(--desktop-surface-code);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-xs);
+  white-space: nowrap;
+}
+
+.runbookCommand p,
+.reportArtifactItem p {
+  margin: 0;
+  color: var(--desktop-text-tertiary);
+  font-size: var(--desktop-text-meta);
+  line-height: 1.5;
 }
 
 .workspaceHealthScore {
@@ -3043,6 +3458,10 @@ body.isResizingSidebar {
 @media (max-width: 1080px) {
   .workspaceFactsQuickEntries,
   .workspaceFactsColumns,
+  .currentProgressStats,
+  .currentProgressSurface,
+  .runbookCommandGrid,
+  .reportArtifactList,
   .workspaceHealthDimensions,
   .workspaceGovernanceLevelTrack {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3052,6 +3471,12 @@ body.isResizingSidebar {
 @media (max-width: 760px) {
   .agentExecutionGrid,
   .workspaceFactsHero,
+  .currentProgressHero,
+  .currentProgressStats,
+  .currentProgressSurface,
+  .runbookHero,
+  .runbookCommandGrid,
+  .reportArtifactList,
   .workspaceFactsQuickEntries,
   .workspaceFactsColumns,
   .workspaceHealthDimensions,
@@ -3067,7 +3492,7 @@ body.isResizingSidebar {
   }
 }
 
-.topicFileList code {
+.topicFileButton {
   border: 1px solid var(--line);
   border-radius: var(--radius-xs);
   background: var(--desktop-surface-panel-soft);
@@ -3075,6 +3500,17 @@ body.isResizingSidebar {
   padding: 4px 6px;
   font-family: var(--mono);
   font-size: var(--desktop-text-meta);
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.topicFileButton:hover,
+.topicFileButton.active {
+  color: var(--desktop-text-primary);
+  border-color: var(--desktop-border-accent);
+  background: var(--desktop-state-accent-bg);
 }
 
 .center {
@@ -3602,6 +4038,34 @@ body.isResizingSidebar {
   margin-top: 8px;
 }
 
+.activeTaskBreadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  margin-bottom: var(--space-8);
+}
+
+.activeTaskBreadcrumb button {
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: var(--desktop-state-accent-bg);
+  color: var(--desktop-text-accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--desktop-text-caption);
+  font-weight: var(--desktop-font-bold);
+  padding: 4px 7px;
+}
+
+.activeTaskBreadcrumb button:hover {
+  background: var(--desktop-state-accent-bg-strong);
+}
+
+.activeTaskBreadcrumb span {
+  color: var(--desktop-text-tertiary);
+  font-size: var(--desktop-text-meta);
+}
+
 .activeTaskHeader {
   display: flex;
   align-items: center;
@@ -3652,6 +4116,10 @@ body.isResizingSidebar {
 
 .activeTaskInlineActions button:hover {
   background: var(--desktop-state-accent-bg);
+}
+
+.activeTaskPrimaryActions {
+  margin-top: var(--space-8);
 }
 
 .planHeader {
@@ -4816,59 +5284,6 @@ body.isResizingSidebar {
   display: none;
 }
 
-.railDisclosureSummary {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--desktop-space-md);
-  margin: calc(var(--desktop-space-xxs) * -1) calc(var(--desktop-space-xs) * -1) 0;
-  border-radius: var(--radius-xs);
-  color: var(--desktop-type-section-color);
-  padding: var(--desktop-space-xxs) var(--desktop-space-xs);
-  user-select: none;
-}
-
-.railDisclosureTitle {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--desktop-space-sm);
-  min-width: 0;
-  overflow: hidden;
-  font-size: var(--desktop-type-section-size);
-  font-weight: var(--desktop-type-section-weight);
-}
-
-.railDisclosureTitle span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.railDisclosureIcon {
-  flex: none;
-  width: var(--desktop-icon-size-sm);
-  height: var(--desktop-icon-size-sm);
-  color: var(--desktop-icon-color-muted);
-  stroke-width: var(--desktop-icon-stroke-muted);
-  transition: transform 120ms ease, color 120ms ease;
-}
-
-.railDisclosure[open] .railDisclosureIcon {
-  color: var(--desktop-icon-color-default);
-  transform: rotate(90deg);
-}
-
-.railDisclosureMeta {
-  flex: none;
-  justify-self: end;
-  min-width: max-content;
-  color: var(--desktop-text-secondary);
-  font-family: var(--mono);
-  font-size: var(--desktop-text-caption);
-  font-weight: var(--desktop-font-regular);
-}
-
 .railDisclosureBody {
   margin-top: var(--desktop-space-sm);
 }
@@ -4891,15 +5306,16 @@ body.isResizingSidebar {
   gap: 3px;
   border: 0;
   background: transparent;
-  color: inherit;
+  color: var(--desktop-type-code-color);
   cursor: pointer;
-  font-family: inherit;
-  font: inherit;
+  font-family: var(--mono);
+  font-size: var(--desktop-type-code-size);
+  font-weight: var(--desktop-type-code-weight);
   padding: 0;
 }
 
 .goalHeaderSwitcher:hover {
-  color: var(--desktop-text-primary);
+  color: var(--desktop-type-code-color);
 }
 
 .goalHeaderSwitcher svg {

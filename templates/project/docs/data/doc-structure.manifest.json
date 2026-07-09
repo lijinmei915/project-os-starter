@@ -95,6 +95,13 @@
       "forbiddenOverlap": ["具体页面实现代码", "后端技术栈"]
     },
     {
+      "file": "docs/design/workbench-visualization.md",
+      "responsibility": "OmniDesk 工作区菜单工作面的可视化结构、状态规则、交互模式和验收清单",
+      "ssotFor": ["工作区菜单怎么可视化"],
+      "requiredSections": ["总原则", "页面骨架", "工作面类型", "验收清单"],
+      "forbiddenOverlap": ["单次页面实现流水", "具体业务文案全文", "当前交接流水"]
+    },
+    {
       "file": "docs/DESKTOP_APP.md",
       "responsibility": "桌面端产品方向、技术选型、本地 Agent Core 和执行权限边界",
       "ssotFor": ["桌面端怎么做", "本地 Agent Core 怎么接入 coding"],

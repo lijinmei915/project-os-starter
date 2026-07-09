@@ -20,7 +20,7 @@ import { Field } from "./components/ui/field";
 import { Input } from "./components/ui/input";
 import { Notice } from "./components/ui/notice";
 import { Panel } from "./components/ui/panel";
-import { SectionTitle } from "./components/ui/section-title";
+import { SectionGroup } from "./components/ui/section-title";
 import { Select } from "./components/ui/select";
 import { Switch } from "./components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
@@ -846,7 +846,7 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
 
   const projectRuntimeStatus = (project) => {
     const relatedTasks = projectTasks(project);
-    if ((project.isCurrent && planLoading) || relatedTasks.some((task) => task.status === taskStatuses.running || task.id === terminalRunningId)) {
+    if ((project.isCurrent && planLoading) || relatedTasks.some((task) => task.id === terminalRunningId)) {
       return { tone: "running", label: "进行中" };
     }
     if (relatedTasks.some((task) => [taskStatuses.failed, "interrupted", "canceled", "cancelled", "error"].includes(task.status))) {
@@ -894,8 +894,8 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
   return (
     <aside className="left">
       <div className="leftScroll">
-        <div className="leftRailSection">
-          <SectionTitle
+        <SectionGroup
+          className="leftRailSection"
             title="项目"
             meta={snapshot.projects.length}
             open={projectsOpen}
@@ -904,12 +904,11 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
             actions={(
               <Tooltip content="添加项目">
                 <button className="sectionIconAction projectAddHeaderButton" type="button" onClick={onPickProject} aria-label="添加项目">
-                  <Plus strokeWidth={2.25} aria-hidden="true" />
+                  <Plus strokeWidth={1.75} aria-hidden="true" />
                 </button>
               </Tooltip>
             )}
-          />
-          {projectsOpen ? (
+          >
             <div className="projectList" aria-label="已接入项目">
               {snapshot.projects.map((project) => (
                 <div className="projectRowWrap" key={project.id}>
@@ -921,16 +920,17 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
                       onSwitchProject(project.id);
                     }}
                     aria-label={`切换到项目 ${project.name}`}
+                    aria-current={project.isCurrent ? "true" : undefined}
                   >
                     {(() => {
                       const runtimeStatus = projectRuntimeStatus(project);
-                      return (
+                      return runtimeStatus.tone ? (
                         <span
-                          className={`projectStatusDot${runtimeStatus.tone ? ` projectStatusDot-${runtimeStatus.tone}` : " projectStatusDot-empty"}`}
+                          className={`projectStatusDot projectStatusDot-${runtimeStatus.tone}`}
                           title={runtimeStatus.label}
                           aria-label={runtimeStatus.label}
                         />
-                      );
+                      ) : <span className="projectStatusDot projectStatusDot-empty" aria-hidden="true" />;
                     })()}
                     <span className="projectRowText">
                       <strong title={project.name}>{project.name}</strong>
@@ -961,9 +961,8 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
                 </div>
               ))}
             </div>
-          ) : null}
           {projectActionError ? <div className="projectError">{projectActionError}</div> : null}
-        </div>
+        </SectionGroup>
         <Dialog open={Boolean(renameProject)} onOpenChange={(open) => {
           if (!open) {
             setRenameProject(null);
@@ -999,10 +998,8 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
           <WorkspaceTree
             inlineAction={(
               <Tooltip content="切换到项目文件">
-                <Button
+                <button
                   className="sectionInlineSwitch"
-                  size="icon"
-                  variant="ghost"
                   type="button"
                   onClick={(event) => {
                     event.preventDefault();
@@ -1012,7 +1009,7 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
                   aria-label="切换到项目文件"
                 >
                   <ArrowLeftRight strokeWidth={1.5} aria-hidden="true" />
-                </Button>
+                </button>
               </Tooltip>
             )}
             activeTopicPath={selectedEngineeringFile?.path}
@@ -1021,17 +1018,15 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
             snapshot={snapshot}
           />
         ) : (
-          <div className="leftRailSection">
-            <SectionTitle
+          <SectionGroup
+              className="leftRailSection"
               title="项目文件"
               open
               onToggle={() => setSidebarView("workspace")}
               inlineAction={(
                 <Tooltip content="切换到工作区">
-                  <Button
+                  <button
                     className="sectionInlineSwitch"
-                    size="icon"
-                    variant="ghost"
                     type="button"
                     onClick={(event) => {
                       event.preventDefault();
@@ -1041,7 +1036,7 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
                     aria-label="切换到工作区"
                   >
                     <ArrowLeftRight strokeWidth={1.5} aria-hidden="true" />
-                  </Button>
+                  </button>
                 </Tooltip>
               )}
               actions={(
@@ -1055,20 +1050,20 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
                     aria-label={fileTreeExpanded ? "收起全部子项" : "展开全部子项"}
                   >
                     {fileTreeExpanded
-                      ? <ChevronsDownUp strokeWidth={2.25} aria-hidden="true" />
-                      : <ChevronsUpDown strokeWidth={2.25} aria-hidden="true" />}
+                      ? <ChevronsDownUp strokeWidth={1.75} aria-hidden="true" />
+                      : <ChevronsUpDown strokeWidth={1.75} aria-hidden="true" />}
                   </Button>
                 </Tooltip>
               )}
               toggleLabel="切换到工作区"
-            />
+            >
             <ProjectFileTree
               activePath={selectedEngineeringFile?.path}
               expanded={fileTreeExpanded}
               snapshot={snapshot}
               onSelectFile={onSelectEngineeringFile}
             />
-          </div>
+          </SectionGroup>
         )}
       </div>
       <Tooltip content="折叠工作区">
@@ -1508,10 +1503,17 @@ function progressFromTodos(todos) {
   if (!todos.length) return 0;
   const score = todos.reduce((total, todo) => {
     if (todo.status === taskStatuses.done) return total + 1;
-    if (todo.status === taskStatuses.running || todo.status === taskStatuses.waitingApproval) return total + 0.5;
+    if (todo.displayStatus === taskStatuses.running || todo.displayStatus === taskStatuses.waitingApproval) return total + 0.5;
     return total;
   }, 0);
   return Math.round((score / todos.length) * 100);
+}
+
+function taskDisplayStatus(task, { activeTaskId = "", planLoading = false, terminalRunningId = "" } = {}) {
+  if (!task) return "";
+  const isLiveRunning = task.id === terminalRunningId || (planLoading && task.id === activeTaskId);
+  if (task.status === taskStatuses.running && !isLiveRunning) return taskStatuses.planned;
+  return task.status;
 }
 
 function snapshotQueueTodos(snapshot) {
@@ -1672,6 +1674,7 @@ function AgentWorkspace({
   onSelectTask,
   onCreateRepairTask,
   onCreateGovernanceTask,
+  onCreateDesignGovernanceTask,
 }) {
   const [taskInput, setTaskInput] = useState("");
   const [attachments, setAttachments] = useState([]);
@@ -1723,9 +1726,14 @@ function AgentWorkspace({
       });
       setActiveWorkspaceTab(tabId);
     } else {
-      setActiveWorkspaceTab("plan");
+      if (activeTask || readonlyPlan) {
+        ensureExecutionTabs();
+        setActiveWorkspaceTab("execution");
+      } else {
+        setActiveWorkspaceTab("plan");
+      }
     }
-  }, [selectedEngineeringFile]);
+  }, [selectedEngineeringFile, activeTask, readonlyPlan]);
 
   const closeWorkspaceTab = (event, tabId) => {
     event.preventDefault();
@@ -1784,11 +1792,31 @@ function AgentWorkspace({
     ]);
   };
 
+  const openCurrentProgress = () => {
+    setWorkspaceTabs((current) => {
+      const progressTab = current.find((tab) =>
+        tab.kind === "file" &&
+        (tab.title === "当前进度" || tab.file?.topic?.id === "project-progress")
+      );
+      if (progressTab) setActiveWorkspaceTab(progressTab.id);
+      return current;
+    });
+  };
+
   useEffect(() => {
     if (actionMode) {
       ensureExecutionTabs();
     }
   }, [actionMode]);
+
+  useEffect(() => {
+    const openExecution = () => {
+      ensureExecutionTabs();
+      setActiveWorkspaceTab("execution");
+    };
+    window.addEventListener("project-os:open-execution", openExecution);
+    return () => window.removeEventListener("project-os:open-execution", openExecution);
+  }, []);
 
   const submitTask = async (event) => {
     event.preventDefault();
@@ -1920,12 +1948,16 @@ function AgentWorkspace({
   return (
     <Tabs className="center" value={activeWorkspaceTab} onValueChange={setActiveWorkspaceTab}>
       <TabsList className="tabs" aria-label="工作区视图">
-        {workspaceTabs.filter((tab) => isExecutionWorkspaceTab(tab, actionMode)).map((tab) => (
+        {workspaceTabs.filter((tab) => isExecutionWorkspaceTab(tab, actionMode)).map((tab) => {
+          const tabTitle = tab.kind === "execution" && (activeTask || readonlyPlan)
+            ? `任务：${compactGoalTitle(activeTask?.title || readonlyPlan?.task || readonlyPlan?.summary || "详情")}`
+            : tab.title;
+          return (
           <TabsTrigger className={`tab workspaceTab ${tab.kind === "file" ? "fileTab" : ""}${tab.closable ? " closable" : ""}`} key={tab.id} value={tab.id}>
-            <span>{tab.title}</span>
+            <span>{tabTitle}</span>
             {tab.closable ? (
               <button
-                aria-label={`关闭 ${tab.title}`}
+                aria-label={`关闭 ${tabTitle}`}
                 className="workspaceTabClose"
                 type="button"
                 onClick={(event) => closeWorkspaceTab(event, tab.id)}
@@ -1934,7 +1966,7 @@ function AgentWorkspace({
               </button>
             ) : null}
           </TabsTrigger>
-        ))}
+        );})}
       </TabsList>
 
       <TabsContent className="workspaceTabContent agentCanvas" value="plan">
@@ -2065,6 +2097,7 @@ function AgentWorkspace({
                 onSelectTask={onSelectTask}
                 onCreateRepairTask={onCreateRepairTask}
                 onCreateGovernanceTask={onCreateGovernanceTask}
+                onCreateDesignGovernanceTask={onCreateDesignGovernanceTask}
               />
             </TabsContent>
           );
@@ -2108,6 +2141,7 @@ function AgentWorkspace({
                   onMergeHandoff={onMergeHandoff}
                   onRunGuardedCheck={onRunGuardedCheck}
                   onSelectConversation={onSelectConversation}
+                  onBackToProgress={openCurrentProgress}
                 />
               ) : readonlyPlan ? (
                 <ReadonlyPlan plan={readonlyPlan} />
@@ -2694,6 +2728,558 @@ function GovernanceFilesHealthSection({ onCreateGovernanceTask, report }) {
               <pre className="engineeringFileCode">{governanceFile.preview.content || "文件为空。"}</pre>
             </>
           ) : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+const designImplementationTopics = {
+  "system-architecture": {
+    files: ["docs/ARCHITECTURE.md"],
+    task: "审阅系统架构",
+  },
+  "data-contracts": {
+    files: ["schemas/", "docs/data/"],
+    task: "审阅数据契约",
+  },
+  "ui-standards": {
+    files: ["docs/DESIGN_STANDARDS.md", "desktop/src/styles.css"],
+    task: "审阅界面规范",
+  },
+  "code-structure": {
+    files: ["docs/CODE_STRUCTURE.md", "desktop/src/main.jsx", "desktop/src-tauri/src/main.rs"],
+    task: "审阅实现结构",
+  },
+};
+
+function DesignImplementationHealthSection({ onCreateDesignGovernanceTask, report, topic }) {
+  const [activeStatusFilter, setActiveStatusFilter] = useState("");
+  const [previewFile, setPreviewFile] = useState(null);
+  const designDomain = (Array.isArray(report?.governanceDomains) ? report.governanceDomains : [])
+    .find((domain) => domain.id === "design-implementation" || domain.title === "设计实现");
+  const allFiles = Array.isArray(designDomain?.fileStatuses) ? designDomain.fileStatuses : [];
+  const topicConfig = designImplementationTopics[topic?.id] || null;
+  const topicFiles = topicConfig
+    ? allFiles.filter((file) => topicConfig.files.some((pattern) => {
+      const path = file.path || "";
+      return pattern.endsWith("/") ? path.startsWith(pattern) : path === pattern;
+    }))
+    : allFiles;
+  const visibleFiles = activeStatusFilter
+    ? topicFiles.filter((file) => (file.status || "found") === activeStatusFilter)
+    : topicFiles;
+  const health = governanceFileHealthSummary([{ fileStatuses: topicFiles }]);
+  const riskFiles = topicFiles.filter((file) => ["missing", "changed", "stale"].includes(file.status || "found"));
+  const actionableFiles = activeStatusFilter
+    ? visibleFiles.filter((file) => ["missing", "changed", "stale"].includes(file.status || "found"))
+    : riskFiles;
+  const actionHint = riskFiles.length
+    ? `发现 ${riskFiles.length} 个需要确认的设计实现资产，建议生成治理任务进入 Patch / 验证闭环。`
+    : "当前设计实现资产状态稳定，后续可继续接入一致性检查。";
+  const previewDesignFile = async (path) => {
+    if (!path || path.includes("*") || path.endsWith("/")) {
+      setPreviewFile({ error: "这是目录或匹配规则，暂不直接预览。请选择具体文件。", path });
+      return;
+    }
+    setPreviewFile({ loading: true, path });
+    try {
+      const preview = await invokeWorkspaceCommand("read_engineering_file", {
+        input: { path },
+      });
+      setPreviewFile({ path, preview });
+    } catch (err) {
+      setPreviewFile({ error: err instanceof Error ? err.message : String(err), path });
+    }
+  };
+
+  return (
+    <section className="workspaceGovernanceFiles">
+      <header>
+        <div>
+          <strong>设计实现健康状态</strong>
+          <p>把架构、契约、界面规范和实现结构接到同一套治理任务闭环。</p>
+        </div>
+        <Badge>{health.riskCount ? `${health.riskCount} 项需确认` : "设计实现稳定"}</Badge>
+      </header>
+      <div className="workspaceGovernanceHealthGrid">
+        {[
+          ["found", "正常"],
+          ["changed", "有本地变更"],
+          ["missing", "缺失"],
+          ["stale", "可能过期"],
+        ].map(([status, label]) => (
+          <button
+            className={`workspaceGovernanceHealthCard status-${status}${activeStatusFilter === status ? " active" : ""}`}
+            disabled={!health[status]}
+            key={status}
+            type="button"
+            onClick={() => setActiveStatusFilter(activeStatusFilter === status ? "" : status)}
+          >
+            <span>{label}</span>
+            <strong>{health[status] || 0}</strong>
+          </button>
+        ))}
+      </div>
+      <div className="workspaceGovernanceActions">
+        <div>
+          <strong>建议动作</strong>
+          <p>{actionHint}</p>
+        </div>
+        <div className="workspaceGovernanceActionButtons">
+          <Button
+            disabled={!actionableFiles.length}
+            size="sm"
+            variant="primary"
+            type="button"
+            onClick={() => onCreateDesignGovernanceTask?.({
+              files: actionableFiles.map((file) => ({
+                ...file,
+                domainTitle: designDomain?.title || "设计实现",
+              })),
+              topic,
+            })}
+          >
+            生成治理任务
+          </Button>
+          {activeStatusFilter ? (
+            <Button size="sm" variant="subtle" type="button" onClick={() => setActiveStatusFilter("")}>
+              查看全部
+            </Button>
+          ) : null}
+        </div>
+      </div>
+      <div className="workspaceGovernanceFileList">
+        {visibleFiles.length ? visibleFiles.map((file) => {
+          const path = file.path || file;
+          const isPreviewable = file.previewable ?? (!path.includes("*") && !path.endsWith("/"));
+          return (
+            <button
+              className={`workspaceGovernanceFile status-${file.status || "found"}${previewFile?.path === path ? " active" : ""}`}
+              disabled={!isPreviewable}
+              key={path}
+              type="button"
+              onClick={() => previewDesignFile(path)}
+            >
+              <span>{path}</span>
+              <small>{governanceFileHealthLabel(file.status)}</small>
+            </button>
+          );
+        }) : (
+          <Notice variant="info">当前入口还没有匹配到设计实现资产。</Notice>
+        )}
+      </div>
+      {previewFile ? (
+        <div className="workspaceGovernancePreview">
+          <div className="engineeringFileHeader">
+            <div>
+              <strong>{previewFile.path}</strong>
+              <p>工程文件只读预览</p>
+            </div>
+            {previewFile.preview ? <Badge>{previewFile.preview.language}</Badge> : null}
+          </div>
+          {previewFile.loading ? (
+            <Notice variant="info">正在读取文件内容...</Notice>
+          ) : previewFile.error ? (
+            <Notice variant="danger">{previewFile.error}</Notice>
+          ) : previewFile.preview ? (
+            <>
+              <div className="engineeringFileMeta">
+                <span>{formatBytes(previewFile.preview.size)}</span>
+                {previewFile.preview.truncated ? <span>已截断</span> : <span>完整预览</span>}
+              </div>
+              <pre className="engineeringFileCode">{previewFile.preview.content || "文件为空。"}</pre>
+            </>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function CurrentProgressPanel({ report, snapshot, tasks = [], onSelectTask }) {
+  const [activeFocus, setActiveFocus] = useState("");
+  const [progressFilePreview, setProgressFilePreview] = useState(null);
+  const activeGoal = activeGoalFromSnapshot(snapshot);
+  const goals = Array.isArray(snapshot?.goals?.goals) ? snapshot.goals.goals : [];
+  const backlogItems = Array.isArray(snapshot?.taskBacklog?.items) ? snapshot.taskBacklog.items : [];
+  const summary = report?.summary?.currentProgress || {};
+  const currentProgressDomain = (Array.isArray(report?.governanceDomains) ? report.governanceDomains : [])
+    .find((domain) => domain.id === "current-progress" || domain.title === "当前进度");
+  const allTasks = tasks.filter((task) => !isNoiseTask(task));
+  const openTasks = allTasks.filter((task) => ![taskStatuses.done, taskStatuses.failed].includes(task.status));
+  const doneTasks = allTasks.filter((task) => task.status === taskStatuses.done);
+  const failedTasks = allTasks.filter((task) => task.status === taskStatuses.failed);
+  const backlogDone = backlogItems.filter((item) => item.status === "done");
+  const backlogOpen = backlogItems.filter((item) => item.status !== "done");
+  const taskTotal = allTasks.length || backlogItems.length;
+  const taskDone = doneTasks.length || backlogDone.length;
+  const progressValue = taskTotal ? Math.round((taskDone / taskTotal) * 100) : 0;
+  const phaseText = phaseLabel(snapshot?.phase || report?.project?.lifecycle);
+  const goalStatus = activeGoal ? goalStatusLabelText(activeGoal.status) : phaseText;
+  const recentDone = [
+    ...doneTasks.slice(0, 3).map((task) => ({
+      id: task.id,
+      title: task.title,
+      meta: task.runSummary?.path || task.updatedAt || task.createdAt || "已完成",
+      task,
+    })),
+    ...backlogDone.slice(0, Math.max(0, 3 - doneTasks.length)).map((item) => ({
+      id: item.id,
+      title: item.title,
+      meta: item.completedAt || item.updatedAt || "已完成",
+    })),
+  ].slice(0, 4);
+  const nextItems = [
+    ...openTasks.slice(0, 4).map((task) => ({
+      id: task.id,
+      title: task.title,
+      meta: taskStatusLabel(task.status),
+      task,
+    })),
+    ...backlogOpen.slice(0, Math.max(0, 4 - openTasks.length)).map((item) => ({
+      id: item.id,
+      title: item.title,
+      meta: item.status || "planned",
+    })),
+  ].slice(0, 4);
+  const fileStatuses = Array.isArray(currentProgressDomain?.fileStatuses) ? currentProgressDomain.fileStatuses : [];
+  const progressFiles = fileStatuses.length
+    ? fileStatuses
+    : (currentProgressDomain?.files || []).map((path) => ({ path, status: "found" }));
+  const riskFiles = fileStatuses.filter((file) => ["missing", "changed", "stale"].includes(file.status || "found"));
+  const riskCount = failedTasks.length + riskFiles.length;
+  const visibleProgressFiles = activeFocus === "risk" ? riskFiles : progressFiles;
+  const primaryNext = nextItems[0];
+  const previewProgressFile = async (path) => {
+    if (!path || path.includes("*") || path.endsWith("/")) {
+      setProgressFilePreview({ error: "这是目录或匹配规则，暂不直接预览。请选择具体文件。", path });
+      return;
+    }
+    setProgressFilePreview({ loading: true, path });
+    try {
+      const preview = await invokeWorkspaceCommand("read_engineering_file", {
+        input: { path },
+      });
+      setProgressFilePreview({ path, preview });
+    } catch (err) {
+      setProgressFilePreview({ error: err instanceof Error ? err.message : String(err), path });
+    }
+  };
+
+  return (
+    <section className="currentProgressBoard">
+      <header className="currentProgressHero">
+        <div>
+          <span>阶段</span>
+          <strong>{phaseText}</strong>
+          <p>{summary.body || "当前进度会从目标、任务、交接和工作区事实中自动汇总。"}</p>
+        </div>
+        <div className="currentProgressScore" aria-label={`当前进度 ${progressValue}%`}>
+          <strong>{progressValue}%</strong>
+          <span>任务完成度</span>
+        </div>
+      </header>
+
+      <div className="currentProgressStage">
+        <div className="currentProgressStageTrack" aria-hidden="true">
+          <span style={{ width: `${progressValue}%` }} />
+        </div>
+        <div className="currentProgressStageMeta">
+          <span>{activeGoal?.shortTitle || activeGoal?.title || "暂无目标"}</span>
+          <strong>{goalStatus}</strong>
+        </div>
+      </div>
+
+      <div className="currentProgressStats">
+        <div>
+          <span>执行任务</span>
+          <strong>{openTasks.length}</strong>
+          <p>待确认 / 进行中</p>
+        </div>
+        <div>
+          <span>已完成</span>
+          <strong>{taskDone}</strong>
+          <p>任务或 backlog</p>
+        </div>
+        <button
+          className={activeFocus === "risk" ? "active" : ""}
+          type="button"
+          onClick={() => setActiveFocus(activeFocus === "risk" ? "" : "risk")}
+        >
+          <span>需关注</span>
+          <strong>{riskCount}</strong>
+          <p>失败或治理变更</p>
+        </button>
+      </div>
+
+      <div className="currentProgressSurface">
+        <section className="currentProgressPrimary">
+          <header>
+            <div>
+              <span>下一步</span>
+              <strong>{primaryNext?.title || "暂无待处理任务"}</strong>
+              <p>{primaryNext ? primaryNext.meta : "当前没有待处理任务。"}</p>
+            </div>
+            {primaryNext?.task ? (
+              <Button size="sm" variant="primary" type="button" onClick={() => onSelectTask?.(primaryNext.task.id)}>
+                打开任务
+              </Button>
+            ) : null}
+          </header>
+          <div className="currentProgressList">
+            {nextItems.slice(1).length ? nextItems.slice(1).map((item) => (
+              <button
+                disabled={!item.task}
+                key={item.id}
+                type="button"
+                onClick={() => item.task && onSelectTask?.(item.task.id)}
+              >
+                <span>{item.title}</span>
+                <small>{item.meta}</small>
+              </button>
+            )) : <Notice variant="success">没有更多待处理任务。</Notice>}
+          </div>
+        </section>
+
+        <aside className="currentProgressAside">
+          <section>
+            <strong>最近完成</strong>
+            <div className="currentProgressTimeline">
+              {recentDone.length ? recentDone.map((item) => (
+              <button
+                disabled={!item.task}
+                key={item.id}
+                type="button"
+                onClick={() => item.task && onSelectTask?.(item.task.id)}
+              >
+                <span>{item.title}</span>
+                <small>{item.meta}</small>
+              </button>
+            )) : <Notice variant="info">完成任务后会出现在这里。</Notice>}
+            </div>
+          </section>
+          <section>
+            <strong>{activeFocus === "risk" ? "需关注项" : "进度依据"}</strong>
+            <div className="currentProgressFiles">
+              {visibleProgressFiles.map((file) => {
+                const path = file.path || file;
+                return (
+                  <button
+                    className={`status-${file.status || "found"}${progressFilePreview?.path === path ? " active" : ""}`}
+                    key={path}
+                    type="button"
+                    onClick={() => previewProgressFile(path)}
+                  >
+                    {path}
+                    <small>{governanceFileHealthLabel(file.status)}</small>
+                  </button>
+                );
+              })}
+              {activeFocus === "risk" && failedTasks.map((task) => (
+                <button
+                  className="status-failed"
+                  key={task.id}
+                  type="button"
+                  onClick={() => onSelectTask?.(task.id)}
+                >
+                  {task.title}
+                  <small>失败任务</small>
+                </button>
+              ))}
+              {activeFocus === "risk" && !riskFiles.length && !failedTasks.length ? <Notice variant="success">当前没有需关注项。</Notice> : null}
+            </div>
+          </section>
+        </aside>
+      </div>
+      {progressFilePreview ? (
+        <div className="workspaceGovernancePreview">
+          <div className="engineeringFileHeader">
+            <div>
+              <strong>{progressFilePreview.path}</strong>
+              <p>进度依据只读预览</p>
+            </div>
+            {progressFilePreview.preview ? <Badge>{progressFilePreview.preview.language}</Badge> : null}
+          </div>
+          {progressFilePreview.loading ? (
+            <Notice variant="info">正在读取文件内容...</Notice>
+          ) : progressFilePreview.error ? (
+            <Notice variant="danger">{progressFilePreview.error}</Notice>
+          ) : progressFilePreview.preview ? (
+            <>
+              <div className="engineeringFileMeta">
+                <span>{formatBytes(progressFilePreview.preview.size)}</span>
+                {progressFilePreview.preview.truncated ? <span>已截断</span> : <span>完整预览</span>}
+              </div>
+              <pre className="engineeringFileCode">{progressFilePreview.preview.content || "文件为空。"}</pre>
+            </>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function RunbookPanel({ report }) {
+  const runbookSummary = report?.summary?.runbook || {};
+  const runbookDomain = (Array.isArray(report?.governanceDomains) ? report.governanceDomains : [])
+    .find((domain) => domain.id === "runbook" || domain.title === "启动方式");
+  const fileStatuses = Array.isArray(runbookDomain?.fileStatuses) ? runbookDomain.fileStatuses : [];
+  const commandGroups = [
+    {
+      command: "npm --prefix desktop run web:dev -- --host 127.0.0.1 --port 1420",
+      label: "开发预览",
+      note: "启动浏览器里的工作台预览，当前地址就是 http://127.0.0.1:1420/。",
+      status: "本地服务",
+    },
+    {
+      command: "npm --prefix desktop run web:build",
+      label: "Web 构建",
+      note: "验证前端页面能否构建通过，适合改 UI 后自检。",
+      status: "可验证",
+    },
+    {
+      command: "cargo check --manifest-path desktop/src-tauri/Cargo.toml",
+      label: "桌面壳检查",
+      note: "验证 Tauri/Rust 桌面端命令和类型是否正常。",
+      status: "可验证",
+    },
+    {
+      command: "bash scripts/check-runtime.sh .",
+      label: "治理检查",
+      note: "检查 Project OS 运行规则、文档 frontmatter 和基础治理约束。",
+      status: "可验证",
+    },
+  ];
+  const foundFiles = fileStatuses.filter((file) => (file.status || "found") === "found").length;
+  const missingFiles = fileStatuses.filter((file) => file.status === "missing").length;
+
+  return (
+    <section className="runbookSurface">
+      <header className="runbookHero">
+        <div>
+          <span>启动方式</span>
+          <strong>{runbookSummary.title || "本地启动方式"}</strong>
+          <p>{runbookSummary.body || "这里集中展示当前项目的启动、构建和检查命令。"}</p>
+        </div>
+        <Badge>{missingFiles ? `${missingFiles} 项待补` : "可启动"}</Badge>
+      </header>
+      <div className="agentTopicPanel">
+        <div className="agentTopicCard">
+          <span>命令类型</span>
+          <strong>{commandGroups.length}</strong>
+        </div>
+        <div className="agentTopicCard">
+          <span>运行说明</span>
+          <strong>{foundFiles}/{fileStatuses.length || 3}</strong>
+        </div>
+        <div className="agentTopicCard">
+          <span>当前入口</span>
+          <strong>浏览器预览 / 桌面端 / 治理检查</strong>
+        </div>
+      </div>
+      <div className="runbookCommandGrid">
+        {commandGroups.map((item) => (
+          <article className="runbookCommand" key={item.label}>
+            <header>
+              <div>
+                <span>{item.label}</span>
+                <strong>{item.status}</strong>
+              </div>
+              <Badge>{item.label === "开发预览" ? "启动" : "检查"}</Badge>
+            </header>
+            <code>{item.command}</code>
+            <p>{item.note}</p>
+          </article>
+        ))}
+      </div>
+      <Notice variant="info">这里先只展示受控启动和检查入口。长期运行的 dev server 后续应接入进程管理，再开放一键启动/停止。</Notice>
+    </section>
+  );
+}
+
+function ReportArtifactsPanel({ snapshot }) {
+  const validationReport = snapshot?.goalValidationReport || {};
+  const checks = Array.isArray(validationReport.checks) ? validationReport.checks : [];
+  const passedChecks = checks.filter((check) => check.success).length;
+  const reportArtifacts = [
+    {
+      label: "AI 工程治理报告",
+      path: ".project-os/reports/ai-project-report.json",
+      purpose: "结构化记录项目评分、缺口和治理建议，是可视化报告的数据源。",
+      status: "治理数据",
+    },
+    {
+      label: "Markdown 报告",
+      path: ".project-os/reports/ai-project-report.md",
+      purpose: "适合人工快速阅读和交接摘录。",
+      status: "文本报告",
+    },
+    {
+      label: "报告截图",
+      path: ".project-os/reports/ai-project-report-preview.png",
+      purpose: "用于视觉回归或把报告结果作为截图证据沉淀。",
+      status: "视觉证据",
+    },
+    {
+      label: "目标验收报告",
+      path: ".project-os/goal-validation-report.json",
+      purpose: "记录最近一次目标验收的检查结果，通过或失败都从这里追溯。",
+      status: validationReport.status || "unknown",
+    },
+  ];
+
+  return (
+    <section className="reportSurface">
+      <header className="runbookHero">
+        <div>
+          <span>可视化报告是什么</span>
+          <strong>工程治理报告产物</strong>
+          <p>它不是单独的漂亮页面，而是把扫描、评分、推荐、验收和视觉证据沉淀成可追溯产物。</p>
+        </div>
+        <Badge>{validationReport.status === "passed" ? "验收通过" : statusLabel(validationReport.status)}</Badge>
+      </header>
+      <div className="agentTopicPanel">
+        <div className="agentTopicCard">
+          <span>报告产物</span>
+          <strong>{reportArtifacts.length}</strong>
+        </div>
+        <div className="agentTopicCard">
+          <span>最近验收</span>
+          <strong>{validationReport.status === "passed" ? "通过" : statusLabel(validationReport.status)}</strong>
+        </div>
+        <div className="agentTopicCard">
+          <span>检查项</span>
+          <strong>{passedChecks}/{checks.length || 0}</strong>
+        </div>
+      </div>
+      <div className="reportArtifactList">
+        {reportArtifacts.map((artifact) => (
+          <article className="reportArtifactItem" key={artifact.path}>
+            <header>
+              <div>
+                <span>{artifact.label}</span>
+                <strong>{artifact.path}</strong>
+              </div>
+              <Badge>{artifact.status}</Badge>
+            </header>
+            <p>{artifact.purpose}</p>
+          </article>
+        ))}
+      </div>
+      {checks.length ? (
+        <div className="agentTopicList">
+          {checks.map((check) => (
+            <div className="agentPatchItem" key={check.id || check.label}>
+              <div className="agentPatchItemHeader">
+                <div>
+                  <strong>{check.label || check.id}</strong>
+                  <span>{check.command}</span>
+                </div>
+                <Badge status={check.success ? "done" : "failed"}>{check.success ? "通过" : "失败"}</Badge>
+              </div>
+            </div>
+          ))}
         </div>
       ) : null}
     </section>
@@ -3294,13 +3880,57 @@ function EngineeringFileTab({
   onSelectTask,
   onCreateRepairTask,
   onCreateGovernanceTask,
+  onCreateDesignGovernanceTask,
 }) {
+  const [relatedFilePreview, setRelatedFilePreview] = useState(null);
+  useEffect(() => {
+    setRelatedFilePreview(null);
+  }, [selectedEngineeringFile.topic?.id, selectedEngineeringFile.path]);
+
+  const previewRelatedFile = async (path) => {
+    if (!path || path.includes("*") || path.endsWith("/")) {
+      setRelatedFilePreview({
+        error: "这是目录或匹配规则，暂不直接预览。请选择具体文件。",
+        path,
+      });
+      return;
+    }
+    setRelatedFilePreview({ loading: true, path });
+    try {
+      const preview = await invokeWorkspaceCommand("read_engineering_file", {
+        input: { path },
+      });
+      setRelatedFilePreview({ path, preview });
+    } catch (err) {
+      setRelatedFilePreview({
+        error: err instanceof Error ? err.message : String(err),
+        path,
+      });
+    }
+  };
+
   if (selectedEngineeringFile.topic) {
     const isOverviewTopic = selectedEngineeringFile.topic.id === "project-identity" || selectedEngineeringFile.topic.title === "项目概览";
+    const isCurrentProgressTopic = selectedEngineeringFile.topic.id === "project-progress" || selectedEngineeringFile.topic.title === "当前进度";
+    const isRunbookTopic = selectedEngineeringFile.topic.id === "project-runbook" || selectedEngineeringFile.topic.title === "启动方式";
     const isGovernanceFilesTopic = selectedEngineeringFile.topic.id === "governance-files" || selectedEngineeringFile.topic.title === "治理文件";
+    const isReportTopic = ["validation-report", "report-artifacts"].includes(selectedEngineeringFile.topic.id);
+    const isDesignImplementationTopic = Object.keys(designImplementationTopics).includes(selectedEngineeringFile.topic.id);
     const workspaceFacts = isOverviewTopic ? snapshot?.workspaceFacts : null;
+    const currentProgressPanel = isCurrentProgressTopic && snapshot?.workspaceFacts
+      ? <CurrentProgressPanel onSelectTask={onSelectTask} report={snapshot.workspaceFacts} snapshot={snapshot} tasks={tasks} />
+      : null;
+    const runbookPanel = isRunbookTopic && snapshot?.workspaceFacts
+      ? <RunbookPanel report={snapshot.workspaceFacts} />
+      : null;
+    const reportPanel = isReportTopic
+      ? <ReportArtifactsPanel snapshot={snapshot} />
+      : null;
     const governanceFilesPanel = isGovernanceFilesTopic && snapshot?.workspaceFacts
       ? <GovernanceFilesHealthSection onCreateGovernanceTask={onCreateGovernanceTask} report={snapshot.workspaceFacts} />
+      : null;
+    const designImplementationPanel = isDesignImplementationTopic && snapshot?.workspaceFacts
+      ? <DesignImplementationHealthSection onCreateDesignGovernanceTask={onCreateDesignGovernanceTask} report={snapshot.workspaceFacts} topic={selectedEngineeringFile.topic} />
       : null;
     const agentTopic = (
       <AgentTopicPanel
@@ -3323,19 +3953,35 @@ function EngineeringFileTab({
     );
     return (
       <Panel className="engineeringFilePreview filePreviewPanel" variant="soft">
-        <div className="engineeringFileHeader">
+        <div className={`engineeringFileHeader${isCurrentProgressTopic ? " progressTopicHeader" : ""}`}>
           <div>
             <strong>{selectedEngineeringFile.topic.title}</strong>
             <p>{selectedEngineeringFile.topic.description}</p>
           </div>
-          <Badge>{selectedEngineeringFile.group}</Badge>
+          {isCurrentProgressTopic ? (
+            <span className="topicBreadcrumb">项目流程 / {selectedEngineeringFile.group}</span>
+          ) : (
+            <Badge>{selectedEngineeringFile.group}</Badge>
+          )}
         </div>
         <div className="topicPreview">
-          {workspaceFacts ? <WorkspaceFactsPreview onCreateGovernanceTask={onCreateGovernanceTask} report={workspaceFacts} /> : governanceFilesPanel || agentTopic || (
+          {workspaceFacts ? <WorkspaceFactsPreview onCreateGovernanceTask={onCreateGovernanceTask} report={workspaceFacts} /> : currentProgressPanel || runbookPanel || reportPanel || governanceFilesPanel || designImplementationPanel || agentTopic || (
             <Notice variant="info">这是项目治理地图。用户只看事项，OmniDesk 在背后维护对应文件、状态来源和更新时机。</Notice>
           )}
-          {(selectedEngineeringFile.topic.statusSource || selectedEngineeringFile.topic.updatesWhen) ? (
+          {(selectedEngineeringFile.topic.governanceRole || selectedEngineeringFile.topic.maturity || selectedEngineeringFile.topic.nextAction || selectedEngineeringFile.topic.statusSource || selectedEngineeringFile.topic.updatesWhen) ? (
             <div className="topicGovernanceMeta">
+              {selectedEngineeringFile.topic.governanceRole ? (
+                <div>
+                  <span>治理角色</span>
+                  <p>{selectedEngineeringFile.topic.governanceRole}</p>
+                </div>
+              ) : null}
+              {selectedEngineeringFile.topic.maturity ? (
+                <div>
+                  <span>闭环程度</span>
+                  <p>{selectedEngineeringFile.topic.maturity}</p>
+                </div>
+              ) : null}
               {selectedEngineeringFile.topic.statusSource ? (
                 <div>
                   <span>状态来源</span>
@@ -3348,16 +3994,53 @@ function EngineeringFileTab({
                   <p>{selectedEngineeringFile.topic.updatesWhen}</p>
                 </div>
               ) : null}
+              {selectedEngineeringFile.topic.nextAction ? (
+                <div>
+                  <span>下一步动作</span>
+                  <p>{selectedEngineeringFile.topic.nextAction}</p>
+                </div>
+              ) : null}
             </div>
           ) : null}
           <div className="topicFileList">
             <strong>关联工程文件</strong>
             <div>
               {selectedEngineeringFile.topic.relatedFiles.map((file) => (
-                <code key={file}>{file}</code>
+                <button
+                  className={`topicFileButton${relatedFilePreview?.path === file ? " active" : ""}`}
+                  key={file}
+                  type="button"
+                  onClick={() => previewRelatedFile(file)}
+                >
+                  {file}
+                </button>
               ))}
             </div>
           </div>
+          {relatedFilePreview ? (
+            <div className="workspaceGovernancePreview">
+              <div className="engineeringFileHeader">
+                <div>
+                  <strong>{relatedFilePreview.path}</strong>
+                  <p>关联工程文件只读预览</p>
+                </div>
+                {relatedFilePreview.preview ? <Badge>{relatedFilePreview.preview.language}</Badge> : null}
+              </div>
+              {relatedFilePreview.loading ? (
+                <Notice variant="info">正在读取文件内容...</Notice>
+              ) : relatedFilePreview.error ? (
+                <Notice variant="danger">{relatedFilePreview.error}</Notice>
+              ) : relatedFilePreview.preview ? (
+                <>
+                  <div className="engineeringFileMeta">
+                    <span>{formatBytes(relatedFilePreview.preview.size)}</span>
+                    {relatedFilePreview.preview.truncated ? <span>已截断</span> : <span>完整预览</span>}
+                  </div>
+                  <pre className="engineeringFileCode">{relatedFilePreview.preview.content || "文件为空。"}</pre>
+                </>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </Panel>
     );
@@ -3406,11 +4089,44 @@ function ActiveTask({
   onMergeHandoff,
   onRunGuardedCheck,
   onSelectConversation,
+  onBackToProgress,
 }) {
   const runnableChecks = checksForPlan(task.plan);
+  const draftActions = [
+    {
+      disabled: patchLoading,
+      key: "generate-patch",
+      label: patchLoading ? "生成中" : task.patchDraft ? "重新生成改动" : "生成改动",
+      onClick: () => onGeneratePatchDraft(task.id),
+      variant: task.patchDraft ? "default" : "primary",
+    },
+    {
+      disabled: applyLoading || !task.patchDraft,
+      key: "apply-patch",
+      label: applyLoading ? "应用中" : "应用改动",
+      onClick: () => onApplyPatchDraft(task.id),
+      variant: task.patchDraft ? "primary" : "default",
+    },
+    {
+      disabled: handoffLoading || !task.runSummary || Boolean(task.handoffMerge),
+      key: "merge-handoff",
+      label: handoffLoading ? "合并中" : task.handoffMerge ? "已更新交接" : "更新交接",
+      onClick: () => onMergeHandoff(task.id),
+    },
+  ];
+  const checkActions = runnableChecks.slice(0, 2).map((check) => ({
+    disabled: Boolean(runnerLoadingId),
+    key: check.id,
+    label: runnerLoadingId === check.id ? "运行中" : check.label,
+    onClick: () => onRunGuardedCheck(task.id, check.id),
+  }));
 
   return (
     <Panel as="article" className="activeTask" variant="soft">
+      <div className="activeTaskBreadcrumb">
+        <button type="button" onClick={onBackToProgress}>返回当前进度</button>
+        <span>任务详情</span>
+      </div>
       <div className="activeTaskHeader">
         <div>
           <strong>{task.title}</strong>
@@ -3432,47 +4148,36 @@ function ActiveTask({
           </button>
         </div>
       ) : null}
+      <div className="activeTaskPrimaryActions">
+        <TaskCommandBar
+          actions={[...draftActions, ...checkActions]}
+          meta={task.patchDraft?.files?.length
+            ? `已生成 ${task.patchDraft.files.length} 个文件的改动草稿。`
+            : "先生成改动，再应用和验证。"}
+        />
+      </div>
+      {patchError ? <Notice className="planError" variant="danger">{patchError}</Notice> : null}
+      {applyError ? <Notice className="planError" variant="danger">{applyError}</Notice> : null}
+      {handoffError ? <Notice className="planError" variant="danger">{handoffError}</Notice> : null}
+      {runnerError ? <Notice className="planError" variant="danger">{runnerError}</Notice> : null}
+      {task.applyResult ? <Notice className="providerSuccess" variant="success">{task.applyResult.message}</Notice> : null}
+      {task.verificationSummary ? (
+        <Notice className={task.status === taskStatuses.failed ? "providerError" : "providerSuccess"} variant={task.status === taskStatuses.failed ? "danger" : "success"}>
+          {task.verificationSummary}
+        </Notice>
+      ) : null}
       <ReadonlyPlan plan={task.plan} />
       <details className="executionTools">
-        <summary>更多操作</summary>
+        <summary>高级详情</summary>
         <Panel className="diffPanel" variant="info">
           <div className="runnerHeader">
             <strong>改动草稿</strong>
             <span>先预览，不直接写入</span>
           </div>
           <TaskCommandBar
-            actions={[
-              {
-                disabled: patchLoading,
-                key: "generate-patch",
-                label: patchLoading ? "生成中" : task.patchDraft ? "重新生成" : "生成改动",
-                onClick: () => onGeneratePatchDraft(task.id),
-              },
-              {
-                disabled: applyLoading || !task.patchDraft,
-                key: "apply-patch",
-                label: applyLoading ? "应用中" : "应用改动",
-                onClick: () => onApplyPatchDraft(task.id),
-                variant: "primary",
-              },
-              {
-                disabled: handoffLoading || !task.runSummary || Boolean(task.handoffMerge),
-                key: "merge-handoff",
-                label: handoffLoading ? "合并中" : task.handoffMerge ? "已更新交接" : "更新交接",
-                onClick: () => onMergeHandoff(task.id),
-              },
-            ]}
+            actions={draftActions}
             meta={task.patchDraft?.files?.length ? `${task.patchDraft.files.length} 个文件` : "还没有生成改动。"}
           />
-          {patchError ? <Notice className="planError" variant="danger">{patchError}</Notice> : null}
-          {applyError ? <Notice className="planError" variant="danger">{applyError}</Notice> : null}
-          {handoffError ? <Notice className="planError" variant="danger">{handoffError}</Notice> : null}
-          {task.applyResult ? <Notice className="providerSuccess" variant="success">{task.applyResult.message}</Notice> : null}
-          {task.verificationSummary ? (
-            <Notice className={task.status === taskStatuses.failed ? "providerError" : "providerSuccess"} variant={task.status === taskStatuses.failed ? "danger" : "success"}>
-              {task.verificationSummary}
-            </Notice>
-          ) : null}
           {task.runSummary ? <Notice className="providerHint" variant="info">{task.runSummary.message}：{task.runSummary.path}</Notice> : null}
           {task.handoffMerge ? <Notice className="providerSuccess" variant="success">{task.handoffMerge.message}：{task.handoffMerge.path}</Notice> : null}
           {task.patchDraft ? <PatchDraft draft={task.patchDraft} /> : null}
@@ -3587,6 +4292,8 @@ function RightRail({
   onConfirmGoal,
   validatingGoal,
   signingGoal,
+  planLoading,
+  terminalRunningId,
 }) {
   const [taskFilter, setTaskFilter] = useState("todo");
   const [confirmGoalOpen, setConfirmGoalOpen] = useState(false);
@@ -3609,6 +4316,7 @@ function RightRail({
   const goalTodos = visibleTasks.length
     ? visibleTasks.map((task) => ({
         description: task.plan?.summary || task.projectName || "",
+        displayStatus: taskDisplayStatus(task, { activeTaskId, planLoading, terminalRunningId }),
         conversationId: task.conversationId || "",
         goalId: task.goalId || "",
         id: task.id,
@@ -3622,7 +4330,7 @@ function RightRail({
       }));
   const progressValue = progressFromTodos(goalTodos);
   const doneCount = goalTodos.filter((todo) => todo.status === taskStatuses.done).length;
-  const runningCount = goalTodos.filter((todo) => todo.status === taskStatuses.running || todo.status === taskStatuses.waitingApproval).length;
+  const runningCount = goalTodos.filter((todo) => todo.displayStatus === taskStatuses.running || todo.displayStatus === taskStatuses.waitingApproval).length;
   const pendingCount = Math.max(goalTodos.length - doneCount - runningCount, 0);
   const allGoals = Array.isArray(snapshot.goals?.goals) ? snapshot.goals.goals : [];
   const activeGoalIndex = Math.max(allGoals.findIndex((goal) => goal.id === activeGoal?.id), 0);
@@ -3905,6 +4613,7 @@ function RightRail({
                       <GoalTaskItem
                         active={todo.id === activeTaskId}
                         description={todo.description}
+                        displayStatus={todo.displayStatus}
                         index={index}
                         key={todo.id}
                         status={todo.status}
@@ -3966,17 +4675,19 @@ function RightRail({
 }
 
 function RailDisclosure({ children, className = "", defaultOpen = false, meta, title }) {
+  const metaIsAction = React.isValidElement(meta);
+
   return (
-    <details className={`railSection railDisclosure ${className}`} open={defaultOpen}>
-      <summary className="railDisclosureSummary">
-        <span className="railDisclosureTitle">
-          <ChevronRight className="railDisclosureIcon" strokeWidth={2.25} aria-hidden="true" />
-          <span>{title}</span>
-        </span>
-        <span className="railDisclosureMeta">{meta}</span>
-      </summary>
-      <div className="railDisclosureBody">{children}</div>
-    </details>
+    <SectionGroup
+      actions={metaIsAction ? meta : undefined}
+      bodyClassName="railDisclosureBody"
+      className={`railSection railDisclosure ${className}`}
+      defaultOpen={defaultOpen}
+      meta={metaIsAction ? undefined : meta}
+      title={title}
+    >
+      {children}
+    </SectionGroup>
   );
 }
 
@@ -4026,10 +4737,11 @@ function GoalMenuGroup({ activeGoalId, goals, muted = false, onSwitchGoal, title
   );
 }
 
-function GoalStatusIcon({ status }) {
-  const done = status === taskStatuses.done;
-  const running = status === taskStatuses.running || status === taskStatuses.waitingApproval;
-  const failed = status === taskStatuses.failed;
+function GoalStatusIcon({ displayStatus, status }) {
+  const currentStatus = displayStatus || status;
+  const done = currentStatus === taskStatuses.done;
+  const running = currentStatus === taskStatuses.running || currentStatus === taskStatuses.waitingApproval;
+  const failed = currentStatus === taskStatuses.failed;
   const label = failed ? "失败" : running ? "进行中" : done ? "已完成" : "待开始";
   return (
     <span className="goalTodoStatus" aria-label={label}>
@@ -4038,10 +4750,11 @@ function GoalStatusIcon({ status }) {
   );
 }
 
-function GoalTaskItem({ active, description, index, onSelect, status, subtasks = [], title }) {
-  const done = status === taskStatuses.done;
-  const running = status === taskStatuses.running || status === taskStatuses.waitingApproval;
-  const failed = status === taskStatuses.failed;
+function GoalTaskItem({ active, description, displayStatus, index, onSelect, status, subtasks = [], title }) {
+  const currentStatus = displayStatus || status;
+  const done = currentStatus === taskStatuses.done;
+  const running = currentStatus === taskStatuses.running || currentStatus === taskStatuses.waitingApproval;
+  const failed = currentStatus === taskStatuses.failed;
   const content = (
     <>
       <span className="goalTodoIndex">{index + 1}</span>
@@ -4049,7 +4762,7 @@ function GoalTaskItem({ active, description, index, onSelect, status, subtasks =
         <span className="goalTodoTitle">{title}</span>
         {!done && description && !subtasks.length ? <span className="goalTodoDescription">{description}</span> : null}
       </span>
-      <GoalStatusIcon status={status} />
+      <GoalStatusIcon displayStatus={displayStatus} status={status} />
     </>
   );
 
@@ -4663,22 +5376,27 @@ function App() {
       return task.projectName && task.projectName === snapshot.projectName;
     });
     let nextActivity = null;
-    if (planLoading || relatedTasks.some((task) => task.status === taskStatuses.running || task.id === terminalRunningId)) {
+    if (planLoading || relatedTasks.some((task) => task.id === terminalRunningId)) {
       nextActivity = { tone: "running", label: "进行中" };
     } else if (relatedTasks.some((task) => [taskStatuses.failed, "interrupted", "canceled", "cancelled", "error"].includes(task.status))) {
       nextActivity = { tone: "danger", label: "任务或会话中断" };
     }
-    setProjectActivities((current) => ({
-      ...current,
-      ...(nextActivity ? { [projectId]: nextActivity } : {}),
-    }));
+    setProjectActivities((current) => {
+      const next = { ...current };
+      if (nextActivity) {
+        next[projectId] = nextActivity;
+      } else {
+        delete next[projectId];
+      }
+      return next;
+    });
   }, [snapshot.currentProjectId, snapshot.currentProjectPath, snapshot.projectName, tasks, planLoading, terminalRunningId]);
 
   const markProjectActivitySeen = (projectId) => {
     if (!projectId) return;
     setProjectActivities((current) => {
       const activity = current[projectId];
-      if (activity?.tone !== "success") return current;
+      if (!activity?.tone || ["danger", "running"].includes(activity.tone)) return current;
       const next = { ...current };
       delete next[projectId];
       return next;
@@ -5269,6 +5987,9 @@ function App() {
           id: file.id,
           title: file.title || file.path,
           description: file.description,
+          governanceRole: file.governanceRole,
+          maturity: file.maturity,
+          nextAction: file.nextAction,
           relatedFiles: file.relatedFiles,
           statusSource: file.statusSource,
           updatesWhen: file.updatesWhen,
@@ -5418,6 +6139,53 @@ function App() {
     return true;
   };
 
+  const createDesignGovernanceTask = async ({ files = [], topic = {} } = {}) => {
+    const actionableFiles = files.filter((file) => file?.path);
+    if (!actionableFiles.length) return false;
+    const topicConfig = designImplementationTopics[topic?.id] || {};
+    const taskTitle = topicConfig.task || `审阅${topic?.title || "设计实现"}`;
+    const fileList = actionableFiles.map((file) => file.path);
+    const statusSummary = [...new Set(actionableFiles.map((file) => governanceFileHealthLabel(file.status)).filter(Boolean))];
+    const designPlan = {
+      candidateChanges: fileList.map((file) => `必要时同步 ${file}`),
+      checks: [
+        "npm --prefix desktop run web:build",
+        "bash scripts/check-runtime.sh .",
+        "bash scripts/check-doc-structure.sh .",
+      ],
+      filesToRead: fileList,
+      guardrails: [
+        "先判断架构、契约、规范和实现是否一致，不直接重构。",
+        "只生成最小治理任务和 Patch 草案，进入 Apply 前必须由用户确认。",
+        "涉及代码结构时保留现有模块边界，不做无关 UI 优化。",
+      ],
+      mode: "design-implementation-governance",
+      projectName: snapshot.projectName,
+      steps: [
+        `聚焦设计实现入口：${topic?.title || "设计实现"}`,
+        statusSummary.length ? `确认资产状态：${statusSummary.join("、")}` : "确认设计实现资产状态。",
+        "比对架构、数据契约、界面规范和实现结构是否一致。",
+        "生成最小处理方案，并运行构建和治理检查。",
+      ],
+      summary: `${taskTitle}：${fileList.slice(0, 3).join("、")}${fileList.length > 3 ? ` 等 ${fileList.length} 个文件` : ""}`,
+      task: taskTitle,
+      trace: [
+        `DESIGN_GOVERNANCE_TOPIC: ${topic?.id || "design-implementation"}`,
+        `DESIGN_GOVERNANCE_FILE_COUNT: ${fileList.length}`,
+      ],
+    };
+    const task = createTaskFromPlan(designPlan, taskTitle, snapshot, {
+      conversationId: activeConversationId,
+    });
+    await setAndPersistTask({
+      ...task,
+      designGovernanceFiles: actionableFiles,
+      designGovernanceTopic: topic?.id || "design-implementation",
+    });
+    showToast(`已生成设计实现治理任务：${taskTitle}`, "success");
+    return true;
+  };
+
   const generatePlan = async (request) => {
     const input = typeof request === "string" ? { task: request, attachments: [] } : request;
     const requestId = input.requestId || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -5520,6 +6288,9 @@ function App() {
     setActiveTaskId(id);
     setReadonlyPlan(task.plan);
     setSelectedEngineeringFile(null);
+    window.dispatchEvent(new CustomEvent("project-os:open-execution", {
+      detail: { taskId: id, source: "current-progress" },
+    }));
   };
 
   const selectConversation = (id) => {
@@ -6133,6 +6904,7 @@ function App() {
           onSelectTask={selectTask}
           onCreateRepairTask={createRepairTask}
           onCreateGovernanceTask={createGovernanceTask}
+          onCreateDesignGovernanceTask={createDesignGovernanceTask}
         />
         <RightRail
           collapsed={rightCollapsed}
@@ -6155,6 +6927,8 @@ function App() {
           onConfirmGoal={confirmGoal}
           validatingGoal={validatingGoal}
           signingGoal={signingGoal}
+          planLoading={planLoading}
+          terminalRunningId={terminalRunningId}
         />
       </main>
       {actionFeedback ? <ActionFeedbackToast feedback={actionFeedback} /> : null}

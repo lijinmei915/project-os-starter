@@ -243,6 +243,22 @@ Project OS Console 内核收口期 / Desktop v0.1 方向确认期
 - 二级菜单表达用户可进入的工作面，不暴露字段级表单项。
 - 同一信息只能有一个主入口，其他页面只能做摘要、跳转或引用。
 - `项目概览` 是总览驾驶舱，只汇总 `当前进度`、`启动方式`、`风险边界`、`本地状态`，不重复承载完整内容。
+- 所有菜单工作面必须遵守 `docs/design/workbench-visualization.md`：先状态，再动作，再证据，治理元信息不占据主视觉。
+
+菜单治理矩阵：
+
+| 菜单项 | 治理角色 | 状态来源 | 当前成熟度 | 下一步 |
+|--------|----------|----------|------------|--------|
+| 项目流程 / 认识项目 | 项目事实入口，回答项目是什么、到哪一步、当前风险是什么 | `.project-os/state.json`、`PROJECT.md`、`HANDOFF.md` | 状态化 | 自动生成工作区事实，并从扫描结果刷新项目概览 |
+| 项目流程 / 定义目标 | 目标治理入口，维护目标、范围、验收标准和目标历史 | `.project-os/goals.json`、`.project-os/goal-validation.json` | 状态化 | 接入目标拆解草案和确认拆解 |
+| 项目流程 / 工作规则 | 协作治理入口，约束 AI 行为、权限、路由和文档归属 | `AGENTS.md`、`docs/ROUTING.md`、`docs/DOCUMENTATION.md` | 闭环 | 规则变化后同步模板并跑治理检查 |
+| 项目流程 / 设计实现 | 方案治理入口，连接架构、契约、界面规范和实现结构 | `docs/ARCHITECTURE.md`、`schemas/*`、`docs/DESIGN_STANDARDS.md`、`docs/CODE_STRUCTURE.md` | 只读 | 补设计实现健康状态，并能生成架构/契约/规范治理任务 |
+| 项目流程 / 验证交付 | 质量治理入口，维护检查项、验收报告和运行记录 | `docs/TESTING.md`、`.project-os/runs/*`、`.project-os/goal-validation-report.json` | 状态化 | 验收失败后生成修复任务，并沉淀视觉或命令证据 |
+| 项目流程 / 复盘沉淀 | 经验治理入口，沉淀交接、决策、教训和变更历史 | `HANDOFF.md`、`docs/DECISIONS.md`、`docs/LESSONS.md`、`docs/CHANGELOG.md` | 状态化 | 结构化复盘内容，区分当前交接和长期记忆 |
+| 任务执行 | 执行治理入口，承载当前任务、队列、Patch 草案、终端和结果 | `.project-os/runs/desktop-tasks/*`、`.project-os/runs/desktop-summary.md` | 可行动 | 继续补失败重试、修复任务和验证回写 |
+| 知识记忆 | 上下文治理入口，区分项目事实、用户偏好、长期记忆和会话摘要 | `.project-os/workspace-facts.json`、`.project-os/memory/*`、`.project-os/conversations/*` | 只读 | 明确哪些信息可沉淀、何时沉淀、如何过期 |
+| 工程资产 | 资产治理入口，管理工程文件、治理文件、报告产物、Schema 和模板 | 项目文件树、`.project-os/workspace-facts.json`、`schemas/*`、`templates/*` | 可行动 | 复制治理文件健康视图模式到报告产物和 Schema |
+| Agent 配置 | 能力治理入口，管理模型、工具、Skill、适配器和安全边界 | `.project-os/desktop-provider.json`、`.agents/skills/*`、`adapters/*`、`docs/AI_SAFETY.md` | 状态化 | 把不可用原因转成配置修复任务 |
 
 Agent 开发优先级：
 
@@ -250,9 +266,19 @@ Agent 开发优先级：
 |--------|--------|----------|----------|
 | P0 | 任务执行闭环 | `任务执行` 工作面展示当前任务、队列、Patch 草案、终端和执行结果状态 | 用户能知道 Agent 当前在做什么、下一步该确认什么 |
 | P0 | 项目概览驾驶舱 | `项目概览` 保持摘要、健康分、快捷治理动作和核心文件入口 | 用户第一眼能看到健康状态、风险和推荐动作 |
+| P0 | 当前进度可视化 | `当前进度` 展示阶段、目标、任务完成度、最近完成、下一步和进度依据 | 用户能一眼知道项目推进到哪、下一步该点什么 |
 | P0 | Agent 配置状态 | `Agent 配置` 工作面展示模型连接、工具白名单、Skill 能力和安全边界 | 用户能判断 Agent 是否可用、能跑什么、为什么不能跑 |
 | P1 | 失败反馈机制 | 任务执行和治理动作失败时输出影响、原因和建议下一步 | 用户不用读原始命令也能理解失败 |
 | P1 | 记忆沉淀规则 | `知识记忆` 区分项目事实、用户偏好、长期记忆和会话摘要 | 信息沉淀不污染任务执行和工程资产 |
+
+设计实现治理闭环：
+
+| 工作面 | 当前能力 | 后续增强 |
+|--------|----------|----------|
+| 系统架构 | 展示 `docs/ARCHITECTURE.md` 状态，可生成架构审阅任务 | 增加架构与实际模块依赖一致性检查 |
+| 数据契约 | 展示 `schemas/*` / `docs/data/*` 状态，可生成契约审阅任务 | 增加 schema 注册表和示例数据校验 |
+| 界面规范 | 展示 `docs/DESIGN_STANDARDS.md` / `desktop/src/styles.css` 状态，可生成规范审阅任务 | 增加 token 使用和组件边界检查 |
+| 实现结构 | 展示 `docs/CODE_STRUCTURE.md` / 关键源码入口状态，可生成结构审阅任务 | 增加目录职责和大文件风险检查 |
 
 边界：
 

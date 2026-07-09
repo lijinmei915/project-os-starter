@@ -46,6 +46,7 @@ Project OS 现在已有 `desktop/` Tauri + React 前端运行层，并开始接�
 | `docs/design/tokens.md` | token 命名、数值表和使用原则 |
 | `docs/design/layout.md` | 页面壳、工作台、表单、列表和响应式布局规则 |
 | `docs/design/component-index.md` | 组件分层和索引 |
+| `docs/design/workbench-visualization.md` | OmniDesk 工作区各菜单工作面的可视化结构、状态和交互规范 |
 
 ---
 
