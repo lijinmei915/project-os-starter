@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
-import { ArrowLeftRight, Brain, Check, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, ClipboardList, Eraser, Loader2, MoreVertical, Package, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, RotateCcw, Square, TerminalSquare, X } from "lucide-react";
+import { Activity, AlertTriangle, ArrowLeftRight, ArrowRight, Brain, Check, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, ClipboardList, Eraser, FileText, Loader2, MessageSquare, MoreVertical, Package, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Play, Plus, RotateCcw, Server, ShieldAlert, Square, Target, TerminalSquare, X } from "lucide-react";
 import { ChatComposer } from "./components/workbench/chat-composer";
 import { Conversation, ConversationMessage } from "./components/workbench/conversation";
 import { InfoCallout } from "./components/workbench/info-callout";
@@ -1201,7 +1201,7 @@ function checksForPlan(plan) {
   );
 }
 
-function previewChatResult(message, hasAttachments) {
+function previewChatResult(message, hasAttachments, snapshot = {}, tasks = []) {
   const normalized = message.trim().replace(/[。！？!?,，\s]/g, "").toLowerCase();
   const lowerMessage = message.toLowerCase();
   const explicitTask = [
@@ -1218,6 +1218,24 @@ function previewChatResult(message, hasAttachments) {
   ].some((keyword) => message.includes(keyword));
   const shouldCreatePlan = explicitTask || (hasAttachments && !questionLike);
   const riskLike = message.includes("风险") || lowerMessage.includes("risk");
+  const statusLike = /状态|进度|下一步|总结|概况|现在/.test(message);
+  const developLike = /开发|改代码|实现|任务|执行|patch|检查|构建|验证/.test(lowerMessage);
+  const visibleTasks = Array.isArray(tasks) ? tasks.filter((task) => !isNoiseTask(task)) : [];
+  const activeTasks = visibleTasks.filter((task) => ![taskStatuses.done, taskStatuses.failed].includes(task.status));
+  const failedTasks = visibleTasks.filter((task) => task.status === taskStatuses.failed);
+  const doneTasks = visibleTasks.filter((task) => task.status === taskStatuses.done);
+  const activeGoal = activeGoalFromSnapshot(snapshot || {});
+  const validationStatus = snapshot?.goalValidationReport?.status || "待生成";
+  const projectName = snapshot?.projectName || snapshot?.workspaceFacts?.project?.name || "当前项目";
+  const phase = phaseLabel(snapshot?.phase || snapshot?.workspaceFacts?.project?.lifecycle || "stabilizing");
+  const currentFocus = activeTasks[0]?.title || activeGoal?.shortTitle || activeGoal?.title || "把工作台能力继续接到真实项目治理闭环";
+  const nextAction = failedTasks.length
+    ? `优先处理 ${failedTasks.length} 个失败任务，再继续推进当前开发任务。`
+    : activeTasks.length
+      ? `先推进「${activeTasks[0].title}」，完成后运行基础检查。`
+      : "先从当前目标创建一个小任务，再进入 Patch、验证和交接闭环。";
+  const statusReply = `${projectName} 处在「${phase}」阶段，当前焦点是「${currentFocus}」；下一步建议：${nextAction}`;
+  const developReply = `开发流程建议按四步走：先把需求生成任务计划，再看 Patch 草案，确认后应用改动，最后运行检查并沉淀交接。当前任务 ${visibleTasks.length} 个，已完成 ${doneTasks.length} 个，验收状态为 ${validationStatus}。`;
   return {
     intent: shouldCreatePlan ? "task" : questionLike ? "question" : "chat",
     reply: shouldCreatePlan
@@ -1226,7 +1244,11 @@ function previewChatResult(message, hasAttachments) {
         ? "你好，我在。"
         : riskLike
           ? "主要风险有三类：交接记录可能继续膨胀；对话和执行状态容易混在一起；模型或检查失败时反馈还不够像人话。我建议先把普通问答和执行任务彻底分开，再打磨失败提示。"
-          : "可以，我直接看当前上下文来回答。",
+          : statusLike
+            ? statusReply
+            : developLike
+              ? developReply
+              : "我可以直接回答项目问题；如果你说“帮我改/实现/优化”，我会先生成任务计划，再进入受控开发流程。",
     shouldCreatePlan,
   };
 }
@@ -1250,7 +1272,23 @@ function isExecutionWorkspaceTab(tab, actionMode) {
 
 function actionPromptsForMessage(message, intent) {
   const text = safeDisplayText(message).trim();
-  if (!text || intent !== "task") return [];
+  if (!text) return [];
+  if (intent !== "task") {
+    const actions = [];
+    if (/状态|进度|下一步|总结|概况|现在/.test(text)) {
+      actions.push({ id: "open-topic", label: "查看当前进度", target: "project-progress" });
+    }
+    if (/风险|检查|验证|报告/.test(text)) {
+      actions.push({ id: "open-topic", label: "查看风险与验收", target: text.includes("风险") ? "project-risks" : "validation-report" });
+    }
+    if (/开发|任务|执行|patch|改代码|实现/.test(text.toLowerCase())) {
+      actions.push({ id: "open-topic", label: "查看任务队列", target: "task-queue" });
+    }
+    if (!actions.length) {
+      actions.push({ id: "open-topic", label: "打开工作台", target: "workbench-overview" });
+    }
+    return actions.slice(0, 2);
+  }
   return [
     {
       id: "generate-plan",
@@ -1615,7 +1653,88 @@ const executionTabs = [
 ];
 
 function workspaceFileTabId(file) {
+  if (file?.virtual) return `topic:${file.id || file.title || file.path || "preview"}`;
   return `file:${file?.path || file?.preview?.path || file?.topic?.title || "preview"}`;
+}
+
+function topicItemKey({ child, item, node }) {
+  return [node?.id || node?.title, child?.id || child?.title, item?.id || item?.title].filter(Boolean).join("/");
+}
+
+function topicPayloadFromOutline(targetId) {
+  for (const node of projectGovernanceOutline) {
+    if (node.id === targetId || node.title === targetId) {
+      return {
+        description: node.description,
+        group: node.title,
+        governanceRole: node.governanceRole,
+        id: node.id,
+        maturity: node.maturity,
+        nextAction: node.nextAction,
+        path: node.id || node.title,
+        relatedFiles: node.files || [],
+        statusSource: node.statusSource,
+        title: node.title,
+        updatesWhen: node.updatesWhen,
+        virtual: true,
+      };
+    }
+    for (const child of node.children || []) {
+      if (child.id === targetId || child.title === targetId) {
+        return {
+          description: child.description,
+          group: child.title || node.title,
+          governanceRole: child.governanceRole || node.governanceRole,
+          id: child.id,
+          maturity: child.maturity || node.maturity,
+          nextAction: child.nextAction || node.nextAction,
+          path: child.id || child.title,
+          relatedFiles: child.files || [],
+          statusSource: child.statusSource || node.statusSource,
+          title: child.title,
+          updatesWhen: child.updatesWhen || node.updatesWhen,
+          virtual: true,
+        };
+      }
+      for (const item of child.items || []) {
+        if (item.id === targetId || item.title === targetId) {
+          return {
+            description: item.description,
+            group: child.title || node.title,
+            governanceRole: item.governanceRole || child.governanceRole || node.governanceRole,
+            id: item.id,
+            maturity: item.maturity || child.maturity || node.maturity,
+            nextAction: item.nextAction || child.nextAction || node.nextAction,
+            path: topicItemKey({ child, item, node }),
+            relatedFiles: item.relatedFiles || [],
+            statusSource: item.statusSource || child.statusSource || node.statusSource,
+            title: item.title,
+            updatesWhen: item.updatesWhen || child.updatesWhen || node.updatesWhen,
+            virtual: true,
+          };
+        }
+      }
+    }
+    for (const item of node.items || []) {
+      if (item.id === targetId || item.title === targetId) {
+        return {
+          description: item.description,
+          group: node.title,
+          governanceRole: item.governanceRole || node.governanceRole,
+          id: item.id,
+          maturity: item.maturity || node.maturity,
+          nextAction: item.nextAction || node.nextAction,
+          path: topicItemKey({ item, node }),
+          relatedFiles: item.relatedFiles || [],
+          statusSource: item.statusSource || node.statusSource,
+          title: item.title,
+          updatesWhen: item.updatesWhen || node.updatesWhen,
+          virtual: true,
+        };
+      }
+    }
+  }
+  return null;
 }
 
 function AgentWorkspace({
@@ -1710,6 +1829,7 @@ function AgentWorkspace({
       const title =
         selectedEngineeringFile.preview?.name ||
         selectedEngineeringFile.topic?.title ||
+        (selectedEngineeringFile.virtual ? selectedEngineeringFile.title : "") ||
         selectedEngineeringFile.path ||
         "文件";
       setWorkspaceTabs((current) => {
@@ -1792,6 +1912,39 @@ function AgentWorkspace({
     ]);
   };
 
+  const navigateWorkbench = (target) => {
+    if (!target) return;
+    if (target === "conversation") {
+      setActiveWorkspaceTab("plan");
+      return;
+    }
+    if (target === "terminal") {
+      setActiveWorkspaceTab("terminal");
+      return;
+    }
+    if (target === "execution") {
+      if (!actionMode) {
+        const topic = topicPayloadFromOutline("project-progress");
+        if (topic) onSelectEngineeringFile?.(topic);
+        return;
+      }
+      ensureExecutionTabs();
+      setActiveWorkspaceTab("execution");
+      return;
+    }
+    if (typeof target === "object" && target.type === "file" && target.path) {
+      onSelectEngineeringFile?.({
+        description: "来自工作台活动的工程文件。",
+        path: target.path,
+      });
+      return;
+    }
+    const topic = topicPayloadFromOutline(target);
+    if (topic) {
+      onSelectEngineeringFile?.(topic);
+    }
+  };
+
   const openCurrentProgress = () => {
     setWorkspaceTabs((current) => {
       const progressTab = current.find((tab) =>
@@ -1853,7 +2006,7 @@ function AgentWorkspace({
     let chatResult;
     try {
       if (!isTauriRuntime()) {
-        chatResult = previewChatResult(nextInput, submittedAttachments.length > 0);
+        chatResult = previewChatResult(nextInput, submittedAttachments.length > 0, snapshot, tasks);
       } else {
         chatResult = await invokeWorkspaceCommand("chat_with_model", {
           input: {
@@ -2095,6 +2248,7 @@ function AgentWorkspace({
                 onMergeHandoff={onMergeHandoff}
                 onRunGuardedCheck={onRunGuardedCheck}
                 onSelectTask={onSelectTask}
+                onNavigateWorkbench={navigateWorkbench}
                 onCreateRepairTask={onCreateRepairTask}
                 onCreateGovernanceTask={onCreateGovernanceTask}
                 onCreateDesignGovernanceTask={onCreateDesignGovernanceTask}
@@ -2240,6 +2394,15 @@ function ChatDock({
   const placeholder = goalRefinementMode
     ? "说说哪里还不满意，比如交互、视觉、文案、流程或结果..."
     : "问项目情况、描述想法，或说要改什么...";
+  const draftText = safeDisplayText(taskInput).toLowerCase();
+  const actionDraft = isActionRequestMessage(taskInput, attachments.length > 0);
+  const modeHint = planLoading || chatLoading
+    ? "正在处理：你可以继续补充要求，也可以停止生成。"
+    : actionDraft
+      ? "开发模式：会先生成任务计划，确认后才会改文件。"
+      : draftText.trim()
+        ? "问答模式：先回答问题，不会改文件。"
+        : "普通问题直接回答；开发需求会进入任务、Patch 和验证流程。";
 
   return (
     <section className="chatDock" aria-label="对话输入">
@@ -2262,6 +2425,7 @@ function ChatDock({
         modelProfile={modelProfile}
         modelSource={modelSource}
         modelTesting={modelTesting}
+        modeHint={modeHint}
         onModelMenuOpen={onLoadComposerModels}
         onModelSelect={onSelectComposerModel}
         onModelTest={onTestComposerModel}
@@ -3286,7 +3450,7 @@ function ReportArtifactsPanel({ snapshot }) {
   );
 }
 
-function WorkspaceFactsPreview({ onCreateGovernanceTask, report }) {
+function WorkspaceFactsPreview({ onCreateGovernanceTask, onNavigate, provider, report, snapshot, tasks = [] }) {
   const [currentReport, setCurrentReport] = useState(report);
   const [refreshing, setRefreshing] = useState(false);
   const [runningAction, setRunningAction] = useState("");
@@ -3317,6 +3481,26 @@ function WorkspaceFactsPreview({ onCreateGovernanceTask, report }) {
   const healthDimensions = Array.isArray(healthScore.dimensions) ? healthScore.dimensions : [];
   const governanceLevel = currentReport?.governanceLevel || {};
   const governanceLevels = Array.isArray(governanceLevel.levels) ? governanceLevel.levels : [];
+  const activeGoal = activeGoalFromSnapshot(snapshot || {});
+  const goals = Array.isArray(snapshot?.goals?.goals) ? snapshot.goals.goals : [];
+  const visibleTasks = tasks.filter((task) => !isNoiseTask(task));
+  const runningTasks = visibleTasks.filter((task) => task.status === taskStatuses.running);
+  const plannedTasks = visibleTasks.filter((task) => task.status === taskStatuses.planned || task.status === taskStatuses.waitingApproval);
+  const failedTasks = visibleTasks.filter((task) => task.status === taskStatuses.failed);
+  const doneTasks = visibleTasks.filter((task) => task.status === taskStatuses.done);
+  const openTasks = [...runningTasks, ...plannedTasks];
+  const draftGoals = goals.filter((goal) => goal.status === "draft" || goal.status === "planned" || goal.status === "pending-confirm");
+  const validationChecks = Array.isArray(snapshot?.goalValidationReport?.checks) ? snapshot.goalValidationReport.checks : [];
+  const failedChecks = validationChecks.filter((check) => check && check.success === false);
+  const taskProgressTotal = visibleTasks.length || goals.length || 0;
+  const taskProgressDone = visibleTasks.length ? doneTasks.length : goals.filter((goal) => goal.status === "done").length;
+  const progressText = taskProgressTotal ? `${taskProgressDone}/${taskProgressTotal} (${Math.round((taskProgressDone / taskProgressTotal) * 100)}%)` : statusLabel(currentReport?.status);
+  const projectIssuesCount = risks.length + missing.length + failedTasks.length + failedChecks.length + draftGoals.length;
+  const localStatusText = failedTasks.length || failedChecks.length
+    ? "需处理"
+    : runningTasks.length
+      ? "执行中"
+      : statusLabel(currentReport?.status) || "正常运行";
   const governanceActions = [
     { id: "scan", label: "一键扫描" },
     { id: "recommend", label: "生成优化建议" },
@@ -3331,6 +3515,210 @@ function WorkspaceFactsPreview({ onCreateGovernanceTask, report }) {
     currentReport?.project?.lifecycle,
     detectedStack,
   ].filter(Boolean);
+  const projectPhase = currentReport?.project?.lifecycle || currentReport?.project?.phase || "stabilizing";
+  const warningItems = [
+    ...failedTasks.map((task) => ({
+      action: "打开任务",
+      body: failureSummaryForTask(task) || task.plan?.summary || "任务执行失败，需要查看运行记录并生成修复任务。",
+      target: "execution",
+      tone: "danger",
+      title: task.title || "任务失败",
+      type: "高危预警",
+    })),
+    ...failedChecks.map((check) => ({
+      action: "查看报告",
+      body: check.output || check.command || "最近一次验收检查未通过。",
+      target: "validation-report",
+      tone: "danger",
+      title: check.label || check.id || "验收失败",
+      type: "高危预警",
+    })),
+    ...risks.map((item) => ({
+      action: "查看详情",
+      body: item.body || item.description || "需要确认风险边界。",
+      target: "project-risks",
+      tone: item.severity === "high" ? "danger" : "warning",
+      title: item.title || "风险预警",
+      type: item.severity === "high" ? "高危预警" : "状态警告",
+    })),
+    ...missing.map((item) => ({
+      action: "补齐信息",
+      body: item.body || item.description || "存在缺失项，需要补齐。",
+      target: "governance-files",
+      tone: "warning",
+      title: item.title || "治理缺口",
+      type: "状态警告",
+    })),
+    ...draftGoals.map((goal) => ({
+      action: "前往确认",
+      body: goal.summary || "目标处于待确认状态，需要进入目标治理确认范围和验收口径。",
+      target: "current-goal",
+      tone: "info",
+      title: goal.shortTitle || goal.title || "待确认目标",
+      type: "操作提示",
+    })),
+    ...recommendations.slice(0, 2).map((item) => ({
+      action: "查看建议",
+      body: item.problem || item.action || "已有治理优化建议。",
+      target: item.files?.[0] ? { type: "file", path: item.files[0] } : "current-goal",
+      tone: item.severity === "high" ? "danger" : "info",
+      title: item.title || "操作提示",
+      type: item.severity === "high" ? "高危预警" : "操作提示",
+    })),
+  ].slice(0, 3);
+  const fallbackWarnings = [
+    {
+      action: "前往确认",
+      body: "系统检测到目标或任务仍有待确认项，需要人工确认后进入执行闭环。",
+      target: "current-goal",
+      tone: "info",
+      title: "待确认目标",
+      type: "操作提示",
+    },
+  ];
+  const visibleWarnings = warningItems.length ? warningItems.slice(0, 3) : fallbackWarnings;
+  const warningCounts = (warningItems.length ? warningItems : visibleWarnings).reduce((acc, item) => {
+    acc[item.tone] = (acc[item.tone] || 0) + 1;
+    return acc;
+  }, {});
+  const primaryFocus = failedTasks[0]
+    ? {
+      next: failureSummaryForTask(failedTasks[0]) || "任务失败，需要查看运行记录并修复。",
+      target: "execution",
+      title: failedTasks[0].title || "处理失败任务",
+    }
+    : failedChecks[0]
+      ? {
+        next: failedChecks[0].command || "最近一次验收未通过，需要查看报告。",
+        target: "validation-report",
+        title: failedChecks[0].label || "处理失败验收",
+      }
+      : runningTasks[0]
+        ? {
+          next: runningTasks[0].plan?.summary || "任务正在执行，优先观察结果和终端输出。",
+          target: "execution",
+          title: runningTasks[0].title || "跟进运行中任务",
+        }
+        : draftGoals[0]
+          ? {
+            next: draftGoals[0].summary || "目标待确认，需要确认范围和验收标准。",
+            target: "current-goal",
+            title: draftGoals[0].shortTitle || draftGoals[0].title || "确认当前目标",
+          }
+          : recommendations[0]
+            ? {
+              next: recommendations[0].action || recommendations[0].problem,
+              target: recommendations[0].files?.[0] ? { type: "file", path: recommendations[0].files[0] } : "governance-files",
+              title: recommendations[0].title || "处理治理建议",
+            }
+            : {
+              next: currentReport?.summary?.currentProgress?.body || activeGoal?.summary || "下一步：确认当前焦点，必要时运行一轮基础检查。",
+              target: "project-progress",
+              title: currentReport?.summary?.currentProgress?.title || activeGoal?.shortTitle || activeGoal?.title || "推进当前项目治理闭环",
+            };
+  const focusTitle = primaryFocus.title;
+  const focusNext = primaryFocus.next;
+  const recentActivities = [
+    ...visibleTasks.slice(0, 3).map((task) => ({
+      body: task.plan?.summary || task.description || task.projectName || "来自当前任务队列。",
+      target: task.status === taskStatuses.done || task.status === taskStatuses.failed ? "execution-results" : "execution",
+      title: task.title || "任务更新",
+      when: task.updatedAt || task.createdAt || taskStatusLabel(task.status),
+      tone: task.status === taskStatuses.failed ? "danger" : task.status === taskStatuses.done ? "success" : "neutral",
+    })),
+    ...recommendations.slice(0, 3).map((item) => ({
+      body: item.problem || item.action || "已生成治理建议。",
+      target: item.files?.[0] ? { type: "file", path: item.files[0] } : "governance-files",
+      title: item.title || "生成治理建议",
+      when: item.impact || "刚刚",
+      tone: "success",
+    })),
+    ...evidence.filter((item) => item.status === "found").slice(0, 3).map((item) => ({
+      body: item.reason || item.path || "已纳入工作台事实。",
+      target: item.path ? { type: "file", path: item.path } : "governance-files",
+      title: `识别 ${item.source || item.path || "工程文件"}`,
+      when: "本次扫描",
+      tone: "neutral",
+    })),
+  ].slice(0, 4);
+  const quickCounts = {
+    conversation: "",
+    execution: openTasks.length || visibleTasks.length || "",
+    terminal: runningTasks.length || "",
+    "project-identity": projectIssuesCount || "",
+    "engineering-files": evidence.filter((item) => item.status === "found").length || "",
+    "validation-report": failedChecks.length || snapshot?.goalValidationReport?.status || "",
+  };
+  const quickLinks = [
+    ["当前对话", "对话", MessageSquare, "conversation"],
+    ["当前任务", "任务", Check, "execution"],
+    ["终端", "命令", TerminalSquare, "terminal"],
+    ["项目流程", "治理", ClipboardList, "project-identity"],
+    ["工程资产", "文件", Package, "engineering-files"],
+    ["验证报告", "验收", FileText, "validation-report"],
+  ];
+  const dashboardStats = [
+    ["当前项目", currentReport?.project?.name || "OmniDesk", "project-identity"],
+    ["项目阶段", projectPhase, "project-progress"],
+    ["目标进度", progressText, "project-progress"],
+    ["治理健康", Number.isFinite(healthScore.score) ? `${healthScore.score}/100` : statusLabel(currentReport?.status), "governance-files"],
+    ["本地状态", localStatusText, "local-project-state"],
+  ];
+  const projectProfileMissing = Array.isArray(snapshot?.projectProfile?.missingFields)
+    ? snapshot.projectProfile.missingFields.length
+    : 0;
+  const governanceFilesCount = governanceDomains.reduce((sum, domain) => sum + (Array.isArray(domain.files) ? domain.files.length : 0), 0);
+  const reportAssetsReady = Boolean(snapshot?.goalValidationReport?.status) || recommendations.length > 0 || Number.isFinite(healthScore.score);
+  const agentReady = Boolean(provider?.enabled && provider?.model);
+  const taskExecutionReady = visibleTasks.length > 0 || Boolean(snapshot?.runCount);
+  const onboardingCards = [
+    {
+      action: projectProfileMissing ? "补齐事实" : "查看事实",
+      body: projectProfileMissing
+        ? `还有 ${projectProfileMissing} 项项目事实待补齐，Agent 理解项目时会优先提示确认。`
+        : "项目身份、阶段、栈和治理事实已可用于 Agent 上下文。",
+      metric: projectProfileMissing ? `${projectProfileMissing} 缺失` : "已识别",
+      status: projectProfileMissing ? "待补齐" : "可用",
+      target: "project-facts",
+      title: "项目事实",
+      tone: projectProfileMissing ? "warning" : "success",
+    },
+    {
+      action: "查看资产",
+      body: governanceFilesCount
+        ? `已识别 ${governanceFilesCount} 个治理域文件引用，可按工程文件、治理文件、报告、Schema 和脚本下钻。`
+        : "还需要扫描关键工程文件、治理文件、报告产物和脚本模板。",
+      metric: governanceFilesCount ? `${governanceFilesCount} 文件` : "待扫描",
+      status: governanceFilesCount ? "已发现" : "待扫描",
+      target: "engineering-files",
+      title: "工程资产",
+      tone: governanceFilesCount ? "success" : "warning",
+    },
+    {
+      action: agentReady ? "查看配置" : "配置模型",
+      body: agentReady
+        ? `当前模型 ${provider.model} 已接入，工具白名单、Skill、适配器和安全边界可继续检查。`
+        : "模型连接未完全可用，其他项目接入后需要先配置 Provider 和默认模型。",
+      metric: agentReady ? "已接入" : "待配置",
+      status: agentReady ? "可用" : "待配置",
+      target: "model-connections",
+      title: "Agent 配置",
+      tone: agentReady ? "success" : "warning",
+    },
+    {
+      action: taskExecutionReady ? "查看队列" : "创建任务",
+      body: taskExecutionReady
+        ? `当前有 ${visibleTasks.length} 个任务记录、${runningTasks.length} 个运行中任务，可进入受控执行链路。`
+        : "还没有任务队列，接入项目后需要从对话或目标生成第一批任务。",
+      metric: taskExecutionReady ? `${visibleTasks.length} 任务` : "待创建",
+      status: failedTasks.length ? "需处理" : taskExecutionReady ? "可执行" : "待创建",
+      target: taskExecutionReady ? "task-queue" : "conversation",
+      title: "任务执行",
+      tone: failedTasks.length ? "danger" : taskExecutionReady ? "success" : "warning",
+    },
+  ];
+  const onboardingBlockers = onboardingCards.filter((card) => card.tone !== "success").length;
+  const onboardingReady = onboardingCards.length - onboardingBlockers;
   const refreshFacts = async (source = "manual") => {
       setRefreshing(true);
       setFeedback(source === "auto" ? "正在自动更新工作区事实..." : "正在手动刷新当前项目事实...");
@@ -3380,174 +3768,136 @@ function WorkspaceFactsPreview({ onCreateGovernanceTask, report }) {
     }
   };
   return (
-    <div className="workspaceFacts">
-      <div className="workspaceFactsHero">
-        <div>
-          <span className="workspaceFactsKicker">工作区事实</span>
-          <h3>{currentReport?.project?.name || "当前项目"}</h3>
-          <p>{currentReport?.project?.description || "OmniDesk 已理解当前项目，并把关键事实整理到工作区视图里。"}</p>
-          {metaParts.length ? <div className="workspaceFactsMeta">{metaParts.join(" · ")}</div> : null}
-        </div>
-        <div className="workspaceFactsStatus">
-          <Badge>{statusLabel(currentReport?.status)}</Badge>
-          <span>已自动接入工作区</span>
-        </div>
-      </div>
+    <div className="workspaceFacts workbenchDashboard">
+      <section className="workbenchHero">
+        <h3>今日工作台</h3>
+        {metaParts.length ? <p>{metaParts.join(" · ")}</p> : null}
+      </section>
 
-      <Notice variant="info">项目已自动接入 OmniDesk 工作区。当前工程文件仅支持预览，不会在这里直接编辑或改写你的工程文件。</Notice>
-      <div className="workspaceFactsActions" aria-label="工作区事实操作">
-        {governanceActions.map((action) => (
-          <Button
-            key={action.id}
-            size="sm"
-            variant={action.id === "scan" ? "primary" : "subtle"}
-            type="button"
-            disabled={refreshing || Boolean(runningAction)}
-            onClick={() => handleWorkspaceAction(action.id)}
-          >
-            {runningAction === action.id ? "执行中" : action.label}
-          </Button>
+      <section className="workbenchStatGrid" aria-label="工作台状态总览">
+        {dashboardStats.map(([label, value, target]) => (
+          <button className="workbenchStatCard" key={label} type="button" onClick={() => onNavigate?.(target)}>
+            <span>{label}</span>
+            <strong>{value}</strong>
+          </button>
         ))}
-        <Button size="sm" variant="subtle" type="button" disabled={refreshing || Boolean(runningAction)} onClick={() => handleWorkspaceAction("refresh")}>{refreshing ? "更新中" : "手动刷新"}</Button>
-      </div>
+      </section>
+
+      <section className="workbenchOnboarding">
+        <header>
+          <div>
+            <strong>项目接入状态</strong>
+            <p>{onboardingReady}/{onboardingCards.length} 条链路可用，{onboardingBlockers ? `${onboardingBlockers} 项需要处理` : "可以进入日常工作"}</p>
+          </div>
+          <button type="button" onClick={() => onNavigate?.("governance-files")}>查看接入详情</button>
+        </header>
+        <div className="workbenchOnboardingGrid">
+          {onboardingCards.map((card) => (
+            <button className={`workbenchOnboardingCard tone-${card.tone}`} key={card.title} type="button" onClick={() => onNavigate?.(card.target)}>
+              <span>{card.status}</span>
+              <strong>{card.title}</strong>
+              <p>{card.body}</p>
+              <small>{card.metric} · {card.action}</small>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="workbenchFocusSection">
+        <h4>当前焦点</h4>
+        <div className="workbenchFocus">
+          <div>
+            <span className="workbenchFocusLabel"><Activity size={14} />进行中任务</span>
+            <strong>{focusTitle}</strong>
+            <p>{focusNext}</p>
+          </div>
+          <Button variant="primary" type="button" disabled={refreshing || Boolean(runningAction)} onClick={() => onNavigate?.(primaryFocus.target)}>
+            <Play size={14} fill="currentColor" />
+            {runningAction === "scan" ? "执行中" : "继续执行"}
+          </Button>
+        </div>
+      </section>
       {feedback ? <Notice variant="success">{feedback}</Notice> : null}
 
-      {Number.isFinite(healthScore.score) ? (
-        <section className="workspaceHealthScore">
-          <header>
-            <div>
-              <span>治理健康分</span>
-              <strong>{healthScore.label || `${healthScore.score} / 100`}</strong>
-              <p>{healthScore.summary}</p>
-            </div>
-            <Badge>{healthScore.status || "score"}</Badge>
-          </header>
-          {healthDimensions.length ? (
-            <div className="workspaceHealthDimensions">
-              {healthDimensions.map((dimension) => (
-                <div className="workspaceHealthDimension" key={dimension.id}>
-                  <div>
-                    <strong>{dimension.label}</strong>
-                    <span>{dimension.score}</span>
-                  </div>
-                  <meter min="0" max="100" value={dimension.score} aria-label={`${dimension.label} ${dimension.score}`} />
-                  <p>{dimension.reason}</p>
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </section>
-      ) : null}
-
-      {governanceLevel.current ? (
-        <section className="workspaceGovernanceLevel">
-          <header>
-            <div>
-              <span>当前治理等级</span>
-              <strong>{governanceLevel.current} {governanceLevel.name}</strong>
-              <p>{governanceLevel.description}</p>
-            </div>
-            {governanceLevel.next ? (
-              <Badge>下一步 {governanceLevel.next} {governanceLevel.nextName}</Badge>
-            ) : null}
-          </header>
-          {governanceLevels.length ? (
-            <div className="workspaceGovernanceLevelTrack">
-              {governanceLevels.map((level) => (
-                <div
-                  className={`workspaceGovernanceLevelStep${level.id === governanceLevel.current ? " active" : ""}`}
-                  key={level.id}
-                  title={level.description}
-                >
-                  <span>{level.id}</span>
-                  <strong>{level.name}</strong>
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </section>
-      ) : null}
-
-      <div className="workspaceFactsQuickEntries" aria-label="项目治理入口">
-        {quickEntries.map((entry) => (
-          <section className="workspaceFactsQuickEntry" key={entry.key}>
-            <header>
-              <strong>{entry.title}</strong>
-              <span>{statusLabel(entry.status)}{entry.confidence ? ` · ${Math.round(entry.confidence * 100)}%` : ""}</span>
-            </header>
-            <p>{entry.description}</p>
-          </section>
-        ))}
-      </div>
-
-      <div className="workspaceFactsColumns">
-        <section>
-          <strong>工程文件如何进入治理</strong>
-          <p>OmniDesk 自动扫描项目根目录，把关键文件按职责归入治理域；这里记录路径和用途，不复制、不改写原工程文件。</p>
-          <div className="workspaceFactsSources workspaceFactsSources-plain">
-            {sourceNames.map((source) => <code key={source}>{source}</code>)}
+      <section className="workbenchWarnings">
+        <header>
+          <div>
+            <strong>系统预警</strong>
+            <span className="workbenchWarningPills">
+              <em className="danger">{warningCounts.danger || 0} 高危</em>
+              <em className="warning">{warningCounts.warning || 0} 警告</em>
+              <em className="info">{warningCounts.info || 0} 提示</em>
+            </span>
           </div>
-        </section>
-        <section>
-          <strong>治理域</strong>
-          <div className="workspaceFactsDomainList">
-            {governanceDomains.slice(0, 5).map((domain) => (
-              <div key={domain.id || domain.title}>
-                <span>{domain.title}</span>
-                <p>
-                  {Array.isArray(domain.files) && domain.files.length
-                    ? `${domain.files.length} 个文件：${domain.files.slice(0, 3).join("、")}`
-                    : domain.description}
-                </p>
+          <p>共发现 {visibleWarnings.length} 项需处理事项</p>
+        </header>
+        <div className="workbenchWarningGrid">
+          {visibleWarnings.map((item) => (
+            <article className={`workbenchWarningCard tone-${item.tone}`} key={`${item.type}-${item.title}`}>
+              <span className="workbenchWarningType">
+                {item.tone === "danger" ? <ShieldAlert size={14} /> : item.tone === "warning" ? <AlertTriangle size={14} /> : <Target size={14} />}
+                {item.type}
+              </span>
+              <strong>{item.title}</strong>
+              <p>{item.body}</p>
+              <div>
+                <button type="button" onClick={() => onNavigate?.(item.target)}>{item.action}<ArrowRight size={12} /></button>
+                <button type="button" onClick={() => onNavigate?.(item.target)}>查看详情</button>
               </div>
-            ))}
-            {!governanceDomains.length ? [...missing, ...risks].slice(0, 3).map((item) => (
-              <div key={item.title}>
-                <span>{item.severity || "info"}</span>
-                <p>{item.title}：{item.body}</p>
-              </div>
-            )) : null}
-          </div>
-        </section>
-      </div>
+            </article>
+          ))}
+        </div>
+      </section>
 
-      {recommendations.length ? (
-        <section className="workspaceRecommendations">
-          <header>
-            <div>
-              <strong>L2 建议修复草稿</strong>
-              <p>基于当前治理事实生成建议，不直接修改工程文件。</p>
-            </div>
-            <Badge>{recommendations.length} drafts</Badge>
-          </header>
-          <div className="workspaceRecommendationList">
-            {recommendations.slice(0, 5).map((item) => (
-              <article className="workspaceRecommendationItem" key={item.id || item.title}>
-                <header>
-                  <div>
-                    <span>{item.domain}</span>
-                    <strong>{item.title}</strong>
-                  </div>
-                  <Badge>{item.severity || "info"}</Badge>
-                </header>
-                <p>{item.problem}</p>
-                <p>{item.action}</p>
-                {Array.isArray(item.files) && item.files.length ? (
-                  <div className="workspaceRecommendationFiles">
-                    {item.files.slice(0, 4).map((file) => <code key={file}>{file}</code>)}
-                  </div>
-                ) : null}
-                <div className="workspaceRecommendationMeta">
-                  <span>{item.canPromoteToL3 ? "可进入 L3 受控修复" : "先保持 L2 建议"}</span>
-                  {item.impact ? <span>{item.impact}</span> : null}
-                </div>
-              </article>
+      <section className="workbenchLowerGrid">
+        <div>
+          <strong>快捷入口</strong>
+          <div className="workbenchShortcutGrid">
+            {quickLinks.map(([title, label, Icon, target]) => (
+              <button type="button" key={title} onClick={() => onNavigate?.(target)}>
+                <Icon size={18} />
+                <strong>{title}</strong>
+                <span>{quickCounts[target] ? `${label} · ${quickCounts[target]}` : label}</span>
+              </button>
             ))}
           </div>
-        </section>
-      ) : null}
+        </div>
+        <div>
+          <strong>最近活动</strong>
+          <div className="workbenchActivityList">
+            {(recentActivities.length ? recentActivities : [{ title: "工作台已接入", body: "项目事实已进入工作台总览。", when: "刚刚", tone: "success" }]).map((item) => (
+              <button className="workbenchActivityItem" key={`${item.title}-${item.when}`} type="button" onClick={() => onNavigate?.(item.target || "governance-files")}>
+                <span className={`workbenchActivityDot tone-${item.tone}`} />
+                <div>
+                  <strong>{item.title}</strong>
+                  <p>{item.body}</p>
+                  <small>{item.when}</small>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
 
-      <GovernanceFilesHealthSection onCreateGovernanceTask={onCreateGovernanceTask} report={currentReport} />
+      <details className="workbenchAdvanced">
+        <summary>治理详情与自动化动作</summary>
+        <div className="workspaceFactsActions" aria-label="工作区事实操作">
+          {governanceActions.map((action) => (
+            <Button
+              key={action.id}
+              size="sm"
+              variant={action.id === "scan" ? "primary" : "subtle"}
+              type="button"
+              disabled={refreshing || Boolean(runningAction)}
+              onClick={() => handleWorkspaceAction(action.id)}
+            >
+              {runningAction === action.id ? "执行中" : action.label}
+            </Button>
+          ))}
+          <Button size="sm" variant="subtle" type="button" disabled={refreshing || Boolean(runningAction)} onClick={() => handleWorkspaceAction("refresh")}>{refreshing ? "更新中" : "手动刷新"}</Button>
+        </div>
+        <GovernanceFilesHealthSection onCreateGovernanceTask={onCreateGovernanceTask} report={currentReport} />
+      </details>
     </div>
   );
 }
@@ -3569,6 +3919,7 @@ function AgentTopicPanel({
   onSelectTask,
   onCreateRepairTask,
   onCreateGovernanceTask,
+  onOpenCapabilityFile,
 }) {
   const id = topic?.id || "";
   const visibleTasks = tasks.filter((task) => !isNoiseTask(task));
@@ -3672,7 +4023,134 @@ function AgentTopicPanel({
     { disabled: true, key: "empty-verify", label: "运行检查" },
     { disabled: true, key: "empty-handoff", label: "更新交接" },
   ];
+  const assetDomains = Array.isArray(snapshot?.workspaceFacts?.governanceDomains) ? snapshot.workspaceFacts.governanceDomains : [];
+  const assetDomainById = (domainId, title) => assetDomains.find((domain) => domain.id === domainId || domain.title === title);
+  const assetDomainFileCount = (domain) => Array.isArray(domain?.files) ? domain.files.length : 0;
+  const assetDomainRiskCount = (domain) => (Array.isArray(domain?.fileStatuses) ? domain.fileStatuses : [])
+    .filter((file) => ["missing", "changed", "stale"].includes(file.status || "")).length;
+  const engineeringDomain = assetDomainById("engineering-files", "工程文件");
+  const governanceDomain = assetDomainById("governance-files", "治理文件");
+  const reportDomain = assetDomainById("report-artifacts", "报告产物");
+  const schemaDomain = assetDomainById("schema-assets", "Schema");
+  const scriptDomain = assetDomainById("script-templates", "脚本模板");
+  const profileMissingCount = Array.isArray(snapshot?.projectProfile?.missingFields) ? snapshot.projectProfile.missingFields.length : 0;
+  const profileKnownCount = Math.max(0, 5 - profileMissingCount);
+  const memoryItems = Array.isArray(snapshot?.memory) ? snapshot.memory : [];
+  const conversationCount = Array.isArray(snapshot?.conversations) ? snapshot.conversations.length : 0;
+  const activeGoal = activeGoalFromSnapshot(snapshot || {});
+  const goals = Array.isArray(snapshot?.goals?.goals) ? snapshot.goals.goals : [];
+  const doneGoals = goals.filter((goal) => goal.status === "done");
+  const openGoals = goals.filter((goal) => goal.status !== "done");
+  const validationChecks = Array.isArray(snapshot?.goalValidationReport?.checks) ? snapshot.goalValidationReport.checks : [];
+  const passedChecks = validationChecks.filter((check) => check?.success).length;
+  const projectPhase = phaseLabel(snapshot?.phase || snapshot?.workspaceFacts?.project?.lifecycle);
+  const topicRelatedCount = Array.isArray(topic?.relatedFiles) ? topic.relatedFiles.length : 0;
   const cardsByTopic = {
+    "project-identity": [
+      ["项目阶段", projectPhase],
+      ["事实完整度", `${profileKnownCount}/5`],
+      ["来源文件", `${topicRelatedCount || 2}`],
+    ],
+    "project-progress": [
+      ["当前目标", activeGoal?.shortTitle || activeGoal?.title || "未选择"],
+      ["任务数量", `${visibleTasks.length}`],
+      ["运行中", `${activeTasks.length}`],
+    ],
+    "project-runbook": [
+      ["启动入口", "desktop/package.json"],
+      ["检查命令", `${validationChecks.length || 3}`],
+      ["状态", "可验证"],
+    ],
+    "project-risks": [
+      ["风险来源", "HANDOFF / LESSONS"],
+      ["失败任务", `${failedTasks.length}`],
+      ["需关注", `${assetDomainRiskCount(governanceDomain)}`],
+    ],
+    "local-project-state": [
+      ["接入状态", snapshot?.workspaceFacts?.status || "connected"],
+      ["运行记录", `${snapshot?.runCount || 0}`],
+      ["本地项目", snapshot?.currentProjectId ? "已选中" : "待选择"],
+    ],
+    "current-goal": [
+      ["当前目标", activeGoal?.shortTitle || activeGoal?.title || "未选择"],
+      ["目标状态", activeGoal ? goalStatusLabelText(activeGoal.status) : "空"],
+      ["目标总数", `${goals.length}`],
+    ],
+    "acceptance-criteria": [
+      ["验收状态", snapshot?.goalValidationReport?.status || "missing"],
+      ["检查项", validationChecks.length ? `${passedChecks}/${validationChecks.length}` : "待补齐"],
+      ["来源", ".project-os/goal-validation.json"],
+    ],
+    "goal-history": [
+      ["已完成", `${doneGoals.length}`],
+      ["进行中", `${openGoals.length}`],
+      ["历史来源", ".project-os/goals.json"],
+    ],
+    "collaboration-boundary": [
+      ["规则来源", "AGENTS.md"],
+      ["路由来源", "docs/ROUTING.md"],
+      ["状态", "已接入"],
+    ],
+    "execution-permissions": [
+      ["自动边界", "受控命令"],
+      ["确认边界", "写入/发布/高风险"],
+      ["状态", "规则已接入"],
+    ],
+    "documentation-rules": [
+      ["文档边界", "DOCUMENTATION"],
+      ["命名规则", "NAMING"],
+      ["状态", "已接入"],
+    ],
+    "system-architecture": [
+      ["架构来源", "docs/ARCHITECTURE.md"],
+      ["实现入口", "desktop/src"],
+      ["状态", "待细化"],
+    ],
+    "data-contracts": [
+      ["契约来源", "schemas / docs/data"],
+      ["Schema 状态", assetDomainFileCount(schemaDomain) ? "已发现" : "待补齐"],
+      ["用途", "状态和报告结构"],
+    ],
+    "ui-standards": [
+      ["规范来源", "DESIGN_STANDARDS"],
+      ["Token 来源", "desktop/src/styles.css"],
+      ["状态", "已接入"],
+    ],
+    "code-structure": [
+      ["结构来源", "CODE_STRUCTURE"],
+      ["前端入口", "desktop/src/main.jsx"],
+      ["后端入口", "desktop/src-tauri/src/main.rs"],
+    ],
+    "validation-checks": [
+      ["检查项", `${validationChecks.length || 3}`],
+      ["通过项", validationChecks.length ? `${passedChecks}` : "待运行"],
+      ["状态", snapshot?.goalValidationReport?.status || "待生成"],
+    ],
+    "validation-report": [
+      ["报告状态", snapshot?.goalValidationReport?.status || "missing"],
+      ["检查结果", validationChecks.length ? `${passedChecks}/${validationChecks.length}` : "待运行"],
+      ["用途", "验收和修复入口"],
+    ],
+    "run-records": [
+      ["运行记录", `${snapshot?.runCount || 0}`],
+      ["任务结果", `${doneTasks.length + failedTasks.length}`],
+      ["来源", ".project-os/runs/*"],
+    ],
+    "handoff-records": [
+      ["交接来源", "HANDOFF.md"],
+      ["任务结果", `${doneTasks.length + failedTasks.length}`],
+      ["状态", "可继续"],
+    ],
+    "decision-records": [
+      ["决策来源", "DECISIONS / CHANGELOG"],
+      ["状态", "待沉淀"],
+      ["用途", "重要取舍记录"],
+    ],
+    "lessons-learned": [
+      ["经验来源", "LESSONS.md"],
+      ["记忆条目", `${memoryItems.length}`],
+      ["用途", "踩坑约束"],
+    ],
     "active-task": [
       ["当前任务", currentTask?.title || "暂无进行中的任务"],
       ["任务状态", currentTask ? taskStatusLabel(currentTask.status) : "空"],
@@ -3709,14 +4187,277 @@ function AgentTopicPanel({
       ["治理动作", "scan / recommend / report / prune / sync"],
       ["执行方式", "Tauri command 白名单"],
     ],
+    "skill-capabilities": [
+      ["已接入 Skill", "project-setup / design-system / frontend"],
+      ["本地目录", ".agents/skills / .claude/skills"],
+      ["触发方式", "按项目请求和领域意图路由"],
+    ],
+    "adapters": [
+      ["适配目标", "Claude / Codex / Cursor / Gemini / DeepSeek"],
+      ["当前形态", "adapters/* 文档适配"],
+      ["接入状态", "可读，待产品化检测"],
+    ],
     "security-boundary": [
       ["写入边界", "工程文件写入必须经确认"],
       ["命令边界", "页面不传任意 shell"],
       ["密钥边界", "API Key 只保存在本地环境"],
     ],
+    "engineering-files": [
+      ["关键文件", `${assetDomainFileCount(engineeringDomain) || "待扫描"}`],
+      ["风险文件", `${assetDomainRiskCount(engineeringDomain)}`],
+      ["用途", "源码入口、配置和工程目录"],
+    ],
+    "governance-files": [
+      ["治理文件", `${assetDomainFileCount(governanceDomain) || "待扫描"}`],
+      ["需关注", `${assetDomainRiskCount(governanceDomain)}`],
+      ["用途", "规则、状态、交接和运行说明"],
+    ],
+    "report-artifacts": [
+      ["报告状态", snapshot?.goalValidationReport?.status || "待生成"],
+      ["推荐数量", `${Array.isArray(snapshot?.workspaceFacts?.recommendations) ? snapshot.workspaceFacts.recommendations.length : 0}`],
+      ["用途", "评分、建议和验收证据"],
+    ],
+    "schema-assets": [
+      ["Schema 文件", `${assetDomainFileCount(schemaDomain) || "待扫描"}`],
+      ["需关注", `${assetDomainRiskCount(schemaDomain)}`],
+      ["用途", "约束 Agent 输入输出契约"],
+    ],
+    "script-templates": [
+      ["脚本模板", `${assetDomainFileCount(scriptDomain) || "待扫描"}`],
+      ["需关注", `${assetDomainRiskCount(scriptDomain)}`],
+      ["用途", "检查、同步、模板和适配资源"],
+    ],
+    "project-facts": [
+      ["事实完整度", `${profileKnownCount}/5`],
+      ["事实来源", "profile / state / workspace-facts"],
+      ["缺失项", profileMissingCount ? `${profileMissingCount}` : "无"],
+    ],
+    "user-preferences": [
+      ["偏好状态", snapshot?.projectProfile?.userPreferences ? "已记录" : "待确认"],
+      ["作用范围", "项目偏好 / 全局偏好"],
+      ["来源", "对话提取 / 用户确认"],
+    ],
+    "long-term-memory": [
+      ["记忆条目", `${memoryItems.length}`],
+      ["沉淀方式", "事实 / 决策 / 经验"],
+      ["状态", memoryItems.length ? "已接入" : "待沉淀"],
+    ],
+    "conversation-summary": [
+      ["会话数量", `${conversationCount || "本地缓存"}`],
+      ["沉淀方向", "任务 / 事实 / 偏好"],
+      ["状态", "待产品化"],
+    ],
   };
+  const agentConfigSpecs = {
+    "model-connections": {
+      title: "模型连接",
+      status: provider?.enabled && provider?.model ? "已接入" : "待配置",
+      tone: provider?.enabled && provider?.model ? "success" : "warning",
+      value: "让接入项目知道当前 Agent 用哪个模型、Key 存在哪里、模型是否可用。",
+      next: provider?.enabled ? "测试当前模型可用性，并补充项目级默认模型策略。" : "配置 Provider、API Base、Key 环境变量和默认模型。",
+      files: [".project-os/desktop-provider.json", ".project-os/model-catalog.json", ".project-os/model-health.json"],
+    },
+    "tool-allowlist": {
+      title: "工具白名单",
+      status: "待产品化",
+      tone: "warning",
+      value: "让新项目明确哪些检查、治理动作和终端命令可以被 Agent 调用。",
+      next: "把 Tauri command、检查脚本、治理动作汇总成项目级允许列表。",
+      files: ["desktop/src-tauri/src/main.rs", "scripts/check-runtime.sh", "scripts/check-ai-project.sh"],
+    },
+    "skill-capabilities": {
+      title: "Skill 能力",
+      status: "已发现",
+      tone: "success",
+      value: "让接入项目按意图启用项目初始化、设计规范、前端实现等能力。",
+      next: "显示每个 Skill 的职责、触发条件、来源目录和启用状态。",
+      files: [".agents/skills/project-setup/SKILL.md", ".agents/skills/design-system/SKILL.md", ".agents/skills/frontend/SKILL.md", ".claude/skills/REGISTRY.md"],
+    },
+    "adapters": {
+      title: "适配器",
+      status: "有基础",
+      tone: "info",
+      value: "让同一个项目规则可以被 Codex、Claude、Cursor、Gemini 等工具复用。",
+      next: "检测 adapters 目录、根入口文件和工具专属规则是否同步。",
+      files: ["adapters/CODEX.md", "adapters/CLAUDE.md", "adapters/CURSOR.md", "adapters/GEMINI.md"],
+    },
+    "security-boundary": {
+      title: "安全边界",
+      status: "规则已接入",
+      tone: "success",
+      value: "让接入项目明确哪些动作必须确认、哪些文件不能动、哪些信息不能外传。",
+      next: "把 AGENTS.md 的禁止行为、确认动作和密钥规则整理成可视化边界。",
+      files: ["AGENTS.md", "docs/ROUTING.md", "docs/DOCUMENTATION.md", "docs/LESSONS.md"],
+    },
+  };
+  const agentConfigSpec = agentConfigSpecs[id];
+  const assetCapabilitySpecs = {
+    "engineering-files": {
+      title: "工程文件",
+      status: assetDomainFileCount(engineeringDomain) ? "已发现" : "待扫描",
+      tone: assetDomainFileCount(engineeringDomain) ? "success" : "warning",
+      value: "让 Agent 快速定位源码入口、配置文件和工程目录，减少从零扫目录的成本。",
+      next: "优先标注入口文件、运行配置、核心模块和高频修改区域。",
+      files: engineeringDomain?.files || ["desktop/*", "cli/*", "package.json"],
+    },
+    "governance-files": {
+      title: "治理文件",
+      status: assetDomainRiskCount(governanceDomain) ? "需关注" : "已接入",
+      tone: assetDomainRiskCount(governanceDomain) ? "warning" : "success",
+      value: "让 Agent 知道项目规则、当前状态、交接记录和文档边界。",
+      next: "把缺失、过期或变更中的治理文件标成待确认事项。",
+      files: governanceDomain?.files || ["PROJECT.md", "HANDOFF.md", "AGENTS.md", "docs/*"],
+    },
+    "report-artifacts": {
+      title: "报告产物",
+      status: snapshot?.goalValidationReport?.status || "待生成",
+      tone: snapshot?.goalValidationReport?.status === "failed" ? "danger" : snapshot?.goalValidationReport?.status ? "success" : "warning",
+      value: "让接入项目有评分、建议、验收和运行证据，用户能知道报告下一步能干嘛。",
+      next: "把评分、建议和失败验收直接连接到修复任务。",
+      files: reportDomain?.files || [".project-os/reports/*", ".project-os/recommendations/*", ".project-os/goal-validation-report.json"],
+    },
+    "schema-assets": {
+      title: "Schema",
+      status: assetDomainFileCount(schemaDomain) ? "已发现" : "待补齐",
+      tone: assetDomainFileCount(schemaDomain) ? "success" : "warning",
+      value: "让 Agent 按结构化契约读取状态、生成报告和校验配置。",
+      next: "展示每个 schema/manifest 约束的数据对象和使用场景。",
+      files: schemaDomain?.files || ["schemas/*", "docs/data/*"],
+    },
+    "script-templates": {
+      title: "脚本模板",
+      status: assetDomainFileCount(scriptDomain) ? "已发现" : "待整理",
+      tone: assetDomainFileCount(scriptDomain) ? "success" : "warning",
+      value: "让接入项目知道哪些检查、同步和模板命令可以被安全复用。",
+      next: "区分可直接运行、需要确认、只作为模板参考的脚本。",
+      files: scriptDomain?.files || ["scripts/*", "templates/*", "adapters/*"],
+    },
+  };
+  const assetCapabilitySpec = assetCapabilitySpecs[id];
+  const executionCapabilitySpecs = {
+    "active-task": {
+      files: [".project-os/runs/desktop-tasks/*", ".project-os/goals.json"],
+      next: currentTask ? "围绕当前任务生成 Patch 草案、应用并自动验证。" : "从对话或目标创建当前任务。",
+      status: currentTask ? taskStatusLabel(currentTask.status) : "待创建",
+      title: "当前任务",
+      tone: currentTask?.status === taskStatuses.failed ? "danger" : currentTask ? "success" : "warning",
+      value: "让接入项目把对话意图变成可追踪、可验证、可交接的执行任务。",
+    },
+    "task-queue": {
+      files: [".project-os/runs/desktop-tasks/*", ".project-os/task-backlog.json"],
+      next: failedTasks.length ? "优先处理失败任务，再推进运行中和待确认任务。" : "按状态推进队列，必要时从对话继续补充任务。",
+      status: failedTasks.length ? "有失败项" : activeTasks.length ? "推进中" : visibleTasks.length ? "已归档" : "待创建",
+      title: "任务队列",
+      tone: failedTasks.length ? "danger" : visibleTasks.length ? "success" : "warning",
+      value: "让接入项目知道所有任务的状态、来源和下一步动作，而不是散落在对话里。",
+    },
+    "patch-drafts": {
+      files: [".project-os/runs/desktop-tasks/*"],
+      next: patchTasks.length ? "查看涉及文件和验证项，确认后应用并自动验证。" : "先从当前任务生成 Patch 草案。",
+      status: patchTasks.length ? "有草案" : "待生成",
+      title: "Patch 草案",
+      tone: patchTasks.length ? "success" : "warning",
+      value: "让接入项目在真正改文件前先看到改动范围、风险和验证计划。",
+    },
+    "execution-terminal": {
+      files: ["scripts/check-runtime.sh", "scripts/check-ai-project.sh", "desktop/package.json"],
+      next: "把常用检查和构建命令标为受控命令，和普通终端输入区分开。",
+      status: "可用",
+      title: "执行终端",
+      tone: "success",
+      value: "让用户知道哪些命令是安全入口，哪些只是普通终端操作。",
+    },
+    "execution-results": {
+      files: [".project-os/runs/*", ".project-os/runs/desktop-summary.md", "HANDOFF.md"],
+      next: failedTasks.length ? "重跑失败检查或生成修复任务。" : "把成功结果沉淀到 run summary 和交接记录。",
+      status: failedTasks.length ? "需处理" : recentResultTasks.length ? "有结果" : "待生成",
+      title: "执行结果",
+      tone: failedTasks.length ? "danger" : recentResultTasks.length ? "success" : "warning",
+      value: "让接入项目保留执行证据，并能从失败结果直接进入修复闭环。",
+    },
+  };
+  const executionCapabilitySpec = executionCapabilitySpecs[id];
+  const memoryCapabilitySpecs = {
+    "project-facts": {
+      files: [".project-os/project-profile.json", ".project-os/workspace-facts.json", ".project-os/state.json", "PROJECT.md"],
+      next: profileMissingCount ? "补齐缺失事实，并标记哪些来自用户确认、哪些来自文件推断。" : "把事实来源、可信度和更新时机展示出来。",
+      status: profileMissingCount ? "待补齐" : "已识别",
+      title: "项目事实",
+      tone: profileMissingCount ? "warning" : "success",
+      value: "让接入项目不再从零理解，Agent 可以直接知道项目定位、阶段、技术栈和治理域。",
+    },
+    "user-preferences": {
+      files: [".project-os/project-profile.json", "OmniDesk global: user-profile.json"],
+      next: "提供偏好确认入口，并区分项目级偏好和全局偏好。",
+      status: snapshot?.projectProfile?.userPreferences ? "已记录" : "待确认",
+      title: "用户偏好",
+      tone: snapshot?.projectProfile?.userPreferences ? "success" : "warning",
+      value: "让 Agent 记住用户对协作方式、视觉偏好、风险边界和表达方式的要求。",
+    },
+    "long-term-memory": {
+      files: [".project-os/memory/*", "docs/LESSONS.md", "docs/DECISIONS.md", "HANDOFF.md"],
+      next: "把重要对话、决策和踩坑经验沉淀为可复用长期记忆。",
+      status: memoryItems.length ? "已接入" : "待沉淀",
+      title: "长期记忆",
+      tone: memoryItems.length ? "success" : "warning",
+      value: "让接入项目保留长期上下文，避免重复解释历史决策和约束。",
+    },
+    "conversation-summary": {
+      files: [".project-os/conversations/*", ".project-os/runs/desktop-tasks/*"],
+      next: "把会话摘要和任务、项目事实、偏好更新关联起来。",
+      status: "待产品化",
+      title: "会话摘要",
+      tone: "warning",
+      value: "让对话不只是聊天记录，而能沉淀成任务、事实、偏好和交接线索。",
+    },
+  };
+  const memoryCapabilitySpec = memoryCapabilitySpecs[id];
+  const flowStageByTopic = {
+    "project-identity": ["认识项目", "项目身份、用途和阶段。"],
+    "project-progress": ["认识项目", "当前进度和下一步。"],
+    "project-runbook": ["认识项目", "启动、构建和检查命令。"],
+    "project-risks": ["认识项目", "已知风险和边界。"],
+    "local-project-state": ["认识项目", "本地接入和文件状态。"],
+    "current-goal": ["定义目标", "当前目标、范围和优先级。"],
+    "acceptance-criteria": ["定义目标", "完成判断和检查条件。"],
+    "goal-history": ["定义目标", "目标历史和完成记录。"],
+    "collaboration-boundary": ["工作规则", "AI 和用户如何分工。"],
+    "execution-permissions": ["工作规则", "自动执行和确认边界。"],
+    "documentation-rules": ["工作规则", "信息归属和命名规则。"],
+    "system-architecture": ["设计实现", "模块、依赖和架构关系。"],
+    "data-contracts": ["设计实现", "对象、状态和结构化契约。"],
+    "ui-standards": ["设计实现", "组件、视觉规范和设计 token。"],
+    "code-structure": ["设计实现", "目录、模块职责和实现入口。"],
+    "validation-checks": ["验证交付", "当前项目可运行检查。"],
+    "validation-report": ["验证交付", "目标验收和检查结果。"],
+    "run-records": ["验证交付", "检查、扫描和执行历史。"],
+    "handoff-records": ["复盘沉淀", "继续工作上下文。"],
+    "decision-records": ["复盘沉淀", "重要取舍记录。"],
+    "lessons-learned": ["复盘沉淀", "踩坑、修正和新增约束。"],
+  };
+  const flowStage = flowStageByTopic[id];
+  const flowCapabilitySpec = flowStage ? {
+    files: topic?.relatedFiles || [],
+    next: topic?.nextAction || "补齐状态源、操作入口和闭环验证。",
+    status: topic?.maturity || "只读",
+    title: topic?.title || flowStage[0],
+    tone: ["闭环", "状态化", "可验证"].includes(topic?.maturity) ? "success" : "info",
+    value: `属于「${flowStage[0]}」阶段，用来让接入项目明确${flowStage[1]}`,
+  } : null;
   const cards = cardsByTopic[id];
   if (!cards) return null;
+  const activeCapabilitySpec = agentConfigSpec || assetCapabilitySpec || executionCapabilitySpec || memoryCapabilitySpec || flowCapabilitySpec;
+  const canPreviewCapabilityFile = (file) => {
+    if (!file || typeof file !== "string") return false;
+    if (file.includes("*") || file.endsWith("/")) return false;
+    if (file.includes(":")) return false;
+    if (file.startsWith("/") || file.startsWith(".env") || file.includes("/.env")) return false;
+    if (file.includes(".project-os/desktop-provider")) return false;
+    if (file.split("/").includes("..")) return false;
+    const extension = file.split(".").pop();
+    if (!["md", "mdx", "txt", "json", "jsonc", "yaml", "yml", "toml", "js", "jsx", "ts", "tsx", "css", "scss", "html", "rs", "sh", "py", "sql"].includes(extension)) return false;
+    return !["desktop/*", "cli/*", "docs/*", "schemas/*", "docs/data/*", "scripts/*", "templates/*", "adapters/*"].includes(file);
+  };
 
   return (
     <div className="agentTopicStack" aria-label={`${topic.title}状态`}>
@@ -3728,6 +4469,84 @@ function AgentTopicPanel({
           </div>
         ))}
       </div>
+
+      {activeCapabilitySpec ? (
+        <div className="agentConfigCapability">
+          <div className="agentConfigCapabilityHeader">
+            <div>
+              <span>{agentConfigSpec ? "接入能力" : assetCapabilitySpec ? "资产能力" : executionCapabilitySpec ? "执行能力" : memoryCapabilitySpec ? "记忆能力" : "流程能力"}</span>
+              <strong>{activeCapabilitySpec.title}</strong>
+              <p>{activeCapabilitySpec.value}</p>
+            </div>
+            <Badge status={activeCapabilitySpec.tone}>{activeCapabilitySpec.status}</Badge>
+          </div>
+          <div className="agentConfigCapabilityGrid">
+            <section>
+              <span>对新项目的作用</span>
+              <p>{activeCapabilitySpec.value}</p>
+            </section>
+            <section>
+              <span>下一步动作</span>
+              <p>{activeCapabilitySpec.next}</p>
+            </section>
+          </div>
+          <div className="agentConfigFiles">
+            <span>来源文件</span>
+            <div>
+              {activeCapabilitySpec.files.slice(0, 8).map((file) => canPreviewCapabilityFile(file) ? (
+                <button key={file} type="button" onClick={() => onOpenCapabilityFile?.(file)}>
+                  {file}
+                </button>
+              ) : (
+                <code key={file}>{file}</code>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {id === "task-queue" ? (
+        <div className="agentTaskQueueList">
+          {visibleTasks.length ? visibleTasks.slice(0, 8).map((task) => (
+            <article className={`agentTaskQueueItem status-${task.status || "unknown"}`} key={task.id}>
+              <div className="agentTaskQueueMain">
+                <span>{taskStatusLabel(task.status)}</span>
+                <strong>{task.title || "未命名任务"}</strong>
+                <p>{task.plan?.summary || task.description || task.projectName || "暂无任务摘要。"}</p>
+              </div>
+              <div className="agentTaskQueueMeta">
+                <span>{task.patchDraft ? "已有草案" : "未生成草案"}</span>
+                <span>{verifyStatusLabel(task)}</span>
+                <span>{task.updatedAt || task.createdAt || "无更新时间"}</span>
+              </div>
+              <TaskCommandBar
+                actions={actionsForTask(task, `queue-${task.id}`)}
+                meta={task.status === taskStatuses.failed ? failureSummaryForTask(task) : "按任务状态进入受控执行链路。"}
+              />
+            </article>
+          )) : (
+            <Notice variant="info">暂无任务。可以从对话或目标开始创建第一批任务。</Notice>
+          )}
+        </div>
+      ) : null}
+
+      {id === "execution-terminal" ? (
+        <div className="agentControlledCommands">
+          {[
+            ["Runtime 检查", "bash scripts/check-runtime.sh .", "验证 Project OS 运行规则和核心文档。"],
+            ["AI 项目报告", "bash scripts/check-ai-project.sh . --write-report", "生成工程治理报告和建议。"],
+            ["Web 构建", "npm --prefix desktop run web:build", "验证桌面前端是否可构建。"],
+          ].map(([label, command, description]) => (
+            <div className="agentControlledCommand" key={command}>
+              <div>
+                <strong>{label}</strong>
+                <p>{description}</p>
+              </div>
+              <code>{command}</code>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       {id === "active-task" ? (
         <div className="agentTopicDetail">
@@ -3878,14 +4697,16 @@ function EngineeringFileTab({
   onMergeHandoff,
   onRunGuardedCheck,
   onSelectTask,
+  onNavigateWorkbench,
   onCreateRepairTask,
   onCreateGovernanceTask,
   onCreateDesignGovernanceTask,
 }) {
+  const selectedTopic = selectedEngineeringFile.topic || (selectedEngineeringFile.virtual ? selectedEngineeringFile : null);
   const [relatedFilePreview, setRelatedFilePreview] = useState(null);
   useEffect(() => {
     setRelatedFilePreview(null);
-  }, [selectedEngineeringFile.topic?.id, selectedEngineeringFile.path]);
+  }, [selectedTopic?.id, selectedEngineeringFile.path]);
 
   const previewRelatedFile = async (path) => {
     if (!path || path.includes("*") || path.endsWith("/")) {
@@ -3909,14 +4730,23 @@ function EngineeringFileTab({
     }
   };
 
-  if (selectedEngineeringFile.topic) {
-    const isOverviewTopic = ["workbench-overview", "project-identity"].includes(selectedEngineeringFile.topic.id) || selectedEngineeringFile.topic.title === "项目概览";
-    const isCurrentProgressTopic = selectedEngineeringFile.topic.id === "project-progress" || selectedEngineeringFile.topic.title === "当前进度";
-    const isRunbookTopic = selectedEngineeringFile.topic.id === "project-runbook" || selectedEngineeringFile.topic.title === "启动方式";
-    const isGovernanceFilesTopic = selectedEngineeringFile.topic.id === "governance-files" || selectedEngineeringFile.topic.title === "治理文件";
-    const isReportTopic = ["validation-report", "report-artifacts"].includes(selectedEngineeringFile.topic.id);
-    const isDesignImplementationTopic = Object.keys(designImplementationTopics).includes(selectedEngineeringFile.topic.id);
-    const workspaceFacts = isOverviewTopic ? snapshot?.workspaceFacts : null;
+  if (selectedTopic) {
+    const isOverviewTopic = ["workbench-overview", "project-identity"].includes(selectedTopic.id) || selectedTopic.title === "项目概览";
+    const isCurrentProgressTopic = selectedTopic.id === "project-progress" || selectedTopic.title === "当前进度";
+    const isRunbookTopic = selectedTopic.id === "project-runbook" || selectedTopic.title === "启动方式";
+    const isGovernanceFilesTopic = selectedTopic.id === "governance-files" || selectedTopic.title === "治理文件";
+    const isReportTopic = ["validation-report", "report-artifacts"].includes(selectedTopic.id);
+    const isDesignImplementationTopic = Object.keys(designImplementationTopics).includes(selectedTopic.id);
+    const isAssetCapabilityTopic = ["engineering-files", "governance-files", "report-artifacts", "schema-assets", "script-templates"].includes(selectedTopic.id);
+    const isFlowCapabilityTopic = [
+      "project-identity", "project-progress", "project-runbook", "project-risks", "local-project-state",
+      "current-goal", "acceptance-criteria", "goal-history",
+      "collaboration-boundary", "execution-permissions", "documentation-rules",
+      "system-architecture", "data-contracts", "ui-standards", "code-structure",
+      "validation-checks", "validation-report", "run-records",
+      "handoff-records", "decision-records", "lessons-learned",
+    ].includes(selectedTopic.id);
+    const workspaceFacts = isOverviewTopic ? snapshot?.workspaceFacts || null : null;
     const currentProgressPanel = isCurrentProgressTopic && snapshot?.workspaceFacts
       ? <CurrentProgressPanel onSelectTask={onSelectTask} report={snapshot.workspaceFacts} snapshot={snapshot} tasks={tasks} />
       : null;
@@ -3930,7 +4760,7 @@ function EngineeringFileTab({
       ? <GovernanceFilesHealthSection onCreateGovernanceTask={onCreateGovernanceTask} report={snapshot.workspaceFacts} />
       : null;
     const designImplementationPanel = isDesignImplementationTopic && snapshot?.workspaceFacts
-      ? <DesignImplementationHealthSection onCreateDesignGovernanceTask={onCreateDesignGovernanceTask} report={snapshot.workspaceFacts} topic={selectedEngineeringFile.topic} />
+      ? <DesignImplementationHealthSection onCreateDesignGovernanceTask={onCreateDesignGovernanceTask} report={snapshot.workspaceFacts} topic={selectedTopic} />
       : null;
     const agentTopic = (
       <AgentTopicPanel
@@ -3938,7 +4768,7 @@ function EngineeringFileTab({
         provider={provider}
         snapshot={snapshot}
         tasks={tasks}
-        topic={selectedEngineeringFile.topic}
+        topic={selectedTopic}
         runnerLoadingId={runnerLoadingId}
         patchLoading={patchLoading}
         applyLoading={applyLoading}
@@ -3949,14 +4779,28 @@ function EngineeringFileTab({
         onRunGuardedCheck={onRunGuardedCheck}
         onSelectTask={onSelectTask}
         onCreateRepairTask={onCreateRepairTask}
+        onOpenCapabilityFile={previewRelatedFile}
       />
     );
+    const capabilityPanel = (isAssetCapabilityTopic || isFlowCapabilityTopic) ? agentTopic : null;
+    const topicBody = isOverviewTopic
+      ? <WorkspaceFactsPreview onCreateGovernanceTask={onCreateGovernanceTask} onNavigate={onNavigateWorkbench} provider={provider} report={workspaceFacts} snapshot={snapshot} tasks={tasks} />
+      : capabilityPanel
+        ? (
+          <>
+            {capabilityPanel}
+            {currentProgressPanel || runbookPanel || reportPanel || governanceFilesPanel || designImplementationPanel}
+          </>
+        )
+        : currentProgressPanel || runbookPanel || reportPanel || governanceFilesPanel || designImplementationPanel || agentTopic || (
+          <Notice variant="info">这是项目治理地图。用户只看事项，OmniDesk 在背后维护对应文件、状态来源和更新时机。</Notice>
+        );
     return (
       <Panel className="engineeringFilePreview filePreviewPanel" variant="soft">
         <div className={`engineeringFileHeader${isCurrentProgressTopic ? " progressTopicHeader" : ""}`}>
           <div>
-            <strong>{selectedEngineeringFile.topic.title}</strong>
-            <p>{selectedEngineeringFile.topic.description}</p>
+            <strong>{selectedTopic.title}</strong>
+            <p>{selectedTopic.description}</p>
           </div>
           {isCurrentProgressTopic ? (
             <span className="topicBreadcrumb">项目流程 / {selectedEngineeringFile.group}</span>
@@ -3965,39 +4809,37 @@ function EngineeringFileTab({
           )}
         </div>
         <div className="topicPreview">
-          {workspaceFacts ? <WorkspaceFactsPreview onCreateGovernanceTask={onCreateGovernanceTask} report={workspaceFacts} /> : currentProgressPanel || runbookPanel || reportPanel || governanceFilesPanel || designImplementationPanel || agentTopic || (
-            <Notice variant="info">这是项目治理地图。用户只看事项，OmniDesk 在背后维护对应文件、状态来源和更新时机。</Notice>
-          )}
-          {(selectedEngineeringFile.topic.governanceRole || selectedEngineeringFile.topic.maturity || selectedEngineeringFile.topic.nextAction || selectedEngineeringFile.topic.statusSource || selectedEngineeringFile.topic.updatesWhen) ? (
+          {topicBody}
+          {(selectedTopic.governanceRole || selectedTopic.maturity || selectedTopic.nextAction || selectedTopic.statusSource || selectedTopic.updatesWhen) ? (
             <div className="topicGovernanceMeta">
-              {selectedEngineeringFile.topic.governanceRole ? (
+              {selectedTopic.governanceRole ? (
                 <div>
                   <span>治理角色</span>
-                  <p>{selectedEngineeringFile.topic.governanceRole}</p>
+                  <p>{selectedTopic.governanceRole}</p>
                 </div>
               ) : null}
-              {selectedEngineeringFile.topic.maturity ? (
+              {selectedTopic.maturity ? (
                 <div>
                   <span>闭环程度</span>
-                  <p>{selectedEngineeringFile.topic.maturity}</p>
+                  <p>{selectedTopic.maturity}</p>
                 </div>
               ) : null}
-              {selectedEngineeringFile.topic.statusSource ? (
+              {selectedTopic.statusSource ? (
                 <div>
                   <span>状态来源</span>
-                  <code>{selectedEngineeringFile.topic.statusSource}</code>
+                  <code>{selectedTopic.statusSource}</code>
                 </div>
               ) : null}
-              {selectedEngineeringFile.topic.updatesWhen ? (
+              {selectedTopic.updatesWhen ? (
                 <div>
                   <span>更新时机</span>
-                  <p>{selectedEngineeringFile.topic.updatesWhen}</p>
+                  <p>{selectedTopic.updatesWhen}</p>
                 </div>
               ) : null}
-              {selectedEngineeringFile.topic.nextAction ? (
+              {selectedTopic.nextAction ? (
                 <div>
                   <span>下一步动作</span>
-                  <p>{selectedEngineeringFile.topic.nextAction}</p>
+                  <p>{selectedTopic.nextAction}</p>
                 </div>
               ) : null}
             </div>
@@ -4005,7 +4847,7 @@ function EngineeringFileTab({
           <div className="topicFileList">
             <strong>关联工程文件</strong>
             <div>
-              {selectedEngineeringFile.topic.relatedFiles.map((file) => (
+              {(selectedTopic.relatedFiles || []).map((file) => (
                 <button
                   className={`topicFileButton${relatedFilePreview?.path === file ? " active" : ""}`}
                   key={file}
@@ -6249,6 +7091,20 @@ function App() {
       if (!targetTask) return false;
       markTaskWaiting(targetTask.id);
       return true;
+    }
+    if (action?.id === "open-topic" && action.target) {
+      if (action.target === "task-queue") {
+        window.dispatchEvent(new Event("project-os:open-execution"));
+        const topic = topicPayloadFromOutline(action.target);
+        if (topic) setSelectedEngineeringFile(topic);
+        return true;
+      }
+      const topic = topicPayloadFromOutline(action.target);
+      if (topic) {
+        setSelectedEngineeringFile(topic);
+        return true;
+      }
+      return false;
     }
     if (action?.id !== "generate-plan" || !action.task) return false;
     const ok = await generatePlan({ task: action.task, attachments: [] });

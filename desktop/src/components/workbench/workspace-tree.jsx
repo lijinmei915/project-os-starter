@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Bot, BookOpen, Brain, CheckCircle2, ChevronsDownUp, ChevronsUpDown, ClipboardList, FileStack, Package, Settings, ShieldCheck, TerminalSquare, Wrench } from "lucide-react";
 import { Button } from "../ui/button";
 import { SectionGroup } from "../ui/section-title";
@@ -95,6 +95,12 @@ export function WorkspaceTree({ activeTopicPath, actions, inlineAction, onSelect
   const isNodeOpen = (key) => nodeOpenByKey[key] !== false;
   const isTopicOpen = (key) => topicOpenByKey[key] === true;
   const expandedMode = allTopicsOpen;
+
+  useEffect(() => {
+    if (!activeTopicPath && firstNode && !firstNode.children?.length && !firstNode.items?.length) {
+      openNodeTopic(firstNode);
+    }
+  }, [activeTopicPath, firstNode]);
 
   const toggleAllTopics = () => {
     const nextOpen = !allTopicsOpen;
@@ -220,6 +226,8 @@ export function WorkspaceTree({ activeTopicPath, actions, inlineAction, onSelect
                     setNodeOpenByKey((current) => ({ ...current, [nodeId]: nextOpen }));
                     setTopicOpenByKey((current) => ({ ...current, ...Object.fromEntries(ownTopicKeys.map((key) => [key, nextOpen])) }));
                     if (nextOpen) openTopic({ item: node.items[0], node });
+                  } else {
+                    openNodeTopic(node);
                   }
                   return;
                 }

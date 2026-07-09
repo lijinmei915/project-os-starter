@@ -73,6 +73,7 @@ export function ChatComposer({
   modelProfile,
   modelSource,
   modelTesting,
+  modeHint,
   placeholder,
   sending,
   value,
@@ -236,6 +237,7 @@ export function ChatComposer({
           rows={1}
           value={value}
         />
+        {modeHint ? <div className="chatComposerModeHint">{modeHint}</div> : null}
         <div className="chatComposerToolbar" aria-label="对话工具">
           <input
             accept="image/*"
