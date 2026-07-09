@@ -1672,7 +1672,7 @@ body.isResizingSidebar {
 .projectRow {
   position: relative;
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr);
+  grid-template-columns: 15px minmax(0, 1fr);
   align-items: center;
   gap: var(--space-3);
   width: 100%;
@@ -1681,7 +1681,7 @@ body.isResizingSidebar {
   border-radius: var(--radius);
   background: transparent;
   color: var(--desktop-text-secondary);
-  padding: 6px 36px 6px 0;
+  padding: 6px 10px 6px 0;
   text-align: left;
   transition:
     background-color 120ms ease,
@@ -1731,7 +1731,7 @@ body.isResizingSidebar {
   margin-top: 2px;
   color: var(--desktop-type-meta-color);
   font-family: var(--mono);
-  font-size: var(--desktop-type-code-size);
+  font-size: 8px;
   font-weight: var(--desktop-type-code-weight);
   line-height: 1.2;
 }
@@ -2166,11 +2166,13 @@ body.isResizingSidebar {
 }
 
 .treeTopic {
+  width: calc(100% + 10.5px);
+  margin-left: -10.5px;
   color: var(--desktop-type-nav-color);
   font-family: inherit;
   font-size: var(--desktop-type-nav-size);
   font-weight: var(--desktop-type-nav-weight);
-  padding-left: var(--desktop-space-xs);
+  padding-left: 8px;
 }
 
 .treeTopic::before {
