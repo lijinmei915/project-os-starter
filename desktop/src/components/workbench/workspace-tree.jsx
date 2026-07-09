@@ -67,6 +67,7 @@ function mappedMeta(node, snapshot) {
     : null;
   const architecture = snapshot?.projectProfile?.architectureSummary || "";
   const projectMeta = {
+    "工作台": compactMeta(snapshot?.phase, node.meta),
     "认识项目": profileFields == null ? compactMeta(snapshot?.phase, node.meta) : `${profileFields}/5`,
     "定义目标": counts.open ? `${counts.open} 进行中` : counts.draft ? `${counts.draft} 待确认` : counts.completed ? `${counts.completed} 历史` : "待添加",
     "工作规则": snapshot?.projectProfile?.collaborationRules ? "已接入" : node.meta,
@@ -119,6 +120,23 @@ export function WorkspaceTree({ activeTopicPath, actions, inlineAction, onSelect
       updatesWhen: item.updatesWhen || child?.updatesWhen || node.updatesWhen,
       relatedFiles: item.relatedFiles || [],
       title: item.title,
+      virtual: true,
+    });
+  };
+
+  const openNodeTopic = (node) => {
+    onSelectTopic({
+      description: node.description,
+      group: node.title,
+      governanceRole: node.governanceRole,
+      id: node.id,
+      maturity: node.maturity,
+      nextAction: node.nextAction,
+      path: node.id || node.title,
+      statusSource: node.statusSource,
+      updatesWhen: node.updatesWhen,
+      relatedFiles: node.files || [],
+      title: node.title,
       virtual: true,
     });
   };
@@ -184,9 +202,10 @@ export function WorkspaceTree({ activeTopicPath, actions, inlineAction, onSelect
         const isActive = activeNodeId === nodeId || expandedMode;
         const children = node.children || [];
         const hasChildren = children.length > 0;
-        const showChildren = hasChildren && isActive && isNodeOpen(nodeId);
+        const showChildren = hasChildren && isActive && nodeOpenByKey[nodeId] !== false;
         const activeChild = activeChildByNode[nodeId] || nodeKey(children[0]);
-        const ownTopicOpen = (node.items || []).some((item) => isTopicOpen(itemKey({ item, node })));
+        const ownTopicKeys = (node.items || []).map((item) => itemKey({ item, node }));
+        const ownTopicOpen = ownTopicKeys.some((key) => isTopicOpen(key)) || (isActive && !hasChildren && ownTopicKeys.length > 0 && isNodeOpen(nodeId));
 
         return (
           <div className="workspaceGroup treeNode treeNode-root" key={nodeId}>
@@ -197,15 +216,17 @@ export function WorkspaceTree({ activeTopicPath, actions, inlineAction, onSelect
                   if (hasChildren) {
                     setNodeOpenByKey((current) => ({ ...current, [nodeId]: current[nodeId] === false }));
                   } else if (node.items?.length) {
-                    const keys = node.items.map((item) => topicKey([node.title, item.title]));
-                    const nextOpen = !keys.every((key) => isTopicOpen(key));
-                    setTopicOpenByKey((current) => ({ ...current, ...Object.fromEntries(keys.map((key) => [key, nextOpen])) }));
+                    const nextOpen = !ownTopicOpen;
+                    setNodeOpenByKey((current) => ({ ...current, [nodeId]: nextOpen }));
+                    setTopicOpenByKey((current) => ({ ...current, ...Object.fromEntries(ownTopicKeys.map((key) => [key, nextOpen])) }));
                     if (nextOpen) openTopic({ item: node.items[0], node });
                   }
                   return;
                 }
                 setActiveNodeId(nodeId);
                 if (hasChildren) setNodeOpenByKey((current) => ({ ...current, [nodeId]: true }));
+                if (!hasChildren && node.items?.length) setNodeOpenByKey((current) => ({ ...current, [nodeId]: true }));
+                if (!hasChildren && !node.items?.length) openNodeTopic(node);
               }}
               type="button"
             >

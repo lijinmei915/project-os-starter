@@ -1,4 +1,13 @@
 const governanceMeta = {
+  "工作台": {
+    id: "workbench-overview",
+    files: ["PROJECT.md", "HANDOFF.md", "docs/RUNBOOK.md", ".project-os/state.json"],
+    governanceRole: "工作台总览入口，回答当前项目状态、进度、启动方式、风险和本地接入状态。",
+    maturity: "状态化",
+    nextAction: "把工作台总览继续接到真实扫描、运行命令和风险任务生成。",
+    statusSource: ".project-os/state.json",
+    updatesWhen: "项目接入、当前进度、启动方式、风险或本地状态变化时更新。",
+  },
   "认识项目": {
     id: "understand-project",
     files: ["PROJECT.md", ".project-os/state.json", "README.md", "HANDOFF.md"],
@@ -227,6 +236,13 @@ export const projectGovernanceFlow = [
 ];
 
 export const projectGovernanceOutline = [
+  {
+    id: "workbench-overview",
+    title: "工作台",
+    meta: "总览",
+    icon: "book",
+    description: "项目工作台的总览入口。",
+  },
   {
     id: "project-governance",
     title: "项目流程",

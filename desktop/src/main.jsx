@@ -3910,7 +3910,7 @@ function EngineeringFileTab({
   };
 
   if (selectedEngineeringFile.topic) {
-    const isOverviewTopic = selectedEngineeringFile.topic.id === "project-identity" || selectedEngineeringFile.topic.title === "项目概览";
+    const isOverviewTopic = ["workbench-overview", "project-identity"].includes(selectedEngineeringFile.topic.id) || selectedEngineeringFile.topic.title === "项目概览";
     const isCurrentProgressTopic = selectedEngineeringFile.topic.id === "project-progress" || selectedEngineeringFile.topic.title === "当前进度";
     const isRunbookTopic = selectedEngineeringFile.topic.id === "project-runbook" || selectedEngineeringFile.topic.title === "启动方式";
     const isGovernanceFilesTopic = selectedEngineeringFile.topic.id === "governance-files" || selectedEngineeringFile.topic.title === "治理文件";
