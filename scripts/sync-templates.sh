@@ -32,6 +32,23 @@ sync_dir() {
   echo "synced directory: $template_path"
 }
 
+sync_dir_without_png_proposals() {
+  source_path="$1"
+  template_path="$2"
+
+  if [ ! -d "$source_path" ]; then
+    echo "ERROR: missing source directory: $source_path"
+    exit 2
+  fi
+
+  rm -rf "$template_path"
+  mkdir -p "$template_path"
+  cp -R "$source_path/." "$template_path/"
+  find "$template_path" -path '*/docs/design/proposals/*.png' -type f -delete
+  find "$template_path" -path '*/design/proposals/*.png' -type f -delete
+  echo "synced directory without proposal PNG assets: $template_path"
+}
+
 sync_file() {
   source_path="$1"
   template_path="$2"
@@ -54,9 +71,9 @@ sync_dir "adapters" "templates/project/adapters"
 sync_dir "schemas" "templates/project/schemas"
 sync_file ".env.example" "templates/project/.env.example"
 sync_file "index.html" "templates/project/index.html"
-sync_dir "templates/project-docs" "templates/project/templates/project-docs"
+sync_dir_without_png_proposals "templates/project-docs" "templates/project/templates/project-docs"
 sync_file "docs/data/doc-structure.manifest.json" "templates/project/docs/data/doc-structure.manifest.json"
-sync_dir "docs/design" "templates/project/docs/design"
+sync_dir_without_png_proposals "docs/design" "templates/project/docs/design"
 # docs/DOCUMENTATION.md is intentionally different: root is kit-specific, template is generic.
 # sync_file "docs/DOCUMENTATION.md" "templates/project/docs/DOCUMENTATION.md"
 sync_file "INSTALL.md" "templates/project/INSTALL.md"

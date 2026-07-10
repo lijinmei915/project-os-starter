@@ -77,6 +77,35 @@ compare_path() {
   fi
 }
 
+compare_path_without_png_proposals() {
+  source_path="$1"
+  template_path="$2"
+
+  if [ ! -e "$source_path" ]; then
+    warn "missing source runtime path: $source_path"
+    return
+  fi
+
+  if [ ! -e "$template_path" ]; then
+    warn "missing template runtime path: $template_path"
+    return
+  fi
+
+  diff_output="$(diff -qr "$source_path" "$template_path" 2>/dev/null || true)"
+  filtered_diff="$(printf '%s\n' "$diff_output" | grep -Ev '(/(docs/)?design/proposals/[^/]+\.png|Only in .*/(docs/)?design/proposals: [^/]+\.png)' || true)"
+  if [ -n "$filtered_diff" ]; then
+    warn "template runtime out of sync: $template_path (source: $source_path)"
+  fi
+
+  if find "$template_path" -path '*/docs/design/proposals/*.png' -type f | grep -q .; then
+    warn "template contains proposal PNG assets: $template_path"
+  fi
+
+  if find "$template_path" -path '*/design/proposals/*.png' -type f | grep -q .; then
+    warn "template contains proposal PNG assets: $template_path"
+  fi
+}
+
 if [ ! -d "templates/project" ]; then
   exit 0
 fi
@@ -92,9 +121,9 @@ compare_path ".claude/project.json" "templates/project/.claude/project.json"
 compare_path "schemas" "templates/project/schemas"
 compare_path ".env.example" "templates/project/.env.example"
 compare_path "index.html" "templates/project/index.html"
-compare_path "templates/project-docs" "templates/project/templates/project-docs"
+compare_path_without_png_proposals "templates/project-docs" "templates/project/templates/project-docs"
 compare_path "docs/data/doc-structure.manifest.json" "templates/project/docs/data/doc-structure.manifest.json"
-compare_path "docs/design" "templates/project/docs/design"
+compare_path_without_png_proposals "docs/design" "templates/project/docs/design"
 # docs/DOCUMENTATION.md is intentionally different: root is kit-specific, template is generic.
 # compare_path "docs/DOCUMENTATION.md" "templates/project/docs/DOCUMENTATION.md"
 compare_path "INSTALL.md" "templates/project/INSTALL.md"

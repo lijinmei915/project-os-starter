@@ -1,11 +1,11 @@
 {
   "schemaVersion": "project-graph.v0.2",
-  "generatedAt": "2026-07-10T03:09:21Z",
+  "generatedAt": "2026-07-10T05:26:35Z",
   "projectPath": "/Users/heqiao/Desktop/Claude练习/OmniDesk",
   "staleDays": 90,
   "summary": {
     "nodeCount": 399,
-    "edgeCount": 3859,
+    "edgeCount": 3863,
     "staleCount": 0
   },
   "nodes": [
@@ -1813,7 +1813,9 @@
     {"source":"docs/data/knowledge-registry.json","target":"docs/TEMPLATE_GOVERNANCE.md","type":"references"},
     {"source":"docs/data/knowledge-registry.json","target":"docs/TESTING.md","type":"references"},
     {"source":"docs/data/knowledge-registry.json","target":"docs/WIZARD_PRESETS.md","type":"references"},
+    {"source":"docs/data/knowledge-registry.json","target":"docs/design/workbench-visualization.md","type":"references"},
     {"source":"docs/data/knowledge-registry.json","target":"templates/project/INSTALL.md","type":"references"},
+    {"source":"docs/data/knowledge-registry.json","target":"templates/project/docs/design/workbench-visualization.md","type":"references"},
     {"source":"docs/data/project-graph.json","target":".agents/skills/baseline-ui/SKILL.md","type":"references"},
     {"source":"docs/data/project-graph.json","target":".agents/skills/changelog/README.md","type":"references"},
     {"source":"docs/data/project-graph.json","target":".agents/skills/design-system/SKILL.md","type":"references"},
@@ -1977,6 +1979,7 @@
     {"source":"docs/data/project-graph.json","target":"docs/design/proposals/ai-project-assistant-4-schemes.html","type":"references"},
     {"source":"docs/data/project-graph.json","target":"docs/design/proposals/ai-project-assistant-low-line-8-schemes.html","type":"references"},
     {"source":"docs/data/project-graph.json","target":"docs/design/tokens.md","type":"references"},
+    {"source":"docs/data/project-graph.json","target":"docs/design/workbench-visualization.md","type":"references"},
     {"source":"docs/data/project-graph.json","target":"examples/filled-project.md","type":"references"},
     {"source":"docs/data/project-graph.json","target":"examples/prompt-simulation.md","type":"references"},
     {"source":"docs/data/project-graph.json","target":"handoff.md","type":"references"},
@@ -2153,6 +2156,7 @@
     {"source":"docs/data/project-graph.json","target":"templates/project/docs/design/proposals/ai-project-assistant-4-schemes.html","type":"references"},
     {"source":"docs/data/project-graph.json","target":"templates/project/docs/design/proposals/ai-project-assistant-low-line-8-schemes.html","type":"references"},
     {"source":"docs/data/project-graph.json","target":"templates/project/docs/design/tokens.md","type":"references"},
+    {"source":"docs/data/project-graph.json","target":"templates/project/docs/design/workbench-visualization.md","type":"references"},
     {"source":"docs/data/project-graph.json","target":"templates/project/index.html","type":"references"},
     {"source":"docs/data/project-graph.json","target":"templates/project/schemas/ai-project-report.schema.json","type":"references"},
     {"source":"docs/data/project-graph.json","target":"templates/project/schemas/ai-project-report.v0.1.json","type":"references"},
