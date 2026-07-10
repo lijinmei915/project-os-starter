@@ -1258,6 +1258,198 @@ function previewChatResult(message, hasAttachments, snapshot = {}, tasks = []) {
   };
 }
 
+function classifyConversationMessage(message, hasAttachments = false) {
+  const text = safeDisplayText(message).trim();
+  const lowerText = text.toLowerCase();
+  const compactText = text.replace(/[。！？!?,，\s]/g, "").toLowerCase();
+  if (!text && hasAttachments) return "task";
+  if (/(你是什么模型|当前.*模型|模型.*是什么|which model|what model)/i.test(text)) return "model-status";
+  if (/(网络.*可用|网络.*好了|联网|连接.*好了|provider|api.*可用|模型.*可用)/i.test(text)) return "connection-status";
+  if (/(状态|进度|下一步|总结|概况|现在)/.test(text)) return "project-status";
+  if (/(风险|检查|验证|报告)/.test(text)) return "project-inspect";
+  if (isActionRequestMessage(text, hasAttachments)) return "task";
+  if (["hi", "hello", "hey", "你好", "您好", "哈喽", "嗨", "在吗", "在么"].includes(compactText)) return "chat";
+  if (/(为什么|怎么|哪些|还有哪些|是什么|吗|呢|看一下|看看)/.test(text)) return "question";
+  if (/(开发|任务|执行|patch|改代码|实现)/.test(lowerText)) return "project-inspect";
+  return "chat";
+}
+
+function loadingLabelForMessageKind(kind) {
+  return {
+    "connection-status": "检查连接状态",
+    "model-status": "读取模型状态",
+    "project-inspect": "检查项目风险",
+    "project-status": "整理项目状态",
+    question: "组织回答",
+    chat: "组织回答",
+    task: "整理计划",
+  }[kind] || "组织回答";
+}
+
+function loadingEventsForMessageKind(kind) {
+  if (kind === "project-inspect") {
+    return [
+      { label: "读取项目状态", status: "current" },
+      { label: "检查风险线索", status: "pending" },
+      { label: "汇总回答", status: "pending" },
+    ];
+  }
+  if (kind === "project-status") {
+    return [
+      { label: "读取项目状态", status: "current" },
+      { label: "整理进度", status: "pending" },
+    ];
+  }
+  if (kind === "model-status" || kind === "connection-status") {
+    return [
+      { label: "读取连接配置", status: "current" },
+      { label: "查看健康状态", status: "pending" },
+    ];
+  }
+  if (kind === "task") {
+    return [
+      { label: "理解请求", status: "done" },
+      { label: "读取上下文", status: "current" },
+      { label: "生成计划", status: "pending" },
+    ];
+  }
+  return [
+    { label: "读取上下文", status: "current" },
+    { label: "组织回答", status: "pending" },
+  ];
+}
+
+function agentEventsForMessageKind(kind, chatResult) {
+  const events = [];
+  if (kind === "project-inspect") {
+    events.push(createAgentEvent("context", "done", "读取项目状态", "已结合当前项目阶段、目标、任务和治理记录。"));
+    events.push(createAgentEvent("check", "done", "检查风险线索", "优先查看交接膨胀、执行状态、模型连接和验证反馈。"));
+    events.push(createAgentEvent("result", "done", "汇总风险回答", "已把结果整理成可读回复。"));
+  } else if (kind === "project-status") {
+    events.push(createAgentEvent("context", "done", "读取项目状态", "已读取当前项目、目标、任务和验收状态。"));
+    events.push(createAgentEvent("result", "done", "整理项目状态", "已生成当前状态摘要。"));
+  } else if (kind === "model-status") {
+    events.push(createAgentEvent("context", "done", "读取模型配置", "已读取当前连接、模型名称和健康状态。"));
+  } else if (kind === "connection-status") {
+    events.push(createAgentEvent("context", "done", "读取连接状态", "已读取当前模型连接健康状态。"));
+  } else if (kind === "question" || kind === "chat") {
+    events.push(createAgentEvent("thinking", "done", "组织回答", "已按当前对话上下文生成回复。"));
+  }
+  if (chatResult?.providerStatus === "unavailable") {
+    events.push(createAgentEvent("error", "failed", "模型调用失败", chatResult.providerError || "Provider 暂时不可用，已切换为本地上下文回复。"));
+  }
+  return events;
+}
+
+function localStatusReply({ kind, provider, providerHealth, snapshot, tasks }) {
+  const modelName = provider?.model || "未选择模型";
+  const connectionName = activeProviderProfileName(provider) || "当前连接";
+  const healthStatus = providerHealth?.status || "unknown";
+  if (kind === "model-status") {
+    if (!provider?.enabled) return `当前没有启用模型连接。已配置模型是 ${modelName}，但对话会先使用本地项目上下文。`;
+    if (healthStatus === "available") return `当前使用的模型是 ${modelName}，连接为「${connectionName}」，状态可用。`;
+    if (healthStatus === "unavailable") return `当前配置的模型是 ${modelName}，连接为「${connectionName}」，但刚才检测不可用。我会先用本地上下文回答。`;
+    return `当前配置的模型是 ${modelName}，连接为「${connectionName}」。可用性还在检测中，我会先按本地上下文回答。`;
+  }
+  if (kind === "connection-status") {
+    if (healthStatus === "available") return `模型连接现在是可用状态：${modelName}。`;
+    if (healthStatus === "unavailable") return `模型连接还没恢复：${modelName} 当前不可用。你可以刷新模型连接；在此之前我会继续用本地上下文回答。`;
+    return `我不能直接判断整台机器的网络，但当前模型连接还没有明确可用结果。你可以刷新顶部连接状态，或继续问项目问题。`;
+  }
+  return previewChatResult("", false, snapshot, tasks).reply;
+}
+
+function conversationDiagnosticForResult(chatResult, providerHealth) {
+  if (chatResult?.providerStatus !== "unavailable") return null;
+  return {
+    label: "模型连接未接通",
+    message: "当前回复使用本地上下文生成。可在顶部连接状态里刷新模型，或继续直接提问。",
+    detail: chatResult.providerError || providerHealth?.message || "",
+  };
+}
+
+function createAgentEvent(type, status, title, detail = "") {
+  return {
+    detail,
+    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    status,
+    time: new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+    title,
+    type,
+  };
+}
+
+function planningAgentEvents(status = "current", detail = "") {
+  return [
+    createAgentEvent("thinking", "done", "理解请求", "已识别为需要进入受控开发流程的任务。"),
+    createAgentEvent("context", status === "failed" ? "done" : "current", "读取当前项目上下文", "使用当前项目、目标、任务和治理状态生成计划。"),
+    createAgentEvent("plan", status, status === "failed" ? "计划生成未完成" : "生成执行计划", detail),
+  ];
+}
+
+function completedPlanAgentEvents() {
+  return [
+    createAgentEvent("thinking", "done", "理解请求", "已识别任务意图。"),
+    createAgentEvent("context", "done", "读取当前项目上下文", "已使用项目状态、目标和任务记录。"),
+    createAgentEvent("plan", "done", "生成执行计划", "计划已创建为本地任务，等待用户确认。"),
+    createAgentEvent("result", "current", "等待确认", "确认后进入执行、检查和交接链路。"),
+  ];
+}
+
+function taskAgentEvents(task, plan) {
+  const events = [];
+  if (!task && !plan) return events;
+  events.push(createAgentEvent("plan", "done", "执行计划已生成", plan?.summary || task?.plan?.summary || task?.title || ""));
+  if (task?.patchDraft) {
+    events.push(createAgentEvent("edit", "done", "Patch 草案已生成", `${task.patchDraft.files?.length || 0} 个候选文件。`));
+  } else if (task?.status === taskStatuses.running || task?.status === taskStatuses.waitingApproval) {
+    events.push(createAgentEvent("edit", "current", "等待生成或应用改动", "确认后进入受控 Patch / Apply 流程。"));
+  }
+  if (task?.applyResult) {
+    events.push(createAgentEvent("edit", task.applyResult.success === false ? "failed" : "done", "应用改动", task.applyResult.message || "已记录应用结果。"));
+  }
+  const runs = Array.isArray(task?.runs) ? task.runs : [];
+  runs.slice(0, 3).forEach((run) => {
+    events.push(createAgentEvent("check", run.success ? "done" : "failed", run.label || run.id || "运行检查", run.output ? cleanTerminalText(run.output).slice(0, 240) : run.command || ""));
+  });
+  if (task?.runSummary) {
+    events.push(createAgentEvent("result", "done", "运行摘要已写入", task.runSummary.path || "已保存到 Project OS 运行记录。"));
+  }
+  if (task?.handoffMerge) {
+    events.push(createAgentEvent("result", "done", "交接已更新", task.handoffMerge.path || "已合并到 HANDOFF。"));
+  }
+  if (task?.status === taskStatuses.failed) {
+    events.push(createAgentEvent("error", "failed", "任务失败", task.verificationSummary || "需要查看失败检查或重新生成修复任务。"));
+  } else if (task?.status === taskStatuses.done) {
+    events.push(createAgentEvent("result", "done", "任务完成", task.verificationSummary || "当前任务已完成。"));
+  }
+  return events;
+}
+
+function agentEventsForTurn(turn) {
+  if (turn.events?.length) return turn.events;
+  return [];
+}
+
+function timelineSummary(events) {
+  if (!events?.length) return "";
+  const failed = events.find((event) => event.status === "failed");
+  if (failed) return `${failed.title}失败`;
+  const current = events.find((event) => event.status === "current");
+  if (current) return current.title;
+  return "已完成";
+}
+
+function withTimeout(promise, timeoutMs, message) {
+  let timer = null;
+  const timeout = new Promise((_, reject) => {
+    timer = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) window.clearTimeout(timer);
+  });
+}
+
 function isActionRequestMessage(message, hasAttachments = false) {
   const lowerMessage = safeDisplayText(message).toLowerCase();
   const actionLike = [
@@ -1288,9 +1480,6 @@ function actionPromptsForMessage(message, intent) {
     }
     if (/开发|任务|执行|patch|改代码|实现/.test(text.toLowerCase())) {
       actions.push({ id: "open-topic", label: "查看任务队列", target: "task-queue" });
-    }
-    if (!actions.length) {
-      actions.push({ id: "open-topic", label: "打开工作台", target: "workbench-overview" });
     }
     return actions.slice(0, 2);
   }
@@ -1791,7 +1980,7 @@ const chatStarterPrompts = [
 ];
 
 const executionTabs = [
-  { id: "execution", title: "执行", kind: "execution", closable: false },
+  { id: "execution", title: "执行", kind: "execution", closable: true },
 ];
 
 function workspaceFileTabId(file) {
@@ -1882,6 +2071,7 @@ function topicPayloadFromOutline(targetId) {
 function AgentWorkspace({
   snapshot,
   selectedEngineeringFile,
+  activeConversationId,
   chatTurns,
   terminalLogs,
   terminalRunningId,
@@ -1948,15 +2138,24 @@ function AgentWorkspace({
   const [attachments, setAttachments] = useState([]);
   const [pendingTurn, setPendingTurn] = useState(null);
   const [chatLoading, setChatLoading] = useState(false);
+  const [chatLoadingLabel, setChatLoadingLabel] = useState("组织回答");
+  const [chatLoadingEvents, setChatLoadingEvents] = useState(() => loadingEventsForMessageKind("chat"));
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState("plan");
   const [workspaceTabs, setWorkspaceTabs] = useState([
     { id: "plan", title: "对话", kind: "conversation", closable: false },
     { id: "terminal", title: "终端", kind: "terminal", closable: false },
   ]);
+  const [closedExecutionKey, setClosedExecutionKey] = useState("");
   const composerRef = React.useRef(null);
   const activeRequestRef = React.useRef(null);
   const actionMode = Boolean(activeTask || readonlyPlan);
+  const executionContextKey = activeTask?.id || readonlyPlan?.task || readonlyPlan?.summary || "";
+  const showExecutionTab = actionMode && executionContextKey !== closedExecutionKey;
   const isConversationEmpty = !chatTurns.length && !activeTask && !readonlyPlan && !loading && !error && !pendingTurn && !chatLoading;
+  const providerHealth = providerModelHealth(provider, composerModelAvailability);
+  const hasConversationPlanPrompt = chatTurns.some((turn) =>
+    Array.isArray(turn.actions) && turn.actions.some((action) => action.id === "confirm-active-task")
+  );
 
   useEffect(() => {
     const handleTerminalShortcut = (event) => {
@@ -1976,9 +2175,11 @@ function AgentWorkspace({
     });
     setPendingTurn(null);
     activeRequestRef.current = null;
-      onChatTurnsChange([]);
-      setActiveWorkspaceTab("plan");
-      setWorkspaceTabs((current) => current.filter((tab) => tab.kind !== "file"));
+    onChatTurnsChange([]);
+    onSelectEngineeringFile?.(null);
+    setClosedExecutionKey("");
+    setActiveWorkspaceTab("plan");
+    setWorkspaceTabs((current) => current.filter((tab) => tab.kind !== "file" && tab.kind !== "execution"));
     composerRef.current?.focus();
   }, [conversationResetKey]);
 
@@ -2005,20 +2206,22 @@ function AgentWorkspace({
       });
       setActiveWorkspaceTab(tabId);
     } else {
-      if (activeTask || readonlyPlan) {
+      if (showExecutionTab) {
         ensureExecutionTabs();
-        setActiveWorkspaceTab("execution");
       } else {
         setActiveWorkspaceTab("plan");
       }
     }
-  }, [selectedEngineeringFile, activeTask, readonlyPlan]);
+  }, [selectedEngineeringFile, activeTask, readonlyPlan, showExecutionTab]);
 
   const closeWorkspaceTab = (event, tabId) => {
     event.preventDefault();
     event.stopPropagation();
     const tab = workspaceTabs.find((item) => item.id === tabId);
     if (!tab?.closable) return;
+    if (tab.kind === "execution") {
+      setClosedExecutionKey(executionContextKey);
+    }
     setWorkspaceTabs((current) => current.filter((item) => item.id !== tabId));
     if (activeWorkspaceTab === tabId) {
       setActiveWorkspaceTab("plan");
@@ -2065,6 +2268,7 @@ function AgentWorkspace({
   };
 
   const ensureExecutionTabs = () => {
+    setClosedExecutionKey("");
     setWorkspaceTabs((current) => [
       ...current,
       ...executionTabs.filter((tab) => !current.some((item) => item.id === tab.id)),
@@ -2116,22 +2320,35 @@ function AgentWorkspace({
   };
 
   useEffect(() => {
-    if (actionMode) {
+    if (showExecutionTab) {
       ensureExecutionTabs();
     }
-  }, [actionMode]);
+  }, [showExecutionTab]);
 
   useEffect(() => {
+    const openConversation = () => {
+      setActiveWorkspaceTab("plan");
+    };
     const openExecution = () => {
       ensureExecutionTabs();
       setActiveWorkspaceTab("execution");
     };
+    const openTerminal = () => {
+      setActiveWorkspaceTab("terminal");
+    };
+    window.addEventListener("project-os:open-conversation", openConversation);
     window.addEventListener("project-os:open-execution", openExecution);
-    return () => window.removeEventListener("project-os:open-execution", openExecution);
+    window.addEventListener("project-os:open-terminal", openTerminal);
+    return () => {
+      window.removeEventListener("project-os:open-conversation", openConversation);
+      window.removeEventListener("project-os:open-execution", openExecution);
+      window.removeEventListener("project-os:open-terminal", openTerminal);
+    };
   }, []);
 
   const submitTask = async (event) => {
     event.preventDefault();
+    setActiveWorkspaceTab("plan");
     const nextInput = taskInput.trim();
     if (!nextInput && !attachments.length) return;
     const submittedAttachments = attachments.map((attachment) => ({
@@ -2160,11 +2377,32 @@ function AgentWorkspace({
         .then((nextSnapshot) => onProfileUpdated?.(nextSnapshot))
         .catch(() => {});
     }
+    const messageKind = classifyConversationMessage(nextInput, submittedAttachments.length > 0);
+    setChatLoadingLabel(loadingLabelForMessageKind(messageKind));
+    setChatLoadingEvents(loadingEventsForMessageKind(messageKind));
     setChatLoading(true);
 
     let chatResult;
     try {
-      if (!isTauriRuntime()) {
+      if (messageKind === "task") {
+        chatResult = {
+          intent: "task",
+          reply: "可以，我先生成计划。",
+          shouldCreatePlan: true,
+        };
+      } else if (["model-status", "connection-status"].includes(messageKind)) {
+        chatResult = {
+          intent: messageKind,
+          reply: localStatusReply({
+            kind: messageKind,
+            provider,
+            providerHealth,
+            snapshot,
+            tasks,
+          }),
+          shouldCreatePlan: false,
+        };
+      } else if (!isTauriRuntime()) {
         chatResult = previewChatResult(nextInput, submittedAttachments.length > 0, snapshot, tasks);
       } else {
         chatResult = await invokeWorkspaceCommand("chat_with_model", {
@@ -2182,7 +2420,10 @@ function AgentWorkspace({
       onModelHealthChange?.(provider?.model, "unavailable", err instanceof Error ? err.message : String(err));
       chatResult = {
         intent: "chat",
-        reply: `我现在先按本地规则回答。模型对话暂时不可用：${err instanceof Error ? err.message : String(err)}`,
+        providerError: err instanceof Error ? err.message : String(err),
+        providerModel: provider?.model || "",
+        providerStatus: "unavailable",
+        reply: "我现在先按本地上下文回答。模型连接暂时不可用，我会把这件事标在状态里，不影响你继续问项目问题。",
         shouldCreatePlan: false,
       };
     } finally {
@@ -2210,6 +2451,9 @@ function AgentWorkspace({
         {
           id: `${Date.now()}-assistant`,
           actions: actionPromptsForMessage(nextInput, chatResult?.intent),
+          diagnostic: conversationDiagnosticForResult(chatResult, providerHealth),
+          events: agentEventsForMessageKind(messageKind, chatResult),
+          statusLabel: loadingLabelForMessageKind(messageKind),
           role: "assistant",
           text: safeDisplayText(chatResult?.reply, "我在。你可以继续说想做什么。"),
         },
@@ -2224,7 +2468,33 @@ function AgentWorkspace({
       text: nextInput || "请根据截图帮我分析并修改。",
     });
     ensureExecutionTabs();
-    onGeneratePlan({
+    let planFallbackTimer = window.setTimeout(() => {
+      if (activeRequestRef.current !== requestId) return;
+      activeRequestRef.current = null;
+      setChatLoading(false);
+      setPendingTurn(null);
+      onChatTurnsChange([
+        ...chatTurns,
+        userTurn,
+        {
+          id: `${Date.now()}-assistant-plan-timeout`,
+          diagnostic: {
+            label: "计划生成等待超时",
+            message: "我已停止等待这次计划生成，避免对话一直悬空。",
+          },
+          role: "assistant",
+          text: "这次没有顺利生成计划。我先把状态收住，你可以继续补充或重试。",
+          workflow: [
+            { label: "理解请求", status: "done" },
+            { label: "生成计划", status: "failed" },
+            { label: "等待重试", status: "current" },
+          ],
+          events: planningAgentEvents("failed", "计划生成等待超时。"),
+        },
+      ]);
+      submittedAttachments.forEach((attachment) => URL.revokeObjectURL(attachment.url));
+    }, 15000);
+    withTimeout(onGeneratePlan({
       attachments: submittedAttachments.map((attachment) => ({
         dataUrl: attachment.dataUrl,
         mimeType: attachment.mimeType,
@@ -2233,9 +2503,11 @@ function AgentWorkspace({
       conversationId: activeConversationId,
       requestId,
       task: nextInput || "请根据截图帮我分析并修改。",
-    }).then((ok) => {
+    }), 15000, "计划生成等待超时").then((ok) => {
       if (activeRequestRef.current !== requestId) return;
+      window.clearTimeout(planFallbackTimer);
       if (ok) {
+        activeRequestRef.current = null;
         onChatTurnsChange([
           ...chatTurns,
           userTurn,
@@ -2243,14 +2515,60 @@ function AgentWorkspace({
             id: `${Date.now()}-assistant-plan`,
             actions: [{ id: "confirm-active-task", label: "开始执行" }],
             role: "assistant",
-            text: "我已经生成计划并创建任务。确认后会进入执行状态。",
+            text: "我整理好了一个执行计划，先不改文件。你点「开始执行」后，我再进入改动和验证。",
+            events: completedPlanAgentEvents(),
+          },
+        ]);
+        setPendingTurn(null);
+        submittedAttachments.forEach((attachment) => URL.revokeObjectURL(attachment.url));
+      } else {
+        activeRequestRef.current = null;
+        onChatTurnsChange([
+          ...chatTurns,
+          userTurn,
+          {
+            id: `${Date.now()}-assistant-plan-failed`,
+            diagnostic: {
+              label: "计划没有生成成功",
+              message: "我没有继续卡在处理中。可以稍后重试，或先把需求拆小一点再发。",
+            },
+            role: "assistant",
+            text: "这次计划生成没有完成，我先停在这里。",
+            events: planningAgentEvents("failed", "计划生成返回失败。"),
+            workflow: [
+              { label: "理解请求", status: "done" },
+              { label: "生成计划", status: "failed" },
+              { label: "等待重试", status: "current" },
+            ],
           },
         ]);
         setPendingTurn(null);
         submittedAttachments.forEach((attachment) => URL.revokeObjectURL(attachment.url));
       }
-    }).catch(() => {
+    }).catch((err) => {
       if (activeRequestRef.current !== requestId) return;
+      window.clearTimeout(planFallbackTimer);
+      activeRequestRef.current = null;
+      onChatTurnsChange([
+        ...chatTurns,
+        userTurn,
+        {
+          id: `${Date.now()}-assistant-plan-timeout`,
+          diagnostic: {
+            label: "计划生成中断",
+            message: "我已停止等待这次计划生成，避免对话一直悬空。",
+            detail: err instanceof Error ? err.message : String(err),
+          },
+          role: "assistant",
+          text: "这次没有顺利生成计划。我先把状态收住，你可以继续补充或重试。",
+          events: planningAgentEvents("failed", err instanceof Error ? err.message : String(err)),
+          workflow: [
+            { label: "理解请求", status: "done" },
+            { label: "生成计划", status: "failed" },
+            { label: "等待重试", status: "current" },
+          ],
+        },
+      ]);
       setPendingTurn(null);
       submittedAttachments.forEach((attachment) => URL.revokeObjectURL(attachment.url));
     });
@@ -2304,6 +2622,39 @@ function AgentWorkspace({
             {chatTurns.map((turn) => (
               <ConversationMessage key={turn.id} role={turn.role}>
                 <div>{safeDisplayText(turn.text)}</div>
+                {turn.diagnostic ? (
+                  <div className="conversationDiagnostic">
+                    <span>{turn.diagnostic.label}</span>
+                    <p>{turn.diagnostic.message}</p>
+                    {turn.diagnostic.detail ? (
+                      <details>
+                        <summary>Details</summary>
+                        <code>{turn.diagnostic.detail}</code>
+                      </details>
+                    ) : null}
+                  </div>
+                ) : null}
+                {agentEventsForTurn(turn).length ? (
+                  <details className="conversationTimelineGroup">
+                    <summary>
+                      <span className="conversationTimelineGroupIcon" aria-hidden="true" />
+                      <strong>{timelineSummary(agentEventsForTurn(turn))}</strong>
+                      <em>{agentEventsForTurn(turn).length}步</em>
+                    </summary>
+                    <div className="conversationTimeline" aria-label="Agent 事件时间线">
+                      {agentEventsForTurn(turn).map((event) => (
+                        <div className={`conversationTimelineEvent ${event.status || "pending"}`} key={event.id || `${event.type}-${event.title}`}>
+                          <div className="conversationTimelineEventHeader">
+                            <span className="conversationTimelineDot" aria-hidden="true" />
+                            <strong>{event.title}</strong>
+                            <em>{event.time}</em>
+                          </div>
+                          {event.detail ? <p>{event.detail}</p> : null}
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                ) : null}
                 {turn.actions?.length ? (
                   <div className="conversationActions">
                     {turn.actions.map((action) => (
@@ -2344,15 +2695,36 @@ function AgentWorkspace({
               </ConversationMessage>
             ) : null}
 
-            {activeTask || readonlyPlan ? (
+            {(activeTask || readonlyPlan) && !hasConversationPlanPrompt ? (
               <ConversationMessage
                 meta={activeTask ? activeTask.status : "计划已生成"}
                 role="assistant"
-                title="OmniDesk"
-              >
+            title="OmniDesk"
+          >
                 {activeTask
                   ? "我整理好了下一步，详情放在「执行」里。你确认后我再继续动手。"
                   : "我整理好了下一步，详情放在「执行」里。"}
+                {taskAgentEvents(activeTask, readonlyPlan).length ? (
+                  <details className="conversationTimelineGroup">
+                    <summary>
+                      <span className="conversationTimelineGroupIcon" aria-hidden="true" />
+                      <strong>{timelineSummary(taskAgentEvents(activeTask, readonlyPlan))}</strong>
+                      <em>{taskAgentEvents(activeTask, readonlyPlan).length}步</em>
+                    </summary>
+                    <div className="conversationTimeline" aria-label="当前任务事件时间线">
+                      {taskAgentEvents(activeTask, readonlyPlan).map((event) => (
+                        <div className={`conversationTimelineEvent ${event.status || "pending"}`} key={event.id || `${event.type}-${event.title}`}>
+                          <div className="conversationTimelineEventHeader">
+                            <span className="conversationTimelineDot" aria-hidden="true" />
+                            <strong>{event.title}</strong>
+                            <em>{event.time}</em>
+                          </div>
+                          {event.detail ? <p>{event.detail}</p> : null}
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                ) : null}
                 {planError ? <Notice className="planError" variant="danger">{planError}</Notice> : null}
                 {activeTask?.status === taskStatuses.planned ? (
                   <div className="conversationActions">
@@ -2384,8 +2756,15 @@ function AgentWorkspace({
               <ConversationMessage className="conversationMessage-thinking" role="assistant" title="OmniDesk">
                 <div className="thinkingStage">
                   <span className="thinkingStageDot" aria-hidden="true" />
-                  <span>{pendingTurn ? "整理计划" : "理解问题"}</span>
+                  <span>{pendingTurn ? "整理计划" : chatLoadingLabel}</span>
                 </div>
+                {!pendingTurn && chatLoadingEvents.length ? (
+                  <div className="thinkingSteps" aria-label="处理中步骤">
+                    {chatLoadingEvents.map((step) => (
+                      <span className={`thinkingStep ${step.status}`} key={step.label}>{step.label}</span>
+                    ))}
+                  </div>
+                ) : null}
               </ConversationMessage>
             </>
           ) : null}
@@ -5403,6 +5782,10 @@ function RightRail({
   onSelectConversation,
   onDeleteConversation,
   onSelectTask,
+  onSendGoalToChat,
+  onSendGoalToTerminal,
+  onSendTaskToChat,
+  onSendTaskToTerminal,
   onMarkTaskWaiting,
   onValidateGoal,
   onSignOffGoal,
@@ -5580,6 +5963,18 @@ function RightRail({
                     <span>{compactGoalTitle(goalTitle)}</span>
                     <em>{viewingCompletedGoal ? "已完成" : goalMeta}</em>
                   </strong>
+                  <div className="goalInlineActions" aria-label="目标联动">
+                    <Tooltip content="发送目标到对话">
+                      <button type="button" aria-label="发送目标到对话" onClick={() => activeGoal && onSendGoalToChat?.(activeGoal)}>
+                        <MessageSquare strokeWidth={2} aria-hidden="true" />
+                      </button>
+                    </Tooltip>
+                    <Tooltip content="发送目标到终端">
+                      <button type="button" aria-label="发送目标到终端" onClick={() => activeGoal && onSendGoalToTerminal?.(activeGoal)}>
+                        <TerminalSquare strokeWidth={2} aria-hidden="true" />
+                      </button>
+                    </Tooltip>
+                  </div>
                 </div>
                 <div className="goalProgressBar" aria-hidden="true">
                   <span style={{ width: `${progressValue}%` }} />
@@ -5740,6 +6135,8 @@ function RightRail({
                         subtasks={todo.subtasks}
                         title={todo.title}
                         onSelect={() => onSelectTask(todo.id)}
+                        onSendChat={() => onSendTaskToChat?.(todo)}
+                        onSendTerminal={() => onSendTaskToTerminal?.(todo)}
                       />
                     ))}
                   </ol>
@@ -5870,12 +6267,12 @@ function GoalStatusIcon({ displayStatus, status }) {
   );
 }
 
-function GoalTaskItem({ active, description, displayStatus, index, onSelect, status, subtasks = [], title }) {
+function GoalTaskItem({ active, description, displayStatus, index, onSelect, onSendChat, onSendTerminal, status, subtasks = [], title }) {
   const currentStatus = displayStatus || status;
   const done = currentStatus === taskStatuses.done;
   const running = currentStatus === taskStatuses.running || currentStatus === taskStatuses.waitingApproval;
   const failed = currentStatus === taskStatuses.failed;
-  const content = (
+  const mainContent = (
     <>
       <span className="goalTodoIndex">{index + 1}</span>
       <span className="goalTodoText">
@@ -5888,13 +6285,27 @@ function GoalTaskItem({ active, description, displayStatus, index, onSelect, sta
 
   return (
     <li className={`goalTodoItem${active ? " active" : ""}${done ? " done" : ""}${running ? " running" : ""}${failed ? " failed" : ""}`}>
-      {onSelect ? (
-        <button className="goalTodoButton" type="button" onClick={onSelect}>
-          {content}
-        </button>
-      ) : (
-        <div className="goalTodoButton">{content}</div>
-      )}
+      <div className="goalTodoRow">
+        {onSelect ? (
+          <button className="goalTodoButton" type="button" onClick={onSelect}>
+            {mainContent}
+          </button>
+        ) : (
+          <div className="goalTodoButton">{mainContent}</div>
+        )}
+        <span className="goalTodoActions" aria-label="任务联动">
+          <Tooltip content="发送任务到对话">
+            <button type="button" aria-label="发送任务到对话" onClick={onSendChat}>
+              <MessageSquare strokeWidth={2} aria-hidden="true" />
+            </button>
+          </Tooltip>
+          <Tooltip content="发送任务到终端">
+            <button type="button" aria-label="发送任务到终端" onClick={onSendTerminal}>
+              <TerminalSquare strokeWidth={2} aria-hidden="true" />
+            </button>
+          </Tooltip>
+        </span>
+      </div>
       {!done && subtasks.length ? (
         <ol className="goalSubtaskList">
           {subtasks.map((subtask) => (
@@ -6662,6 +7073,12 @@ function App() {
         }));
       }
     }
+    if (!isTauriRuntime()) {
+      persistDesktopTask(nextTask).catch((err) => {
+        setRunnerError(err instanceof Error ? err.message : String(err));
+      });
+      return;
+    }
     try {
       await persistDesktopTask(nextTask);
     } catch (err) {
@@ -7203,6 +7620,10 @@ function App() {
   };
 
   const selectEngineeringFile = async (file) => {
+    if (!file) {
+      setSelectedEngineeringFile(null);
+      return;
+    }
     const nextFile = {
       ...file,
       error: "",
@@ -7742,6 +8163,130 @@ function App() {
       setTerminalError(err instanceof Error ? err.message : String(err));
       return false;
     }
+  };
+
+  const resolveGoalTodoTask = (todo) => {
+    if (!todo?.id) return null;
+    const task = tasks.find((item) => item.id === todo.id);
+    if (task) return task;
+    const queueItem = snapshot.queue?.find((item) => item.id === todo.id) || todo;
+    return {
+      createdAt: "",
+      id: queueItem.id,
+      plan: {
+        candidateChanges: [],
+        checks: [],
+        filesToRead: [],
+        guardrails: ["这是目标拆解里的待办，开始执行前仍需确认具体改动范围。"],
+        mode: "planned-task",
+        projectName: snapshot.projectName,
+        steps: [queueItem.body || queueItem.description || "补齐任务执行方案。"],
+        summary: queueItem.body || queueItem.description || "",
+        task: queueItem.title,
+        trace: [`GOAL_TASK: ${queueItem.goalId || "current"}`],
+      },
+      projectId: snapshot.currentProjectId || "",
+      projectName: snapshot.projectName,
+      projectPath: snapshot.currentProjectPath || "",
+      status: queueItem.status || taskStatuses.planned,
+      title: queueItem.title,
+    };
+  };
+
+  const goalTasksForContext = (goal) => {
+    const goalTaskIds = new Set(Array.isArray(goal?.taskIds) ? goal.taskIds : []);
+    if (!goal?.id && !goalTaskIds.size) return tasks.filter((task) => !isNoiseTask(task)).slice(0, 8);
+    return tasks
+      .filter((task) => !isNoiseTask(task) && (task.goalId === goal.id || goalTaskIds.has(task.id)))
+      .slice(0, 8);
+  };
+
+  const appendContextTurn = (text, actions = []) => {
+    const now = Date.now();
+    updateChatTurns([
+      ...chatTurns,
+      {
+        id: `${now}-context`,
+        role: "assistant",
+        text,
+        actions,
+      },
+    ]);
+    setSelectedEngineeringFile(null);
+    window.dispatchEvent(new Event("project-os:open-conversation"));
+  };
+
+  const sendGoalToChat = (goal) => {
+    if (!goal) return;
+    const relatedTasks = goalTasksForContext(goal);
+    const taskLines = relatedTasks.length
+      ? relatedTasks.map((task, index) => `${index + 1}. ${task.title}（${taskStatusLabel(task.status)}）`).join("\n")
+      : "暂未绑定具体任务。";
+    appendContextTurn(
+      `已带入目标上下文：${goal.shortTitle || goal.title || "当前目标"}\n\n状态：${goalStatusLabelText(goal.status)}\n说明：${goal.summary || "暂无说明"}\n\n关联任务：\n${taskLines}\n\n你可以直接继续问：下一步先做哪个、要不要拆任务、或者从哪个任务开始执行。`,
+      [{ id: "open-topic", label: "查看当前进度", target: "project-progress" }]
+    );
+    showToast("已发送目标到对话。", "success");
+  };
+
+  const sendTaskToChat = (todo) => {
+    const task = resolveGoalTodoTask(todo);
+    if (!task) return;
+    setActiveTaskId(task.id);
+    setReadonlyPlan(task.plan || null);
+    setSelectedEngineeringFile(null);
+    appendContextTurn(
+      `已带入任务上下文：${task.title}\n\n状态：${taskStatusLabel(task.status)}\n来自目标：${task.goalTitle || todo?.goalTitle || "当前目标"}\n说明：${task.plan?.summary || todo?.description || "暂无说明"}\n\n你可以继续问这个任务怎么做，也可以点下面开始执行。`,
+      task.status === taskStatuses.planned ? [{ id: "confirm-active-task", label: "开始执行" }] : [{ id: "open-topic", label: "查看任务详情", target: "execution" }]
+    );
+    showToast("已发送任务到对话。", "success");
+  };
+
+  const appendContextToTerminal = async (text) => {
+    const normalized = text.endsWith("\n") ? text : `${text}\n`;
+    setTerminalTextBySession((current) => ({
+      ...current,
+      [activeTerminalSessionId]: `${current[activeTerminalSessionId] || ""}${normalized}`.slice(-50000),
+    }));
+    window.dispatchEvent(new Event("project-os:open-terminal"));
+    if (isTauriRuntime()) {
+      await writeTerminalData(normalized);
+    }
+  };
+
+  const sendGoalToTerminal = async (goal) => {
+    if (!goal) return;
+    const relatedTasks = goalTasksForContext(goal);
+    const taskLines = relatedTasks.length
+      ? relatedTasks.map((task, index) => `#   ${index + 1}. ${task.title} [${taskStatusLabel(task.status)}]`).join("\n")
+      : "#   暂未绑定具体任务";
+    await appendContextToTerminal([
+      "",
+      `# Goal: ${goal.shortTitle || goal.title || "当前目标"}`,
+      `# Status: ${goalStatusLabelText(goal.status)}`,
+      `# Summary: ${goal.summary || "暂无说明"}`,
+      "# Tasks:",
+      taskLines,
+      "",
+    ].join("\n"));
+    showToast("已发送目标到终端。", "success");
+  };
+
+  const sendTaskToTerminal = async (todo) => {
+    const task = resolveGoalTodoTask(todo);
+    if (!task) return;
+    setActiveTaskId(task.id);
+    setReadonlyPlan(task.plan || null);
+    await appendContextToTerminal([
+      "",
+      `# Task: ${task.title}`,
+      `# Status: ${taskStatusLabel(task.status)}`,
+      `# Goal: ${task.goalTitle || todo?.goalTitle || "当前目标"}`,
+      `# Summary: ${task.plan?.summary || todo?.description || "暂无说明"}`,
+      "# Next: 在这里输入要运行的检查或命令。",
+      "",
+    ].join("\n"));
+    showToast("已发送任务到终端。", "success");
   };
 
   const resizeTerminalSession = async (cols, rows) => {
@@ -8284,6 +8829,7 @@ function App() {
         <AgentWorkspace
           snapshot={snapshot}
           selectedEngineeringFile={selectedEngineeringFile}
+          activeConversationId={activeConversationId}
           chatTurns={chatTurns}
           terminalLogs={terminalLogs}
           terminalRunningId={terminalRunningId}
@@ -8358,6 +8904,10 @@ function App() {
           onSelectConversation={selectConversation}
           onDeleteConversation={deleteConversation}
           onSelectTask={selectTask}
+          onSendGoalToChat={sendGoalToChat}
+          onSendGoalToTerminal={sendGoalToTerminal}
+          onSendTaskToChat={sendTaskToChat}
+          onSendTaskToTerminal={sendTaskToTerminal}
           onMarkTaskWaiting={markTaskWaiting}
           onValidateGoal={validateGoal}
           onSignOffGoal={signOffGoal}

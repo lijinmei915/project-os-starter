@@ -1,7 +1,91 @@
 {
   "schemaVersion": "project-os.task-backlog.v0.1",
-  "updatedAt": "2026-07-08T05:24:00.000Z",
+  "updatedAt": "2026-07-10T05:45:00.000Z",
   "items": [
+    {
+      "id": "codex-dialogue-agent-event-schema",
+      "title": "定义 AgentEvent 数据结构",
+      "status": "done",
+      "body": "把 Codex 式对话能力拆成可记录事件，覆盖 thinking、read-file、search、edit、command、check、result 和 error，先用于前端时间线和现有动作接入。",
+      "tone": "accent",
+      "goalId": "打磨对话体验-1783435178902",
+      "updatedAt": "2026-07-10T05:50:00.000Z",
+      "completedAt": "2026-07-10T05:50:00.000Z"
+    },
+    {
+      "id": "codex-dialogue-event-timeline",
+      "title": "对话里渲染工具调用时间线",
+      "status": "done",
+      "body": "assistant 消息下方显示可折叠时间线，呈现正在理解、读取上下文、生成计划、运行检查和完成/失败等状态。",
+      "tone": "accent",
+      "goalId": "打磨对话体验-1783435178902",
+      "updatedAt": "2026-07-10T05:50:00.000Z",
+      "completedAt": "2026-07-10T05:50:00.000Z"
+    },
+    {
+      "id": "codex-dialogue-connect-actions",
+      "title": "接入现有动作事件",
+      "status": "done",
+      "body": "把 generate plan、apply patch、run check、merge handoff 等现有动作转成真实 timeline event，而不是只显示最终结果。",
+      "tone": "accent",
+      "goalId": "打磨对话体验-1783435178902",
+      "updatedAt": "2026-07-10T05:50:00.000Z",
+      "completedAt": "2026-07-10T05:50:00.000Z"
+    },
+    {
+      "id": "codex-dialogue-message-reference",
+      "title": "定义 MessageReference 引用结构",
+      "status": "planned",
+      "body": "支持在对话里引用文件、命令、任务和检查结果，为后续点击跳转和上下文追问做准备。",
+      "tone": "neutral",
+      "goalId": "打磨对话体验-1783435178902",
+      "updatedAt": "2026-07-10T05:45:00.000Z"
+    },
+    {
+      "id": "codex-dialogue-clickable-references",
+      "title": "对话消息支持可点击引用",
+      "status": "planned",
+      "body": "点击文件引用打开工程文件预览，点击检查引用打开执行结果或终端记录。",
+      "tone": "neutral",
+      "goalId": "打磨对话体验-1783435178902",
+      "updatedAt": "2026-07-10T05:45:00.000Z"
+    },
+    {
+      "id": "codex-dialogue-turn-summary",
+      "title": "保存本轮上下文摘要",
+      "status": "planned",
+      "body": "保存本轮读了什么、改了什么、跑了什么、结果如何，让用户问“刚才做了啥”时能基于本轮上下文回答。",
+      "tone": "neutral",
+      "goalId": "打磨对话体验-1783435178902",
+      "updatedAt": "2026-07-10T05:45:00.000Z"
+    },
+    {
+      "id": "codex-dialogue-task-state-machine",
+      "title": "定义可中断任务运行状态",
+      "status": "planned",
+      "body": "建立 idle、planning、waiting-confirmation、editing、checking、paused、failed、done 等状态，支持对话和任务执行一致展示。",
+      "tone": "neutral",
+      "goalId": "打磨对话体验-1783435178902",
+      "updatedAt": "2026-07-10T05:45:00.000Z"
+    },
+    {
+      "id": "codex-dialogue-stop-continue",
+      "title": "支持停止和继续",
+      "status": "planned",
+      "body": "用户停止后对话里显示停在哪一步；用户说继续时能从上次任务恢复，而不是重新开始。",
+      "tone": "neutral",
+      "goalId": "打磨对话体验-1783435178902",
+      "updatedAt": "2026-07-10T05:45:00.000Z"
+    },
+    {
+      "id": "codex-dialogue-midflight-redirect",
+      "title": "支持中途改方向",
+      "status": "planned",
+      "body": "执行中用户说先解释、换个方案或别改了时，任务暂停并切回问答或重新生成计划。",
+      "tone": "neutral",
+      "goalId": "打磨对话体验-1783435178902",
+      "updatedAt": "2026-07-10T05:45:00.000Z"
+    },
     {
       "id": "workspace-project-context",
       "title": "项目切换后的真实上下文",

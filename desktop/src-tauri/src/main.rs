@@ -1474,7 +1474,6 @@ async fn chat_with_model(input: ChatWithModelInput) -> Result<ChatWithModelResul
             }
             Err(err) => {
                 let mut fallback = local_chat_result(&message, !attachments.is_empty());
-                fallback.reply = format!("{}（模型暂时不可用：{}）", fallback.reply, err);
                 fallback.provider_status = "unavailable".to_string();
                 fallback.provider_model = provider.model.clone();
                 fallback.provider_error = err;

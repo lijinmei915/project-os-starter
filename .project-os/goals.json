@@ -27,10 +27,20 @@
       "shortTitle": "打磨对话体验",
       "status": "planned",
       "summary": "对齐主流",
-      "taskIds": [],
+      "taskIds": [
+        "codex-dialogue-agent-event-schema",
+        "codex-dialogue-event-timeline",
+        "codex-dialogue-connect-actions",
+        "codex-dialogue-message-reference",
+        "codex-dialogue-clickable-references",
+        "codex-dialogue-turn-summary",
+        "codex-dialogue-task-state-machine",
+        "codex-dialogue-stop-continue",
+        "codex-dialogue-midflight-redirect"
+      ],
       "title": "打磨对话体验",
       "confirmedAt": "2026-07-09T09:36:31.750Z",
-      "updatedAt": "2026-07-09T09:36:31.750Z"
+      "updatedAt": "2026-07-10T05:45:00.000Z"
     },
     {
       "completedAt": "2026-07-07T09:39:31.032Z",
@@ -46,5 +56,5 @@
     }
   ],
   "schemaVersion": "project-os.goals.v0.1",
-  "updatedAt": "2026-07-09T09:36:31.750Z"
+  "updatedAt": "2026-07-10T05:45:00.000Z"
 }

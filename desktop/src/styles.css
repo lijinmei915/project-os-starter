@@ -4420,12 +4420,13 @@ body.isResizingSidebar {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 0;
+  max-width: min(760px, 82%);
 }
 
 .conversationMessage-user {
   grid-template-columns: minmax(0, 1fr);
   width: fit-content;
-  max-width: min(72%, 680px);
+  max-width: min(62%, 560px);
   justify-self: end;
 }
 
@@ -4489,6 +4490,8 @@ body.isResizingSidebar {
 }
 
 .conversationBubble {
+  width: fit-content;
+  max-width: 100%;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -4496,8 +4499,9 @@ body.isResizingSidebar {
   color: var(--desktop-text-secondary);
   font-size: var(--desktop-text-body);
   font-weight: var(--desktop-font-regular);
-  line-height: 1.45;
+  line-height: 1.55;
   overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .conversationMessage-empty {
@@ -4519,6 +4523,11 @@ body.isResizingSidebar {
   white-space: pre-wrap;
 }
 
+.conversationMessage-assistant + .conversationMessage-user,
+.conversationMessage-user + .conversationMessage-assistant {
+  margin-top: 8px;
+}
+
 .conversationMessage-user .conversationBubble:has(.conversationAttachmentGrid) {
   min-width: min(280px, 100%);
 }
@@ -4527,7 +4536,7 @@ body.isResizingSidebar {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 8px;
 }
 
 .conversationActions button {
@@ -4546,6 +4555,260 @@ body.isResizingSidebar {
 
 .conversationActions button:hover {
   background: var(--desktop-state-accent-bg-hover);
+}
+
+.conversationStatusLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  margin-top: 8px;
+  color: var(--desktop-text-muted);
+  font-size: var(--desktop-text-meta);
+  font-weight: var(--desktop-font-semibold);
+  padding: 0;
+}
+
+.conversationStatusLabel::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--desktop-accent);
+  opacity: 0.86;
+}
+
+.conversationDiagnostic {
+  display: grid;
+  gap: 3px;
+  max-width: 460px;
+  margin-top: 8px;
+  border-left: 2px solid var(--desktop-border-accent);
+  color: var(--desktop-text-muted);
+  padding: 2px 0 2px 9px;
+}
+
+.conversationDiagnostic span {
+  color: var(--desktop-text-secondary);
+  font-size: var(--desktop-text-meta);
+  font-weight: var(--desktop-font-semibold);
+}
+
+.conversationDiagnostic p {
+  margin: 0;
+  color: var(--desktop-text-soft);
+  font-size: var(--desktop-text-meta);
+  line-height: 1.45;
+}
+
+.conversationDiagnostic details {
+  margin-top: 4px;
+}
+
+.conversationDiagnostic summary {
+  width: fit-content;
+  color: var(--desktop-text-muted);
+  cursor: pointer;
+  font-size: var(--desktop-text-meta);
+  font-weight: var(--desktop-font-medium);
+}
+
+.conversationDiagnostic code {
+  display: block;
+  max-width: min(520px, 100%);
+  margin-top: 5px;
+  overflow-x: auto;
+  border: 1px solid var(--desktop-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--desktop-surface-panel);
+  color: var(--desktop-text-soft);
+  font-family: var(--mono);
+  font-size: var(--desktop-text-meta);
+  line-height: 1.45;
+  padding: 7px 8px;
+  white-space: pre-wrap;
+}
+
+.conversationWorkflow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.conversationWorkflowStep {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  border: 1px solid var(--desktop-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--desktop-surface-panel);
+  color: var(--desktop-text-muted);
+  font-size: var(--desktop-text-meta);
+  padding: 0 8px;
+}
+
+.conversationWorkflowStep span {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--desktop-text-soft);
+}
+
+.conversationWorkflowStep strong {
+  font-weight: var(--desktop-font-semibold);
+}
+
+.conversationWorkflowStep.done {
+  color: var(--desktop-text-secondary);
+}
+
+.conversationWorkflowStep.done span {
+  background: #16a34a;
+}
+
+.conversationWorkflowStep.current {
+  border-color: var(--desktop-border-accent);
+  color: var(--desktop-text-primary);
+}
+
+.conversationWorkflowStep.current span {
+  background: var(--desktop-accent);
+  box-shadow: 0 0 0 3px var(--desktop-state-accent-bg);
+}
+
+.conversationWorkflowStep.failed {
+  border-color: color-mix(in srgb, #dc2626 42%, var(--desktop-border-default));
+  color: var(--desktop-text-secondary);
+}
+
+.conversationWorkflowStep.failed span {
+  background: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+}
+
+.conversationTimelineGroup {
+  width: fit-content;
+  max-width: min(560px, 100%);
+  margin-top: 8px;
+}
+
+.conversationTimelineGroup > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 20px;
+  color: var(--desktop-text-soft);
+  cursor: pointer;
+  font-size: var(--desktop-text-meta);
+  padding: 0;
+  list-style: none;
+}
+
+.conversationTimelineGroup > summary::-webkit-details-marker {
+  display: none;
+}
+
+.conversationTimelineGroupIcon,
+.conversationTimelineDot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+}
+
+.conversationTimelineGroupIcon {
+  width: 5px;
+  height: 5px;
+  background: currentColor;
+  opacity: 0.68;
+}
+
+.conversationTimelineGroup > summary strong {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: var(--desktop-font-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversationTimelineGroup > summary em {
+  display: inline;
+  color: var(--desktop-text-soft);
+  font-size: var(--desktop-text-meta);
+  font-style: normal;
+}
+
+.conversationTimelineGroup > summary em::before {
+  content: "· ";
+}
+
+.conversationTimeline {
+  display: grid;
+  gap: 6px;
+  max-width: min(560px, 100%);
+  margin-top: 7px;
+  border-left: 1px solid var(--desktop-border-default);
+  padding-left: 10px;
+}
+
+.conversationTimelineGroup:not([open]) .conversationTimeline {
+  display: none;
+}
+
+.conversationTimelineEvent {
+  min-width: 0;
+}
+
+.conversationTimelineEventHeader {
+  display: grid;
+  grid-template-columns: 9px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  min-height: 21px;
+  color: var(--desktop-text-muted);
+}
+
+.conversationTimelineDot {
+  background: var(--desktop-text-soft);
+}
+
+.conversationTimelineEventHeader strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--desktop-text-secondary);
+  font-size: var(--desktop-text-meta);
+  font-weight: var(--desktop-font-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversationTimelineEventHeader em {
+  color: var(--desktop-text-soft);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-style: normal;
+}
+
+.conversationTimelineEvent p {
+  margin: 2px 0 3px 16px;
+  color: var(--desktop-text-soft);
+  font-size: var(--desktop-text-meta);
+  line-height: 1.45;
+}
+
+.conversationTimelineEvent.done .conversationTimelineDot {
+  background: #16a34a;
+}
+
+.conversationTimelineEvent.current .conversationTimelineDot {
+  background: var(--desktop-accent);
+  box-shadow: 0 0 0 3px var(--desktop-state-accent-bg);
+}
+
+.conversationTimelineEvent.failed .conversationTimelineDot {
+  background: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
 }
 
 .conversationAttachmentGrid {
@@ -4602,6 +4865,35 @@ body.isResizingSidebar {
   display: inline-flex;
   align-items: center;
   gap: 7px;
+}
+
+.thinkingSteps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.thinkingStep {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  border: 1px solid var(--desktop-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--desktop-surface-panel);
+  color: var(--desktop-text-soft);
+  font-size: var(--desktop-text-meta);
+  font-weight: var(--desktop-font-medium);
+  padding: 0 7px;
+}
+
+.thinkingStep.current {
+  border-color: var(--desktop-border-accent);
+  color: var(--desktop-text-secondary);
+}
+
+.thinkingStep.done {
+  color: var(--desktop-text-secondary);
 }
 
 .thinkingStageDot {
@@ -6317,6 +6609,8 @@ body.isResizingSidebar {
 
 .goalProgressHeader {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
   gap: 4px;
 }
 
@@ -6349,6 +6643,43 @@ body.isResizingSidebar {
   font-size: var(--desktop-text-caption);
   font-weight: var(--desktop-font-medium);
   line-height: 1.4;
+}
+
+.goalInlineActions,
+.goalTodoActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.goalInlineActions button,
+.goalTodoActions button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--desktop-text-soft);
+  cursor: pointer;
+  padding: 0;
+}
+
+.goalInlineActions button:hover,
+.goalTodoActions button:hover,
+.goalInlineActions button:focus-visible,
+.goalTodoActions button:focus-visible {
+  border-color: var(--desktop-border-default);
+  background: var(--desktop-hover-surface);
+  color: var(--desktop-text-primary);
+  outline: none;
+}
+
+.goalInlineActions svg,
+.goalTodoActions svg {
+  width: 13px;
+  height: 13px;
 }
 
 .goalProgressBar {
@@ -6525,6 +6856,24 @@ body.isResizingSidebar {
   color: var(--desktop-text-primary);
   padding: 4px 3px;
   text-align: left;
+}
+
+.goalTodoRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px;
+  border-radius: var(--radius);
+}
+
+.goalTodoActions {
+  padding-right: 2px;
+  opacity: 0;
+}
+
+.goalTodoItem:hover .goalTodoActions,
+.goalTodoActions:focus-within {
+  opacity: 1;
 }
 
 .goalTodoItem.done .goalTodoButton {
