@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
-import { Activity, AlertTriangle, ArrowLeftRight, ArrowRight, Brain, Check, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, ClipboardList, Eraser, FileText, Loader2, MessageSquare, MoreVertical, Package, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Play, Plus, RotateCcw, Server, ShieldAlert, Square, Target, TerminalSquare, X } from "lucide-react";
+import { Activity, AlertTriangle, ArrowLeftRight, ArrowRight, Brain, Check, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, ClipboardList, Eraser, ExternalLink, FileText, Loader2, MessageSquare, MoreVertical, Package, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Play, Plus, RotateCcw, Server, ShieldAlert, Square, Target, TerminalSquare, X } from "lucide-react";
 import { ChatComposer } from "./components/workbench/chat-composer";
 import { Conversation, ConversationMessage } from "./components/workbench/conversation";
 import { InfoCallout } from "./components/workbench/info-callout";
@@ -653,6 +653,9 @@ async function invokeWorkspaceCommand(command, payload) {
       }
       return result;
     }
+    if (command === "open_native_terminal") {
+      throw new Error("浏览器预览不能打开系统终端，请在桌面 App 窗口里使用。");
+    }
     throw new Error("当前是浏览器预览，只能查看界面；请在桌面 App 窗口里保存配置。");
   }
 
@@ -703,6 +706,7 @@ function TopBar({
   source,
   error,
   provider,
+  providerHealth,
   modelCatalog,
   onSaveProvider,
   onSaveProviderSecret,
@@ -711,6 +715,7 @@ function TopBar({
   onStartConversation,
 }) {
   const providerButtonLabel = activeProviderProfileName(provider) || "连接";
+  const health = providerHealth || { status: "unknown", label: "Checking" };
   return (
     <header className="topbar">
         <div className="brand">
@@ -726,7 +731,7 @@ function TopBar({
         <Dialog>
           <DialogTrigger asChild>
             <Button className="modelStatusButton" variant="subtle" type="button" aria-label="连接设置">
-              <span className="dot mutedDot" />
+              <span className={`dot modelHealthDot modelHealthDot-${health.status}`} />
               {providerButtonLabel}
             </Button>
           </DialogTrigger>
@@ -1370,6 +1375,129 @@ function cleanTerminalText(value) {
   return text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
 }
 
+function hasTerminalScreenControl(value) {
+  const text = safeDisplayText(value);
+  return /\x1Bc|\x1B\[[0-?]*[ -/]*[HJf]|\x1B\[[0-?]*[ -/]*[hl]/.test(text);
+}
+
+function terminalThemeForCurrentMode() {
+  const light = document.documentElement.classList.contains("theme-light");
+  if (light) {
+    return {
+      background: "#ffffff",
+      black: "#e9eaec",
+      blue: "#1f5fbf",
+      brightBlack: "#8f9399",
+      brightBlue: "#175cd3",
+      brightCyan: "#0e9384",
+      brightGreen: "#087443",
+      brightMagenta: "#6941c6",
+      brightRed: "#b42318",
+      brightWhite: "#111317",
+      brightYellow: "#b54708",
+      cursor: "#111317",
+      cyan: "#0e9384",
+      foreground: "#161a1f",
+      green: "#067647",
+      magenta: "#7f56d9",
+      red: "#d92d20",
+      selectionBackground: "#d7d9dd",
+      white: "#f3f4f6",
+      yellow: "#b54708",
+    };
+  }
+  return {
+    background: "#050908",
+    black: "#101716",
+    blue: "#7ea7ff",
+    brightBlack: "#66706f",
+    brightBlue: "#a9c2ff",
+    brightCyan: "#8ee8d3",
+    brightGreen: "#7ce4b0",
+    brightMagenta: "#d7b7ff",
+    brightRed: "#ff9a87",
+    brightWhite: "#f4fbf8",
+    brightYellow: "#ffe09a",
+    cursor: "#35e6aa",
+    cyan: "#68d8c2",
+    foreground: "#d7e3df",
+    green: "#35d892",
+    magenta: "#c8a5ff",
+    red: "#ff846f",
+    selectionBackground: "#214238",
+    white: "#d7e3df",
+    yellow: "#ffd680",
+  };
+}
+
+function terminalKeyEventToData(event) {
+  if (event.isComposing) return "";
+  if (event.metaKey) return "";
+  const keyCode = Number(event.keyCode || event.which || 0);
+  if (event.key === "Backspace" || event.code === "Backspace" || keyCode === 8) return "\u007f";
+  if (event.key === "Delete" || event.code === "Delete" || keyCode === 46) return "\u001b[3~";
+  const ctrlMap = {
+    c: "\u0003",
+    d: "\u0004",
+    j: "\n",
+    l: "\u000c",
+    m: "\r",
+    o: "\u000f",
+    r: "\u0012",
+    u: "\u0015",
+  };
+  if (event.ctrlKey) {
+    return ctrlMap[event.key.toLowerCase()] || "";
+  }
+  const keyMap = {
+    ArrowDown: "\u001b[B",
+    ArrowLeft: "\u001b[D",
+    ArrowRight: "\u001b[C",
+    ArrowUp: "\u001b[A",
+    End: "\u001b[F",
+    Enter: "\r",
+    Escape: "\u001b",
+    Home: "\u001b[H",
+    PageDown: "\u001b[6~",
+    PageUp: "\u001b[5~",
+    Tab: "\t",
+  };
+  if (keyMap[event.key]) return keyMap[event.key];
+  if (event.altKey && event.key.length === 1) return `\u001b${event.key}`;
+  if (event.key.length === 1) return event.key;
+  return "";
+}
+
+function terminalControlKeyEventToData(event) {
+  if (event.isComposing || event.metaKey) return "";
+  const isPrintable = event.key?.length === 1 && !event.ctrlKey && !event.altKey;
+  if (isPrintable) return "";
+  return terminalKeyEventToData(event);
+}
+
+function isTerminalPromptEcho(text) {
+  const lines = safeDisplayText(text).split("\n").map((line) => line.trim()).filter(Boolean);
+  if (lines.length !== 1) return false;
+  return /^[\w.-]+@[\w.-]+\s+\S+\s+[%$#]$/.test(lines[0]);
+}
+
+function terminalPromptLine(text) {
+  const lines = safeDisplayText(text).split("\n").map((line) => line.trim()).filter(Boolean);
+  return lines.length ? lines[lines.length - 1] : "";
+}
+
+function collapseDuplicateTerminalPromptLines(text) {
+  const lines = safeDisplayText(text).split("\n");
+  const nextLines = [];
+  lines.forEach((line) => {
+    const trimmed = line.trim();
+    const previous = nextLines.length ? nextLines[nextLines.length - 1].trim() : "";
+    if (trimmed && trimmed === previous && isTerminalPromptEcho(trimmed)) return;
+    nextLines.push(line);
+  });
+  return nextLines.join("\n");
+}
+
 function conversationTitle(turns) {
   const firstUser = turns.find((turn) => turn.role === "user");
   const title = cleanConversationText(firstUser?.text) || "新对话";
@@ -1412,6 +1540,20 @@ function providerModelKey(provider) {
 
 function modelAvailabilityKey(provider, model) {
   return [provider?.apiBase || "", provider?.apiKeyEnv || "", model || ""].join("|");
+}
+
+function providerModelHealth(provider, availability = {}) {
+  if (!provider?.enabled || !provider?.model) {
+    return { label: "Not work", status: "unavailable" };
+  }
+  const entry = availability[provider.model];
+  if (entry?.status === "available") {
+    return { label: "Work", status: "available", message: entry.message || "" };
+  }
+  if (entry?.status === "unavailable") {
+    return { label: "Not work", status: "unavailable", message: entry.message || "" };
+  }
+  return { label: "Checking", status: "unknown" };
 }
 
 function catalogModelsForProvider(provider, modelCatalog) {
@@ -1746,6 +1888,8 @@ function AgentWorkspace({
   terminalText,
   terminalChunks,
   terminalSession,
+  terminalSessions,
+  activeTerminalSessionId,
   terminalError,
   loading,
   error,
@@ -1775,6 +1919,10 @@ function AgentWorkspace({
   onRunTerminalCommand,
   onWriteTerminalData,
   onResizeTerminalSession,
+  onSelectTerminalSession,
+  onNewTerminalSession,
+  onCloseTerminalSession,
+  onOpenNativeTerminal,
   onRestartTerminalSession,
   onProfileUpdated,
   onStopPlan,
@@ -1787,6 +1935,7 @@ function AgentWorkspace({
   onLoadComposerModels,
   onSelectComposerModel,
   onTestComposerModel,
+  onModelHealthChange,
   goalRefinementMode,
   onSelectEngineeringFile,
   onSelectConversation,
@@ -1808,6 +1957,16 @@ function AgentWorkspace({
   const activeRequestRef = React.useRef(null);
   const actionMode = Boolean(activeTask || readonlyPlan);
   const isConversationEmpty = !chatTurns.length && !activeTask && !readonlyPlan && !loading && !error && !pendingTurn && !chatLoading;
+
+  useEffect(() => {
+    const handleTerminalShortcut = (event) => {
+      if ((!event.metaKey && !event.ctrlKey) || event.key.toLowerCase() !== "j") return;
+      event.preventDefault();
+      setActiveWorkspaceTab((current) => current === "terminal" ? "plan" : "terminal");
+    };
+    window.addEventListener("keydown", handleTerminalShortcut);
+    return () => window.removeEventListener("keydown", handleTerminalShortcut);
+  }, []);
 
   useEffect(() => {
     setTaskInput("");
@@ -2020,6 +2179,7 @@ function AgentWorkspace({
         });
       }
     } catch (err) {
+      onModelHealthChange?.(provider?.model, "unavailable", err instanceof Error ? err.message : String(err));
       chatResult = {
         intent: "chat",
         reply: `我现在先按本地规则回答。模型对话暂时不可用：${err instanceof Error ? err.message : String(err)}`,
@@ -2037,6 +2197,11 @@ function AgentWorkspace({
     }
 
     const shouldCreatePlan = Boolean(chatResult?.shouldCreatePlan) || isActionRequestMessage(nextInput, submittedAttachments.length > 0);
+    if (chatResult?.providerStatus === "available") {
+      onModelHealthChange?.(chatResult.providerModel || provider?.model, "available", `${chatResult.providerModel || provider?.model} work`);
+    } else if (chatResult?.providerStatus === "unavailable") {
+      onModelHealthChange?.(chatResult.providerModel || provider?.model, "unavailable", chatResult.providerError || "模型不可用");
+    }
 
     if (!shouldCreatePlan) {
       onChatTurnsChange([
@@ -2267,10 +2432,16 @@ function AgentWorkspace({
                 onRunCommand={onRunTerminalCommand}
                 onWriteTerminalData={onWriteTerminalData}
                 onResizeTerminalSession={onResizeTerminalSession}
+                onSelectTerminalSession={onSelectTerminalSession}
+                onNewTerminalSession={onNewTerminalSession}
+                onCloseTerminalSession={onCloseTerminalSession}
+                onOpenNativeTerminal={onOpenNativeTerminal}
                 onRestartTerminalSession={onRestartTerminalSession}
                 text={terminalText}
                 chunks={terminalChunks}
                 session={terminalSession}
+                sessions={terminalSessions}
+                activeSessionId={activeTerminalSessionId}
                 error={terminalError}
               />
             </TabsContent>
@@ -2394,16 +2565,6 @@ function ChatDock({
   const placeholder = goalRefinementMode
     ? "说说哪里还不满意，比如交互、视觉、文案、流程或结果..."
     : "问项目情况、描述想法，或说要改什么...";
-  const draftText = safeDisplayText(taskInput).toLowerCase();
-  const actionDraft = isActionRequestMessage(taskInput, attachments.length > 0);
-  const modeHint = planLoading || chatLoading
-    ? "正在处理：你可以继续补充要求，也可以停止生成。"
-    : actionDraft
-      ? "开发模式：会先生成任务计划，确认后才会改文件。"
-      : draftText.trim()
-        ? "问答模式：先回答问题，不会改文件。"
-        : "普通问题直接回答；开发需求会进入任务、Patch 和验证流程。";
-
   return (
     <section className="chatDock" aria-label="对话输入">
       <ChatComposer
@@ -2425,7 +2586,6 @@ function ChatDock({
         modelProfile={modelProfile}
         modelSource={modelSource}
         modelTesting={modelTesting}
-        modeHint={modeHint}
         onModelMenuOpen={onLoadComposerModels}
         onModelSelect={onSelectComposerModel}
         onModelTest={onTestComposerModel}
@@ -2439,16 +2599,22 @@ function ChatDock({
 
 function TerminalDock({
   active = true,
+  activeSessionId = "main",
   logs,
   runningId,
   onRunCheck,
   onRunCommand,
   onWriteTerminalData,
   onResizeTerminalSession,
+  onSelectTerminalSession,
+  onNewTerminalSession,
+  onCloseTerminalSession,
+  onOpenNativeTerminal,
   onRestartTerminalSession,
   text,
   chunks,
   session,
+  sessions = [],
   error,
 }) {
   const terminalHostRef = React.useRef(null);
@@ -2457,8 +2623,13 @@ function TerminalDock({
   const writeDataRef = React.useRef(onWriteTerminalData);
   const resizeSessionRef = React.useRef(onResizeTerminalSession);
   const writtenChunkCountRef = React.useRef(0);
+  const renderedSessionKeyRef = React.useRef("");
   const lastSizeRef = React.useRef({ cols: 0, rows: 0 });
-  const isRunning = Boolean(runningId);
+  const isTerminalReady = Boolean(session);
+  const visibleSessions = sessions.length ? sessions : session ? [session] : [];
+  const sessionKey = session
+    ? `${session.sessionId || session.session_id || session.id || activeSessionId}:${session.generation || ""}`
+    : "";
 
   useEffect(() => {
     writeDataRef.current = onWriteTerminalData;
@@ -2468,14 +2639,14 @@ function TerminalDock({
     resizeSessionRef.current = onResizeTerminalSession;
   }, [onResizeTerminalSession]);
 
-  const syncTerminalSize = React.useCallback(() => {
+  const syncTerminalSize = React.useCallback((force = false) => {
     if (!xtermRef.current || !fitAddonRef.current) return;
     try {
       fitAddonRef.current.fit();
       const cols = xtermRef.current.cols;
       const rows = xtermRef.current.rows;
       if (!cols || !rows) return;
-      if (cols === lastSizeRef.current.cols && rows === lastSizeRef.current.rows) return;
+      if (!force && cols === lastSizeRef.current.cols && rows === lastSizeRef.current.rows) return;
       lastSizeRef.current = { cols, rows };
       resizeSessionRef.current?.(cols, rows);
     } catch {
@@ -2491,80 +2662,99 @@ function TerminalDock({
       convertEol: true,
       cursorBlink: true,
       cursorStyle: "block",
-      disableStdin: false,
       fontFamily: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace",
       fontSize: 11,
       letterSpacing: 0,
       lineHeight: 1.35,
+      scrollOnUserInput: true,
       scrollback: 5000,
-      theme: {
-        background: "#050908",
-        black: "#101716",
-        blue: "#7ea7ff",
-        brightBlack: "#66706f",
-        brightBlue: "#a9c2ff",
-        brightCyan: "#8ee8d3",
-        brightGreen: "#7ce4b0",
-        brightMagenta: "#d7b7ff",
-        brightRed: "#ff9a87",
-        brightWhite: "#f4fbf8",
-        brightYellow: "#ffe09a",
-        cursor: "#35e6aa",
-        cyan: "#68d8c2",
-        foreground: "#d7e3df",
-        green: "#35d892",
-        magenta: "#c8a5ff",
-        red: "#ff846f",
-        selectionBackground: "#214238",
-        white: "#d7e3df",
-        yellow: "#ffd680",
-      },
+      theme: terminalThemeForCurrentMode(),
     });
     const fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
     terminal.open(terminalHostRef.current);
     terminal.focus();
-    terminal.onData((data) => {
+    terminal.attachCustomKeyEventHandler((event) => {
+      if (event.type !== "keydown") return true;
+      const sequence = terminalControlKeyEventToData(event);
+      if (!sequence) return true;
+      event.preventDefault();
+      event.stopPropagation();
+      terminal.scrollToBottom();
+      writeDataRef.current(sequence);
+      return false;
+    });
+    const dataDisposable = terminal.onData((data) => {
+      terminal.scrollToBottom();
       writeDataRef.current(data);
     });
     xtermRef.current = terminal;
     fitAddonRef.current = fitAddon;
-    requestAnimationFrame(syncTerminalSize);
+    requestAnimationFrame(() => {
+      syncTerminalSize(true);
+      requestAnimationFrame(() => syncTerminalSize(true));
+    });
 
+    const themeObserver = new MutationObserver(() => {
+      terminal.options.theme = terminalThemeForCurrentMode();
+    });
+    themeObserver.observe(document.documentElement, { attributeFilter: ["class"], attributes: true });
+    const handleWindowKeyDown = (event) => {
+      const host = terminalHostRef.current;
+      if (!host || !host.contains(document.activeElement)) return;
+      const sequence = terminalControlKeyEventToData(event);
+      if (!sequence) return;
+      event.preventDefault();
+      event.stopPropagation();
+      xtermRef.current?.scrollToBottom();
+      writeDataRef.current(sequence);
+    };
+    window.addEventListener("keydown", handleWindowKeyDown, true);
     window.addEventListener("resize", syncTerminalSize);
     return () => {
+      themeObserver.disconnect();
+      window.removeEventListener("keydown", handleWindowKeyDown, true);
       window.removeEventListener("resize", syncTerminalSize);
+      dataDisposable.dispose();
       terminal.dispose();
       xtermRef.current = null;
       fitAddonRef.current = null;
       writtenChunkCountRef.current = 0;
+      renderedSessionKeyRef.current = "";
       lastSizeRef.current = { cols: 0, rows: 0 };
     };
   }, [syncTerminalSize]);
 
   useEffect(() => {
     if (!xtermRef.current) return;
-    const nextChunks = Array.isArray(chunks) ? chunks.slice(writtenChunkCountRef.current) : [];
-    nextChunks.forEach((chunk) => xtermRef.current.write(chunk.data || ""));
-    writtenChunkCountRef.current = Array.isArray(chunks) ? chunks.length : 0;
-  }, [chunks]);
-
-  useEffect(() => {
-    if (!xtermRef.current || !session) return;
-    xtermRef.current.reset();
-    writtenChunkCountRef.current = Array.isArray(chunks) ? chunks.length : 0;
-    try {
-      requestAnimationFrame(syncTerminalSize);
-      xtermRef.current.focus();
-    } catch {
-      // Ignore focus/fit races during hot reload.
+    const replayChunks = Array.isArray(chunks) ? chunks : [];
+    if (renderedSessionKeyRef.current !== sessionKey) {
+      xtermRef.current.reset();
+      replayChunks.forEach((chunk) => xtermRef.current.write(chunk.data || ""));
+      writtenChunkCountRef.current = replayChunks.length;
+      renderedSessionKeyRef.current = sessionKey;
+      requestAnimationFrame(() => {
+        syncTerminalSize(true);
+        requestAnimationFrame(() => {
+          syncTerminalSize(true);
+          xtermRef.current?.scrollToBottom();
+          xtermRef.current?.focus();
+        });
+      });
+      return;
     }
-  }, [session, syncTerminalSize]);
+    const nextChunks = replayChunks.slice(writtenChunkCountRef.current);
+    nextChunks.forEach((chunk) => {
+      xtermRef.current.write(chunk.data || "", () => xtermRef.current?.scrollToBottom());
+    });
+    writtenChunkCountRef.current = replayChunks.length;
+  }, [chunks, sessionKey, syncTerminalSize]);
 
   useEffect(() => {
     if (!active || !xtermRef.current) return;
     requestAnimationFrame(() => {
-      syncTerminalSize();
+      syncTerminalSize(true);
+      requestAnimationFrame(() => syncTerminalSize(true));
       xtermRef.current?.focus();
     });
   }, [active, syncTerminalSize]);
@@ -2575,20 +2765,101 @@ function TerminalDock({
     requestAnimationFrame(() => xtermRef.current?.focus());
   };
 
+  if (!isTerminalReady) {
+    return (
+      <section className="terminalDock" aria-label="终端">
+        <div className="terminalDockHeader">
+          <div className="terminalDockPrimary">
+            <Tooltip content="浏览器预览">
+              <div className="terminalSessionTabs" role="tablist" aria-label="终端会话">
+                <button className="terminalSessionTab active" type="button" role="tab" aria-selected="true">
+                  <TerminalSquare aria-hidden="true" />
+                  <span>preview</span>
+                </button>
+              </div>
+            </Tooltip>
+          </div>
+          <div className="terminalDockActions">
+            <Tooltip content="在原生终端打开">
+              <Button className="terminalIconButton" size="icon" type="button" variant="ghost" onClick={onOpenNativeTerminal} aria-label="在原生终端打开">
+                <ExternalLink strokeWidth={2} aria-hidden="true" />
+              </Button>
+            </Tooltip>
+          </div>
+        </div>
+        <div className="terminalPreviewEmpty">
+          <TerminalSquare aria-hidden="true" />
+          <strong>浏览器预览不启动本地终端</strong>
+          <p>{text || "请在桌面 App 窗口里使用完整终端。这里不会执行命令，也不会写入工程文件。"}</p>
+        </div>
+        {error ? <Notice className="terminalNotice" variant="danger">{error}</Notice> : null}
+      </section>
+    );
+  }
+
   return (
     <section className="terminalDock" aria-label="终端">
       <div className="terminalDockHeader">
-        <Tooltip content={session?.cwd || "终端"}>
-          <div className="terminalSessionTabs" role="tablist" aria-label="终端会话">
-            <button className="terminalSessionTab active" type="button" role="tab" aria-selected="true">
-              <TerminalSquare aria-hidden="true" />
-              <span>main</span>
-            </button>
-          </div>
-        </Tooltip>
+        <div className="terminalDockPrimary">
+          <Tooltip content={session?.cwd || "终端"}>
+            <div className="terminalSessionTabs" role="tablist" aria-label="终端会话">
+              {visibleSessions.map((item, index) => {
+                const sessionId = item.sessionId || item.session_id || item.id || `term-${index + 1}`;
+                const activeItem = sessionId === activeSessionId;
+                const canClose = sessionId !== "main";
+                return (
+                  <div
+                    className={`terminalSessionTab${activeItem ? " active" : ""}`}
+                    key={sessionId}
+                    role="tab"
+                    aria-selected={activeItem}
+                    tabIndex={0}
+                    onClick={() => onSelectTerminalSession?.(sessionId)}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter" && event.key !== " ") return;
+                      event.preventDefault();
+                      onSelectTerminalSession?.(sessionId);
+                    }}
+                    title={item.cwd || session?.cwd || sessionId}
+                  >
+                    <TerminalSquare aria-hidden="true" />
+                    <span>{sessionId === "main" ? "main" : sessionId.replace(/^terminal-/, "term-")}</span>
+                    {canClose ? (
+                      <span
+                        aria-label={`关闭 ${sessionId}`}
+                        className="terminalSessionClose"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          onCloseTerminalSession?.(sessionId);
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        title="关闭会话"
+                        onKeyDown={(event) => {
+                          if (event.key !== "Enter" && event.key !== " ") return;
+                          event.preventDefault();
+                          event.stopPropagation();
+                          onCloseTerminalSession?.(sessionId);
+                        }}
+                      >
+                        <X aria-hidden="true" />
+                      </span>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          </Tooltip>
+        </div>
         <div className="terminalDockActions">
+          <Tooltip content="在原生终端打开">
+            <Button className="terminalIconButton" size="icon" type="button" variant="ghost" onClick={onOpenNativeTerminal} aria-label="在原生终端打开">
+              <ExternalLink strokeWidth={2} aria-hidden="true" />
+            </Button>
+          </Tooltip>
           <Tooltip content="新建会话">
-            <Button className="terminalIconButton" size="icon" type="button" variant="ghost" onClick={onRestartTerminalSession} aria-label="新建终端会话">
+            <Button className="terminalIconButton" size="icon" type="button" variant="ghost" onClick={onNewTerminalSession} aria-label="新建终端会话">
               <Plus strokeWidth={2} aria-hidden="true" />
             </Button>
           </Tooltip>
@@ -2609,7 +2880,14 @@ function TerminalDock({
           </Tooltip>
         </div>
       </div>
-      <div className="terminal terminalDockOutput terminalDockXterm" ref={terminalHostRef} />
+      <div
+        className="terminal terminalDockOutput terminalDockXterm"
+        onMouseDown={() => requestAnimationFrame(() => {
+          xtermRef.current?.scrollToBottom();
+          xtermRef.current?.focus();
+        })}
+        ref={terminalHostRef}
+      />
       {error ? <Notice className="terminalNotice" variant="danger">{error}</Notice> : null}
     </section>
   );
@@ -6145,9 +6423,10 @@ function App() {
   const [runnerError, setRunnerError] = useState("");
   const [terminalRunningId, setTerminalRunningId] = useState("");
   const [terminalLogs, setTerminalLogs] = useState([]);
-  const [terminalText, setTerminalText] = useState("");
-  const [terminalChunks, setTerminalChunks] = useState([]);
-  const [terminalSession, setTerminalSession] = useState(null);
+  const [activeTerminalSessionId, setActiveTerminalSessionId] = useState("main");
+  const [terminalSessions, setTerminalSessions] = useState([]);
+  const [terminalTextBySession, setTerminalTextBySession] = useState({});
+  const [terminalChunksBySession, setTerminalChunksBySession] = useState({});
   const [terminalError, setTerminalError] = useState("");
   const [patchLoading, setPatchLoading] = useState(false);
   const [patchError, setPatchError] = useState("");
@@ -6164,6 +6443,25 @@ function App() {
   const [projectActivities, setProjectActivities] = useState({});
   const [conversationResetKey, setConversationResetKey] = useState(0);
   const [selectedEngineeringFile, setSelectedEngineeringFile] = useState(null);
+  const terminalSession = terminalSessions.find((item) => (item.sessionId || item.session_id || item.id) === activeTerminalSessionId) || null;
+  const terminalText = terminalTextBySession[activeTerminalSessionId] || "";
+  const terminalChunks = terminalChunksBySession[activeTerminalSessionId] || [];
+  const lastTerminalPromptRef = React.useRef({});
+  const terminalTextBySessionRef = React.useRef(terminalTextBySession);
+  const terminalSessionsRef = React.useRef(terminalSessions);
+  const terminalClearRequestedRef = React.useRef({});
+  const terminalGenerationBySessionRef = React.useRef({});
+  const terminalInputBufferRef = React.useRef({});
+  const terminalLastOutputRef = React.useRef({});
+  const terminalPassthroughRef = React.useRef({});
+
+  useEffect(() => {
+    terminalTextBySessionRef.current = terminalTextBySession;
+  }, [terminalTextBySession]);
+
+  useEffect(() => {
+    terminalSessionsRef.current = terminalSessions;
+  }, [terminalSessions]);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [leftWidth, setLeftWidth] = useState(sidebarSizing.leftDefault);
@@ -6319,9 +6617,15 @@ function App() {
     setApplyError("");
     setHandoffError("");
     setTerminalLogs([]);
-    setTerminalText("");
-    setTerminalChunks([]);
-    setTerminalSession(null);
+    setActiveTerminalSessionId("main");
+    setTerminalSessions([]);
+    setTerminalTextBySession({});
+    setTerminalChunksBySession({});
+    lastTerminalPromptRef.current = {};
+    terminalClearRequestedRef.current = {};
+    terminalGenerationBySessionRef.current = {};
+    terminalInputBufferRef.current = {};
+    terminalPassthroughRef.current = {};
     setTerminalError("");
     try {
       const records = JSON.parse(window.localStorage?.getItem(projectScopedStorageKey(nextSnapshot, "conversations.v1")) || "[]");
@@ -6638,7 +6942,8 @@ function App() {
 
   useEffect(() => {
     if (!isTauriRuntime()) {
-      setTerminalText("浏览器预览不能启动本地终端。请在桌面 App 窗口里使用完整终端。");
+      setTerminalTextBySession({ main: "浏览器预览不能启动本地终端。请在桌面 App 窗口里使用完整终端。" });
+      setTerminalSessions([]);
       return undefined;
     }
 
@@ -6650,29 +6955,111 @@ function App() {
         const { listen } = await import("@tauri-apps/api/event");
         unlisten = await listen("terminal://output", (event) => {
           const payload = event.payload || {};
-          if (payload.sessionId && payload.sessionId !== "main") return;
-          setTerminalChunks((current) => [
+          const sessionId = payload.sessionId || "main";
+          const generation = Number(payload.generation || 0);
+          const currentGeneration = Number(terminalGenerationBySessionRef.current[sessionId] || 0);
+          if (generation && currentGeneration && generation !== currentGeneration) {
+            return;
+          }
+          let data = payload.data || "";
+          const now = Date.now();
+          const lastOutput = terminalLastOutputRef.current[sessionId];
+          if (lastOutput?.data === data && now - lastOutput.at < 80) {
+            return;
+          }
+          terminalLastOutputRef.current = {
+            ...terminalLastOutputRef.current,
+            [sessionId]: { at: now, data },
+          };
+          const passthrough = Boolean(terminalPassthroughRef.current[sessionId]);
+          if (!passthrough) {
+            const sessionHasOutput = Boolean((terminalTextBySessionRef.current[sessionId] || "").trim());
+            if (!sessionHasOutput) {
+              data = data.replace(/^(?:\r?\n)+/, "");
+            }
+          }
+          let cleanedData = cleanTerminalText(data);
+          const screenControlOnly = !cleanedData && hasTerminalScreenControl(data);
+          if (!cleanedData && !screenControlOnly) return;
+          const previousTerminalText = terminalTextBySessionRef.current[sessionId] || "";
+          if (terminalClearRequestedRef.current[sessionId]) {
+            terminalClearRequestedRef.current = {
+              ...terminalClearRequestedRef.current,
+              [sessionId]: false,
+            };
+            data = `\u001bc${data}`;
+          }
+          if (!passthrough) {
+            const collapsedData = collapseDuplicateTerminalPromptLines(cleanedData);
+            if (collapsedData !== cleanedData) {
+              data = collapsedData;
+              cleanedData = collapsedData;
+            }
+          }
+          if (!passthrough) {
+            const lastPrompt = lastTerminalPromptRef.current[sessionId];
+            const incomingPromptLine = terminalPromptLine(cleanedData);
+            const currentPromptLine = terminalPromptLine(previousTerminalText);
+            if (
+              isTerminalPromptEcho(cleanedData) &&
+              (lastPrompt?.text === incomingPromptLine || currentPromptLine === incomingPromptLine)
+            ) {
+              return;
+            }
+            if (isTerminalPromptEcho(cleanedData)) {
+              lastTerminalPromptRef.current = {
+                ...lastTerminalPromptRef.current,
+                [sessionId]: { at: now, text: incomingPromptLine },
+              };
+            }
+          }
+          const nextTerminalText = screenControlOnly
+            ? previousTerminalText
+            : `${previousTerminalText}${cleanedData}`.slice(-50000);
+          terminalTextBySessionRef.current = {
+            ...terminalTextBySessionRef.current,
+            [sessionId]: nextTerminalText,
+          };
+          setTerminalChunksBySession((current) => {
+            const currentChunks = current[sessionId] || [];
+            return {
+              ...current,
+              [sessionId]: [
+                ...currentChunks,
+                {
+                  data,
+                  id: `${Date.now()}-${currentChunks.length}`,
+                },
+              ].slice(-2000),
+            };
+          });
+          setTerminalTextBySession((current) => ({
             ...current,
-            {
-              data: payload.data || "",
-              id: `${Date.now()}-${current.length}`,
-            },
-          ].slice(-2000));
-          setTerminalText((current) => `${current}${cleanTerminalText(payload.data || "")}`.slice(-50000));
+            [sessionId]: nextTerminalText,
+          }));
         });
-        setTerminalChunks([]);
+        if (cancelled) {
+          if (unlisten) unlisten();
+          return;
+        }
+        setTerminalChunksBySession((current) => ({ ...current, main: [] }));
         const session = await invokeWorkspaceCommand("start_terminal_session", {
           input: { sessionId: "main", cols: 120, rows: 32 },
         });
         if (!cancelled) {
-          setTerminalSession(session);
+          terminalGenerationBySessionRef.current = {
+            ...terminalGenerationBySessionRef.current,
+            main: Number(session.generation || 0),
+          };
+          setTerminalSessions([session]);
+          setActiveTerminalSessionId("main");
           setTerminalError("");
-          setTerminalText((current) => current || `Connected to ${session.shell} at ${session.cwd}\n`);
+          setTerminalTextBySession((current) => ({ ...current, main: current.main || `Connected to ${session.shell} at ${session.cwd}\n` }));
         }
       } catch (err) {
         if (!cancelled) {
           setTerminalError(err instanceof Error ? err.message : String(err));
-          setTerminalText((current) => current || "终端启动失败。");
+          setTerminalTextBySession((current) => ({ ...current, main: current.main || "终端启动失败。" }));
         }
       }
     };
@@ -6684,9 +7071,15 @@ function App() {
       if (unlisten) {
         unlisten();
       }
-      invokeWorkspaceCommand("stop_terminal_session", {
-        input: { sessionId: "main" },
-      }).catch(() => {});
+      const sessionIds = new Set([
+        "main",
+        ...terminalSessionsRef.current.map((item) => item.sessionId || item.session_id || item.id).filter(Boolean),
+      ]);
+      sessionIds.forEach((sessionId) => {
+        invokeWorkspaceCommand("stop_terminal_session", {
+          input: { sessionId },
+        }).catch(() => {});
+      });
     };
   }, []);
 
@@ -7278,14 +7671,70 @@ function App() {
       },
       ...current,
     ].slice(0, 8));
-    setTerminalText((current) => `${current}\n$ ${result.command || result.id || "command"}\n${cleanTerminalText(result.output || "")}\n`.slice(-50000));
+    setTerminalTextBySession((current) => ({
+      ...current,
+      [activeTerminalSessionId]: `${current[activeTerminalSessionId] || ""}\n$ ${result.command || result.id || "command"}\n${cleanTerminalText(result.output || "")}\n`.slice(-50000),
+    }));
   };
 
   const writeTerminalData = async (data) => {
     if (!data) return false;
+    const sessionId = activeTerminalSessionId;
+    let dataToSend = data;
+    if (data === "\u0003") {
+      terminalInputBufferRef.current = {
+        ...terminalInputBufferRef.current,
+        [sessionId]: "",
+      };
+    } else {
+      const previousInput = terminalInputBufferRef.current[sessionId] || "";
+      const nextInput = data === "\u007f" || data === "\b"
+        ? previousInput.slice(0, -1)
+        : `${previousInput}${data}`;
+      if (/[\r\n]/.test(data)) {
+        const command = previousInput.trim();
+        if (/^codex(?:\s|$)/.test(command)) {
+          dataToSend = "\u0015clear\u000dcodex\u000d";
+          terminalClearRequestedRef.current = {
+            ...terminalClearRequestedRef.current,
+            [sessionId]: true,
+          };
+          terminalPassthroughRef.current = {
+            ...terminalPassthroughRef.current,
+            [sessionId]: true,
+          };
+          setTerminalTextBySession((current) => ({ ...current, [sessionId]: "" }));
+          setTerminalChunksBySession((current) => ({ ...current, [sessionId]: [] }));
+          delete terminalLastOutputRef.current[sessionId];
+        }
+        terminalInputBufferRef.current = {
+          ...terminalInputBufferRef.current,
+          [sessionId]: "",
+        };
+      } else {
+        let bufferedInput = nextInput.slice(-240);
+        if (bufferedInput.length >= 2 && bufferedInput.length % 2 === 0) {
+          const midpoint = bufferedInput.length / 2;
+          const firstHalf = bufferedInput.slice(0, midpoint);
+          const secondHalf = bufferedInput.slice(midpoint);
+          if (firstHalf === secondHalf) {
+            bufferedInput = firstHalf;
+            dataToSend = "";
+          }
+        }
+        terminalInputBufferRef.current = {
+          ...terminalInputBufferRef.current,
+          [sessionId]: bufferedInput,
+        };
+      }
+    }
     try {
+      if (!dataToSend) {
+        setTerminalError("");
+        return true;
+      }
       await invokeWorkspaceCommand("write_terminal_session", {
-        input: { sessionId: "main", data },
+        input: { sessionId, data: dataToSend },
       });
       setTerminalError("");
       return true;
@@ -7299,7 +7748,7 @@ function App() {
     if (!isTauriRuntime() || !cols || !rows) return false;
     try {
       await invokeWorkspaceCommand("resize_terminal_session", {
-        input: { sessionId: "main", cols, rows },
+        input: { sessionId: activeTerminalSessionId, cols, rows },
       });
       return true;
     } catch (err) {
@@ -7308,21 +7757,121 @@ function App() {
     }
   };
 
-  const restartTerminalSession = async () => {
+  const startTerminalSession = async (sessionId, { activate = true, reset = false } = {}) => {
     if (!isTauriRuntime()) return false;
     setTerminalError("");
     try {
-      await invokeWorkspaceCommand("stop_terminal_session", {
-        input: { sessionId: "main" },
-      });
-      setTerminalText("");
-      setTerminalChunks([]);
-      setTerminalSession(null);
+      if (reset) {
+        await invokeWorkspaceCommand("stop_terminal_session", {
+          input: { sessionId },
+        }).catch(() => {});
+        setTerminalTextBySession((current) => ({ ...current, [sessionId]: "" }));
+        setTerminalChunksBySession((current) => ({ ...current, [sessionId]: [] }));
+        lastTerminalPromptRef.current = {
+          ...lastTerminalPromptRef.current,
+          [sessionId]: null,
+        };
+        terminalInputBufferRef.current = {
+          ...terminalInputBufferRef.current,
+          [sessionId]: "",
+        };
+        terminalClearRequestedRef.current = {
+          ...terminalClearRequestedRef.current,
+          [sessionId]: false,
+        };
+        terminalGenerationBySessionRef.current = {
+          ...terminalGenerationBySessionRef.current,
+          [sessionId]: 0,
+        };
+        terminalLastOutputRef.current = {
+          ...terminalLastOutputRef.current,
+          [sessionId]: null,
+        };
+        terminalPassthroughRef.current = {
+          ...terminalPassthroughRef.current,
+          [sessionId]: false,
+        };
+      }
       const session = await invokeWorkspaceCommand("start_terminal_session", {
-        input: { sessionId: "main", cols: 120, rows: 32 },
+        input: { sessionId, cols: 120, rows: 32 },
       });
-      setTerminalSession(session);
-      setTerminalText(`Connected to ${session.shell} at ${session.cwd}\n`);
+      terminalGenerationBySessionRef.current = {
+        ...terminalGenerationBySessionRef.current,
+        [sessionId]: Number(session.generation || 0),
+      };
+      setTerminalSessions((current) => {
+        const next = current.filter((item) => (item.sessionId || item.session_id || item.id) !== sessionId);
+        return [...next, session];
+      });
+      setTerminalTextBySession((current) => ({
+        ...current,
+        [sessionId]: current[sessionId] || `Connected to ${session.shell} at ${session.cwd}\n`,
+      }));
+      setTerminalChunksBySession((current) => ({ ...current, [sessionId]: current[sessionId] || [] }));
+      if (activate) setActiveTerminalSessionId(sessionId);
+      return true;
+    } catch (err) {
+      setTerminalError(err instanceof Error ? err.message : String(err));
+      return false;
+    }
+  };
+
+  const newTerminalSession = async () => {
+    const used = new Set(terminalSessions.map((item) => item.sessionId || item.session_id || item.id));
+    let index = terminalSessions.length + 1;
+    let sessionId = `term-${index}`;
+    while (used.has(sessionId)) {
+      index += 1;
+      sessionId = `term-${index}`;
+    }
+    return startTerminalSession(sessionId, { activate: true });
+  };
+
+  const closeTerminalSession = async (sessionId) => {
+    if (!sessionId || sessionId === "main") return false;
+    setTerminalError("");
+    const sessionIds = terminalSessions.map((item) => item.sessionId || item.session_id || item.id).filter(Boolean);
+    const closingIndex = sessionIds.indexOf(sessionId);
+    const fallbackSessionId = sessionIds[closingIndex - 1] || sessionIds[closingIndex + 1] || "main";
+    try {
+      if (isTauriRuntime()) {
+        await invokeWorkspaceCommand("stop_terminal_session", {
+          input: { sessionId },
+        });
+      }
+      setTerminalSessions((current) => current.filter((item) => (item.sessionId || item.session_id || item.id) !== sessionId));
+      setTerminalTextBySession((current) => {
+        const next = { ...current };
+        delete next[sessionId];
+        return next;
+      });
+      setTerminalChunksBySession((current) => {
+        const next = { ...current };
+        delete next[sessionId];
+        return next;
+      });
+      delete lastTerminalPromptRef.current[sessionId];
+      delete terminalClearRequestedRef.current[sessionId];
+      delete terminalGenerationBySessionRef.current[sessionId];
+      delete terminalInputBufferRef.current[sessionId];
+      delete terminalLastOutputRef.current[sessionId];
+      delete terminalPassthroughRef.current[sessionId];
+      if (activeTerminalSessionId === sessionId) {
+        setActiveTerminalSessionId(fallbackSessionId === sessionId ? "main" : fallbackSessionId);
+      }
+      return true;
+    } catch (err) {
+      setTerminalError(err instanceof Error ? err.message : String(err));
+      return false;
+    }
+  };
+
+  const restartTerminalSession = async () => startTerminalSession(activeTerminalSessionId, { activate: true, reset: true });
+
+  const openNativeTerminal = async () => {
+    setTerminalError("");
+    try {
+      await invokeWorkspaceCommand("open_native_terminal", {});
       return true;
     } catch (err) {
       setTerminalError(err instanceof Error ? err.message : String(err));
@@ -7609,6 +8158,32 @@ function App() {
     }
   };
 
+  const updateComposerModelHealth = React.useCallback((model, status, message = "") => {
+    const targetModel = model || provider?.model;
+    if (!targetModel) return;
+    const key = modelAvailabilityKey(provider, targetModel);
+    setComposerModelTests((current) => ({
+      ...current,
+      [key]: {
+        checkedAt: Date.now(),
+        message,
+        status,
+      },
+    }));
+  }, [provider]);
+
+  useEffect(() => {
+    if (source !== "tauri" || !provider?.enabled || !provider?.model || !provider?.apiBase || !provider?.apiKeyEnv) return undefined;
+    const key = modelAvailabilityKey(provider, provider.model);
+    if (!composerModelTests[key]?.status) {
+      testComposerModel(provider.model);
+    }
+    const timer = window.setInterval(() => {
+      testComposerModel(provider.model);
+    }, 60000);
+    return () => window.clearInterval(timer);
+  }, [source, provider?.enabled, provider?.apiBase, provider?.apiKeyEnv, provider?.model]);
+
   const saveProviderSecret = async (apiKeyEnv, apiKey) => {
     const feedbackKey = "save-provider-secret";
     beginActionFeedback(feedbackKey, "正在保存 API Key...");
@@ -7659,6 +8234,7 @@ function App() {
   const composerModelAvailability = Object.fromEntries(
     composerModelOptions.map((model) => [model, composerModelTests[modelAvailabilityKey(provider, model)]])
   );
+  const currentProviderHealth = providerModelHealth(provider, composerModelAvailability);
 
   return (
     <TooltipProvider>
@@ -7668,6 +8244,7 @@ function App() {
         source={source}
         error={error}
         provider={provider}
+        providerHealth={currentProviderHealth}
         modelCatalog={modelCatalog}
         onSaveProvider={saveProvider}
         onSaveProviderSecret={saveProviderSecret}
@@ -7713,6 +8290,8 @@ function App() {
           terminalText={terminalText}
           terminalChunks={terminalChunks}
           terminalSession={terminalSession}
+          terminalSessions={terminalSessions}
+          activeTerminalSessionId={activeTerminalSessionId}
           terminalError={terminalError}
           loading={loading}
           error={error}
@@ -7742,6 +8321,10 @@ function App() {
           onRunTerminalCommand={runTerminalCommand}
           onWriteTerminalData={writeTerminalData}
           onResizeTerminalSession={resizeTerminalSession}
+          onSelectTerminalSession={setActiveTerminalSessionId}
+          onNewTerminalSession={newTerminalSession}
+          onCloseTerminalSession={closeTerminalSession}
+          onOpenNativeTerminal={openNativeTerminal}
           onRestartTerminalSession={restartTerminalSession}
           onProfileUpdated={applySnapshot}
           onStopPlan={stopPlanGeneration}
@@ -7754,6 +8337,7 @@ function App() {
           onLoadComposerModels={loadComposerModels}
           onSelectComposerModel={selectComposerModel}
           onTestComposerModel={testComposerModel}
+          onModelHealthChange={updateComposerModelHealth}
           goalRefinementMode={goalRefinementMode}
           onSelectEngineeringFile={selectEngineeringFile}
           onSelectConversation={selectConversation}

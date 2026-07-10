@@ -115,6 +115,7 @@ struct WorkspaceSnapshot {
 
 #[derive(Default)]
 struct TerminalState {
+    generation: Mutex<u64>,
     sessions: Mutex<HashMap<String, TerminalSession>>,
 }
 
@@ -502,6 +503,7 @@ struct TerminalCommandResult {
 struct TerminalSessionResult {
     session_id: String,
     cwd: String,
+    generation: u64,
     shell: String,
     running: bool,
 }
@@ -510,6 +512,7 @@ struct TerminalSessionResult {
 #[serde(rename_all = "camelCase")]
 struct TerminalOutputEvent {
     session_id: String,
+    generation: u64,
     data: String,
 }
 
@@ -622,6 +625,12 @@ struct ChatWithModelResult {
     reply: String,
     should_create_plan: bool,
     intent: String,
+    #[serde(default)]
+    provider_status: String,
+    #[serde(default)]
+    provider_model: String,
+    #[serde(default)]
+    provider_error: String,
 }
 
 #[derive(Deserialize)]
@@ -1314,6 +1323,45 @@ fn open_project_folder(id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn open_native_terminal() -> Result<(), String> {
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let current_project = current_registry_project(&mut registry, &app_root)?;
+    let root = PathBuf::from(&current_project.path);
+    if !root.exists() || !root.is_dir() {
+        return Err("当前项目路径不存在或不是目录".to_string());
+    }
+
+    #[cfg(target_os = "macos")]
+    let mut command = {
+        let mut command = Command::new("open");
+        command.args(["-a", "Terminal"]);
+        command.arg(&root);
+        command
+    };
+
+    #[cfg(target_os = "windows")]
+    let mut command = {
+        let mut command = Command::new("cmd");
+        command.args(["/C", "start", "wt", "-d"]);
+        command.arg(&root);
+        command
+    };
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let mut command = {
+        let mut command = Command::new("x-terminal-emulator");
+        command.current_dir(&root);
+        command
+    };
+
+    command
+        .spawn()
+        .map_err(|err| format!("无法打开原生终端：{}", err))?;
+    Ok(())
+}
+
+#[tauri::command]
 fn read_engineering_file(input: ReadEngineeringFileInput) -> Result<EngineeringFilePreview, String> {
     const MAX_PREVIEW_BYTES: usize = 80 * 1024;
 
@@ -1413,6 +1461,9 @@ async fn chat_with_model(input: ChatWithModelInput) -> Result<ChatWithModelResul
     if provider.enabled {
         match generate_provider_chat(&provider, &root, &project_name, &stage, &message, &attachments).await {
             Ok(mut result) => {
+                result.provider_status = "available".to_string();
+                result.provider_model = provider.model.clone();
+                result.provider_error = String::new();
                 if result.should_create_plan && !should_create_plan_for_message(&message, !attachments.is_empty()) {
                     result.should_create_plan = false;
                     if result.intent.trim().is_empty() || result.intent == "task" {
@@ -1424,6 +1475,9 @@ async fn chat_with_model(input: ChatWithModelInput) -> Result<ChatWithModelResul
             Err(err) => {
                 let mut fallback = local_chat_result(&message, !attachments.is_empty());
                 fallback.reply = format!("{}（模型暂时不可用：{}）", fallback.reply, err);
+                fallback.provider_status = "unavailable".to_string();
+                fallback.provider_model = provider.model.clone();
+                fallback.provider_error = err;
                 return Ok(fallback);
             }
         }
@@ -2412,6 +2466,9 @@ fn local_chat_result(message: &str, has_attachments: bool) -> ChatWithModelResul
         },
         should_create_plan,
         intent: if should_create_plan { "task" } else { "chat" }.to_string(),
+        provider_status: "local".to_string(),
+        provider_model: String::new(),
+        provider_error: String::new(),
     }
 }
 
@@ -3179,6 +3236,11 @@ fn start_terminal_session(
     } else {
         input.session_id.trim().to_string()
     };
+    let generation = {
+        let mut next_generation = state.generation.lock().map_err(|err| err.to_string())?;
+        *next_generation += 1;
+        *next_generation
+    };
 
     {
         let mut sessions = state.sessions.lock().map_err(|err| err.to_string())?;
@@ -3214,6 +3276,7 @@ fn start_terminal_session(
     let writer = pair.master.take_writer().map_err(|err| err.to_string())?;
     let reader_session_id = session_id.clone();
     let reader_app = app.clone();
+    let reader_generation = generation;
 
     std::thread::spawn(move || {
         let mut buffer = [0_u8; 4096];
@@ -3226,6 +3289,7 @@ fn start_terminal_session(
                         "terminal://output",
                         TerminalOutputEvent {
                             session_id: reader_session_id.clone(),
+                            generation: reader_generation,
                             data,
                         },
                     );
@@ -3248,6 +3312,7 @@ fn start_terminal_session(
     Ok(TerminalSessionResult {
         session_id,
         cwd: root.to_string_lossy().to_string(),
+        generation,
         shell,
         running: true,
     })
@@ -5546,6 +5611,7 @@ fn main() {
             probe_provider_models,
             test_provider_model,
             test_provider_model_with_cache,
+            open_native_terminal,
             read_engineering_file,
             run_guarded_check,
             run_project_os_action,

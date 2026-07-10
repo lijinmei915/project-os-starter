@@ -27,9 +27,13 @@ function modelAvailabilityLabel(entry) {
   return "未验证";
 }
 
-function groupedModelOptions(models, currentModel) {
+function flatModelOptions(models) {
+  return Array.from(new Set((models || []).filter(Boolean)));
+}
+
+function defaultFavoriteModelOptions(models, currentModel) {
   const uniqueModels = Array.from(new Set((models || []).filter(Boolean)));
-  const preferred = uniqueModels.filter((model) => {
+  const favorites = uniqueModels.filter((model) => {
     const name = String(model).toLowerCase();
     if (model === currentModel) return true;
     return (
@@ -39,15 +43,24 @@ function groupedModelOptions(models, currentModel) {
       !/nano|mini|compact/.test(name)
     );
   }).slice(0, 5);
-  const recommendationSet = new Set([currentModel, ...preferred].filter(Boolean));
-  const sections = [
-    { title: "推荐", models: uniqueModels.filter((model) => recommendationSet.has(model)) },
-    { title: "编程", models: uniqueModels.filter((model) => modelUsage(model) === "编程" && !recommendationSet.has(model)) },
-    { title: "轻量", models: uniqueModels.filter((model) => modelUsage(model) === "轻量" && !recommendationSet.has(model)) },
-    { title: "图像", models: uniqueModels.filter((model) => modelUsage(model) === "图像" && !recommendationSet.has(model)) },
-    { title: "其他", models: uniqueModels.filter((model) => !recommendationSet.has(model) && !["编程", "轻量", "图像"].includes(modelUsage(model))) },
-  ];
-  return sections.filter((section) => section.models.length);
+  return Array.from(new Set([currentModel, ...favorites].filter(Boolean)));
+}
+
+const favoriteModelsStorageKey = "omnidesk.favoriteModels.v1";
+
+function readFavoriteModels() {
+  if (typeof window === "undefined") return [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(favoriteModelsStorageKey) || "[]");
+    return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeFavoriteModels(models) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(favoriteModelsStorageKey, JSON.stringify(models));
 }
 
 export function ChatComposer({
@@ -73,7 +86,6 @@ export function ChatComposer({
   modelProfile,
   modelSource,
   modelTesting,
-  modeHint,
   placeholder,
   sending,
   value,
@@ -86,10 +98,20 @@ export function ChatComposer({
   const [isListening, setIsListening] = React.useState(false);
   const [speechSupported, setSpeechSupported] = React.useState(false);
   const [voiceError, setVoiceError] = React.useState("");
+  const [storedFavoriteModels, setStoredFavoriteModels] = React.useState(() => readFavoriteModels());
   const hasValue = Boolean(value?.trim()) || attachments.length > 0;
   const isDisabled = sending ? false : disabled || !hasValue;
   const voiceDisabled = disabled || !speechSupported || !onVoiceInput;
-  const modelSections = groupedModelOptions(modelOptions, currentModel);
+  const flatModels = flatModelOptions(modelOptions);
+  const defaultFavoriteModels = defaultFavoriteModelOptions(modelOptions, currentModel);
+  const favoriteModels = (storedFavoriteModels.length ? storedFavoriteModels : defaultFavoriteModels)
+    .filter((model) => flatModels.includes(model) || model === currentModel);
+  const currentModelStatus = modelAvailability[currentModel]?.status || "unknown";
+  const currentModelStatusLabel = currentModelStatus === "available"
+    ? "Work"
+    : currentModelStatus === "unavailable"
+      ? "Not work"
+      : "Checking";
   const toolbarHint = sending
     ? "正在生成，可继续补充"
     : isListening
@@ -112,6 +134,23 @@ export function ChatComposer({
       setIsListening(false);
     }
   }, [disabled, isListening]);
+
+  const updateFavoriteModels = React.useCallback((updater) => {
+    setStoredFavoriteModels((current) => {
+      const base = current.length ? current : defaultFavoriteModels;
+      const next = Array.from(new Set(updater(base).filter(Boolean)));
+      writeFavoriteModels(next);
+      return next;
+    });
+  }, [defaultFavoriteModels]);
+
+  const addFavoriteModel = React.useCallback((model) => {
+    updateFavoriteModels((current) => [model, ...current].slice(0, 12));
+  }, [updateFavoriteModels]);
+
+  const removeFavoriteModel = React.useCallback((model) => {
+    updateFavoriteModels((current) => current.filter((item) => item !== model));
+  }, [updateFavoriteModels]);
 
   const setTextareaRef = React.useCallback((node) => {
     textareaRef.current = node;
@@ -237,7 +276,6 @@ export function ChatComposer({
           rows={1}
           value={value}
         />
-        {modeHint ? <div className="chatComposerModeHint">{modeHint}</div> : null}
         <div className="chatComposerToolbar" aria-label="对话工具">
           <input
             accept="image/*"
@@ -282,7 +320,7 @@ export function ChatComposer({
                 <strong>{currentModel || modelLabel || "未选择模型"}</strong>
               </div>
               <button
-                className="chatComposerModelTest"
+                className={`chatComposerModelHealth chatComposerModelHealth-${currentModelStatus}`}
                 disabled={!currentModel || modelTesting}
                 onClick={(event) => {
                   event.preventDefault();
@@ -290,18 +328,62 @@ export function ChatComposer({
                   onModelTest?.(currentModel);
                 }}
                 type="button"
+                title="重新检查当前模型连接"
               >
-                {modelTesting ? "测试中" : modelAvailability[currentModel]?.status === "available" ? "重新测试" : "测试"}
+                <span className="chatComposerModelHealthDot" aria-hidden="true" />
+                {modelTesting ? "Checking" : currentModelStatusLabel}
               </button>
             </div>
             <div className="chatComposerModelSource">
               <span>{modelSource || "当前可用模型"}</span>
               <span>{modelOptions.length ? `${modelOptions.length} 个` : "0 个"}</span>
             </div>
-            {modelSections.map((section) => (
-              <div className="chatComposerModelSection" key={section.title}>
-                <div className="chatComposerModelSectionTitle">{section.title}</div>
-                {section.models.map((model) => (
+            {favoriteModels.length ? (
+              <div className="chatComposerFavoriteModels" aria-label="我的常选">
+                <div className="chatComposerModelSectionTitle">我的常选</div>
+                <div className="chatComposerFavoriteGrid">
+                  {favoriteModels.map((model) => (
+                    <button
+                      className={`chatComposerFavoriteModel${model === currentModel ? " active" : ""}`}
+                      key={model}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        onModelSelect?.(model);
+                      }}
+                      type="button"
+                    >
+                      <span>{model}</span>
+                      {model === currentModel ? <Check aria-hidden="true" strokeWidth={2.2} /> : null}
+                      <span
+                        aria-label={`从常选移除 ${model}`}
+                        className="chatComposerFavoriteRemove"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          removeFavoriteModel(model);
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        title="从常选移除"
+                        onKeyDown={(event) => {
+                          if (event.key !== "Enter" && event.key !== " ") return;
+                          event.preventDefault();
+                          event.stopPropagation();
+                          removeFavoriteModel(model);
+                        }}
+                      >
+                        <X aria-hidden="true" strokeWidth={2.2} />
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {flatModels.length ? (
+              <div className="chatComposerModelSection">
+                <div className="chatComposerModelSectionTitle">全部模型</div>
+                {flatModels.map((model) => (
                   <DropdownMenuItem
                     className="chatComposerModelItem"
                     key={model}
@@ -311,11 +393,27 @@ export function ChatComposer({
                     <span className={`chatComposerModelMeta ${modelAvailability[model]?.status || ""}`}>
                       {model === currentModel ? `当前 · ${modelAvailabilityLabel(modelAvailability[model])}` : `${modelDescription(model)} · ${modelAvailabilityLabel(modelAvailability[model])}`}
                     </span>
-                  {model === currentModel ? <Check aria-hidden="true" strokeWidth={2.2} /> : null}
+                  <span className="chatComposerModelItemActions">
+                    {model === currentModel ? <Check aria-hidden="true" strokeWidth={2.2} /> : null}
+                    {!favoriteModels.includes(model) ? (
+                      <button
+                        aria-label={`添加 ${model} 到常选`}
+                        className="chatComposerModelAdd"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          addFavoriteModel(model);
+                        }}
+                        type="button"
+                      >
+                        <Plus aria-hidden="true" strokeWidth={2.2} />
+                      </button>
+                    ) : null}
+                  </span>
                 </DropdownMenuItem>
                 ))}
               </div>
-            ))}
+            ) : null}
             {!modelOptions.length ? (
               <div className="chatComposerModelEmpty">没有读取到模型列表</div>
             ) : null}
