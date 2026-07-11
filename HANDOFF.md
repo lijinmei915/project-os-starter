@@ -26,6 +26,7 @@ depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
 
 ## 最近完成
 
+- 2026-07-11 左侧导航完成工作台层级纠正并接入跨项目总览与任务摘要索引：工作台总览置顶，项目集合位于其下，原“工作区”改为当前项目名称；总览从 registry 展示项目总数、基础健康、当前项目和项目列表。Tauri 快照会只读扫描各项目 `.project-os/runs/desktop-tasks`，聚合活跃、失败、完成和最近任务；浏览器预览无法跨本地目录读取时明确降级为当前项目任务，不伪造全局统计。
 - 2026-07-11 对话持久化已从浏览器 `localStorage` 收敛到项目级 `.project-os/runs/desktop-conversations/*.json`：Tauri 和预览适配层均支持列表、保存和删除；会话与任务现在共享项目级运行记录边界，切换项目、备份和清理不再依赖浏览器缓存。新增预览契约回归测试；浏览器预览重新加载无控制台错误。
 - 2026-07-11 桌面端第一批架构治理完成：移除未被 UI 使用的 headless Shell command；目标和任务发送到终端时统一逐行编码为注释，避免换行内容成为可执行命令；白名单检查、治理动作和 Patch 应用写入 `.project-os/runs/execution-audit.jsonl`；WebView 恢复最小 CSP；浏览器预览调用收敛到 `desktop/src/lib/runtime-api.js`，并为终端上下文和预览命令补了 Node 原生回归测试。已通过 `npm --prefix desktop test`、`npm --prefix desktop run web:build`、`cargo check --manifest-path desktop/src-tauri/Cargo.toml`、`bash scripts/check-template-sync.sh .`、`bash scripts/check-runtime.sh .` 和 `PROJECT_OS_ALLOW_EMPTY_PROVIDER_KEYS=1 PROJECT_OS_SKIP_SCREENSHOT=1 bash tests/run-tests.sh`。
 - 2026-07-09 根据用户确认的架构图，记录 OmniDesk / Project OS 的 6 层整体架构：入口层、工作台应用层、治理服务层、核心内核层、元数据层、接入层。`docs/ARCHITECTURE.md` 是完整 SSOT，`PROJECT.md` 和 `.project-os/state.json` 保留摘要。
@@ -178,6 +179,6 @@ bash tests/run-tests.sh
 
 ## 下一步建议
 
-1. 在真实桌面端点一次“验证目标”和“签收目标”，确认 `.project-os/goal-validation-report.json` 与 `.project-os/goal-signoff-history.json` 的实际生成内容。
-2. 继续把失败验收拆成修复任务：当报告失败时，右侧应自动生成“修复失败检查”的待办。
-3. 再补视觉证据：把关键界面截图或像素检查纳入目标验收报告。
+1. 当前先做 `dialogue-context-state`：建立多轮对话状态，让追问和用户委托继承上一轮话题、结论和下一动作。
+2. 之后依次做项目证据 Context Assembler、有证据的回答契约、引用与任务动作闭环、多轮对话回归评测；顺序已写入 `.project-os/task-backlog.json`。
+3. 每项完成后单独跑对应自动化和真实对话验收，再开始下一项，不并行扩展对话功能。

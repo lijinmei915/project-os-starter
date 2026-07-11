@@ -67,6 +67,22 @@ struct RegistryProject {
     is_current: bool,
     health: String,
     status_label: String,
+    task_count: usize,
+    active_task_count: usize,
+    failed_task_count: usize,
+    completed_task_count: usize,
+    latest_activity_at: String,
+    latest_activity_title: String,
+}
+
+#[derive(Default)]
+struct ProjectTaskSummary {
+    task_count: usize,
+    active_task_count: usize,
+    failed_task_count: usize,
+    completed_task_count: usize,
+    latest_activity_at: String,
+    latest_activity_title: String,
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -5301,6 +5317,7 @@ fn registry_projects(registry: &RegistryFile) -> Vec<RegistryProject> {
         .iter()
         .map(|project| {
             let (health, status_label) = project_health(project);
+            let summary = project_task_summary(&PathBuf::from(&project.path));
             RegistryProject {
                 id: project.id.clone(),
                 name: project.name.clone(),
@@ -5309,9 +5326,54 @@ fn registry_projects(registry: &RegistryFile) -> Vec<RegistryProject> {
                 is_current: project.id == registry.current_project_id,
                 health,
                 status_label,
+                task_count: summary.task_count,
+                active_task_count: summary.active_task_count,
+                failed_task_count: summary.failed_task_count,
+                completed_task_count: summary.completed_task_count,
+                latest_activity_at: summary.latest_activity_at,
+                latest_activity_title: summary.latest_activity_title,
             }
         })
         .collect()
+}
+
+fn project_task_summary(root: &Path) -> ProjectTaskSummary {
+    let task_dir = desktop_tasks_dir(root);
+    let Ok(entries) = fs::read_dir(task_dir) else {
+        return ProjectTaskSummary::default();
+    };
+    let mut summary = ProjectTaskSummary::default();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("json")
+            || path.file_name().and_then(|value| value.to_str()) == Some("manifest.json")
+        {
+            continue;
+        }
+        let Some(task) = read_json(path) else {
+            continue;
+        };
+        summary.task_count += 1;
+        match task.get("status").and_then(Value::as_str).unwrap_or("") {
+            "done" => summary.completed_task_count += 1,
+            "failed" => summary.failed_task_count += 1,
+            _ => summary.active_task_count += 1,
+        }
+        let activity_at = task
+            .get("updatedAt")
+            .and_then(Value::as_str)
+            .or_else(|| task.get("createdAt").and_then(Value::as_str))
+            .unwrap_or("");
+        if activity_at > summary.latest_activity_at.as_str() {
+            summary.latest_activity_at = activity_at.to_string();
+            summary.latest_activity_title = task
+                .get("title")
+                .and_then(Value::as_str)
+                .unwrap_or("任务更新")
+                .to_string();
+        }
+    }
+    summary
 }
 
 fn project_health(project: &RegistryFileProject) -> (String, String) {

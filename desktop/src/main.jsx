@@ -7,7 +7,6 @@ import { ChatComposer } from "./components/workbench/chat-composer";
 import { Conversation, ConversationMessage } from "./components/workbench/conversation";
 import { ConversationHistoryItem } from "./components/workbench/conversation-history-item";
 import { InfoCallout } from "./components/workbench/info-callout";
-import { ProviderStatusRow } from "./components/workbench/provider-status-row";
 import { SystemSettingsMenu } from "./components/workbench/system-settings-menu";
 import { TaskCard } from "./components/workbench/task-card";
 import { TaskCommandBar } from "./components/workbench/task-command-bar";
@@ -27,7 +26,7 @@ import { Switch } from "./components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Tooltip, TooltipProvider } from "./components/ui/tooltip";
 import { projectGovernanceOutline } from "./workspace-outline";
-import { formatTerminalContext } from "./lib/terminal-context";
+import { formatTerminalContext, formatTerminalContextForInput, formatTerminalInputForPaste } from "./lib/terminal-context";
 import { invokePreviewCommand, invokeTauriCommand, isTauriRuntime } from "./lib/runtime-api";
 import { buildConversationRecord, mergeConversationRecords } from "./lib/conversation-record";
 import "@xterm/xterm/css/xterm.css";
@@ -897,8 +896,23 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
   return (
     <aside className="left">
       <div className="leftScroll">
+        <button
+          className={`uiSectionTitle leftRailSection workbenchRootLink${selectedEngineeringFile?.path === "workbench-overview" ? " active" : ""}`}
+          type="button"
+          onClick={() => onSelectEngineeringFile?.({
+            description: "跨项目状态与下一步入口。",
+            group: "工作台",
+            id: "workbench-overview",
+            path: "workbench-overview",
+            title: "工作台总览",
+            virtual: true,
+          })}
+        >
+          <Activity strokeWidth={1.8} aria-hidden="true" />
+          <span>工作台</span>
+        </button>
         <SectionGroup
-          className="leftRailSection"
+          className="leftRailSection projectRailSection"
             title="项目"
             meta={snapshot.projects.length}
             open={projectsOpen}
@@ -1017,7 +1031,8 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
             )}
             activeTopicPath={selectedEngineeringFile?.path}
             onSelectTopic={onSelectEngineeringFile}
-            outline={projectGovernanceOutline}
+            outline={projectGovernanceOutline.filter((node) => node.id !== "workbench-overview")}
+            sectionTitle="工作区"
             snapshot={snapshot}
           />
         ) : (
@@ -1608,51 +1623,6 @@ function terminalThemeForCurrentMode() {
   };
 }
 
-function terminalKeyEventToData(event) {
-  if (event.isComposing) return "";
-  if (event.metaKey) return "";
-  const keyCode = Number(event.keyCode || event.which || 0);
-  if (event.key === "Backspace" || event.code === "Backspace" || keyCode === 8) return "\u007f";
-  if (event.key === "Delete" || event.code === "Delete" || keyCode === 46) return "\u001b[3~";
-  const ctrlMap = {
-    c: "\u0003",
-    d: "\u0004",
-    j: "\n",
-    l: "\u000c",
-    m: "\r",
-    o: "\u000f",
-    r: "\u0012",
-    u: "\u0015",
-  };
-  if (event.ctrlKey) {
-    return ctrlMap[event.key.toLowerCase()] || "";
-  }
-  const keyMap = {
-    ArrowDown: "\u001b[B",
-    ArrowLeft: "\u001b[D",
-    ArrowRight: "\u001b[C",
-    ArrowUp: "\u001b[A",
-    End: "\u001b[F",
-    Enter: "\r",
-    Escape: "\u001b",
-    Home: "\u001b[H",
-    PageDown: "\u001b[6~",
-    PageUp: "\u001b[5~",
-    Tab: "\t",
-  };
-  if (keyMap[event.key]) return keyMap[event.key];
-  if (event.altKey && event.key.length === 1) return `\u001b${event.key}`;
-  if (event.key.length === 1) return event.key;
-  return "";
-}
-
-function terminalControlKeyEventToData(event) {
-  if (event.isComposing || event.metaKey) return "";
-  const isPrintable = event.key?.length === 1 && !event.ctrlKey && !event.altKey;
-  if (isPrintable) return "";
-  return terminalKeyEventToData(event);
-}
-
 function isTerminalPromptEcho(text) {
   const lines = safeDisplayText(text).split("\n").map((line) => line.trim()).filter(Boolean);
   if (lines.length !== 1) return false;
@@ -1963,6 +1933,11 @@ function workspaceFileTabId(file) {
   return `file:${file?.path || file?.preview?.path || file?.topic?.title || "preview"}`;
 }
 
+function workspaceFileTabTitle(file) {
+  if (file?.id === "workbench-overview" || file?.path === "workbench-overview") return "工作台";
+  return file?.preview?.name || file?.topic?.title || (file?.virtual ? file.title : "") || file?.path || "文件";
+}
+
 function topicItemKey({ child, item, node }) {
   return [node?.id || node?.title, child?.id || child?.title, item?.id || item?.title].filter(Boolean).join("/");
 }
@@ -2160,12 +2135,7 @@ function AgentWorkspace({
   useEffect(() => {
     if (selectedEngineeringFile) {
       const tabId = workspaceFileTabId(selectedEngineeringFile);
-      const title =
-        selectedEngineeringFile.preview?.name ||
-        selectedEngineeringFile.topic?.title ||
-        (selectedEngineeringFile.virtual ? selectedEngineeringFile.title : "") ||
-        selectedEngineeringFile.path ||
-        "文件";
+      const title = workspaceFileTabTitle(selectedEngineeringFile);
       setWorkspaceTabs((current) => {
         const nextTab = {
           file: selectedEngineeringFile,
@@ -2968,6 +2938,8 @@ function TerminalDock({
   sessions = [],
   error,
 }) {
+  const [terminalDraft, setTerminalDraft] = useState("");
+  const [terminalDraftSending, setTerminalDraftSending] = useState(false);
   const terminalHostRef = React.useRef(null);
   const xtermRef = React.useRef(null);
   const fitAddonRef = React.useRef(null);
@@ -2976,7 +2948,9 @@ function TerminalDock({
   const writtenChunkCountRef = React.useRef(0);
   const renderedSessionKeyRef = React.useRef("");
   const lastSizeRef = React.useRef({ cols: 0, rows: 0 });
+  const isDesktopRuntime = isTauriRuntime();
   const isTerminalReady = Boolean(session);
+  const terminalEmptyState = !isDesktopRuntime ? "preview" : error ? "failed" : "starting";
   const visibleSessions = sessions.length ? sessions : session ? [session] : [];
   const sessionKey = session
     ? `${session.sessionId || session.session_id || session.id || activeSessionId}:${session.generation || ""}`
@@ -3026,13 +3000,20 @@ function TerminalDock({
     terminal.open(terminalHostRef.current);
     terminal.focus();
     terminal.attachCustomKeyEventHandler((event) => {
-      if (event.type !== "keydown") return true;
-      const sequence = terminalControlKeyEventToData(event);
-      if (!sequence) return true;
+      if (
+        event.type !== "keydown"
+        || event.isComposing
+        || event.key !== "Tab"
+        || event.metaKey
+        || event.ctrlKey
+        || event.altKey
+      ) {
+        return true;
+      }
       event.preventDefault();
       event.stopPropagation();
       terminal.scrollToBottom();
-      writeDataRef.current(sequence);
+      writeDataRef.current(event.shiftKey ? "\u001b[Z" : "\t");
       return false;
     });
     const dataDisposable = terminal.onData((data) => {
@@ -3050,21 +3031,9 @@ function TerminalDock({
       terminal.options.theme = terminalThemeForCurrentMode();
     });
     themeObserver.observe(document.documentElement, { attributeFilter: ["class"], attributes: true });
-    const handleWindowKeyDown = (event) => {
-      const host = terminalHostRef.current;
-      if (!host || !host.contains(document.activeElement)) return;
-      const sequence = terminalControlKeyEventToData(event);
-      if (!sequence) return;
-      event.preventDefault();
-      event.stopPropagation();
-      xtermRef.current?.scrollToBottom();
-      writeDataRef.current(sequence);
-    };
-    window.addEventListener("keydown", handleWindowKeyDown, true);
     window.addEventListener("resize", syncTerminalSize);
     return () => {
       themeObserver.disconnect();
-      window.removeEventListener("keydown", handleWindowKeyDown, true);
       window.removeEventListener("resize", syncTerminalSize);
       dataDisposable.dispose();
       terminal.dispose();
@@ -3116,34 +3085,75 @@ function TerminalDock({
     requestAnimationFrame(() => xtermRef.current?.focus());
   };
 
+  const submitTerminalDraft = async () => {
+    if (!terminalDraft || terminalDraftSending) return;
+    setTerminalDraftSending(true);
+    try {
+      const sent = await onWriteTerminalData(
+        formatTerminalInputForPaste(terminalDraft, { submit: true }),
+        { trackInput: false }
+      );
+      if (sent !== false) setTerminalDraft("");
+    } finally {
+      setTerminalDraftSending(false);
+    }
+  };
+
   if (!isTerminalReady) {
+    const emptyStateLabel = terminalEmptyState === "preview"
+      ? "preview"
+      : terminalEmptyState === "failed"
+        ? "启动失败"
+        : "正在启动";
+    const emptyStateTitle = terminalEmptyState === "preview"
+      ? "浏览器预览不启动本地终端"
+      : terminalEmptyState === "failed"
+        ? "终端启动失败"
+        : "正在启动本地终端";
+    const emptyStateDescription = terminalEmptyState === "preview"
+      ? (text || "请在桌面 App 窗口里使用完整终端。这里不会执行命令，也不会写入工程文件。")
+      : terminalEmptyState === "failed"
+        ? error
+        : "正在连接当前项目的本地终端。";
+
     return (
       <section className="terminalDock" aria-label="终端">
         <div className="terminalDockHeader">
           <div className="terminalDockPrimary">
-            <Tooltip content="浏览器预览">
+            <Tooltip content={emptyStateTitle}>
               <div className="terminalSessionTabs" role="tablist" aria-label="终端会话">
                 <button className="terminalSessionTab active" type="button" role="tab" aria-selected="true">
-                  <TerminalSquare aria-hidden="true" />
-                  <span>preview</span>
+                  {terminalEmptyState === "starting"
+                    ? <Loader2 className="terminalLoadingIcon" aria-hidden="true" />
+                    : <TerminalSquare aria-hidden="true" />}
+                  <span>{emptyStateLabel}</span>
                 </button>
               </div>
             </Tooltip>
           </div>
-          <div className="terminalDockActions">
-            <Tooltip content="在原生终端打开">
-              <Button className="terminalIconButton" size="icon" type="button" variant="ghost" onClick={onOpenNativeTerminal} aria-label="在原生终端打开">
-                <ExternalLink strokeWidth={2} aria-hidden="true" />
-              </Button>
-            </Tooltip>
-          </div>
+          {isDesktopRuntime ? (
+            <div className="terminalDockActions">
+              <Tooltip content="在原生终端打开">
+                <Button className="terminalIconButton" size="icon" type="button" variant="ghost" onClick={onOpenNativeTerminal} aria-label="在原生终端打开">
+                  <ExternalLink strokeWidth={2} aria-hidden="true" />
+                </Button>
+              </Tooltip>
+            </div>
+          ) : null}
         </div>
         <div className="terminalPreviewEmpty">
-          <TerminalSquare aria-hidden="true" />
-          <strong>浏览器预览不启动本地终端</strong>
-          <p>{text || "请在桌面 App 窗口里使用完整终端。这里不会执行命令，也不会写入工程文件。"}</p>
+          {terminalEmptyState === "starting"
+            ? <Loader2 className="terminalLoadingIcon" aria-hidden="true" />
+            : <TerminalSquare aria-hidden="true" />}
+          <strong>{emptyStateTitle}</strong>
+          <p>{emptyStateDescription}</p>
+          {terminalEmptyState === "failed" ? (
+            <Button size="sm" type="button" variant="default" onClick={onRestartTerminalSession}>
+              <RotateCcw aria-hidden="true" />
+              重试
+            </Button>
+          ) : null}
         </div>
-        {error ? <Notice className="terminalNotice" variant="danger">{error}</Notice> : null}
       </section>
     );
   }
@@ -3239,6 +3249,37 @@ function TerminalDock({
         })}
         ref={terminalHostRef}
       />
+      <div className="terminalComposer" role="region" aria-label="终端输入">
+        <textarea
+          aria-label="终端输入内容"
+          className="terminalComposerInput"
+          disabled={terminalDraftSending}
+          onChange={(event) => setTerminalDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+            event.preventDefault();
+            submitTerminalDraft();
+          }}
+          placeholder="输入终端内容..."
+          rows={1}
+          value={terminalDraft}
+        />
+        <Tooltip content="发送到终端">
+          <Button
+            aria-label="发送到终端"
+            className="terminalComposerSend"
+            disabled={!terminalDraft || terminalDraftSending}
+            onClick={submitTerminalDraft}
+            size="icon"
+            type="button"
+            variant="primary"
+          >
+            {terminalDraftSending
+              ? <Loader2 className="terminalLoadingIcon" aria-hidden="true" />
+              : <ArrowRight aria-hidden="true" />}
+          </Button>
+        </Tooltip>
+      </div>
       {error ? <Notice className="terminalNotice" variant="danger">{error}</Notice> : null}
     </section>
   );
@@ -4079,7 +4120,7 @@ function ReportArtifactsPanel({ snapshot }) {
   );
 }
 
-function WorkspaceFactsPreview({ onCreateGovernanceTask, onNavigate, provider, report, snapshot, tasks = [] }) {
+function WorkspaceFactsPreview({ globalOverview = false, onCreateGovernanceTask, onNavigate, provider, report, snapshot, tasks = [] }) {
   const [currentReport, setCurrentReport] = useState(report);
   const [refreshing, setRefreshing] = useState(false);
   const [runningAction, setRunningAction] = useState("");
@@ -4088,6 +4129,61 @@ function WorkspaceFactsPreview({ onCreateGovernanceTask, onNavigate, provider, r
   useEffect(() => {
     setCurrentReport(report);
   }, [report]);
+  useEffect(() => {
+    if (globalOverview) return;
+    const nextKey = [report?.project?.path, report?.generatedAt].filter(Boolean).join("|");
+    if (!nextKey || nextKey === autoRefreshKey) return;
+    setAutoRefreshKey(nextKey);
+    refreshFacts("auto");
+  }, [globalOverview, report?.project?.path, report?.generatedAt, autoRefreshKey]);
+  if (globalOverview) {
+    const projects = Array.isArray(snapshot?.projects) ? snapshot.projects : [];
+    const readyProjects = projects.filter((project) => project.health === "ready" || !project.health).length;
+    const attentionProjects = projects.length - readyProjects;
+    const currentProject = projects.find((project) => project.isCurrent);
+    const indexedTaskCount = projects.reduce((sum, project) => sum + Number(project.taskCount || 0), 0);
+    const indexedActiveTasks = projects.reduce((sum, project) => sum + Number(project.activeTaskCount || 0), 0);
+    const indexedFailedTasks = projects.reduce((sum, project) => sum + Number(project.failedTaskCount || 0), 0);
+    const hasProjectTaskIndex = projects.some((project) => Number.isFinite(project.taskCount));
+    const currentActiveTasks = tasks.filter((task) => ![taskStatuses.done, taskStatuses.failed].includes(task.status)).length;
+    return (
+      <div className="workspaceFacts workbenchDashboard portfolioDashboard">
+        <section className="workbenchHero">
+          <h3>工作台总览</h3>
+          <p>{projects.length} 个项目 · 当前：{currentProject?.name || snapshot?.projectName || "未选择"}</p>
+        </section>
+        <section className="portfolioStats" aria-label="跨项目状态">
+          <div><span>项目总数</span><strong>{projects.length}</strong></div>
+          <div><span>可用</span><strong>{readyProjects}</strong></div>
+          <div><span>需关注</span><strong>{attentionProjects}</strong></div>
+          <div><span>{hasProjectTaskIndex ? "跨项目活跃任务" : "当前项目任务"}</span><strong>{hasProjectTaskIndex ? indexedActiveTasks : currentActiveTasks}</strong></div>
+        </section>
+        <section className="portfolioProjects">
+          <header><strong>项目</strong><p>跨项目状态来自本地工作台 registry。</p></header>
+          <div className="portfolioProjectList">
+            {projects.map((project) => {
+              const needsAttention = ["missing", "partial"].includes(project.health);
+              return (
+                <div className={`portfolioProjectRow${project.isCurrent ? " active" : ""}`} key={project.id}>
+                  <span className={`projectStatusDot${needsAttention ? ` projectStatusDot-${project.health === "missing" ? "danger" : "warning"}` : " projectStatusDot-empty"}`} aria-hidden="true" />
+                  <div>
+                    <strong>{project.name}</strong>
+                    <span>{project.latestActivityTitle || project.path}</span>
+                  </div>
+                  <em>{project.isCurrent ? "当前" : Number(project.failedTaskCount) ? `${project.failedTaskCount} 失败` : Number(project.activeTaskCount) ? `${project.activeTaskCount} 活跃` : project.phase || "已接入"}</em>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+        <Notice variant={indexedFailedTasks ? "warning" : "info"}>
+          {hasProjectTaskIndex
+            ? `已索引 ${indexedTaskCount} 个跨项目任务${indexedFailedTasks ? `，其中 ${indexedFailedTasks} 个失败` : ""}。`
+            : "浏览器预览仅能读取当前项目任务；桌面端会从各项目目录建立只读摘要。"}
+        </Notice>
+      </div>
+    );
+  }
   const quickEntries = [
     ["currentProgress", "当前进度", "进展、最近完成和下一步"],
     ["runbook", "启动方式", "运行、构建和验证命令"],
@@ -4363,12 +4459,6 @@ function WorkspaceFactsPreview({ onCreateGovernanceTask, onNavigate, provider, r
         setRefreshing(false);
       }
   };
-  useEffect(() => {
-    const nextKey = [report?.project?.path, report?.generatedAt].filter(Boolean).join("|");
-    if (!nextKey || nextKey === autoRefreshKey) return;
-    setAutoRefreshKey(nextKey);
-    refreshFacts("auto");
-  }, [report?.project?.path, report?.generatedAt, autoRefreshKey]);
   const handleWorkspaceAction = async (nextMode) => {
     if (nextMode === "refresh") {
       await refreshFacts("manual");
@@ -5332,6 +5422,9 @@ function EngineeringFileTab({
   onCreateDesignGovernanceTask,
 }) {
   const selectedTopic = selectedEngineeringFile.topic || (selectedEngineeringFile.virtual ? selectedEngineeringFile : null);
+  const selectedTopicGroupLabel = selectedEngineeringFile.group === "workbench-overview"
+    ? "工作台"
+    : selectedEngineeringFile.group;
   const [relatedFilePreview, setRelatedFilePreview] = useState(null);
   useEffect(() => {
     setRelatedFilePreview(null);
@@ -5413,7 +5506,7 @@ function EngineeringFileTab({
     );
     const capabilityPanel = (isAssetCapabilityTopic || isFlowCapabilityTopic) ? agentTopic : null;
     const topicBody = isOverviewTopic
-      ? <WorkspaceFactsPreview onCreateGovernanceTask={onCreateGovernanceTask} onNavigate={onNavigateWorkbench} provider={provider} report={workspaceFacts} snapshot={snapshot} tasks={tasks} />
+      ? <WorkspaceFactsPreview globalOverview={selectedTopic.id === "workbench-overview"} onCreateGovernanceTask={onCreateGovernanceTask} onNavigate={onNavigateWorkbench} provider={provider} report={workspaceFacts} snapshot={snapshot} tasks={tasks} />
       : capabilityPanel
         ? (
           <>
@@ -5432,9 +5525,9 @@ function EngineeringFileTab({
             <p>{selectedTopic.description}</p>
           </div>
           {isCurrentProgressTopic ? (
-            <span className="topicBreadcrumb">项目流程 / {selectedEngineeringFile.group}</span>
+            <span className="topicBreadcrumb">项目流程 / {selectedTopicGroupLabel}</span>
           ) : (
-            <Badge>{selectedEngineeringFile.group}</Badge>
+            <Badge>{selectedTopicGroupLabel}</Badge>
           )}
         </div>
         <div className="topicPreview">
@@ -5775,7 +5868,6 @@ function RightRail({
   const [newGoalOpen, setNewGoalOpen] = useState(false);
   const [newGoalTitle, setNewGoalTitle] = useState("");
   const [newGoalSummary, setNewGoalSummary] = useState("");
-  const [viewingHistoryGoalId, setViewingHistoryGoalId] = useState("");
   const activeGoal = activeGoalFromSnapshot(snapshot);
   const activeGoalTaskIds = new Set(Array.isArray(activeGoal?.taskIds) ? activeGoal.taskIds : []);
   const belongsToActiveGoal = (item) => {
@@ -5795,7 +5887,7 @@ function RightRail({
         conversationId: task.conversationId || "",
         goalId: task.goalId || "",
         id: task.id,
-        status: task.status,
+        status: taskDisplayStatus(task, { activeTaskId, planLoading, terminalRunningId }),
         subtasks: taskSubtasks(task),
         title: task.title,
       }))
@@ -5805,22 +5897,15 @@ function RightRail({
       }));
   const progressValue = progressFromTodos(goalTodos);
   const doneCount = goalTodos.filter((todo) => todo.status === taskStatuses.done).length;
-  const runningCount = goalTodos.filter((todo) => todo.displayStatus === taskStatuses.running || todo.displayStatus === taskStatuses.waitingApproval).length;
+  const runningCount = goalTodos.filter((todo) => todo.status === taskStatuses.running || todo.status === taskStatuses.waitingApproval).length;
   const pendingCount = Math.max(goalTodos.length - doneCount - runningCount, 0);
-  const allGoals = Array.isArray(snapshot.goals?.goals) ? snapshot.goals.goals : [];
-  const activeGoalIndex = Math.max(allGoals.findIndex((goal) => goal.id === activeGoal?.id), 0);
-  const completedGoals = allGoals.filter((goal) => goal.status === "done");
-  const recentCompletedGoals = completedGoals.slice(0, 3);
-  const draftGoals = allGoals.filter((goal) => goal.status === "draft" || (goal.status === "planned" && !Array.isArray(goal.taskIds)));
-  const openGoals = allGoals.filter((goal) => !["done", "draft"].includes(goal.status) && !(goal.status === "planned" && !Array.isArray(goal.taskIds)));
-  const goalTitle = activeTask?.title || activeGoal?.shortTitle || activeGoal?.title || snapshot.stage || snapshot.projectName || "当前项目";
+  const goalTitle = activeGoal?.shortTitle || activeGoal?.title || snapshot.stage || snapshot.projectName || "当前项目";
   const validationGoal = snapshot.goalValidation?.goal || {};
   const validationReportStatus = snapshot.goalValidationReport?.status || "missing";
   const validationStatus = goalValidationStatusFromActiveGoal(activeGoal, validationGoal, validationReportStatus);
   const goalMeta = runningCount || (activeGoal?.status === "planned" && goalTodos.length)
     ? "进行中"
     : goalMetaFromStatus(activeGoal?.status || validationStatus, validationReportStatus, goalTodos, snapshot.phase);
-  const goalCountMeta = `${allGoals.length ? activeGoalIndex + 1 : 0}/${allGoals.length || 0}`;
   const openTodos = goalTodos.filter((todo) => todo.status !== taskStatuses.done);
   const doneTodos = goalTodos.filter((todo) => todo.status === taskStatuses.done);
   const displayedTodos = taskFilter === "all"
@@ -5841,11 +5926,21 @@ function RightRail({
   const goalSignedOff = validationStatus === "signed-off";
   const goalVerified = validationStatus === "verified";
   const hasActiveWorkGoal = Boolean(activeGoal) && !goalSignedOff;
-  const viewingCompletedGoal = goalSignedOff && viewingHistoryGoalId === activeGoal?.id;
-  const showGoalDetail = hasActiveWorkGoal || viewingCompletedGoal;
-  const visibleGoalTodos = viewingCompletedGoal ? goalTodos : displayedTodos;
-  const visibleTaskFilterLabel = viewingCompletedGoal ? "记录" : taskFilterLabel;
-  const visibleTaskFilterCount = visibleGoalTodos.length;
+  const viewingCompletedGoal = false;
+  const showGoalDetail = hasActiveWorkGoal;
+  const visibleGoalTodos = displayedTodos;
+  const currentDialogueTaskIds = new Set([
+    "dialogue-context-state",
+    "dialogue-context-assembler",
+    "dialogue-grounded-answer-contract",
+    "dialogue-reference-action-loop",
+    "dialogue-multiturn-evaluation",
+  ]);
+  const currentPhaseTodos = visibleGoalTodos.filter((todo) => currentDialogueTaskIds.has(todo.id));
+  const futurePhaseTodos = visibleGoalTodos.filter((todo) => !currentDialogueTaskIds.has(todo.id));
+  const useDialoguePhaseGroups = currentPhaseTodos.length > 1;
+  const visibleTaskFilterLabel = useDialoguePhaseGroups ? "当前阶段" : viewingCompletedGoal ? "记录" : taskFilterLabel;
+  const visibleTaskFilterCount = useDialoguePhaseGroups ? currentPhaseTodos.length : visibleGoalTodos.length;
   const goalIsDraft = activeGoal?.status === "draft";
   const goalIsPlanned = activeGoal?.status === "planned" && !goalTodos.length;
   const goalSteps = goalTodos.length
@@ -5861,15 +5956,9 @@ function RightRail({
       title,
       summary: newGoalSummary.trim(),
     });
-    setViewingHistoryGoalId("");
     setNewGoalOpen(false);
     setNewGoalTitle("");
     setNewGoalSummary("");
-  };
-
-  const selectGoalFromMenu = (goal) => {
-    setViewingHistoryGoalId(goal?.status === "done" ? goal.id : "");
-    onSwitchGoal?.(goal.id);
   };
 
   if (collapsed) {
@@ -5899,34 +5988,7 @@ function RightRail({
   return (
     <aside className="right">
       <div className="rightScroll">
-        <RailDisclosure
-          title="目标"
-          meta={(
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="goalHeaderSwitcher" type="button">
-                  <span>{goalCountMeta}</span>
-                  <ChevronDown strokeWidth={2} aria-hidden="true" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="goalSwitcherMenu">
-                <GoalMenuGroup activeGoalId={showGoalDetail ? activeGoal?.id : ""} title="进行中" goals={openGoals} onSwitchGoal={selectGoalFromMenu} />
-                <GoalMenuGroup activeGoalId={showGoalDetail ? activeGoal?.id : ""} title="待确认" goals={draftGoals} onSwitchGoal={selectGoalFromMenu} />
-                <GoalMenuGroup activeGoalId={viewingCompletedGoal ? activeGoal?.id : ""} title="已完成" goals={recentCompletedGoals} onSwitchGoal={selectGoalFromMenu} muted />
-                {completedGoals.length > recentCompletedGoals.length ? (
-                  <DropdownMenuItem className="goalMenuHint" onSelect={(event) => event.preventDefault()}>
-                    更多历史在工程文件里查看
-                  </DropdownMenuItem>
-                ) : null}
-                {allGoals.length ? <DropdownMenuSeparator /> : null}
-                <DropdownMenuItem className="goalMenuAction" onSelect={() => setNewGoalOpen(true)}>
-                  <Plus strokeWidth={2.1} aria-hidden="true" />
-                  <span>新目标</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        >
+        <RailDisclosure title="目标">
           <div className="goalStack">
             {showGoalDetail ? (
               <div className="goalProgress">
@@ -5935,18 +5997,6 @@ function RightRail({
                     <span>{compactGoalTitle(goalTitle)}</span>
                     <em>{viewingCompletedGoal ? "已完成" : goalMeta}</em>
                   </strong>
-                  <div className="goalInlineActions" aria-label="目标联动">
-                    <Tooltip content="发送目标到对话">
-                      <button type="button" aria-label="发送目标到对话" onClick={() => activeGoal && onSendGoalToChat?.(activeGoal)}>
-                        <MessageSquare strokeWidth={2} aria-hidden="true" />
-                      </button>
-                    </Tooltip>
-                    <Tooltip content="发送目标到终端">
-                      <button type="button" aria-label="发送目标到终端" onClick={() => activeGoal && onSendGoalToTerminal?.(activeGoal)}>
-                        <TerminalSquare strokeWidth={2} aria-hidden="true" />
-                      </button>
-                    </Tooltip>
-                  </div>
                 </div>
                 <div className="goalProgressBar" aria-hidden="true">
                   <span style={{ width: `${progressValue}%` }} />
@@ -6079,7 +6129,7 @@ function RightRail({
             {showGoalDetail ? (
               <>
                 <div className="goalTaskHeader">
-                  <DropdownMenu>
+                  {useDialoguePhaseGroups ? <span>当前阶段</span> : <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button className="goalTaskFilter" type="button">
                         <span>任务拆解 · {visibleTaskFilterLabel}</span>
@@ -6091,15 +6141,15 @@ function RightRail({
                       <DropdownMenuItem onSelect={() => setTaskFilter("all")}>全部</DropdownMenuItem>
                       <DropdownMenuItem onSelect={() => setTaskFilter("done")}>已完成</DropdownMenuItem>
                     </DropdownMenuContent>
-                  </DropdownMenu>
-                  <span>{visibleTaskFilterCount}</span>
+                  </DropdownMenu>}
+                  <span>{useDialoguePhaseGroups ? currentPhaseTodos.length : visibleTaskFilterCount}</span>
                 </div>
                 {visibleGoalTodos.length ? (
+                  <>
                   <ol className="goalTodoList">
-                    {visibleGoalTodos.map((todo, index) => (
+                    {(useDialoguePhaseGroups ? currentPhaseTodos : visibleGoalTodos).map((todo, index) => (
                       <GoalTaskItem
                         active={todo.id === activeTaskId}
-                        description={todo.description}
                         displayStatus={todo.displayStatus}
                         index={index}
                         key={todo.id}
@@ -6107,11 +6157,27 @@ function RightRail({
                         subtasks={todo.subtasks}
                         title={todo.title}
                         onSelect={() => onSelectTask(todo.id)}
-                        onSendChat={() => onSendTaskToChat?.(todo)}
-                        onSendTerminal={() => onSendTaskToTerminal?.(todo)}
                       />
                     ))}
                   </ol>
+                  {useDialoguePhaseGroups && futurePhaseTodos.length ? (
+                    <details className="goalFutureTasks">
+                      <summary><span>后续任务</span><em>{futurePhaseTodos.length}</em></summary>
+                      <ol className="goalTodoList">
+                        {futurePhaseTodos.map((todo, index) => (
+                          <GoalTaskItem
+                            active={todo.id === activeTaskId}
+                            index={currentPhaseTodos.length + index}
+                            key={todo.id}
+                            status={todo.status}
+                            title={todo.title}
+                            onSelect={() => onSelectTask(todo.id)}
+                          />
+                        ))}
+                      </ol>
+                    </details>
+                  ) : null}
+                  </>
                 ) : (
                   <div className="goalEmpty">{viewingCompletedGoal ? "还没有任务记录。" : taskFilter === "done" ? "还没有完成任务。" : "当前没有待办任务。"}</div>
                 )}
@@ -6180,21 +6246,6 @@ function RailDisclosure({ children, className = "", defaultOpen = false, meta, t
   );
 }
 
-function GoalMenuGroup({ activeGoalId, goals, muted = false, onSwitchGoal, title }) {
-  if (!goals.length) return null;
-  return (
-    <>
-      <div className="goalMenuGroupTitle">{title}</div>
-      {goals.map((goal) => (
-        <DropdownMenuItem className={`${muted ? "goalMenuItem muted" : "goalMenuItem"}${goal.id === activeGoalId ? " active" : ""}`} key={goal.id} onSelect={() => onSwitchGoal?.(goal)}>
-          <span className="goalMenuTitle">{goal.shortTitle || compactGoalTitle(goal.title)}</span>
-          {goal.id === activeGoalId ? <span className="goalMenuCurrent">当前</span> : null}
-        </DropdownMenuItem>
-      ))}
-    </>
-  );
-}
-
 function GoalStatusIcon({ displayStatus, status }) {
   const currentStatus = displayStatus || status;
   const done = currentStatus === taskStatuses.done;
@@ -6208,7 +6259,7 @@ function GoalStatusIcon({ displayStatus, status }) {
   );
 }
 
-function GoalTaskItem({ active, description, displayStatus, index, onSelect, onSendChat, onSendTerminal, status, subtasks = [], title }) {
+function GoalTaskItem({ active, displayStatus, index, onSelect, status, title }) {
   const currentStatus = displayStatus || status;
   const done = currentStatus === taskStatuses.done;
   const running = currentStatus === taskStatuses.running || currentStatus === taskStatuses.waitingApproval;
@@ -6218,7 +6269,6 @@ function GoalTaskItem({ active, description, displayStatus, index, onSelect, onS
       <span className="goalTodoIndex">{index + 1}</span>
       <span className="goalTodoText">
         <span className="goalTodoTitle">{title}</span>
-        {!done && description && !subtasks.length ? <span className="goalTodoDescription">{description}</span> : null}
       </span>
       <GoalStatusIcon displayStatus={displayStatus} status={status} />
     </>
@@ -6234,29 +6284,7 @@ function GoalTaskItem({ active, description, displayStatus, index, onSelect, onS
         ) : (
           <div className="goalTodoButton">{mainContent}</div>
         )}
-        <span className="goalTodoActions" aria-label="任务联动">
-          <Tooltip content="发送任务到对话">
-            <button type="button" aria-label="发送任务到对话" onClick={onSendChat}>
-              <MessageSquare strokeWidth={2} aria-hidden="true" />
-            </button>
-          </Tooltip>
-          <Tooltip content="发送任务到终端">
-            <button type="button" aria-label="发送任务到终端" onClick={onSendTerminal}>
-              <TerminalSquare strokeWidth={2} aria-hidden="true" />
-            </button>
-          </Tooltip>
-        </span>
       </div>
-      {!done && subtasks.length ? (
-        <ol className="goalSubtaskList">
-          {subtasks.map((subtask) => (
-            <li className={`goalSubtask${subtask.status === taskStatuses.done ? " done" : ""}`} key={subtask.id}>
-              <span>{subtask.title}</span>
-              <GoalStatusIcon status={subtask.status} />
-            </li>
-          ))}
-        </ol>
-      ) : null}
     </li>
   );
 }
@@ -6297,6 +6325,7 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
   const [probeError, setProbeError] = useState("");
   const [modelTestLoading, setModelTestLoading] = useState(false);
   const [modelTestMessage, setModelTestMessage] = useState("");
+  const [modelTestStatus, setModelTestStatus] = useState("untested");
   const catalogProviders =
     Array.isArray(modelCatalog?.providers) && modelCatalog.providers.length
       ? modelCatalog.providers
@@ -6313,6 +6342,11 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
     ...(detectedModels.length ? detectedModels : (activePreset?.models || [])),
   ].filter(Boolean)));
   const isPreview = source !== "tauri";
+  const connectionTestLabel = modelTestStatus === "available"
+    ? modelTestMessage
+    : modelTestStatus === "unavailable"
+      ? "当前连接不可用"
+      : "当前连接尚未测试";
   const savedProfile = profiles.find((profile) => profile.id === form.profileId);
   const isCreatingProfile = Boolean(form.profileId) && !savedProfile;
   const currentHasApiKey = isCreatingProfile ? Boolean(apiKey.trim()) : Boolean(savedProfile?.hasApiKey ?? provider.hasApiKey);
@@ -6475,18 +6509,14 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
       });
       const models = Array.isArray(result.models) ? result.models : [];
       setDetectedModels(models);
-      if (models.length && previousModel && models.includes(previousModel)) {
-        setModelTestMessage(`已读取 ${models.length} 个模型，当前模型 ${previousModel} 可见。`);
-      } else if (models.length && previousModel) {
+      if (models.length && previousModel && !models.includes(previousModel)) {
         setCustomModel(false);
         updateField("model", models[0]);
-        setModelTestMessage(`已读取 ${models.length} 个模型，${previousModel} 不在当前 Key 可见列表中，已切到 ${models[0]}。`);
       } else if (models.length) {
-        setCustomModel(false);
-        updateField("model", models[0]);
-        setModelTestMessage(`已读取 ${models.length} 个模型，已选择 ${models[0]}。`);
-      } else {
-        setModelTestMessage("已连接，但没有读取到可见模型。");
+        if (!previousModel) {
+          setCustomModel(false);
+          updateField("model", models[0]);
+        }
       }
       return true;
     } catch (err) {
@@ -6499,11 +6529,11 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
 
   const testCurrentModel = async () => {
     if (isPreview) {
-      setModelTestMessage("");
+      setModelTestStatus("untested");
       return false;
     }
     setProbeError("");
-    setModelTestMessage("");
+    setModelTestStatus("testing");
     setModelTestLoading(true);
     try {
       const result = await invokeWorkspaceCommand("test_provider_model", {
@@ -6514,9 +6544,12 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
           apiKey,
         },
       });
-      setModelTestMessage(result.message || `${form.model} 可用`);
+      setModelTestStatus("available");
+      setModelTestMessage(`当前连接可用 · ${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`);
       return true;
     } catch (err) {
+      setModelTestStatus("unavailable");
+      setModelTestMessage("当前连接不可用");
       setProbeError(err instanceof Error ? err.message : String(err));
       return false;
     } finally {
@@ -6546,24 +6579,24 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
 
   return (
 	    <Panel as="form" className={`providerPanel${isCreatingProfile ? " providerPanel-creating" : ""}`} onSubmit={submitProvider}>
-	      <ProviderStatusRow
-	        enabled={form.enabled}
-	        hasApiKey={currentHasApiKey}
-	        keyLabel={isCreatingProfile ? "Key 待填写" : undefined}
-	        modelLabel={form.model || "未选模型"}
-	        profileLabel={currentConnectionName}
-	        statusLabel={isCreatingProfile ? "正在新建" : undefined}
-	        variant={isCreatingProfile ? "creating" : "default"}
-	      />
+      <section className={`providerConnectionSummary ${modelTestStatus}`} aria-label="当前连接状态">
+        <div>
+          <strong>{currentConnectionName || "当前连接"}</strong>
+          <span>{form.model || "未选模型"} · {form.enabled ? "已启用" : "未启用"} · {currentHasApiKey ? "Key 已保存" : "未保存 Key"}</span>
+        </div>
+        <div className="providerConnectionSummaryAction">
+          <span>{connectionTestLabel}</span>
+          <Button className="textAction" size="sm" variant="ghost" type="button" onClick={testCurrentModel} disabled={modelTestLoading || isPreview}>
+            {modelTestLoading ? "测试中" : "测试当前"}
+          </Button>
+        </div>
+      </section>
       {isPreview ? (
         <InfoCallout>当前是浏览器预览；保存 Key、刷新模型和写入配置需要在桌面 App 窗口中操作，删除已保存连接可在预览中验证。</InfoCallout>
       ) : null}
       <div className="providerSavedConnections" aria-label="已保存连接">
         <div className="providerSectionTitle">
           <span>已保存连接</span>
-          <Button className="textAction" size="sm" variant="ghost" type="button" onClick={probeModels} disabled={probeLoading || isPreview}>
-            {probeLoading ? "测试中" : "测试当前"}
-          </Button>
         </div>
         {profiles.length ? (
           <div className="providerConnectionList">
@@ -6625,14 +6658,7 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
           placeholder={currentHasApiKey && !isCreatingProfile ? "已保存；留空则不修改" : "粘贴你的 API Key"}
         />}
       </Field>
-      <div className="providerSectionTitle">
-        <span>模型</span>
-        <span className="modelActions">
-          <Button className="textAction" size="sm" variant="ghost" type="button" onClick={probeModels} disabled={probeLoading || isPreview}>
-            {probeLoading ? "检测中" : "刷新列表"}
-          </Button>
-        </span>
-      </div>
+      <div className="providerSectionTitle">模型</div>
       <Field label={<RequiredLabel>模型</RequiredLabel>}>
         {({ id }) => <Select id={id} value={!customModel && modelOptions.includes(form.model) ? form.model : "__custom"} onChange={selectModel}>
           {modelOptions.map((model) => (
@@ -6651,7 +6677,6 @@ function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveP
           />}
         </Field>
       ) : null}
-      {modelTestMessage ? <Notice className="providerSuccess" variant="success">{modelTestMessage}</Notice> : null}
       <details className="advancedProvider">
         <summary>
           <span>高级设置</span>
@@ -8020,21 +8045,25 @@ function App() {
     }));
   };
 
-  const writeTerminalData = async (data) => {
+  const writeTerminalData = async (data, { trackInput = true } = {}) => {
     if (!data) return false;
     const sessionId = activeTerminalSessionId;
     let dataToSend = data;
-    if (data === "\u0003") {
+    if (!trackInput) {
+      dataToSend = data;
+    } else if (data === "\u0003") {
       terminalInputBufferRef.current = {
         ...terminalInputBufferRef.current,
         [sessionId]: "",
       };
     } else {
       const previousInput = terminalInputBufferRef.current[sessionId] || "";
-      const nextInput = data === "\u007f" || data === "\b"
-        ? previousInput.slice(0, -1)
-        : `${previousInput}${data}`;
-      if (/[\r\n]/.test(data)) {
+      const isEditingControl = data.startsWith("\u001b")
+        || data === "\t"
+        || (/[\x00-\x1f]/.test(data) && !/[\r\n\b]/.test(data));
+      if (isEditingControl) {
+        // xterm already encoded navigation, completion, and control keys for the active TUI mode.
+      } else if (/[\r\n]/.test(data)) {
         const command = previousInput.trim();
         if (/^codex(?:\s|$)/.test(command)) {
           dataToSend = "\u0015clear\u000dcodex\u000d";
@@ -8055,6 +8084,9 @@ function App() {
           [sessionId]: "",
         };
       } else {
+        const nextInput = data === "\u007f" || data === "\b"
+          ? previousInput.slice(0, -1)
+          : `${previousInput}${data}`;
         let bufferedInput = nextInput.slice(-240);
         if (bufferedInput.length >= 2 && bufferedInput.length % 2 === 0) {
           const midpoint = bufferedInput.length / 2;
@@ -8165,14 +8197,15 @@ function App() {
   };
 
   const appendContextToTerminal = async (lines) => {
-    const normalized = formatTerminalContext(lines);
-    setTerminalTextBySession((current) => ({
-      ...current,
-      [activeTerminalSessionId]: `${current[activeTerminalSessionId] || ""}${normalized}`.slice(-50000),
-    }));
     window.dispatchEvent(new Event("project-os:open-terminal"));
     if (isTauriRuntime()) {
-      await writeTerminalData(normalized);
+      await writeTerminalData(formatTerminalContextForInput(lines), { trackInput: false });
+    } else {
+      const normalized = formatTerminalContext(lines);
+      setTerminalTextBySession((current) => ({
+        ...current,
+        [activeTerminalSessionId]: `${current[activeTerminalSessionId] || ""}${normalized}`.slice(-50000),
+      }));
     }
   };
 

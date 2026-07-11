@@ -82,7 +82,7 @@ function mappedMeta(node, snapshot) {
   return projectMeta[node.title] || node.meta;
 }
 
-export function WorkspaceTree({ activeTopicPath, actions, inlineAction, onSelectTopic, outline, snapshot }) {
+export function WorkspaceTree({ activeTopicPath, actions, inlineAction, onSelectTopic, outline, sectionTitle = "当前项目", snapshot }) {
   const [sectionOpen, setSectionOpen] = useState(true);
   const firstNode = outline[0];
   const [activeNodeId, setActiveNodeId] = useState(firstNode?.id || firstNode?.title || "");
@@ -176,11 +176,11 @@ export function WorkspaceTree({ activeTopicPath, actions, inlineAction, onSelect
   return (
     <SectionGroup
       className="leftRailSection"
-        title="工作区"
+        title={sectionTitle}
         open={sectionOpen}
         onToggle={() => setSectionOpen((value) => !value)}
         inlineAction={inlineAction}
-        toggleLabel={sectionOpen ? "收起工作区" : "展开工作区"}
+        toggleLabel={sectionOpen ? `收起${sectionTitle}` : `展开${sectionTitle}`}
         actions={(
           <>
             {actions}
@@ -201,7 +201,7 @@ export function WorkspaceTree({ activeTopicPath, actions, inlineAction, onSelect
           </>
         )}
       >
-      <nav className="flowNav workspaceTree" aria-label="工作区">
+      <nav className="flowNav workspaceTree" aria-label={`${sectionTitle}能力`}>
       {outline.map((node) => {
         const NodeIcon = iconFor(node);
         const nodeId = nodeKey(node);
