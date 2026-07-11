@@ -8,6 +8,7 @@
     "dev": "tauri dev",
     "web:dev": "vite --host 127.0.0.1 --port 1420",
     "web:build": "vite build",
+    "test": "node --test tests/*.test.mjs",
     "build": "tauri build"
   },
   "dependencies": {

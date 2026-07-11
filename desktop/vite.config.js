@@ -171,6 +171,10 @@ function desktopTasksDir(projectRoot) {
   return path.join(projectRoot, ".project-os/runs/desktop-tasks");
 }
 
+function desktopConversationsDir(projectRoot) {
+  return path.join(projectRoot, ".project-os/runs/desktop-conversations");
+}
+
 function safeTaskFileName(id) {
   return `${String(id || "").replace(/[^a-zA-Z0-9._-]/g, "-")}.json`;
 }
@@ -223,6 +227,50 @@ function saveDesktopTaskPreview(input) {
   };
   fs.writeFileSync(manifestPath, `${JSON.stringify(nextManifest, null, 2)}\n`);
   return nextTask;
+}
+
+function listDesktopConversationsPreview() {
+  const { projectRoot } = currentPreviewProject();
+  const directory = desktopConversationsDir(projectRoot);
+  let files = [];
+  try {
+    files = fs.readdirSync(directory).filter((file) => file.endsWith(".json"));
+  } catch {
+    files = [];
+  }
+  return files
+    .map((file) => readJsonAt(projectRoot, `.project-os/runs/desktop-conversations/${file}`, null))
+    .filter(Boolean)
+    .sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")))
+    .slice(0, 50);
+}
+
+function saveDesktopConversationPreview(input) {
+  const conversation = input?.conversation;
+  if (!conversation?.id) return { error: "对话缺少 id。" };
+  const { projectRoot } = currentPreviewProject();
+  const directory = desktopConversationsDir(projectRoot);
+  fs.mkdirSync(directory, { recursive: true });
+  const nextConversation = {
+    schemaVersion: "project-os.desktop-conversation.v0.1",
+    ...conversation,
+    projectPath: projectRoot,
+    updatedAt: new Date().toISOString(),
+  };
+  fs.writeFileSync(
+    path.join(directory, safeTaskFileName(conversation.id)),
+    `${JSON.stringify(nextConversation, null, 2)}\n`
+  );
+  return nextConversation;
+}
+
+function deleteDesktopConversationPreview(input) {
+  const id = String(input?.id || "").trim();
+  if (!id) return { error: "对话 id 不能为空。" };
+  const { projectRoot } = currentPreviewProject();
+  const filePath = path.join(desktopConversationsDir(projectRoot), safeTaskFileName(id));
+  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  return { id };
 }
 
 function readJsonAt(projectRoot, relativePath, fallback) {
@@ -867,9 +915,25 @@ function projectOsPreviewFiles() {
           sendJson(res, 200, listDesktopTasksPreview());
           return;
         }
+        if (req.method === "GET" && req.url === "/__project-os/desktop-conversations") {
+          sendJson(res, 200, listDesktopConversationsPreview());
+          return;
+        }
         if (req.method === "POST" && req.url === "/__project-os/save-desktop-task") {
           const input = await readRequestJson(req);
           const result = saveDesktopTaskPreview(input);
+          sendJson(res, result.error ? 400 : 200, result);
+          return;
+        }
+        if (req.method === "POST" && req.url === "/__project-os/save-desktop-conversation") {
+          const input = await readRequestJson(req);
+          const result = saveDesktopConversationPreview(input);
+          sendJson(res, result.error ? 400 : 200, result);
+          return;
+        }
+        if (req.method === "POST" && req.url === "/__project-os/delete-desktop-conversation") {
+          const input = await readRequestJson(req);
+          const result = deleteDesktopConversationPreview(input);
           sendJson(res, result.error ? 400 : 200, result);
           return;
         }

@@ -18,7 +18,7 @@ depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
 - 先读 `AGENTS.md`、`PROJECT.md`，再按任务需要查 `docs/ROUTING.md`、`docs/DOCUMENTATION.md`、`docs/NAMING.md`。
 - 产品路线和阶段拆解看 `docs/PRODUCT_PLAN.md`，不要在本文件重复维护。
 - 结构性历史看 `docs/CHANGELOG.md`，决策原因看 `docs/DECISIONS.md`。
-- 当前仓库有较多未提交改动和未跟踪文件，继续工作时不要回滚非本轮改动。
+- 当前桌面端安全基线改动尚未提交，继续工作时不要回滚本轮或其他未确认改动。
 - 当前产品定位已推进为 `Project OS Desktop / Console`：先稳定项目理解、推荐补齐、跑检查、维护交接状态，再通过 Tauri + Local Agent Core 做本地 coding 工作台；暂时不要把它做成完整 IDE、开放插件市场或通用 Hermes Studio 复制品。
 - 整体架构分层已确认并写入 `docs/ARCHITECTURE.md`：自下而上为 `接入层 -> 元数据层 -> 核心内核层 -> 治理服务层 -> 工作台应用层 -> 入口层`；底层解决“接得进来”，上层解决“治得好”。
 - 入口层已补架构约束：第一周前置定稿 `Entry Context` JSON 标准；Gateway 承担鉴权、参数标准化、日志链路、限流、异常封装和路由分发；CLI 是离线能力内核，Web / CI 通过 Gateway 复用 CLI 逻辑；新增能力必须同时具备 CLI、Gateway、CI 和离线降级路径。
@@ -26,6 +26,8 @@ depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
 
 ## 最近完成
 
+- 2026-07-11 对话持久化已从浏览器 `localStorage` 收敛到项目级 `.project-os/runs/desktop-conversations/*.json`：Tauri 和预览适配层均支持列表、保存和删除；会话与任务现在共享项目级运行记录边界，切换项目、备份和清理不再依赖浏览器缓存。新增预览契约回归测试；浏览器预览重新加载无控制台错误。
+- 2026-07-11 桌面端第一批架构治理完成：移除未被 UI 使用的 headless Shell command；目标和任务发送到终端时统一逐行编码为注释，避免换行内容成为可执行命令；白名单检查、治理动作和 Patch 应用写入 `.project-os/runs/execution-audit.jsonl`；WebView 恢复最小 CSP；浏览器预览调用收敛到 `desktop/src/lib/runtime-api.js`，并为终端上下文和预览命令补了 Node 原生回归测试。已通过 `npm --prefix desktop test`、`npm --prefix desktop run web:build`、`cargo check --manifest-path desktop/src-tauri/Cargo.toml`、`bash scripts/check-template-sync.sh .`、`bash scripts/check-runtime.sh .` 和 `PROJECT_OS_ALLOW_EMPTY_PROVIDER_KEYS=1 PROJECT_OS_SKIP_SCREENSHOT=1 bash tests/run-tests.sh`。
 - 2026-07-09 根据用户确认的架构图，记录 OmniDesk / Project OS 的 6 层整体架构：入口层、工作台应用层、治理服务层、核心内核层、元数据层、接入层。`docs/ARCHITECTURE.md` 是完整 SSOT，`PROJECT.md` 和 `.project-os/state.json` 保留摘要。
 - 2026-07-09 根据用户补充的入口层要求，补齐 `docs/ARCHITECTURE.md` 的入口层方案，并新增 `schemas/entry-context.schema.json`。入口层正式约束包括 Entry Context 前置标准化、Gateway 完整职责、CLI 复用架构、CLI/CI/Desktop 三端数据闭环、内外 API 隔离、新能力准入标准和离线降级方案。
 - 2026-07-09 入口层最小 CLI 已跑通：`scripts/ai-project.sh` 增加 `scan` / `run` 统一入口，并在 `check` / `report` / `recommend` / `scan` / `run` 前写入 `.project-os/entry-contexts/*.json`，作为 Gateway 未落地前的 CLI Entry Context 产物。

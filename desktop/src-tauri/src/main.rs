@@ -324,12 +324,6 @@ struct RunProjectOsActionInput {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct RunTerminalCommandInput {
-    command: String,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
 struct StartTerminalSessionInput {
     #[serde(default = "default_terminal_session_id")]
     session_id: String,
@@ -369,6 +363,18 @@ struct StopTerminalSessionInput {
 #[serde(rename_all = "camelCase")]
 struct DesktopTaskInput {
     task: Value,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopConversationInput {
+    conversation: Value,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DeleteDesktopConversationInput {
+    id: String,
 }
 
 #[derive(Deserialize)]
@@ -481,18 +487,6 @@ struct ProjectOsActionResult {
     id: String,
     label: String,
     command: String,
-    success: bool,
-    code: Option<i32>,
-    output: String,
-}
-
-#[derive(Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct TerminalCommandResult {
-    id: String,
-    label: String,
-    command: String,
-    cwd: String,
     success: bool,
     code: Option<i32>,
     output: String,
@@ -1630,6 +1624,88 @@ fn save_desktop_task(input: DesktopTaskInput) -> Result<Value, String> {
 }
 
 #[tauri::command]
+fn list_desktop_conversations() -> Result<Vec<Value>, String> {
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let current_project = current_registry_project(&mut registry, &app_root)?;
+    let root = PathBuf::from(&current_project.path);
+    let directory = desktop_conversations_dir(&root);
+    if !directory.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut conversations = fs::read_dir(directory)
+        .map_err(|err| err.to_string())?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().and_then(|value| value.to_str()) == Some("json"))
+        .filter_map(read_json)
+        .collect::<Vec<_>>();
+    conversations.sort_by(|a, b| {
+        let a_time = a.get("updatedAt").and_then(Value::as_str).unwrap_or("");
+        let b_time = b.get("updatedAt").and_then(Value::as_str).unwrap_or("");
+        b_time.cmp(a_time)
+    });
+    conversations.truncate(50);
+    Ok(conversations)
+}
+
+#[tauri::command]
+fn save_desktop_conversation(input: DesktopConversationInput) -> Result<Value, String> {
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let current_project = current_registry_project(&mut registry, &app_root)?;
+    let root = PathBuf::from(&current_project.path);
+    let mut conversation = input.conversation;
+    let id = conversation
+        .get("id")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| "对话缺少 id".to_string())?
+        .to_string();
+    let object = conversation
+        .as_object_mut()
+        .ok_or_else(|| "对话记录必须是 JSON object".to_string())?;
+    object.insert(
+        "schemaVersion".to_string(),
+        Value::String("project-os.desktop-conversation.v0.1".to_string()),
+    );
+    object.insert(
+        "updatedAt".to_string(),
+        Value::String(current_timestamp_string()),
+    );
+    object.insert(
+        "projectPath".to_string(),
+        Value::String(current_project.path.clone()),
+    );
+
+    let directory = desktop_conversations_dir(&root);
+    fs::create_dir_all(&directory).map_err(|err| err.to_string())?;
+    let path = directory.join(format!("{}.json", safe_task_file_stem(&id)));
+    let content = serde_json::to_string_pretty(&conversation).map_err(|err| err.to_string())?;
+    fs::write(path, format!("{content}\n")).map_err(|err| err.to_string())?;
+    Ok(conversation)
+}
+
+#[tauri::command]
+fn delete_desktop_conversation(input: DeleteDesktopConversationInput) -> Result<(), String> {
+    let id = input.id.trim();
+    if id.is_empty() {
+        return Err("对话 id 不能为空".to_string());
+    }
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let current_project = current_registry_project(&mut registry, &app_root)?;
+    let path = desktop_conversations_dir(Path::new(&current_project.path))
+        .join(format!("{}.json", safe_task_file_stem(id)));
+    if path.exists() {
+        fs::remove_file(path).map_err(|err| err.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
 fn run_goal_validation() -> Result<WorkspaceSnapshot, String> {
     let app_root = find_workspace_root()?;
     let mut registry = load_or_seed_registry(&app_root)?;
@@ -1940,6 +2016,7 @@ fn apply_patch_draft(input: ApplyPatchDraftInput) -> Result<ApplyPatchResult, St
 
     let check = run_git_apply(&root, diff, true)?;
     if !check.status.success() {
+        let _ = append_execution_audit(&root, "patch-apply", false, json!({ "stage": "validate" }));
         return Err(format!(
             "patch 验证失败：{}",
             trim_runner_output(&format!(
@@ -1957,8 +2034,11 @@ fn apply_patch_draft(input: ApplyPatchDraftInput) -> Result<ApplyPatchResult, St
         String::from_utf8_lossy(&applied.stderr)
     ));
     if !applied.status.success() {
+        let _ = append_execution_audit(&root, "patch-apply", false, json!({ "stage": "apply" }));
         return Err(format!("patch 应用失败：{}", output));
     }
+
+    let _ = append_execution_audit(&root, "patch-apply", true, json!({ "stage": "apply" }));
 
     Ok(ApplyPatchResult {
         success: true,
@@ -3113,14 +3193,16 @@ fn run_guarded_check(input: RunGuardedCheckInput) -> Result<GuardedCheckResult, 
     let stderr = String::from_utf8_lossy(&output.stderr);
     let combined = trim_runner_output(&format!("{}{}", stdout, stderr));
 
-    Ok(GuardedCheckResult {
+    let result = GuardedCheckResult {
         id: spec.id.to_string(),
         label: spec.label.to_string(),
         command: spec.command.to_string(),
         success: output.status.success(),
         code: output.status.code(),
         output: combined,
-    })
+    };
+    let _ = append_execution_audit(&root, "guarded-check", result.success, json!({ "checkId": result.id }));
+    Ok(result)
 }
 
 #[tauri::command]
@@ -3150,70 +3232,16 @@ fn run_project_os_action(input: RunProjectOsActionInput) -> Result<ProjectOsActi
     let stderr = String::from_utf8_lossy(&output.stderr);
     let combined = trim_runner_output(&format!("{}{}", stdout, stderr));
 
-    Ok(ProjectOsActionResult {
+    let result = ProjectOsActionResult {
         id: spec.id.to_string(),
         label: spec.label.to_string(),
         command: spec.command,
         success: output.status.success(),
         code: output.status.code(),
         output: combined,
-    })
-}
-
-#[tauri::command]
-fn run_terminal_command(input: RunTerminalCommandInput) -> Result<TerminalCommandResult, String> {
-    let app_root = find_workspace_root()?;
-    let mut registry = load_or_seed_registry(&app_root)?;
-    let current_project = current_registry_project(&mut registry, &app_root)?;
-    let root = PathBuf::from(&current_project.path);
-    if !root.exists() || !root.is_dir() {
-        return Err("当前项目路径不存在或不是目录".to_string());
-    }
-
-    let command = input.command.trim();
-    validate_terminal_command(command)?;
-
-    let mut child = Command::new("zsh")
-        .args(["-lc", command])
-        .current_dir(&root)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|err| err.to_string())?;
-
-    let started_at = Instant::now();
-    let timeout = Duration::from_secs(30);
-    let mut timed_out = false;
-
-    loop {
-        match child.try_wait().map_err(|err| err.to_string())? {
-            Some(_) => break,
-            None if started_at.elapsed() >= timeout => {
-                timed_out = true;
-                let _ = child.kill();
-                break;
-            }
-            None => std::thread::sleep(Duration::from_millis(80)),
-        }
-    }
-
-    let output = child.wait_with_output().map_err(|err| err.to_string())?;
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    let mut combined = format!("{}{}", stdout, stderr);
-    if timed_out {
-        combined.push_str("\nCommand timed out after 30s.");
-    }
-
-    Ok(TerminalCommandResult {
-        id: "terminal".to_string(),
-        label: "Terminal".to_string(),
-        command: command.to_string(),
-        cwd: root.to_string_lossy().to_string(),
-        success: output.status.success() && !timed_out,
-        code: output.status.code(),
-        output: trim_runner_output(&combined),
-    })
+    };
+    let _ = append_execution_audit(&root, "governance-action", result.success, json!({ "actionId": result.id }));
+    Ok(result)
 }
 
 #[tauri::command]
@@ -3377,36 +3405,6 @@ fn stop_terminal_session(
     if let Some(mut session) = sessions.remove(&session_id) {
         let _ = session.child.kill();
     }
-    Ok(())
-}
-
-fn validate_terminal_command(command: &str) -> Result<(), String> {
-    if command.is_empty() {
-        return Err("请输入要运行的命令".to_string());
-    }
-    if command.len() > 1000 {
-        return Err("命令太长，请拆成更小的步骤".to_string());
-    }
-    if command.contains('\0') {
-        return Err("命令包含非法字符".to_string());
-    }
-
-    let normalized = command.to_lowercase();
-    let blocked_patterns = [
-        "rm -rf /",
-        "rm -rf ~",
-        "sudo ",
-        "su -",
-        "mkfs",
-        "diskutil erase",
-        ":(){",
-        "chmod -r 777 /",
-        "chown -r ",
-    ];
-    if blocked_patterns.iter().any(|pattern| normalized.contains(pattern)) {
-        return Err("这个命令看起来风险过高，已被终端保护拦截。".to_string());
-    }
-
     Ok(())
 }
 
@@ -3586,6 +3584,28 @@ fn trim_runner_output(value: &str) -> String {
         result.push_str("\n...output trimmed...");
     }
     result
+}
+
+fn append_execution_audit(root: &Path, action: &str, success: bool, details: Value) -> Result<(), String> {
+    let path = root.join(".project-os/runs/execution-audit.jsonl");
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|err| err.to_string())?;
+    }
+    let event = json!({
+        "schemaVersion": "project-os.execution-audit.v0.1",
+        "timestamp": current_timestamp_string(),
+        "action": action,
+        "success": success,
+        "details": details,
+    });
+    let line = serde_json::to_string(&event).map_err(|err| err.to_string())?;
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .map_err(|err| err.to_string())?;
+    file.write_all(format!("{line}\n").as_bytes())
+        .map_err(|err| err.to_string())
 }
 
 fn run_git_apply(root: &Path, diff: &str, check_only: bool) -> Result<std::process::Output, String> {
@@ -4638,6 +4658,10 @@ fn desktop_tasks_dir(root: &Path) -> PathBuf {
     root.join(".project-os/runs/desktop-tasks")
 }
 
+fn desktop_conversations_dir(root: &Path) -> PathBuf {
+    root.join(".project-os/runs/desktop-conversations")
+}
+
 fn safe_task_file_stem(id: &str) -> String {
     let stem = id
         .chars()
@@ -5591,6 +5615,9 @@ fn main() {
             merge_run_summary_to_handoff,
             list_desktop_tasks,
             save_desktop_task,
+            list_desktop_conversations,
+            save_desktop_conversation,
+            delete_desktop_conversation,
             run_goal_validation,
             sign_off_goal_validation,
             create_goal,
@@ -5614,7 +5641,6 @@ fn main() {
             read_engineering_file,
             run_guarded_check,
             run_project_os_action,
-            run_terminal_command,
             start_terminal_session,
             write_terminal_session,
             resize_terminal_session,

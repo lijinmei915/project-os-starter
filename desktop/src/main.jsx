@@ -5,6 +5,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { Activity, AlertTriangle, ArrowLeftRight, ArrowRight, Brain, Check, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, ClipboardList, Eraser, ExternalLink, FileText, Loader2, MessageSquare, MoreVertical, Package, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Play, Plus, RotateCcw, Server, ShieldAlert, Square, Target, TerminalSquare, X } from "lucide-react";
 import { ChatComposer } from "./components/workbench/chat-composer";
 import { Conversation, ConversationMessage } from "./components/workbench/conversation";
+import { ConversationHistoryItem } from "./components/workbench/conversation-history-item";
 import { InfoCallout } from "./components/workbench/info-callout";
 import { ProviderStatusRow } from "./components/workbench/provider-status-row";
 import { SystemSettingsMenu } from "./components/workbench/system-settings-menu";
@@ -26,6 +27,9 @@ import { Switch } from "./components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Tooltip, TooltipProvider } from "./components/ui/tooltip";
 import { projectGovernanceOutline } from "./workspace-outline";
+import { formatTerminalContext } from "./lib/terminal-context";
+import { invokePreviewCommand, invokeTauriCommand, isTauriRuntime } from "./lib/runtime-api";
+import { buildConversationRecord, mergeConversationRecords } from "./lib/conversation-record";
 import "@xterm/xterm/css/xterm.css";
 import "./styles.css";
 
@@ -606,6 +610,15 @@ async function loadDesktopTasks() {
   return invoke("list_desktop_tasks");
 }
 
+async function loadDesktopConversations() {
+  if (!isTauriRuntime()) {
+    const response = await fetch("/__project-os/desktop-conversations");
+    if (!response.ok) return [];
+    return response.json();
+  }
+  return invokeTauriCommand("list_desktop_conversations");
+}
+
 async function loadPreviewJson(path, fallback) {
   try {
     const response = await fetch(path);
@@ -629,38 +642,9 @@ async function loadPreviewProviderStatus() {
 
 async function invokeWorkspaceCommand(command, payload) {
   if (!isTauriRuntime()) {
-    if (command === "read_engineering_file") {
-      const response = await fetch("/__project-os/read-engineering-file", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload?.input || payload || {}),
-      });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(result.error || "读取文件失败。");
-      }
-      return result;
-    }
-    if (command === "run_project_os_action") {
-      const response = await fetch("/__project-os/run-project-os-action", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload?.input || payload || {}),
-      });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(result.error || "治理动作执行失败。");
-      }
-      return result;
-    }
-    if (command === "open_native_terminal") {
-      throw new Error("浏览器预览不能打开系统终端，请在桌面 App 窗口里使用。");
-    }
-    throw new Error("当前是浏览器预览，只能查看界面；请在桌面 App 窗口里保存配置。");
+    return invokePreviewCommand(command, payload);
   }
-
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke(command, payload);
+  return invokeTauriCommand(command, payload);
 }
 
 function readFileAsDataUrl(file) {
@@ -686,6 +670,20 @@ async function persistDesktopTask(task) {
     return response.json();
   }
   return invokeWorkspaceCommand("save_desktop_task", { input: { task } });
+}
+
+async function persistDesktopConversation(conversation) {
+  if (!isTauriRuntime()) {
+    return invokePreviewCommand("save_desktop_conversation", { conversation });
+  }
+  return invokeTauriCommand("save_desktop_conversation", { input: { conversation } });
+}
+
+async function removeDesktopConversation(id) {
+  if (!isTauriRuntime()) {
+    return invokePreviewCommand("delete_desktop_conversation", { id });
+  }
+  return invokeTauriCommand("delete_desktop_conversation", { input: { id } });
 }
 
 async function pickProjectDirectory() {
@@ -1537,15 +1535,6 @@ function safeDisplayText(value, fallback = "") {
   }
 }
 
-function isTauriRuntime() {
-  return Boolean(window.__TAURI_INTERNALS__ || window.__TAURI__ || window.__TAURI_METADATA__);
-}
-
-function projectScopedStorageKey(snapshot, suffix) {
-  const projectKey = snapshot?.currentProjectId || snapshot?.currentProjectPath || snapshot?.projectName || "current";
-  return `omnidesk.${suffix}.${projectKey}`;
-}
-
 function cleanTerminalText(value) {
   let text = safeDisplayText(value);
   text = text
@@ -1685,20 +1674,6 @@ function collapseDuplicateTerminalPromptLines(text) {
     nextLines.push(line);
   });
   return nextLines.join("\n");
-}
-
-function conversationTitle(turns) {
-  const firstUser = turns.find((turn) => turn.role === "user");
-  const title = cleanConversationText(firstUser?.text) || "新对话";
-  return compactConversationText(title, 24);
-}
-
-function conversationPreview(turns) {
-  const meaningful = [...turns]
-    .reverse()
-    .map((turn) => cleanConversationText(turn.text))
-    .find((text) => text && !isLowSignalConversationText(text));
-  return compactConversationText(meaningful || "暂无内容", 52);
 }
 
 function cleanConversationText(value) {
@@ -2106,7 +2081,6 @@ function AgentWorkspace({
   onRunChatAction,
   onRunGuardedCheck,
   onRunTerminalCheck,
-  onRunTerminalCommand,
   onWriteTerminalData,
   onResizeTerminalSession,
   onSelectTerminalSession,
@@ -2808,7 +2782,6 @@ function AgentWorkspace({
                 logs={terminalLogs}
                 runningId={terminalRunningId}
                 onRunCheck={onRunTerminalCheck}
-                onRunCommand={onRunTerminalCommand}
                 onWriteTerminalData={onWriteTerminalData}
                 onResizeTerminalSession={onResizeTerminalSession}
                 onSelectTerminalSession={onSelectTerminalSession}
@@ -2982,7 +2955,6 @@ function TerminalDock({
   logs,
   runningId,
   onRunCheck,
-  onRunCommand,
   onWriteTerminalData,
   onResizeTerminalSession,
   onSelectTerminalSession,
@@ -6208,37 +6180,6 @@ function RailDisclosure({ children, className = "", defaultOpen = false, meta, t
   );
 }
 
-function ConversationHistoryItem({ conversation, active, onDeleteConversation, onSelectConversation }) {
-  return (
-    <Panel as="article" className={`conversationHistoryItem${active ? " active" : ""}`} padding="none">
-      <button
-        aria-label={`打开对话：${conversation.title}`}
-        className="conversationHistoryButton"
-        type="button"
-        onClick={() => onSelectConversation(conversation.id)}
-      >
-        <div className="conversationHistoryHead">
-          <strong>{conversation.title}</strong>
-          <span>{conversation.updatedAt}</span>
-        </div>
-      </button>
-      <Tooltip content="删除对话">
-        <button
-          aria-label={`删除对话：${conversation.title}`}
-          className="conversationHistoryDelete"
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            onDeleteConversation(conversation.id);
-          }}
-        >
-          <X strokeWidth={2} aria-hidden="true" />
-        </button>
-      </Tooltip>
-    </Panel>
-  );
-}
-
 function GoalMenuGroup({ activeGoalId, goals, muted = false, onSwitchGoal, title }) {
   if (!goals.length) return null;
   return (
@@ -6990,29 +6931,12 @@ function App() {
       hour: "2-digit",
       minute: "2-digit",
     });
+    const record = buildConversationRecord({ id: activeConversationId, turns: nextTurns, updatedAt: now });
     setConversations((current) => {
-      const title = conversationTitle(nextTurns);
-      const record = {
-        id: activeConversationId,
-        preview: conversationPreview(nextTurns),
-        title,
-        turns: nextTurns.map((turn) => ({
-          actions: turn.actions,
-          id: turn.id,
-          role: turn.role,
-          text: turn.text,
-        })),
-        updatedAt: now,
-      };
-      const merged = current
-        .filter((conversation) => conversation.id !== activeConversationId && conversation.title !== title);
-      const next = [record, ...merged].slice(0, 50);
-      try {
-        window.localStorage?.setItem(projectScopedStorageKey(snapshot, "conversations.v1"), JSON.stringify(next));
-      } catch {
-        // localStorage may be unavailable in some embedded contexts.
-      }
-      return next;
+      return mergeConversationRecords(current, record);
+    });
+    persistDesktopConversation(record).catch((err) => {
+      setRunnerError(err instanceof Error ? err.message : String(err));
     });
   };
 
@@ -7038,12 +6962,9 @@ function App() {
     terminalInputBufferRef.current = {};
     terminalPassthroughRef.current = {};
     setTerminalError("");
-    try {
-      const records = JSON.parse(window.localStorage?.getItem(projectScopedStorageKey(nextSnapshot, "conversations.v1")) || "[]");
-      setConversations(Array.isArray(records) ? records.slice(0, 50) : []);
-    } catch {
-      setConversations([]);
-    }
+    loadDesktopConversations()
+      .then((records) => setConversations(Array.isArray(records) ? records : []))
+      .catch(() => setConversations([]));
     loadDesktopTasks()
       .then((records) => setTasks(Array.isArray(records) ? records : []))
       .catch(() => setTasks([]));
@@ -7289,14 +7210,17 @@ function App() {
   }, []);
 
   useEffect(() => {
-    try {
-      const records = JSON.parse(window.localStorage?.getItem(projectScopedStorageKey(snapshot, "conversations.v1")) || "[]");
-      if (Array.isArray(records)) {
-        setConversations(records.slice(0, 50));
-      }
-    } catch {
-      setConversations([]);
-    }
+    let cancelled = false;
+    loadDesktopConversations()
+      .then((records) => {
+        if (!cancelled) setConversations(Array.isArray(records) ? records : []);
+      })
+      .catch(() => {
+        if (!cancelled) setConversations([]);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [snapshot.currentProjectId, snapshot.currentProjectPath]);
 
   useEffect(() => {
@@ -7982,11 +7906,9 @@ function App() {
 
     const nextConversations = conversations.filter((item) => item.id !== id);
     setConversations(nextConversations);
-    try {
-      window.localStorage?.setItem(projectScopedStorageKey(snapshot, "conversations.v1"), JSON.stringify(nextConversations));
-    } catch {
-      // localStorage may be unavailable in some embedded contexts.
-    }
+    removeDesktopConversation(id).catch((err) => {
+      setRunnerError(err instanceof Error ? err.message : String(err));
+    });
 
     if (activeConversationId !== id) return;
     const nextConversation = nextConversations[0];
@@ -8242,8 +8164,8 @@ function App() {
     showToast("已发送任务到对话。", "success");
   };
 
-  const appendContextToTerminal = async (text) => {
-    const normalized = text.endsWith("\n") ? text : `${text}\n`;
+  const appendContextToTerminal = async (lines) => {
+    const normalized = formatTerminalContext(lines);
     setTerminalTextBySession((current) => ({
       ...current,
       [activeTerminalSessionId]: `${current[activeTerminalSessionId] || ""}${normalized}`.slice(-50000),
@@ -8258,17 +8180,16 @@ function App() {
     if (!goal) return;
     const relatedTasks = goalTasksForContext(goal);
     const taskLines = relatedTasks.length
-      ? relatedTasks.map((task, index) => `#   ${index + 1}. ${task.title} [${taskStatusLabel(task.status)}]`).join("\n")
-      : "#   暂未绑定具体任务";
+      ? relatedTasks.map((task, index) => `  ${index + 1}. ${task.title} [${taskStatusLabel(task.status)}]`)
+      : ["  暂未绑定具体任务"];
     await appendContextToTerminal([
-      "",
-      `# Goal: ${goal.shortTitle || goal.title || "当前目标"}`,
-      `# Status: ${goalStatusLabelText(goal.status)}`,
-      `# Summary: ${goal.summary || "暂无说明"}`,
-      "# Tasks:",
-      taskLines,
-      "",
-    ].join("\n"));
+      "Goal context",
+      `Goal: ${goal.shortTitle || goal.title || "当前目标"}`,
+      `Status: ${goalStatusLabelText(goal.status)}`,
+      `Summary: ${goal.summary || "暂无说明"}`,
+      "Tasks:",
+      ...taskLines,
+    ]);
     showToast("已发送目标到终端。", "success");
   };
 
@@ -8278,14 +8199,13 @@ function App() {
     setActiveTaskId(task.id);
     setReadonlyPlan(task.plan || null);
     await appendContextToTerminal([
-      "",
-      `# Task: ${task.title}`,
-      `# Status: ${taskStatusLabel(task.status)}`,
-      `# Goal: ${task.goalTitle || todo?.goalTitle || "当前目标"}`,
-      `# Summary: ${task.plan?.summary || todo?.description || "暂无说明"}`,
-      "# Next: 在这里输入要运行的检查或命令。",
-      "",
-    ].join("\n"));
+      "Task context",
+      `Task: ${task.title}`,
+      `Status: ${taskStatusLabel(task.status)}`,
+      `Goal: ${task.goalTitle || todo?.goalTitle || "当前目标"}`,
+      `Summary: ${task.plan?.summary || todo?.description || "暂无说明"}`,
+      "Next: 在这里手动输入要运行的检查或命令。",
+    ]);
     showToast("已发送任务到终端。", "success");
   };
 
@@ -8437,28 +8357,6 @@ function App() {
       appendTerminalLog({
         id: checkId,
         command: guardedChecks.find((check) => check.id === checkId)?.command || checkId,
-        output: err instanceof Error ? err.message : String(err),
-        success: false,
-      });
-      return false;
-    } finally {
-      setTerminalRunningId("");
-    }
-  };
-
-  const runTerminalCommand = async (command) => {
-    setRunnerError("");
-    setTerminalRunningId("terminal");
-    try {
-      const result = await invokeWorkspaceCommand("run_terminal_command", {
-        input: { command },
-      });
-      appendTerminalLog(result);
-      return true;
-    } catch (err) {
-      appendTerminalLog({
-        id: "terminal",
-        command,
         output: err instanceof Error ? err.message : String(err),
         success: false,
       });
@@ -8864,7 +8762,6 @@ function App() {
           onRunChatAction={runChatAction}
           onRunGuardedCheck={runGuardedCheck}
           onRunTerminalCheck={runTerminalCheck}
-          onRunTerminalCommand={runTerminalCommand}
           onWriteTerminalData={writeTerminalData}
           onResizeTerminalSession={resizeTerminalSession}
           onSelectTerminalSession={setActiveTerminalSessionId}
