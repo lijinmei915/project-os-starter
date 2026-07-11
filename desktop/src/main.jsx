@@ -28,7 +28,7 @@ import { Tooltip, TooltipProvider } from "./components/ui/tooltip";
 import { projectGovernanceOutline } from "./workspace-outline";
 import { formatTerminalContext, formatTerminalContextForInput, formatTerminalInputForPaste } from "./lib/terminal-context";
 import { invokePreviewCommand, invokeTauriCommand, isTauriRuntime } from "./lib/runtime-api";
-import { buildConversationRecord, mergeConversationRecords } from "./lib/conversation-record";
+import { buildChatRequestContext, buildConversationRecord, contextualizeUserMessage, isDialogueActionRequest, mergeConversationRecords } from "./lib/conversation-record";
 import "@xterm/xterm/css/xterm.css";
 import "./styles.css";
 
@@ -1219,7 +1219,7 @@ function checksForPlan(plan) {
   );
 }
 
-function previewChatResult(message, hasAttachments, snapshot = {}, tasks = []) {
+function previewChatResult(message, hasAttachments, snapshot = {}, tasks = [], dialogueContext = {}) {
   const normalized = message.trim().replace(/[。！？!?,，\s]/g, "").toLowerCase();
   const lowerMessage = message.toLowerCase();
   const explicitTask = [
@@ -1228,6 +1228,7 @@ function previewChatResult(message, hasAttachments, snapshot = {}, tasks = []) {
     "实现", "接入", "配置", "做成", "设计", "push", "提交", "应用 patch",
     "帮我处理", "处理一下", "解决一下", "看看解决", "看下解决", "整理一下",
     "梳理一下", "制定方案", "出个方案", "给个方案", "整理待办", "处理方案",
+    "直接修", "直接改", "直接做", "你来处理", "你自己处理",
   ].some((keyword) => lowerMessage.includes(keyword));
   const greeting = ["hi", "hello", "hey", "你好", "您好", "哈喽", "嗨", "在吗", "在么"].includes(normalized);
   const questionLike = [
@@ -1235,7 +1236,8 @@ function previewChatResult(message, hasAttachments, snapshot = {}, tasks = []) {
     "检查当前项目还有哪些风险", "有哪些风险",
   ].some((keyword) => message.includes(keyword));
   const shouldCreatePlan = explicitTask || (hasAttachments && !questionLike);
-  const riskLike = message.includes("风险") || lowerMessage.includes("risk");
+  const currentTopic = dialogueContext?.currentTopic || message;
+  const riskLike = message.includes("风险") || lowerMessage.includes("risk") || currentTopic.includes("风险");
   const statusLike = /状态|进度|下一步|总结|概况|现在/.test(message);
   const developLike = /开发|改代码|实现|任务|执行|patch|检查|构建|验证/.test(lowerMessage);
   const visibleTasks = Array.isArray(tasks) ? tasks.filter((task) => !isNoiseTask(task)) : [];
@@ -1244,6 +1246,7 @@ function previewChatResult(message, hasAttachments, snapshot = {}, tasks = []) {
   const doneTasks = visibleTasks.filter((task) => task.status === taskStatuses.done);
   const activeGoal = activeGoalFromSnapshot(snapshot || {});
   const validationStatus = snapshot?.goalValidationReport?.status || "待生成";
+  const changedFiles = snapshot?.workspaceFacts?.git?.changedFiles || snapshot?.git?.changedFiles || [];
   const projectName = snapshot?.projectName || snapshot?.workspaceFacts?.project?.name || "当前项目";
   const phase = phaseLabel(snapshot?.phase || snapshot?.workspaceFacts?.project?.lifecycle || "stabilizing");
   const currentFocus = activeTasks[0]?.title || activeGoal?.shortTitle || activeGoal?.title || "把工作台能力继续接到真实项目治理闭环";
@@ -1254,19 +1257,31 @@ function previewChatResult(message, hasAttachments, snapshot = {}, tasks = []) {
       : "先从当前目标创建一个小任务，再进入 Patch、验证和交接闭环。";
   const statusReply = `${projectName} 处在「${phase}」阶段，当前焦点是「${currentFocus}」；下一步建议：${nextAction}`;
   const developReply = `开发流程建议按四步走：先把需求生成任务计划，再看 Patch 草案，确认后应用改动，最后运行检查并沉淀交接。当前任务 ${visibleTasks.length} 个，已完成 ${doneTasks.length} 个，验收状态为 ${validationStatus}。`;
+  const followUpReply = dialogueContext?.expectedNextAction === "recommend-next"
+    ? `建议按这个顺序处理：先推进「${currentFocus}」；然后运行目标验收并处理失败项；最后审阅剩余 Git 变更，确认是否可以交付。`
+    : dialogueContext?.expectedNextAction === "decide-next"
+      ? `我判断先推进「${currentFocus}」。它是当前最直接的阻塞点，完成后立即运行目标验收，再决定是否处理其他风险。`
+      : "";
   return {
     intent: shouldCreatePlan ? "task" : questionLike ? "question" : "chat",
     reply: shouldCreatePlan
       ? "可以，我整理成一个可执行计划。"
+      : followUpReply
+        ? followUpReply
       : greeting
         ? "你好，我在。"
         : riskLike
-          ? "主要风险有三类：交接记录可能继续膨胀；对话和执行状态容易混在一起；模型或检查失败时反馈还不够像人话。我建议先把普通问答和执行任务彻底分开，再打磨失败提示。"
+          ? `当前可确认的风险有三项：还有 ${activeTasks.length} 个活跃或待确认任务；Git 工作区有 ${changedFiles.length} 个变更文件；目标验收状态为 ${validationStatus}。建议先处理失败或进行中的任务，再运行目标验收，最后确认剩余 Git 变更是否属于本轮交付。`
           : statusLike
             ? statusReply
             : developLike
               ? developReply
               : "我可以直接回答项目问题；如果你说“帮我改/实现/优化”，我会先生成任务计划，再进入受控开发流程。",
+    references: [
+      { kind: "file", label: "项目状态", target: "PROJECT.md" },
+      { kind: "file", label: "当前交接", target: "HANDOFF.md" },
+      { kind: "file", label: "任务清单", target: ".project-os/task-backlog.json" },
+    ],
     shouldCreatePlan,
   };
 }
@@ -1444,6 +1459,14 @@ function agentEventsForTurn(turn) {
   return [];
 }
 
+function shouldShowAgentTimeline(turn) {
+  const events = agentEventsForTurn(turn);
+  return Boolean(
+    events.length
+    && (turn.intent === "task" || turn.workflow?.length || events.some((event) => ["current", "failed"].includes(event.status)))
+  );
+}
+
 function timelineSummary(events) {
   if (!events?.length) return "";
   const failed = events.find((event) => event.status === "failed");
@@ -1464,15 +1487,7 @@ function withTimeout(promise, timeoutMs, message) {
 }
 
 function isActionRequestMessage(message, hasAttachments = false) {
-  const lowerMessage = safeDisplayText(message).toLowerCase();
-  const actionLike = [
-    "帮我改", "帮我修", "帮我优化", "帮我生成", "帮我创建", "帮我新增", "帮我删除",
-    "帮我执行", "帮我跑", "开始执行", "生成计划", "创建任务", "改代码", "修复",
-    "实现", "接入", "配置", "做成", "设计", "push", "提交", "应用 patch",
-    "帮我处理", "处理一下", "解决一下", "看看解决", "看下解决", "整理一下",
-    "梳理一下", "制定方案", "出个方案", "给个方案", "整理待办", "处理方案",
-  ].some((keyword) => lowerMessage.includes(keyword));
-  return actionLike || hasAttachments;
+  return isDialogueActionRequest(safeDisplayText(message), hasAttachments);
 }
 
 function isExecutionWorkspaceTab(tab, actionMode) {
@@ -2309,6 +2324,9 @@ function AgentWorkspace({
       text: nextInput || "请根据截图帮我分析并修改。",
     };
     const requestId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const requestContext = buildChatRequestContext([...chatTurns, userTurn]);
+    const recentTurns = requestContext.recentTurns.slice(0, -1);
+    const contextualTask = contextualizeUserMessage(nextInput, requestContext.contextState);
     activeRequestRef.current = requestId;
     setTaskInput("");
     setAttachments([]);
@@ -2347,7 +2365,7 @@ function AgentWorkspace({
           shouldCreatePlan: false,
         };
       } else if (!isTauriRuntime()) {
-        chatResult = previewChatResult(nextInput, submittedAttachments.length > 0, snapshot, tasks);
+        chatResult = previewChatResult(nextInput, submittedAttachments.length > 0, snapshot, tasks, requestContext.contextState);
       } else {
         chatResult = await invokeWorkspaceCommand("chat_with_model", {
           input: {
@@ -2356,7 +2374,9 @@ function AgentWorkspace({
               mimeType: attachment.mimeType,
               name: attachment.name,
             })),
+            contextState: requestContext.contextState,
             message: nextInput,
+            recentTurns,
           },
         });
       }
@@ -2394,9 +2414,11 @@ function AgentWorkspace({
         userTurn,
         {
           id: `${Date.now()}-assistant`,
-          actions: actionPromptsForMessage(nextInput, chatResult?.intent),
+          actions: chatResult?.intent === "task" ? actionPromptsForMessage(nextInput, chatResult?.intent) : [],
           diagnostic: conversationDiagnosticForResult(chatResult, providerHealth),
           events: agentEventsForMessageKind(messageKind, chatResult),
+          intent: chatResult?.intent || "chat",
+          references: Array.isArray(chatResult?.references) ? chatResult.references : [],
           statusLabel: loadingLabelForMessageKind(messageKind),
           role: "assistant",
           text: safeDisplayText(chatResult?.reply, "我在。你可以继续说想做什么。"),
@@ -2445,8 +2467,9 @@ function AgentWorkspace({
         name: attachment.name,
       })),
       conversationId: activeConversationId,
+      displayTask: requestContext.contextState.currentTopic || nextInput,
       requestId,
-      task: nextInput || "请根据截图帮我分析并修改。",
+      task: contextualTask || "请根据截图帮我分析并修改。",
     }), 15000, "计划生成等待超时").then((ok) => {
       if (activeRequestRef.current !== requestId) return;
       window.clearTimeout(planFallbackTimer);
@@ -2578,7 +2601,7 @@ function AgentWorkspace({
                     ) : null}
                   </div>
                 ) : null}
-                {agentEventsForTurn(turn).length ? (
+                {shouldShowAgentTimeline(turn) ? (
                   <details className="conversationTimelineGroup">
                     <summary>
                       <span className="conversationTimelineGroupIcon" aria-hidden="true" />
@@ -2598,6 +2621,20 @@ function AgentWorkspace({
                       ))}
                     </div>
                   </details>
+                ) : null}
+                {turn.references?.length ? (
+                  <div className="conversationReferences" aria-label="回答依据">
+                    {turn.references.map((reference) => (
+                      <button
+                        key={`${reference.kind}-${reference.target}`}
+                        type="button"
+                        onClick={() => onRunChatAction?.({ ...reference, id: "open-reference" })}
+                      >
+                        <FileText aria-hidden="true" />
+                        <span>{reference.label}</span>
+                      </button>
+                    ))}
+                  </div>
                 ) : null}
                 {turn.actions?.length ? (
                   <div className="conversationActions">
@@ -7822,7 +7859,7 @@ function App() {
         }
       }
       if (activePlanRequestRef.current !== requestId) return false;
-      const nextTask = createTaskFromPlan(plan, input.task, snapshot, {
+      const nextTask = createTaskFromPlan(plan, input.displayTask || input.task, snapshot, {
         conversationId: input.conversationId || activeConversationId,
       });
       setReadonlyPlan(plan);
@@ -7849,6 +7886,26 @@ function App() {
   };
 
   const runChatAction = async (action) => {
+    if (action?.id === "open-reference" && action.target) {
+      if (action.kind === "file") {
+        await selectEngineeringFile({ path: action.target, title: action.label });
+        return true;
+      }
+      if (action.kind === "task") {
+        selectTask(action.target);
+        return true;
+      }
+      if (action.kind === "terminal") {
+        window.dispatchEvent(new Event("project-os:open-terminal"));
+        return true;
+      }
+      const topic = topicPayloadFromOutline(action.target);
+      if (topic) {
+        setSelectedEngineeringFile(topic);
+        return true;
+      }
+      return false;
+    }
     if (action?.id === "confirm-active-task") {
       const targetTask = tasks.find((task) => task.id === activeTaskId);
       if (!targetTask) return false;

@@ -26,6 +26,7 @@ depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
 
 ## 最近完成
 
+- 2026-07-11 对话系统完成当前阶段 5 项架构闭环：多轮状态进入模型请求；Tauri Context Assembler 组装阶段、目标、任务、Git、验收和治理文件证据；回答统一为有证据结论并附本地生成的可点击文件/任务引用；普通问答隐藏无意义步骤时间线；“风险是什么 -> 那怎么办 -> 你判断 -> 直接修”固定回归评测与浏览器三轮真实验收通过。
 - 2026-07-11 左侧导航完成工作台层级纠正并接入跨项目总览与任务摘要索引：工作台总览置顶，项目集合位于其下，原“工作区”改为当前项目名称；总览从 registry 展示项目总数、基础健康、当前项目和项目列表。Tauri 快照会只读扫描各项目 `.project-os/runs/desktop-tasks`，聚合活跃、失败、完成和最近任务；浏览器预览无法跨本地目录读取时明确降级为当前项目任务，不伪造全局统计。
 - 2026-07-11 对话持久化已从浏览器 `localStorage` 收敛到项目级 `.project-os/runs/desktop-conversations/*.json`：Tauri 和预览适配层均支持列表、保存和删除；会话与任务现在共享项目级运行记录边界，切换项目、备份和清理不再依赖浏览器缓存。新增预览契约回归测试；浏览器预览重新加载无控制台错误。
 - 2026-07-11 桌面端第一批架构治理完成：移除未被 UI 使用的 headless Shell command；目标和任务发送到终端时统一逐行编码为注释，避免换行内容成为可执行命令；白名单检查、治理动作和 Patch 应用写入 `.project-os/runs/execution-audit.jsonl`；WebView 恢复最小 CSP；浏览器预览调用收敛到 `desktop/src/lib/runtime-api.js`，并为终端上下文和预览命令补了 Node 原生回归测试。已通过 `npm --prefix desktop test`、`npm --prefix desktop run web:build`、`cargo check --manifest-path desktop/src-tauri/Cargo.toml`、`bash scripts/check-template-sync.sh .`、`bash scripts/check-runtime.sh .` 和 `PROJECT_OS_ALLOW_EMPTY_PROVIDER_KEYS=1 PROJECT_OS_SKIP_SCREENSHOT=1 bash tests/run-tests.sh`。
@@ -179,6 +180,6 @@ bash tests/run-tests.sh
 
 ## 下一步建议
 
-1. 当前先做 `dialogue-context-state`：建立多轮对话状态，让追问和用户委托继承上一轮话题、结论和下一动作。
-2. 之后依次做项目证据 Context Assembler、有证据的回答契约、引用与任务动作闭环、多轮对话回归评测；顺序已写入 `.project-os/task-backlog.json`。
-3. 每项完成后单独跑对应自动化和真实对话验收，再开始下一项，不并行扩展对话功能。
+1. 下一阶段先做 `codex-dialogue-turn-summary`：保存每轮读取、改动、命令和结果摘要，让“刚才做了什么”可基于真实事件回答。
+2. 再建立可中断任务状态机，统一 `planning / waiting-confirmation / editing / checking / paused / failed / done` 与对话展示。
+3. 状态机稳定后再接停止继续和中途改方向，不提前扩展多 Agent 或远程执行。

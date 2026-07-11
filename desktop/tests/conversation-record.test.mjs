@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildConversationRecord, buildDialogueContextState, mergeConversationRecords } from "../src/lib/conversation-record.js";
+import { buildChatRequestContext, buildConversationRecord, buildDialogueContextState, contextualizeUserMessage, mergeConversationRecords } from "../src/lib/conversation-record.js";
 
 test("builds a compact project conversation record", () => {
   const record = buildConversationRecord({
@@ -25,6 +25,25 @@ test("keeps the prior conclusion and user delegation for follow-up turns", () =>
   assert.equal(state.userDelegation, "你自己判断，直接修");
   assert.equal(state.expectedNextAction, "apply-fix");
   assert.equal(state.lastIntent, "task");
+});
+
+test("keeps the explicit topic through a chain of short follow-ups", () => {
+  const turns = [
+    { id: "u1", role: "user", text: "这个项目当前有什么风险？" },
+    { id: "a1", role: "assistant", text: "当前主要风险是对话缺少连续状态。" },
+    { id: "u2", role: "user", text: "那怎么办？" },
+    { id: "a2", role: "assistant", text: "先接通多轮上下文。" },
+    { id: "u3", role: "user", text: "你自己判断" },
+  ];
+  const request = buildChatRequestContext(turns);
+  assert.equal(request.contextState.currentTopic, "这个项目当前有什么风险？");
+  assert.equal(request.contextState.previousConclusion, "先接通多轮上下文。");
+  assert.equal(request.contextState.userDelegation, "你自己判断");
+  assert.deepEqual(request.recentTurns.map((turn) => turn.role), ["user", "assistant", "user", "assistant", "user"]);
+  assert.equal(
+    contextualizeUserMessage("直接修", request.contextState),
+    "当前话题：这个项目当前有什么风险？\n上一结论：先接通多轮上下文。\n用户当前要求：直接修"
+  );
 });
 
 test("keeps the latest record and removes same-title duplicates", () => {

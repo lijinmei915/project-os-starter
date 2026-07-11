@@ -118,6 +118,27 @@ project-os state sync . --set phase=stabilizing --set stage="Console 内核收�
 - 写入完成后生成 `.project-os/state-bundles/*.json`，作为 CI 和本地 Desktop 回流的骨架产物。
 - 前端只读渲染本地 JSON；任何变更请求转发给 CLI/Core 作为唯一写入通道。
 
+### Desktop 对话上下文链路
+
+Desktop 对话遵守“前端采集、核心组装、模型回答、工作台执行”的单向数据流：
+
+```txt
+chat turns + dialogue context state
+-> Tauri chat command
+-> local project evidence assembler
+-> grounded answer contract
+-> message references / existing task actions
+```
+
+边界：
+
+- 前端保存最近对话，并提取当前话题、上一轮结论、待回答问题、用户委托和下一预期动作。
+- Tauri 核心按当前项目组装阶段、目标、任务、Git 变更、验收报告和治理文件证据；浏览器预览使用同字段的只读降级数据。
+- 模型只能基于传入证据回答；证据不足时标记为推断，不能要求用户重复已有上下文。
+- 文件和任务引用由本地核心生成并验证，不采信模型凭空生成的路径；点击引用复用现有文件预览和任务工作面。
+- 普通问答不展示 Agent 步骤时间线；只有任务执行、进行中或失败事件显示过程状态。
+- “那怎么办 / 你判断 / 直接修”等短追问继承当前话题；进入任务时使用完整上下文生成计划，但任务标题保持用户可读的原始话题。
+
 ### CLI 复用架构
 
 CLI 是入口层的能力内核，不只是给开发者手敲命令的工具。

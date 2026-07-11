@@ -192,6 +192,28 @@ struct ChatWithModelInput {
     message: String,
     #[serde(default)]
     attachments: Vec<PlanAttachment>,
+    #[serde(default)]
+    recent_turns: Vec<ChatTurnInput>,
+    #[serde(default)]
+    context_state: DialogueContextInput,
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct ChatTurnInput {
+    role: String,
+    text: String,
+}
+
+#[derive(Default, Deserialize, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct DialogueContextInput {
+    current_topic: String,
+    expected_next_action: String,
+    last_intent: String,
+    pending_question: String,
+    previous_conclusion: String,
+    user_delegation: String,
 }
 
 #[derive(Deserialize)]
@@ -641,6 +663,18 @@ struct ChatWithModelResult {
     provider_model: String,
     #[serde(default)]
     provider_error: String,
+    #[serde(default)]
+    references: Vec<MessageReference>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct MessageReference {
+    kind: String,
+    label: String,
+    target: String,
+    #[serde(default)]
+    detail: String,
 }
 
 #[derive(Deserialize)]
@@ -1431,6 +1465,159 @@ fn read_engineering_file(input: ReadEngineeringFileInput) -> Result<EngineeringF
     })
 }
 
+fn compact_json_items(value: Option<&Value>, key: &str, limit: usize) -> Vec<String> {
+    value
+        .and_then(|item| item.get(key))
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| item.as_str().map(str::trim).filter(|text| !text.is_empty()))
+                .take(limit)
+                .map(String::from)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn chat_project_evidence(root: &Path, state: Option<&Value>) -> (Value, Vec<MessageReference>) {
+    let project_status = state.and_then(|value| value.get("status")).or(state);
+    let goals = read_json(root.join(".project-os/goals.json"));
+    let active_goal_id = goals
+        .as_ref()
+        .and_then(|value| value.get("activeGoalId"))
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let active_goal = goals
+        .as_ref()
+        .and_then(|value| value.get("goals"))
+        .and_then(Value::as_array)
+        .and_then(|items| {
+            items.iter().find(|item| {
+                item.get("id").and_then(Value::as_str) == Some(active_goal_id)
+            })
+        });
+
+    let mut task_items = Vec::new();
+    if let Ok(entries) = fs::read_dir(desktop_tasks_dir(root)) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|value| value.to_str()) != Some("json")
+                || path.file_name().and_then(|value| value.to_str()) == Some("manifest.json")
+            {
+                continue;
+            }
+            if let Some(task) = read_json(path) {
+                let status = task.get("status").and_then(Value::as_str).unwrap_or("planned");
+                if status != "done" {
+                    task_items.push(json!({
+                        "id": task.get("id").and_then(Value::as_str).unwrap_or(""),
+                        "title": task.get("title").and_then(Value::as_str).unwrap_or("未命名任务"),
+                        "status": status,
+                        "updatedAt": task.get("updatedAt").and_then(Value::as_str).unwrap_or("")
+                    }));
+                }
+            }
+        }
+    }
+    task_items.sort_by(|a, b| {
+        b.get("updatedAt")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .cmp(a.get("updatedAt").and_then(Value::as_str).unwrap_or(""))
+    });
+    task_items.truncate(8);
+
+    let mut changed_files = git_changed_files(root).into_iter().collect::<Vec<_>>();
+    changed_files.sort();
+    changed_files.truncate(12);
+    let validation = read_json(root.join(".project-os/goal-validation-report.json"));
+    let validation_status = validation
+        .as_ref()
+        .and_then(|value| value.get("status"))
+        .and_then(Value::as_str)
+        .unwrap_or("not-run");
+
+    let mut references = Vec::new();
+    for (path, label) in [
+        ("PROJECT.md", "项目状态"),
+        ("HANDOFF.md", "当前交接"),
+        (".project-os/task-backlog.json", "任务清单"),
+        (".project-os/goal-validation-report.json", "验收报告"),
+    ] {
+        if root.join(path).is_file() {
+            references.push(MessageReference {
+                kind: "file".to_string(),
+                label: label.to_string(),
+                target: path.to_string(),
+                detail: String::new(),
+            });
+        }
+    }
+    if let Some(task) = task_items.first() {
+        if let (Some(id), Some(title)) = (
+            task.get("id").and_then(Value::as_str),
+            task.get("title").and_then(Value::as_str),
+        ) {
+            references.push(MessageReference {
+                kind: "task".to_string(),
+                label: title.to_string(),
+                target: id.to_string(),
+                detail: task.get("status").and_then(Value::as_str).unwrap_or("").to_string(),
+            });
+        }
+    }
+
+    let evidence = json!({
+        "phase": state.and_then(|value| value.get("phase")).and_then(Value::as_str).unwrap_or("unknown"),
+        "stage": state.and_then(|value| value.get("stage")).and_then(Value::as_str).unwrap_or("unknown"),
+        "doing": compact_json_items(project_status, "doing", 6),
+        "blocked": compact_json_items(project_status, "blocked", 6),
+        "activeGoal": active_goal.map(|goal| json!({
+            "id": goal.get("id").and_then(Value::as_str).unwrap_or(""),
+            "title": goal.get("shortTitle").and_then(Value::as_str)
+                .or_else(|| goal.get("title").and_then(Value::as_str)).unwrap_or(""),
+            "status": goal.get("status").and_then(Value::as_str).unwrap_or("")
+        })),
+        "activeTasks": task_items,
+        "changedFiles": changed_files,
+        "validationStatus": validation_status
+    });
+    (evidence, references)
+}
+
+fn chat_references_for_message(
+    message: &str,
+    context_state: &DialogueContextInput,
+    references: Vec<MessageReference>,
+) -> Vec<MessageReference> {
+    if is_greeting_message(message) {
+        return Vec::new();
+    }
+    let topic = format!("{} {}", context_state.current_topic, message);
+    let preferred_labels: &[&str] = if topic.contains("风险") || topic.contains("验收") {
+        &["当前交接", "任务清单", "验收报告"]
+    } else if topic.contains("状态") || topic.contains("进度") || topic.contains("下一步") {
+        &["项目状态", "当前交接", "任务清单"]
+    } else if context_state.expected_next_action == "apply-fix" {
+        &["任务清单", "当前交接"]
+    } else {
+        &["项目状态", "当前交接"]
+    };
+    let mut selected = references
+        .iter()
+        .filter(|reference| preferred_labels.contains(&reference.label.as_str()))
+        .cloned()
+        .collect::<Vec<_>>();
+    if topic.contains("任务") || context_state.expected_next_action == "apply-fix" {
+        if let Some(task) = references.iter().find(|reference| reference.kind == "task") {
+            selected.push(task.clone());
+        }
+    }
+    selected.truncate(4);
+    selected
+}
+
 #[tauri::command]
 async fn chat_with_model(input: ChatWithModelInput) -> Result<ChatWithModelResult, String> {
     let message = input.message.trim().to_string();
@@ -1467,9 +1654,25 @@ async fn chat_with_model(input: ChatWithModelInput) -> Result<ChatWithModelResul
         .and_then(Value::as_str)
         .unwrap_or("未读取到阶段信息")
         .to_string();
+    let (project_evidence, all_evidence_references) = chat_project_evidence(&root, state.as_ref());
+    let evidence_references = chat_references_for_message(
+        &message,
+        &input.context_state,
+        all_evidence_references,
+    );
 
     if provider.enabled {
-        match generate_provider_chat(&provider, &root, &project_name, &stage, &message, &attachments).await {
+        match generate_provider_chat(
+            &provider,
+            &root,
+            &project_name,
+            &stage,
+            &message,
+            &attachments,
+            &input.recent_turns,
+            &input.context_state,
+            &project_evidence,
+        ).await {
             Ok(mut result) => {
                 result.provider_status = "available".to_string();
                 result.provider_model = provider.model.clone();
@@ -1480,19 +1683,33 @@ async fn chat_with_model(input: ChatWithModelInput) -> Result<ChatWithModelResul
                         result.intent = "question".to_string();
                     }
                 }
+                result.references = evidence_references;
                 return Ok(result);
             }
             Err(err) => {
-                let mut fallback = local_chat_result(&message, !attachments.is_empty());
+                let mut fallback = local_chat_result(
+                    &message,
+                    !attachments.is_empty(),
+                    &input.context_state,
+                    &project_evidence,
+                );
                 fallback.provider_status = "unavailable".to_string();
                 fallback.provider_model = provider.model.clone();
                 fallback.provider_error = err;
+                fallback.references = evidence_references;
                 return Ok(fallback);
             }
         }
     }
 
-    Ok(local_chat_result(&message, !attachments.is_empty()))
+    let mut result = local_chat_result(
+        &message,
+        !attachments.is_empty(),
+        &input.context_state,
+        &project_evidence,
+    );
+    result.references = evidence_references;
+    Ok(result)
 }
 
 #[tauri::command]
@@ -2422,6 +2639,9 @@ async fn generate_provider_chat(
     stage: &str,
     message: &str,
     attachments: &[PlanAttachment],
+    recent_turns: &[ChatTurnInput],
+    context_state: &DialogueContextInput,
+    project_evidence: &Value,
 ) -> Result<ChatWithModelResult, String> {
     let api_key = read_secret_from_env_or_dotenv(root, &provider.api_key_env)
         .ok_or_else(|| format!("环境变量或 .env.local 中未设置 {}", provider.api_key_env))?;
@@ -2434,7 +2654,16 @@ async fn generate_provider_chat(
         .timeout(Duration::from_secs(45))
         .build()
         .map_err(|err| err.to_string())?;
-    let router_prompt = chat_router_prompt(project_name, stage, &provider.model, message, attachments);
+    let router_prompt = chat_router_prompt(
+        project_name,
+        stage,
+        &provider.model,
+        message,
+        attachments,
+        recent_turns,
+        context_state,
+        project_evidence,
+    );
     let user_content = if attachments.is_empty() {
         Value::String(router_prompt)
     } else {
@@ -2498,7 +2727,16 @@ async fn generate_provider_chat(
     Ok(result)
 }
 
-fn chat_router_prompt(project_name: &str, stage: &str, current_model: &str, message: &str, attachments: &[PlanAttachment]) -> String {
+fn chat_router_prompt(
+    project_name: &str,
+    stage: &str,
+    current_model: &str,
+    message: &str,
+    attachments: &[PlanAttachment],
+    recent_turns: &[ChatTurnInput],
+    context_state: &DialogueContextInput,
+    project_evidence: &Value,
+) -> String {
     let attachment_note = if attachments.is_empty() {
         "No image attachments.".to_string()
     } else {
@@ -2511,11 +2749,28 @@ fn chat_router_prompt(project_name: &str, stage: &str, current_model: &str, mess
                 .join(", ")
         )
     };
+    let history = recent_turns
+        .iter()
+        .take(8)
+        .map(|turn| format!("{}: {}", turn.role, trim_for_trace(&turn.text)))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let context_json = serde_json::to_string(context_state).unwrap_or_else(|_| "{}".to_string());
+    let evidence_json = serde_json::to_string_pretty(project_evidence).unwrap_or_else(|_| "{}".to_string());
     format!(
         r#"Current project: {project_name}
 Current stage: {stage}
 Current configured model: {current_model}
 {attachment_note}
+
+Dialogue context state:
+{context_json}
+
+Recent conversation:
+{history}
+
+Verified local project evidence:
+{evidence_json}
 
 User message:
 {message}
@@ -2530,6 +2785,9 @@ Return strict JSON only:
 }}
 
 Rules:
+- Treat short follow-ups such as "那怎么办", "你判断", "直接告诉我", and "直接修" as continuations of currentTopic and previousConclusion. Do not ask the user to repeat the subject when contextState identifies it.
+- For project questions, answer from verified local project evidence. State the conclusion first, then cite concrete evidence in the prose, then give the smallest useful next action.
+- If evidence is insufficient for a claim, label it as an inference instead of presenting it as fact.
 - Greetings, small talk, broad questions, or "what is X" shouldCreatePlan=false.
 - Questions that ask "why", "how", "what risks", "what happened", "is this ok", or "look at this" shouldCreatePlan=false and should receive a natural answer.
 - Set shouldCreatePlan=true when the user clearly asks OmniDesk to solve, handle, organize, clean up, make a plan, create a task, apply a patch, run commands/checks, or implement/fix code.
@@ -2537,24 +2795,78 @@ Rules:
 - If the user asks what model you are, mention the current configured model exactly.
 - If shouldCreatePlan=true, reply should briefly acknowledge that you will create a plan.
 - If shouldCreatePlan=false, do not suggest generating a plan, clicking buttons, or asking for confirmation unless the user's request is ambiguous.
+- Do not tell the user to inspect another page instead of answering when the evidence above already supports an answer.
 - Do not invent completed work.
 - Do not mention internal JSON or routing.
 "#
     )
 }
 
-fn local_chat_result(message: &str, has_attachments: bool) -> ChatWithModelResult {
+fn local_chat_result(
+    message: &str,
+    has_attachments: bool,
+    context_state: &DialogueContextInput,
+    project_evidence: &Value,
+) -> ChatWithModelResult {
     let should_create_plan = should_create_plan_for_message(message, has_attachments);
+    let topic = if context_state.current_topic.trim().is_empty() {
+        message
+    } else {
+        context_state.current_topic.as_str()
+    };
+    let risk_question = message.contains("风险") || topic.contains("风险");
+    let active_task_count = project_evidence
+        .get("activeTasks")
+        .and_then(Value::as_array)
+        .map(Vec::len)
+        .unwrap_or(0);
+    let changed_file_count = project_evidence
+        .get("changedFiles")
+        .and_then(Value::as_array)
+        .map(Vec::len)
+        .unwrap_or(0);
+    let validation_status = project_evidence
+        .get("validationStatus")
+        .and_then(Value::as_str)
+        .unwrap_or("not-run");
+    let current_focus = project_evidence
+        .get("activeTasks")
+        .and_then(Value::as_array)
+        .and_then(|tasks| tasks.first())
+        .and_then(|task| task.get("title"))
+        .and_then(Value::as_str)
+        .unwrap_or("当前最高优先级任务");
     ChatWithModelResult {
         reply: if should_create_plan {
             "可以，我整理成一个可执行计划。".to_string()
         } else if is_greeting_message(message) {
             "你好，我在。".to_string()
-        } else if is_question_like_message(message) {
-            if message.contains("风险") {
-                "主要风险有三类：交接记录可能继续膨胀；对话和执行状态容易混在一起；模型或检查失败时反馈还不够像人话。建议先把普通问答和执行任务分开，再打磨失败提示。".to_string()
+        } else if context_state.expected_next_action == "recommend-next" {
+            format!(
+                "建议按这个顺序处理：先推进「{}」；然后运行目标验收并处理失败项；最后审阅剩余 Git 变更，确认是否可以交付。",
+                current_focus
+            )
+        } else if context_state.expected_next_action == "decide-next" {
+            format!(
+                "我判断先推进「{}」。它是当前最直接的阻塞点，完成后立即运行目标验收，再决定是否处理其他风险。",
+                current_focus
+            )
+        } else if is_question_like_message(message) || !context_state.current_topic.is_empty() {
+            if risk_question {
+                format!(
+                    "当前可确认的风险有三项：还有 {} 个活跃或待确认任务；Git 工作区有 {} 个变更文件；目标验收状态为 {}。建议先处理失败或进行中的任务，再运行目标验收，最后确认剩余 Git 变更是否属于本轮交付。",
+                    active_task_count, changed_file_count, validation_status
+                )
             } else {
-                "可以，我直接看当前上下文来回答。".to_string()
+                format!(
+                    "继续回答「{}」：{}",
+                    topic,
+                    if context_state.previous_conclusion.is_empty() {
+                        "当前本地证据还不足以给出更具体结论。"
+                    } else {
+                        context_state.previous_conclusion.as_str()
+                    }
+                )
             }
         } else {
             "可以，继续说。".to_string()
@@ -2564,6 +2876,7 @@ fn local_chat_result(message: &str, has_attachments: bool) -> ChatWithModelResul
         provider_status: "local".to_string(),
         provider_model: String::new(),
         provider_error: String::new(),
+        references: Vec::new(),
     }
 }
 
