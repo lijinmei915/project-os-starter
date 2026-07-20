@@ -15,6 +15,8 @@ depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
 
 ## 接手摘要
 
+- 2026-07-21 `adapters/` 六个跨工具分发文件已物理删除。`REFERENCE_SYSTEMS.md` 改为描述 OmniDesk Runtime 内置的 Hermes ACP/Provider 边界，工作区元数据也不再保留 adapter 状态源；Hermes 仍只能生成草案，写入继续经授权、Diff 校验与独立审批。验证：文档结构、frontmatter、Desktop Node 443/443 与 diff check 通过。旧 installer、模板和 routing 文档中的历史引用仍待同批退役，不能把它们误作活入口。
+
 - 2026-07-21 `README.md` 与 `INSTALL.md` 已改为 OmniDesk Desktop 的启动、验证和状态迁移入口，不再宣传 Project OS 安装 profile、模板复制、adapter 生成或旧 CLI。Desktop 项目接入改由 Runtime 的工作区选择、扫描与权限控制承担。验证：文档结构、frontmatter 与 diff check 通过。此后旧 installer、templates 与 adapters 不再拥有对外入口消费者，但旧治理文档内部引用仍需按批清理。
 
 - 2026-07-21 受保护 Hermes Eval 的 `failed-check-repair` case 现先对隔离 fixture 执行原始失败检查，并将退出码和受限输出摘要写入 `initialCheck` trace；只有“初始检查失败 + Patch 通过 Gateway 审批并应用 + 最终检查通过”才计为成功。该改动补强真实 Eval 证据，不把预设失败文本当作修复闭环；本机未调用 Provider 或伪造 trace。验证：`node --check` 与 Desktop Node 442/442 通过。仍待受保护环境下一次真实运行产出新 artifact；当前 runner 尚未模拟原生窗口中的审批点击。

@@ -2,7 +2,7 @@
 layer: knowledge
 type: spec
 last_verified: 2026-07-18
-depends_on: [docs/PRODUCT_PLAN.md, docs/DESKTOP_APP.md, adapters/HERMES.md]
+depends_on: [docs/ARCHITECTURE.md, docs/DESKTOP_APP.md]
 teaches: "OmniDesk 和 Hermes、Claude Projects、Cursor 等成熟工具的关系、借鉴边界和接入策略"
 use_when: "评估是否接入成熟治理工程、比较 Hermes 等工具、或决定 OmniDesk 该借鉴什么不借鉴什么时"
 ---
@@ -68,7 +68,7 @@ Hermes 适合作为：
 - 长时任务执行器
 - Agent 工作流参照
 - 治理工程形态参考
-- Project OS adapter 目标之一
+- 可选的受控执行器
 
 Hermes 不应该成为：
 
@@ -76,8 +76,6 @@ Hermes 不应该成为：
 - Project OS 的规则源头
 - 用户必须理解的配置前置条件
 - 替代 `.project-os/` 项目记忆的唯一状态源
-
-当前适配策略见 `adapters/HERMES.md`。
 
 桌面端已完成两层运行时接入：在 `Agent 配置 / 适配器` 中只读探测 `hermes-acp` 优先、`hermes` 次之的本地可用性；`hermes-acp --check` 只证明 ACP 通道可启动，不证明模型凭据可用。OmniDesk 的当前连接是 Hermes 的非敏感运行配置源：保存或切换当前连接后，自动同步 Hermes `config.yaml` 中的 custom provider、网关地址、API mode 和默认模型，保留 Hermes 其他设置。Patch Draft 生成时，OmniDesk 会优先以 ACP stdio 建立一次性 session，并只把当前 provider 的密钥注入子进程内存环境。对于 Hermes 的 custom provider，还会按网关主域临时注入兼容的 `<VENDOR>_API_KEY`，避免 Hermes 的 host-scoped 凭据保护把有效 Key 误判为缺失；密钥不会写入 Hermes 文件或前端。Hermes 只能返回草案，实际写入仍必须走 OmniDesk 的 Diff review 和 Apply 确认。请求提示禁止工具调用，且所有需要 ACP client 支持的工具或权限请求都会被拒绝。未安装、仅 CLI、ACP 健康检查失败、模型调用失败、无有效 diff 或 ACP 调用失败，都必须如实显示或回退到既有 provider/local 草案，不得伪造已执行或已写入。
 
@@ -125,15 +123,15 @@ OmniDesk 应采用分层接入：
 
 ```txt
 OmniDesk UI
-  -> Project OS Local Agent Core
-    -> Project OS memory / runs / recommendations
+  -> OmniDesk Local Agent Runtime
+    -> Workspace / Task / Agent Run evidence
     -> Hermes / Codex CLI / Claude Code / scripts / MCP
 ```
 
 规则：
 
 - OmniDesk 负责用户体验和项目治理。
-- Project OS 负责事实、记忆、规则和检查闭环。
+- OmniDesk Runtime 负责事实、记忆、规则和检查闭环。
 - Hermes 等工具负责执行某些任务。
 - 执行结果必须回写到 `.project-os/`，不能只留在外部工具。
 
@@ -148,7 +146,6 @@ OmniDesk UI
 - diff review
 - 受控 runner
 - 项目记忆和推荐
-- Hermes adapter 规则说明
 - Hermes ACP 可用性探测和状态展示
 
 当前阶段暂不做：

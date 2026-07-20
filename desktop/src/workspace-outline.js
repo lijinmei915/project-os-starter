@@ -114,7 +114,6 @@ const itemMeta = {
   "模型连接": { statusSource: ".project-os/desktop-provider.json" },
   "工具白名单": { statusSource: "desktop/src-tauri/src/main.rs" },
   "Skill 能力": { statusSource: ".agents/skills/*" },
-  "适配器": { statusSource: "adapters/*" },
   "安全边界": { statusSource: "docs/AI_SAFETY.md" },
 };
 
