@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { isApplicablePatchDraft } from "../../conversation-runtime";
 import { executePatchApplyWorkflow } from "../../lib/patch-apply-executor";
 import { executePatchDraftWorkflow } from "../../lib/patch-draft-executor";
+import { measureDesktopPerformance } from "../../lib/performance-baseline";
 
 /** React lifecycle wrapper for Patch Draft, Apply/verify, and handoff actions. */
 export function usePatchActions({
@@ -30,6 +31,8 @@ export function usePatchActions({
     beginActionFeedback(feedbackKey, "正在生成改动草稿...");
     setPatchError("");
     setPatchLoading(true);
+    const finishMeasure = measureDesktopPerformance("patch-draft", { taskId: task.id || "" });
+    let draftMeasure = { applicable: false, outcome: "failed" };
     try {
       const result = await executePatchDraftWorkflow({
         generatePatch: (nextTask) => executionClient.generatePatchDraft(nextTask, nextTask?.requestId),
@@ -38,9 +41,11 @@ export function usePatchActions({
         task,
       });
       if (result.error) setPatchError(result.error);
+      draftMeasure = { applicable: isApplicablePatchDraft(result.patchDraft), outcome: result.success ? "succeeded" : "failed" };
       finishActionFeedback(feedbackKey, result.success ? "success" : "failed", result.feedback);
       return result;
     } finally {
+      finishMeasure(draftMeasure);
       if (activePatchRequestRef.current === feedbackKey) {
         activePatchRequestRef.current = null;
         setPatchLoading(false);
@@ -79,6 +84,11 @@ export function usePatchActions({
     setApplyError("");
     setRunnerError("");
     setApplyLoading(true);
+    const finishMeasure = measureDesktopPerformance("patch-apply", {
+      checkCount: checksForPlan(task.plan).length,
+      taskId: task.id || "",
+    });
+    let applyMeasure = { outcome: "failed" };
     try {
       const result = await executePatchApplyWorkflow({
         applyPatch: executionClient.applyPatchDraft,
@@ -94,9 +104,11 @@ export function usePatchActions({
         setApplyError(result.error);
         setRunnerError(result.error);
       }
+      applyMeasure = { outcome: result.success ? "succeeded" : "failed" };
       finishActionFeedback(feedbackKey, result.success ? "success" : "failed", result.feedback);
       return result;
     } finally {
+      finishMeasure(applyMeasure);
       setApplyLoading(false);
       setRunnerLoadingId("");
     }

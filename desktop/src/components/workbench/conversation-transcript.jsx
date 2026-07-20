@@ -63,6 +63,7 @@ export function ConversationTranscript({
   onTurnAction,
   pendingTurn,
   phase,
+  streamingReply,
   tasks,
   turns,
 }) {
@@ -133,6 +134,12 @@ export function ConversationTranscript({
         </ConversationMessage>
       ) : null}
 
+      {streamingReply ? (
+        <ConversationMessage className="conversationMessage-streaming" role="assistant">
+          <div>{conversationTextForDisplay(streamingReply)}<span className="conversationStreamCursor" aria-label="正在生成" /></div>
+        </ConversationMessage>
+      ) : null}
+
       {pendingTurn || chatLoading ? (
         <>
           {pendingTurn && pendingTurn.showUser !== false ? (
@@ -141,12 +148,14 @@ export function ConversationTranscript({
               <Attachments attachments={pendingTurn.attachments} />
             </ConversationMessage>
           ) : null}
-          <AgentProcessingStatus
-            events={pendingTurn?.events || chatLoadingEvents}
-            label={pendingTurn?.label || chatLoadingLabel}
-            running
-            startedAt={pendingTurn?.startedAt || chatStartedAt}
-          />
+          {!streamingReply ? (
+            <AgentProcessingStatus
+              events={pendingTurn?.events || chatLoadingEvents}
+              label={pendingTurn?.label || chatLoadingLabel}
+              running
+              startedAt={pendingTurn?.startedAt || chatStartedAt}
+            />
+          ) : null}
         </>
       ) : null}
     </Conversation>

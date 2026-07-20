@@ -1,5 +1,6 @@
 import { conversationActionDefinition, executeRegisteredConversationAction, isApplicablePatchDraft } from "./action-registry.js";
 import { guardedCheckCapability } from "./capabilities.js";
+import { taskExecutionNextAction } from "../lib/task-execution-mode.js";
 
 const terminalStatuses = new Set(["cancelled", "failed", "succeeded", "timed-out"]);
 
@@ -117,8 +118,10 @@ async function executePlanAction(action, adapters, context, emitProgress, now) {
   }));
   const status = requestStatus(outcome?.status);
   const succeeded = status === "succeeded" && Boolean(outcome?.taskId);
+  const nextAction = succeeded ? taskExecutionNextAction(outcome.task) : null;
   const pendingAction = succeeded ? {
     id: `confirm-task-${outcome.taskId}`,
+    nextAction,
     requestId: context.requestId,
     taskId: outcome.taskId,
     type: "confirm-active-task",
@@ -129,7 +132,7 @@ async function executePlanAction(action, adapters, context, emitProgress, now) {
     turn: {
       ...turnBase(context, `plan-${status}`, now),
       actions: succeeded
-        ? [{ id: "confirm-active-task", label: "确认并开始", taskId: outcome.taskId }]
+        ? [{ id: "confirm-active-task", label: `确认并${nextAction.label}`, nextAction, taskId: outcome.taskId }]
         : [{ id: "retry", label: "重试", task: action.task || context.input }],
       diagnostic: succeeded ? null : {
         detail: outcome?.message || "计划生成失败。",
@@ -141,7 +144,7 @@ async function executePlanAction(action, adapters, context, emitProgress, now) {
       pendingAction,
       taskId: outcome?.taskId || "",
       text: succeeded
-        ? "执行计划已生成并保存。确认后才会进入改动流程。"
+        ? `执行计划已生成并保存。确认后将${nextAction.label}。`
         : status === "cancelled"
           ? "计划生成已取消，没有继续执行。"
           : "这次计划没有生成成功，已停止后续操作。",

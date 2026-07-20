@@ -1,3 +1,5 @@
+import { taskExecutionNextAction } from "./task-execution-mode.js";
+
 const flowSteps = [
   { id: "draft", label: "生成 AI 建议" },
   { id: "review", label: "查看并确认" },
@@ -30,6 +32,13 @@ export function taskNextAction(task) {
   }
   if (task.status === "waiting repair approval") {
     return { action: "apply-draft", detail: "修复草稿已生成。请核对后独立确认应用。", label: "确认应用修复", step: "review" };
+  }
+  if (task.patchDraft?.notApplicable) {
+    const next = taskExecutionNextAction(task);
+    if (next.id === "run-check") {
+      return { action: "run-check", detail: "任务尚无实际工程改动；先运行已登记检查，再决定是否需要修复。", label: next.label, step: "verify" };
+    }
+    return { action: "open-task", detail: "当前计划未声明可应用的工程改动。请查看任务范围并在需要时调整计划。", label: "查看任务详情", step: "draft" };
   }
   if (!task.patchDraft) {
     return {

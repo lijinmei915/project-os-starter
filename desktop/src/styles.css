@@ -6559,7 +6559,7 @@ body.isResizingSidebar {
 
 .tabs {
   display: flex;
-  align-items: end;
+  align-items: center;
   gap: var(--desktop-space-inline);
   height: 28px;
   min-height: 28px;
@@ -6840,6 +6840,18 @@ body.isResizingSidebar {
 
 .conversationMessage-empty .conversationBubble {
   background: var(--desktop-surface-panel);
+}
+
+.conversationMessage-streaming .conversationBubble {
+  min-width: 72px;
+}
+
+.conversationStreamCursor {
+  display: inline-block;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -0.12em;
+  border-right: 2px solid var(--desktop-text-secondary);
 }
 
 .conversationMessage-user .conversationBubble {
@@ -7747,6 +7759,25 @@ body.isResizingSidebar {
   line-height: 1.45;
 }
 
+.readonlyPlanEvidence {
+  margin-top: 8px;
+}
+
+.readonlyPlanEvidence > summary {
+  color: var(--desktop-text-muted);
+  cursor: pointer;
+  font-size: var(--desktop-text-caption);
+  list-style-position: inside;
+}
+
+.readonlyPlanEvidence[open] > summary {
+  margin-bottom: 2px;
+}
+
+.readonlyPlan-confirmed {
+  background: var(--desktop-surface-page);
+}
+
 .planColumns {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -8240,8 +8271,8 @@ body.isResizingSidebar {
 }
 
 .terminalComposer {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 28px;
+  display: flex;
+  flex-wrap: wrap;
   align-items: end;
   gap: var(--desktop-space-sm);
   margin-top: var(--desktop-space-sm);
@@ -8251,12 +8282,98 @@ body.isResizingSidebar {
   background: var(--desktop-surface-input);
 }
 
+.terminalImageInput {
+  display: none;
+}
+
+.terminalImageAttachment {
+  align-items: center;
+  background: var(--desktop-surface-input);
+  border: 1px solid var(--desktop-border-default);
+  border-radius: 5px;
+  display: flex;
+  gap: 4px;
+  flex: 0 1 auto;
+  max-width: 48%;
+  overflow-x: auto;
+  min-width: 0;
+  padding: 2px 4px;
+  min-height: 28px;
+  align-self: center;
+}
+
+.terminalImageAttachment img {
+  background: var(--desktop-surface-panel);
+  border-radius: 3px;
+  height: 18px;
+  object-fit: cover;
+  width: 18px;
+}
+
+.terminalImageAttachmentItem {
+  align-items: center;
+  display: inline-flex;
+  gap: 3px;
+  min-width: 0;
+}
+
+.terminalImageAttachmentItem > span {
+  max-width: 88px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.terminalImageAttachment span {
+  color: var(--desktop-text-primary);
+  flex: 1;
+  font-size: 10px;
+  line-height: 18px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.terminalImageAttachment button {
+  background: transparent;
+  border: 0;
+  color: var(--desktop-text-muted);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 4px;
+}
+
+.terminalImageAttachment button:hover {
+  color: var(--desktop-text-primary);
+}
+
+.terminalImageAttachment .terminalImageAttachmentPreview {
+  border: 0;
+  display: inline-flex;
+  padding: 0;
+}
+
+.terminalImageAttachmentHint {
+  color: var(--desktop-text-soft);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.terminalComposerImage {
+  align-self: end;
+  flex: 0 0 28px;
+}
+
 .terminalComposer:focus-within {
   border-color: var(--desktop-border-accent);
 }
 
 .terminalComposerInput {
-  width: 100%;
+  align-self: center;
+  flex: 1 1 180px;
+  width: auto;
+  height: 28px;
   min-height: 28px;
   max-height: 96px;
   resize: none;
@@ -8266,8 +8383,8 @@ body.isResizingSidebar {
   color: var(--desktop-text-primary);
   font-family: var(--mono);
   font-size: var(--desktop-text-caption);
-  line-height: 1.45;
-  padding: 5px 6px;
+  line-height: 20px;
+  padding: 4px 6px;
 }
 
 .terminalComposerInput:hover:not(:disabled),
@@ -8281,6 +8398,7 @@ body.isResizingSidebar {
 }
 
 .terminalComposerSend {
+  align-self: center;
   width: 28px;
   height: 28px;
 }
@@ -8302,6 +8420,37 @@ body.isResizingSidebar {
 
 .terminalNotice {
   margin-top: 8px;
+}
+
+.terminalTaskNotice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 6px;
+  border: 1px solid var(--desktop-border-accent);
+  border-radius: var(--radius-xs);
+  background: var(--desktop-state-accent-bg);
+  color: var(--desktop-text-secondary);
+  font-size: var(--desktop-text-caption);
+  line-height: 1.4;
+  padding: 6px 8px;
+}
+
+.terminalTaskNotice button {
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--desktop-text-accent);
+  cursor: pointer;
+  font: inherit;
+  font-weight: var(--desktop-font-semibold);
+  padding: 2px 4px;
+}
+
+.terminalTaskNotice button:hover {
+  background: var(--desktop-hover-surface);
 }
 
 .terminalEntry + .terminalEntry {

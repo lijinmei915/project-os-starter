@@ -8,7 +8,8 @@ const TASK_SCHEMA_VERSION: &str = "project-os.desktop-task.v0.1";
 const TASK_DIRECTORY: &str = ".project-os/runs/desktop-tasks";
 
 pub fn directory(root: &Path) -> std::path::PathBuf {
-    root.join(TASK_DIRECTORY)
+    crate::runtime::state_namespace::state_path_for_read(root, TASK_DIRECTORY)
+        .unwrap_or_else(|_| root.join(TASK_DIRECTORY))
 }
 
 pub fn list_repository_records(repository: &Repository) -> Result<Vec<(String, Value)>, String> {
@@ -24,7 +25,7 @@ pub fn list_repository_records(repository: &Repository) -> Result<Vec<(String, V
 pub fn list(root: &Path) -> Result<Vec<Value>, String> {
     let mut tasks = list_repository_records(&Repository::new(root))?
         .into_iter()
-        .map(|(_, task)| task)
+        .map(|(_, task)| project_legacy_execution_state(task))
         .collect::<Vec<_>>();
     tasks.sort_by(|a, b| {
         let a_time = a
@@ -40,6 +41,64 @@ pub fn list(root: &Path) -> Result<Vec<Value>, String> {
         b_time.cmp(a_time)
     });
     Ok(tasks)
+}
+
+/// Old desktop records can contain a syntactically valid placeholder diff for
+/// a plan that explicitly said not to modify files. Keep the stored artifact
+/// untouched, but project it as non-applicable so it cannot appear as a live
+/// approval after an upgrade.
+fn project_legacy_execution_state(mut task: Value) -> Value {
+    if task.get("status").and_then(Value::as_str) != Some("waiting approval")
+        || task
+            .pointer("/patchDraft/notApplicable")
+            .and_then(Value::as_bool)
+            == Some(true)
+        || !legacy_plan_is_validation_only(&task)
+    {
+        return task;
+    }
+    let Some(object) = task.as_object_mut() else {
+        return task;
+    };
+    object.insert("status".to_string(), Value::String("planned".to_string()));
+    object.insert(
+        "runtimeMigration".to_string(),
+        serde_json::json!({
+            "fromStatus": "waiting approval",
+            "reason": "历史计划未声明实际工程改动，旧草稿不再可应用。",
+            "version": "semantic-patch-gate-v1"
+        }),
+    );
+    if let Some(draft) = object.get_mut("patchDraft").and_then(Value::as_object_mut) {
+        draft.insert("notApplicable".to_string(), Value::Bool(true));
+        draft.insert(
+            "failureReason".to_string(),
+            Value::String("历史计划明确不修改工程文件；该草稿仅保留为证据，不能应用。".to_string()),
+        );
+    }
+    task
+}
+
+fn legacy_plan_is_validation_only(task: &Value) -> bool {
+    let Some(changes) = task
+        .pointer("/plan/candidateChanges")
+        .or_else(|| task.pointer("/plan/candidate_changes"))
+        .and_then(Value::as_array)
+    else {
+        return false;
+    };
+    !changes.is_empty()
+        && changes.iter().filter_map(Value::as_str).all(|change| {
+            [
+                "先不写文件",
+                "先不改文件",
+                "不自动写文件",
+                "不修改文件",
+                "只形成",
+            ]
+            .iter()
+            .any(|marker| change.contains(marker))
+        })
 }
 
 /// Persists a desktop task and synchronizes its goal index as one Repository
@@ -319,6 +378,22 @@ mod tests {
         )
         .unwrap();
         assert_eq!(list(&root).unwrap()[0]["id"], "latest");
+    }
+
+    #[test]
+    fn projects_legacy_non_writing_drafts_out_of_approval() {
+        let projected = project_legacy_execution_state(serde_json::json!({
+            "id": "legacy-check",
+            "status": "waiting approval",
+            "patchDraft": { "diff": "--- a/HANDOFF.md\n+++ b/HANDOFF.md" },
+            "plan": { "candidateChanges": ["先不写文件，只形成下一步建议。"] }
+        }));
+        assert_eq!(projected["status"], "planned");
+        assert_eq!(projected["patchDraft"]["notApplicable"], true);
+        assert_eq!(
+            projected["runtimeMigration"]["version"],
+            "semantic-patch-gate-v1"
+        );
     }
 
     #[test]

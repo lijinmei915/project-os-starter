@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://omnidesk.local/schemas/state-layout.schema.json",
+  "title": "OmniDesk state namespace",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "layoutVersion",
+    "stateRoot",
+    "legacyRoot",
+    "activeNamespace",
+    "partitions"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "omnidesk.state-namespace.v1"
+    },
+    "layoutVersion": {
+      "const": 1
+    },
+    "stateRoot": {
+      "const": ".omnidesk"
+    },
+    "legacyRoot": {
+      "const": ".project-os"
+    },
+    "activeNamespace": {
+      "enum": ["legacy", "omnidesk"]
+    },
+    "readMode": {
+      "enum": ["legacy-primary", "omnidesk-primary", "omnidesk-only"]
+    },
+    "partitions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["data", "runtime", "cache", "evidence"],
+      "properties": {
+        "data": { "const": ".omnidesk/data" },
+        "runtime": { "const": ".omnidesk/runtime" },
+        "cache": { "const": ".omnidesk/cache" },
+        "evidence": { "const": ".omnidesk/evidence" }
+      }
+    },
+    "migration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "copied", "unchanged", "conflicts", "skipped"],
+      "properties": {
+        "status": { "enum": ["not-needed", "copied", "conflicted"] },
+        "copied": { "type": "integer", "minimum": 0 },
+        "unchanged": { "type": "integer", "minimum": 0 },
+        "conflicts": { "type": "array", "items": { "type": "string" } },
+        "skipped": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

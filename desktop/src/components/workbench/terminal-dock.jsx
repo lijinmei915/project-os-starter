@@ -3,6 +3,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 import { ArrowRight, Eraser, ExternalLink, Loader2, Plus, RotateCcw, Square, TerminalSquare, X } from "lucide-react";
 import { formatTerminalInputForPaste } from "../../lib/terminal-context";
+import { traceNativeTerminalStage } from "../../lib/native-test-trace";
 import { isTauriRuntime } from "../../lib/runtime-api";
 import { Button } from "../ui/button";
 import { Notice } from "../ui/notice";
@@ -59,6 +60,10 @@ function terminalThemeForCurrentMode() {
   };
 }
 
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, "'\\''")}'`;
+}
+
 export function TerminalDock({
   active = true,
   activeSessionId = "main",
@@ -73,6 +78,7 @@ export function TerminalDock({
   onCloseTerminalSession,
   onOpenNativeTerminal,
   onRestartTerminalSession,
+  onSaveTerminalImage,
   text,
   chunks,
   session,
@@ -81,6 +87,9 @@ export function TerminalDock({
 }) {
   const [terminalDraft, setTerminalDraft] = useState("");
   const [terminalDraftSending, setTerminalDraftSending] = useState(false);
+  const [terminalImageError, setTerminalImageError] = useState("");
+  const [terminalImageAttachments, setTerminalImageAttachments] = useState([]);
+  const [terminalImagePreview, setTerminalImagePreview] = useState(null);
   const terminalDraftRef = React.useRef(null);
   const terminalHostRef = React.useRef(null);
   const xtermRef = React.useRef(null);
@@ -93,6 +102,7 @@ export function TerminalDock({
   const isDesktopRuntime = isTauriRuntime();
   const isTerminalReady = Boolean(session);
   const terminalEmptyState = !isDesktopRuntime ? "preview" : error ? "failed" : "starting";
+  const agentWorking = /(?:^|\n)\s*(?:Working|Running)\s*\(/i.test(String(text || ""));
   const visibleSessions = sessions.length ? sessions : session ? [session] : [];
   const sessionKey = session
     ? `${session.sessionId || session.session_id || session.id || activeSessionId}:${session.generation || ""}`
@@ -109,7 +119,9 @@ export function TerminalDock({
   const syncTerminalSize = React.useCallback((force = false) => {
     if (!xtermRef.current || !fitAddonRef.current) return;
     try {
+      traceNativeTerminalStage("terminal-dock.fit-start");
       fitAddonRef.current.fit();
+      traceNativeTerminalStage("terminal-dock.fit-complete");
       const cols = xtermRef.current.cols;
       const rows = xtermRef.current.rows;
       if (!cols || !rows) return;
@@ -117,12 +129,14 @@ export function TerminalDock({
       lastSizeRef.current = { cols, rows };
       resizeSessionRef.current?.(cols, rows);
     } catch {
+      traceNativeTerminalStage("terminal-dock.fit-error");
       // Ignore fit races while the panel is settling.
     }
   }, []);
 
   useEffect(() => {
     if (!terminalHostRef.current || xtermRef.current) return undefined;
+    traceNativeTerminalStage("terminal-dock.mount");
 
     const terminal = new Terminal({
       allowProposedApi: false,
@@ -138,9 +152,17 @@ export function TerminalDock({
       theme: terminalThemeForCurrentMode(),
     });
     const fitAddon = new FitAddon();
+    traceNativeTerminalStage("terminal-dock.xterm-created");
     terminal.loadAddon(fitAddon);
     terminal.open(terminalHostRef.current);
-    terminal.focus();
+    traceNativeTerminalStage("terminal-dock.xterm-opened");
+    try {
+      traceNativeTerminalStage("terminal-dock.initial-focus-start");
+      terminal.focus();
+      traceNativeTerminalStage("terminal-dock.initial-focus-complete");
+    } catch {
+      traceNativeTerminalStage("terminal-dock.initial-focus-error");
+    }
     terminal.attachCustomKeyEventHandler((event) => {
       if (
         event.type !== "keydown"
@@ -175,6 +197,7 @@ export function TerminalDock({
     themeObserver.observe(document.documentElement, { attributeFilter: ["class"], attributes: true });
     window.addEventListener("resize", syncTerminalSize);
     return () => {
+      traceNativeTerminalStage("terminal-dock.cleanup");
       themeObserver.disconnect();
       window.removeEventListener("resize", syncTerminalSize);
       dataDisposable.dispose();
@@ -214,10 +237,17 @@ export function TerminalDock({
 
   useEffect(() => {
     if (!active || !xtermRef.current) return;
+    traceNativeTerminalStage("terminal-dock.active-effect");
     requestAnimationFrame(() => {
       syncTerminalSize(true);
       requestAnimationFrame(() => syncTerminalSize(true));
-      xtermRef.current?.focus();
+      try {
+        traceNativeTerminalStage("terminal-dock.active-focus-start");
+        xtermRef.current?.focus();
+        traceNativeTerminalStage("terminal-dock.active-focus-complete");
+      } catch {
+        traceNativeTerminalStage("terminal-dock.active-focus-error");
+      }
     });
   }, [active, syncTerminalSize]);
 
@@ -237,13 +267,45 @@ export function TerminalDock({
     if (!terminalDraft || terminalDraftSending) return;
     setTerminalDraftSending(true);
     try {
+      const command = terminalImageAttachments.length
+        ? `codex ${terminalImageAttachments.map((image) => `-i ${shellQuote(image.path)}`).join(" ")} ${shellQuote(terminalDraft)}\n`
+        : terminalDraft;
       const sent = await onWriteTerminalData(
-        formatTerminalInputForPaste(terminalDraft, { submit: true }),
+        formatTerminalInputForPaste(command, { submit: true }),
         { trackInput: false }
       );
-      if (sent !== false) setTerminalDraft("");
+      if (sent !== false) {
+        setTerminalDraft("");
+        terminalImageAttachments.forEach((image) => URL.revokeObjectURL(image.url));
+        setTerminalImageAttachments([]);
+      }
     } finally {
       setTerminalDraftSending(false);
+    }
+  };
+
+  const handleTerminalPaste = async (event) => {
+    const image = Array.from(event.clipboardData?.files || []).find((file) => file.type.startsWith("image/"))
+      || Array.from(event.clipboardData?.items || [])
+        .find((item) => item.kind === "file" && item.type.startsWith("image/"))
+        ?.getAsFile?.();
+    if (!image || !onSaveTerminalImage) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setTerminalImageError("");
+    try {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(reader.error || new Error("图片读取失败"));
+        reader.readAsDataURL(image);
+      });
+      const path = await onSaveTerminalImage({ name: image.name || "pasted-image.png", dataUrl });
+      if (path) {
+        setTerminalImageAttachments((current) => [...current, { name: image.name || "图片", path, url: URL.createObjectURL(image) }].slice(-6));
+      }
+    } catch (error) {
+      setTerminalImageError(error instanceof Error ? error.message : String(error));
     }
   };
 
@@ -265,7 +327,7 @@ export function TerminalDock({
         : "正在连接当前项目的本地终端。";
 
     return (
-      <section className="terminalDock" aria-label="终端">
+      <section className="terminalDock" aria-label="终端" onPaste={handleTerminalPaste}>
         <div className="terminalDockHeader">
           <div className="terminalDockPrimary">
             <Tooltip content={emptyStateTitle}>
@@ -308,7 +370,7 @@ export function TerminalDock({
   }
 
   return (
-    <section className="terminalDock" aria-label="终端">
+    <section className="terminalDock" aria-label="终端" onPaste={handleTerminalPaste}>
       <div className="terminalDockHeader">
         <div className="terminalDockPrimary">
           <Tooltip content={session?.cwd || "终端"}>
@@ -398,7 +460,26 @@ export function TerminalDock({
         })}
         ref={terminalHostRef}
       />
+      {agentWorking ? (
+        <div className="terminalTaskNotice" role="status">
+          <span>当前终端任务正在执行。需要补充或调整方向，请回到对话。</span>
+          <button type="button" onClick={() => window.dispatchEvent(new Event("project-os:open-conversation"))}>返回对话调整</button>
+        </div>
+      ) : null}
       <div className="terminalComposer" role="region" aria-label="终端输入">
+        {terminalImageAttachments.length ? (
+          <div className="terminalImageAttachment" title={terminalImageAttachments.map((image) => image.path).join("\n")}>
+            {terminalImageAttachments.map((image, index) => (
+              <span className="terminalImageAttachmentItem" key={image.path}>
+                <button className="terminalImageAttachmentPreview" aria-label={`预览 ${image.name}`} onClick={() => setTerminalImagePreview(image)} type="button">
+                  <img src={image.url} alt="" />
+                </button>
+                <span>{image.name}</span>
+                <button aria-label={`移除 ${image.name}`} onClick={() => { URL.revokeObjectURL(image.url); setTerminalImagePreview(null); setTerminalImageAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index)); }} type="button">×</button>
+              </span>
+            ))}
+          </div>
+        ) : null}
         <textarea
           aria-label="终端输入内容"
           className="terminalComposerInput"
@@ -410,6 +491,7 @@ export function TerminalDock({
             submitTerminalDraft();
           }}
           placeholder="输入终端内容..."
+          onPaste={handleTerminalPaste}
           ref={terminalDraftRef}
           rows={1}
           value={terminalDraft}
@@ -430,7 +512,21 @@ export function TerminalDock({
           </Button>
         </Tooltip>
       </div>
+      {terminalImageError ? <Notice className="terminalNotice" variant="danger">{terminalImageError}</Notice> : null}
       {error ? <Notice className="terminalNotice" variant="danger">{error}</Notice> : null}
+      {terminalImagePreview ? (
+        <div className="chatImagePreview" role="dialog" aria-modal="true" aria-label={`预览 ${terminalImagePreview.name}`} onClick={() => setTerminalImagePreview(null)}>
+          <div className="chatImagePreviewPanel" onClick={(event) => event.stopPropagation()}>
+            <div className="chatImagePreviewHeader">
+              <span>{terminalImagePreview.name}</span>
+              <button className="chatImagePreviewClose" type="button" onClick={() => setTerminalImagePreview(null)} aria-label="关闭图片预览">
+                <X aria-hidden="true" strokeWidth={2.25} />
+              </button>
+            </div>
+            <img src={terminalImagePreview.url} alt={terminalImagePreview.name} />
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

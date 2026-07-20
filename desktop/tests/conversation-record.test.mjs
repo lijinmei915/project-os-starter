@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { actionFromAssistantCommitment, buildChatRequestContext, buildConversationRecord, buildDialogueContextState, contextualizeUserMessage, derivePendingAction, followUpDecision, isEphemeralConversation, isEphemeralConversationTurn, mergeConversationRecords } from "../src/lib/conversation-record.js";
+import { actionFromAssistantCommitment, actionFromAssistantRecommendation, buildChatRequestContext, buildConversationRecord, buildDialogueContextState, contextualizeUserMessage, derivePendingAction, followUpDecision, isEphemeralConversation, isEphemeralConversationTurn, mergeConversationRecords } from "../src/lib/conversation-record.js";
 import { buildTurnSummary } from "../src/conversation-runtime/summary.js";
 
 test("builds a compact project conversation record", () => {
@@ -146,6 +146,19 @@ test("keeps one unresolved action in conversation state", () => {
   ]), null);
 });
 
+test("recovers a confirmable recommendation from legacy conversation text", () => {
+  const action = derivePendingAction([{
+    id: "assistant-legacy",
+    role: "assistant",
+    text: "当前风险已整理。最小下一步是运行一轮基础检查，并补齐回归证据。",
+  }]);
+  assert.deepEqual(action, {
+    id: "recommended-assistant-legacy",
+    task: "运行一轮基础检查，并补齐回归证据",
+    type: "generate-plan",
+  });
+});
+
 test("maps short follow-ups to pending-action decisions", () => {
   assert.equal(followUpDecision("好"), "confirm");
   assert.equal(followUpDecision("继续"), "confirm");
@@ -158,4 +171,14 @@ test("turns an assistant action promise into a machine action", () => {
   const action = actionFromAssistantCommitment("好的，下一步我会创建一轮检查计划。", "运行检查", "action-1");
   assert.deepEqual(action, { id: "action-1", task: "运行检查", type: "generate-plan" });
   assert.equal(actionFromAssistantCommitment("当前检查有三项。", "检查"), null);
+});
+
+test("turns an explicit recommended next step into a confirmation action", () => {
+  const action = actionFromAssistantRecommendation("最小下一步是运行一轮基础检查，并优先清理重复任务。", "检查风险", "action-2");
+  assert.deepEqual(action, { id: "action-2", task: "运行一轮基础检查，并优先清理重复任务", type: "generate-plan" });
+  assert.equal(actionFromAssistantRecommendation("当前存在三类风险。", "检查风险"), null);
+  assert.equal(
+    actionFromAssistantRecommendation("那就先收口，优先合并重复任务并补一次构建。", "检查风险")?.task,
+    "收口，优先合并重复任务并补一次构建",
+  );
 });

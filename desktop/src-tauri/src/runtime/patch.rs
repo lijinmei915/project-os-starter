@@ -1,4 +1,66 @@
 use std::collections::{HashMap, HashSet};
+use std::path::{Component, Path};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+/// Transport contract for one read-only Patch Draft. Keeping it with the
+/// semantic and unified-diff validators prevents the app command layer from
+/// becoming the owner of Patch state.
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[allow(dead_code)] // The standalone patch-normalizer validates diffs but does not construct drafts.
+pub struct PatchDraft {
+    pub summary: String,
+    pub diff: String,
+    pub files: Vec<String>,
+    #[serde(default)]
+    pub allowed_files: Vec<String>,
+    #[serde(default)]
+    pub context_files: Vec<String>,
+    #[serde(default)]
+    pub draft_attempt: usize,
+    #[serde(default)]
+    pub failure_reason: String,
+    #[serde(default)]
+    pub not_applicable: bool,
+    pub guardrails: Vec<String>,
+    pub trace: Vec<String>,
+}
+
+/// A draft is allowed only when the plan declares a real engineering change
+/// and provides at least one authorized source file. This belongs beside diff
+/// validation so every draft producer shares the same semantic boundary.
+#[allow(dead_code)] // The standalone patch-normalizer binary shares this module but does not create drafts.
+pub fn draft_ineligibility_reason(plan: &Value, files: &[String]) -> Option<String> {
+    let candidate_changes = plan
+        .get("candidateChanges")
+        .or_else(|| plan.get("candidate_changes"))
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::trim)
+                .filter(|item| !item.is_empty())
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    if candidate_changes.is_empty() {
+        return Some("任务计划没有声明实际工程改动；当前应先讨论、补充计划或运行已登记检查。".to_string());
+    }
+    let no_write_change = candidate_changes.iter().all(|item| {
+        ["先不写文件", "不自动写文件", "不修改文件", "只形成", "形成下一步建议", "运行检查", "执行检查"]
+            .iter()
+            .any(|marker| item.contains(marker))
+    });
+    if no_write_change {
+        return Some("任务计划明确不修改工程文件；当前应先运行检查或查看建议，不生成 Patch。".to_string());
+    }
+    if files.is_empty() {
+        return Some("任务计划没有提供可读取且已授权的工程文件；请先补充具体文件范围，再生成 Patch。".to_string());
+    }
+    None
+}
 
 fn is_patch_context_path(path: &str) -> bool {
     !path.starts_with('/')
@@ -52,6 +114,59 @@ pub fn validate_unified_diff_authorized(diff: &str, allowed_files: &[String]) ->
         return Err("Patch 草案包含授权范围之外的文件。".to_string());
     }
     Ok(())
+}
+
+/// Native Patch application cannot trust a WebView or provider boundary for
+/// path validation. Keep this check with the diff parser so every caller uses
+/// the same escape and environment-file rules.
+#[allow(dead_code)] // The standalone patch-normalizer does not apply diffs.
+pub fn validate_apply_diff_paths(diff: &str) -> Result<(), String> {
+    let headers = diff
+        .lines()
+        .filter(|line| line.starts_with("--- ") || line.starts_with("+++ "))
+        .collect::<Vec<_>>();
+    if headers.len() < 2 || headers.len() % 2 != 0 {
+        return Err("patch 草案缺少完整的文件头。".to_string());
+    }
+    for header in headers {
+        let path = header[4..].split('\t').next().unwrap_or("").trim();
+        validate_apply_path(path)?;
+    }
+    Ok(())
+}
+
+#[allow(dead_code)] // Called only by the native Patch application validator.
+fn validate_apply_path(path: &str) -> Result<(), String> {
+    if path == "/dev/null" {
+        return Ok(());
+    }
+    let relative = path.strip_prefix("a/").or_else(|| path.strip_prefix("b/")).unwrap_or(path);
+    let candidate = Path::new(relative);
+    if relative.is_empty()
+        || candidate.is_absolute()
+        || candidate.components().any(|component| matches!(component, Component::ParentDir | Component::RootDir | Component::Prefix(_)))
+    {
+        return Err("patch 不允许访问项目目录之外的路径。".to_string());
+    }
+    if candidate.components().any(|component| component.as_os_str().to_string_lossy().starts_with(".env")) {
+        return Err("patch 不允许修改受保护的环境文件。".to_string());
+    }
+    Ok(())
+}
+
+#[allow(dead_code)] // The standalone patch-normalizer returns normalized diff text only.
+pub fn files_from_unified_diff(diff: &str) -> Vec<String> {
+    let mut files = diff
+        .lines()
+        .filter_map(|line| line.strip_prefix("+++ "))
+        .filter_map(|path| {
+            let path = path.trim().trim_start_matches("b/");
+            (path != "/dev/null" && is_patch_context_path(path)).then(|| path.to_string())
+        })
+        .collect::<Vec<_>>();
+    files.sort();
+    files.dedup();
+    files
 }
 fn hermes_diff_header_paths(diff: &str) -> Result<Vec<String>, String> {
     let lines = diff.lines().collect::<Vec<_>>();
@@ -288,7 +403,17 @@ fn parse_unified_hunk_range(value: &str, prefix: char) -> Result<(usize, usize),
 
 #[cfg(test)]
 mod tests {
-    use super::normalize_hermes_unified_diff;
+    use super::{draft_ineligibility_reason, normalize_hermes_unified_diff};
+    use serde_json::json;
+
+    #[test]
+    fn rejects_validation_only_or_unscoped_draft_plans() {
+        let validation = json!({ "candidateChanges": ["先不写文件，只形成下一步建议。"] });
+        assert!(draft_ineligibility_reason(&validation, &["src/app.ts".to_string()]).is_some());
+        let change = json!({ "candidateChanges": ["调整状态提示"] });
+        assert!(draft_ineligibility_reason(&change, &[]).is_some());
+        assert_eq!(draft_ineligibility_reason(&change, &["src/app.ts".to_string()]), None);
+    }
 
     #[test]
     fn rejects_incomplete_hunk_headers_before_a_patch_can_reach_approval() {

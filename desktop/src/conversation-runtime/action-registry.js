@@ -52,7 +52,8 @@ export function conversationActionDecision(message) {
 
 export function isApplicablePatchDraft(patchDraft) {
   const diff = String(patchDraft?.diff || "");
-  return !diff.includes("PATCH_DRAFT_PENDING")
+  return patchDraft?.notApplicable !== true
+    && !diff.includes("PATCH_DRAFT_PENDING")
     && /^---\s+\S+/m.test(diff)
     && /^\+\+\+\s+\S+/m.test(diff)
     && /^@@(?:\s|$)/m.test(diff);

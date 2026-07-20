@@ -64,7 +64,13 @@ export function derivePendingAction(turns = []) {
     const action = turn?.pendingAction;
     if (action?.id && !resolved.has(action.id)) return action;
   }
-  return null;
+  const latestAssistant = [...turns].reverse().find((turn) => turn?.role === "assistant" && compactText(turn?.text));
+  if (!latestAssistant || latestAssistant.resolvedActionId) return null;
+  return actionFromAssistantRecommendation(
+    latestAssistant.text,
+    "",
+    `recommended-${latestAssistant.id || "latest"}`,
+  );
 }
 
 export function actionFromAssistantCommitment(reply, task, id = `generate-plan-${Date.now()}`) {
@@ -72,6 +78,14 @@ export function actionFromAssistantCommitment(reply, task, id = `generate-plan-$
   const promisesAction = /我(会|来|将|先|接下来).*(创建|生成|拆成|推进|执行).*(计划|任务|检查|改动)|下一步我会/.test(text);
   if (!promisesAction) return null;
   return { id, task: compactText(task, 600), type: "generate-plan" };
+}
+
+export function actionFromAssistantRecommendation(reply, fallbackTask, id = `generate-plan-${Date.now()}`) {
+  const text = compactText(reply, 600);
+  const match = text.match(/(?:最小下一步|下一步|那就先)(?:是|为|：)?\s*([^。！？]+)/);
+  const task = compactText(match?.[1] || "", 600);
+  if (!task || !/(运行|执行|检查|修复|整理|合并|构建|测试|审查|生成|创建)/.test(task)) return null;
+  return { id, task: task || compactText(fallbackTask, 600), type: "generate-plan" };
 }
 
 export function contextualizeUserMessage(message, contextState = {}) {

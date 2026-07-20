@@ -14,23 +14,24 @@ export async function executePatchDraftWorkflow({ generatePatch, isActive, persi
     if (isActive && !isActive()) return cancelledPatchDraftResult(task);
     const repairAttempt = Number(task?.repair?.attempt || 0);
     const isRepair = task?.status === "repair pending" || repairAttempt > 0;
+    const notApplicable = patchDraft?.notApplicable === true;
     const evidence = [...(task.executionEvidence || []), {
       at: new Date().toISOString(),
       kind: "draft",
-      status: "ready",
-      summary: isRepair ? `第 ${repairAttempt} 轮修复草稿已生成，尚未写入文件。` : "初始改动草稿已生成，尚未写入文件。",
+      status: notApplicable ? "not-applicable" : "ready",
+      summary: notApplicable ? (patchDraft?.failureReason || "当前任务不适合生成文件改动草稿。") : isRepair ? `第 ${repairAttempt} 轮修复草稿已生成，尚未写入文件。` : "初始改动草稿已生成，尚未写入文件。",
       details: { allowedFiles: patchDraft?.allowedFiles || patchDraft?.files || [], failureReason: patchDraft?.failureReason || "" },
     }];
     const projectedTask = {
       ...task,
       patchDraft,
       executionEvidence: evidence,
-      repair: isRepair ? { ...(task.repair || {}), phase: "awaiting-approval", attempt: repairAttempt } : task.repair,
-      status: isRepair ? "waiting repair approval" : "waiting approval",
+      repair: isRepair && !notApplicable ? { ...(task.repair || {}), phase: "awaiting-approval", attempt: repairAttempt } : task.repair,
+      status: notApplicable ? task.status : isRepair ? "waiting repair approval" : "waiting approval",
     };
     const persistedTask = await persistTask(projectedTask, { durable: true });
     return {
-      feedback: "改动草稿已生成。",
+      feedback: notApplicable ? "当前任务不生成文件改动；请先运行检查或调整计划。" : "改动草稿已生成。",
       patchDraft,
       success: true,
       task: persistedTask || projectedTask,

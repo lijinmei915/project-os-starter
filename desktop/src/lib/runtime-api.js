@@ -6,6 +6,10 @@ export function isTauriRuntime() {
   const hasTauriBridge = Boolean(window.__TAURI_INTERNALS__ || window.__TAURI__ || window.__TAURI_METADATA__);
   if (!hasTauriBridge) return false;
   const { hostname, port, protocol } = window.location || {};
+  // Native WebDriver uses the dedicated 1422 test server. A normal browser on
+  // that port has no Tauri bridge and already returned above, so Preview keeps
+  // its read-only boundary.
+  if (port === "1422") return true;
   const isLoopbackHttp = ["http:", "https:"].includes(protocol) && ["127.0.0.1", "localhost", "::1"].includes(hostname);
   return !isLoopbackHttp || port === "1420";
 }

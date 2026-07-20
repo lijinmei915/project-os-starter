@@ -18,6 +18,12 @@ test("accepts the OmniDesk Tauri development origin", () => {
   try { assert.equal(isTauriRuntime(), true); } finally { globalThis.window = originalWindow; }
 });
 
+test("accepts the isolated native WebDriver origin only with a Tauri bridge", () => {
+  const originalWindow = globalThis.window;
+  globalThis.window = { __TAURI_INTERNALS__: {}, location: { hostname: "127.0.0.1", port: "1422", protocol: "http:" } };
+  try { assert.equal(isTauriRuntime(), true); } finally { globalThis.window = originalWindow; }
+});
+
 test("rejects unsupported preview commands instead of falling through", async () => {
   await assert.rejects(() => invokePreviewCommand("unknown_command", { input: {} }), /浏览器预览/);
 });

@@ -9,7 +9,11 @@ export function useActionFeedback() {
   const [actionFeedback, setActionFeedback] = useState(null);
   const showToast = useCallback((message, variant = "success") => setToast({ id: nextId(), message, variant }), []);
   const beginActionFeedback = useCallback((key, message) => setActionFeedback({ id: nextId(), key, message, status: "running" }), []);
-  const finishActionFeedback = useCallback((key, status, message) => {
+  const finishActionFeedback = useCallback((key, status, message, { inline = false } = {}) => {
+    if (inline) {
+      setActionFeedback((current) => current?.key === key ? null : current);
+      return;
+    }
     setActionFeedback((current) => current?.key && current.key !== key ? current : { id: nextId(), key, message, status });
     showToast(message, status === "failed" ? "danger" : "success");
   }, [showToast]);

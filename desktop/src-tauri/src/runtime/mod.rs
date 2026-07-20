@@ -7,6 +7,7 @@ pub mod goals;
 pub mod governance;
 pub mod provider;
 pub mod repository;
+pub mod state_namespace;
 pub mod tasks;
 pub mod workspace;
 

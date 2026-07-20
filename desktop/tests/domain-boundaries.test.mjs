@@ -225,6 +225,7 @@ test("keeps the app status bar as a stateless workbench surface", () => {
   assert.match(workbench, /<StatusBar/);
   assert.match(statusBar, /export function StatusBar/);
   assert.equal(statusBar.includes("runtime-api"), false);
+  assert.match(statusBar, /不执行终端、检查或文件写入/);
 });
 
 test("keeps the Provider form surface outside App while preserving the Provider client boundary", () => {
@@ -770,6 +771,18 @@ test("keeps the App three-column shell outside the lifecycle container", () => {
   assert.equal(shell.includes("desktop-task-client"), false);
 });
 
+test("keeps request progress in the conversation surface instead of duplicate global feedback", () => {
+  const composer = source("src/components/workbench/chat-composer.jsx");
+  const workbench = source("src/main.jsx");
+  const requestState = source("src/components/workbench/use-conversation-request-state.js");
+  const transcript = source("src/components/workbench/conversation-transcript.jsx");
+  assert.match(composer, /\{modelLoading \? <span className="chatComposerSpinner"/);
+  assert.equal(composer.includes("sending || modelLoading ? <span className=\"chatComposerSpinner\""), false);
+  assert.match(workbench, /if \(feedback\.status === "running"\) return null;/);
+  assert.match(requestState, /setStreamingReply\(\(current\) => `\$\{current\}\$\{text\}`\)/);
+  assert.match(transcript, /conversationMessage-streaming/);
+});
+
 test("keeps RightRail shared display primitives outside the root Workbench module", () => {
   const workbench = source("src/main.jsx");
   const components = source("src/components/workbench/right-rail-components.jsx");
@@ -872,12 +885,17 @@ test("collects bounded performance samples at startup, route, conversation, and 
   const tabs = source("src/components/workbench/use-workspace-tabs.js");
   const persistence = source("src/components/workbench/use-conversation-persistence.js");
   const terminal = source("src/components/workbench/use-terminal-session.js");
+  const patchActions = source("src/components/workbench/use-patch-actions.js");
+  const executionActions = source("src/lib/execution-action-controller.js");
   const recorder = source("src/lib/performance-baseline.js");
   assert.match(workbench, /exposeDesktopPerformanceBaseline\(\)/);
   assert.match(workbench, /recordWorkbenchReady\(\)/);
   assert.match(tabs, /measureDesktopPerformance\("workspace-route"\)/);
   assert.match(persistence, /measureDesktopPerformance\("conversation-update"\)/);
   assert.match(terminal, /measureDesktopPerformance\("terminal-output"\)/);
+  assert.match(patchActions, /measureDesktopPerformance\("patch-draft"/);
+  assert.match(patchActions, /measureDesktopPerformance\("patch-apply"/);
+  assert.match(executionActions, /measureDesktopPerformance\("guarded-check"/);
   assert.match(recorder, /maxSamples: 60/);
   assert.doesNotMatch(recorder, /text:|attachments:|content:/);
 });

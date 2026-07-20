@@ -9,6 +9,7 @@ export function useConversationRequestState({ cancelRuntimeRequest, chatTurns, i
   const [chatStartedAt, setChatStartedAt] = useState(Date.now());
   const [chatLoadingLabel, setChatLoadingLabel] = useState("组织回答");
   const [chatLoadingEvents, setChatLoadingEvents] = useState(() => initialLoadingEvents);
+  const [streamingReply, setStreamingReply] = useState("");
   const activeRequestRef = useRef(null);
   const lastSubmissionRef = useRef({ at: 0, key: "" });
 
@@ -23,6 +24,8 @@ export function useConversationRequestState({ cancelRuntimeRequest, chatTurns, i
       if (payload.type === "model.delta") {
         receivedChars += Number(payload.payload?.chars || 0);
         setChatLoadingLabel(`正在生成回答（已接收 ${receivedChars} 字）`);
+        const text = String(payload.payload?.text || "");
+        if (text) setStreamingReply((current) => `${current}${text}`);
       }
     }).then((nextUnlisten) => {
       if (disposed) nextUnlisten();
@@ -34,6 +37,7 @@ export function useConversationRequestState({ cancelRuntimeRequest, chatTurns, i
   const resetConversationRequest = useCallback(() => {
     setPendingTurn(null);
     setChatLoading(false);
+    setStreamingReply("");
     activeRequestRef.current = null;
   }, []);
 
@@ -46,13 +50,14 @@ export function useConversationRequestState({ cancelRuntimeRequest, chatTurns, i
     }
     setChatLoading(false);
     setPendingTurn(null);
+    setStreamingReply("");
     void cancelRuntimeRequest?.(requestId);
     onStopPlan?.();
   }, [cancelRuntimeRequest, chatTurns, onChatTurnsChange, onStopPlan]);
 
   return {
-    activeRequestRef, chatLoading, chatLoadingEvents, chatLoadingLabel, chatStartedAt, lastSubmissionRef,
+    activeRequestRef, chatLoading, chatLoadingEvents, chatLoadingLabel, chatStartedAt, lastSubmissionRef, streamingReply,
     pendingTurn, resetConversationRequest, setChatLoading, setChatLoadingEvents, setChatLoadingLabel,
-    setChatStartedAt, setPendingTurn, stopCurrentResponse,
+    setChatStartedAt, setPendingTurn, setStreamingReply, stopCurrentResponse,
   };
 }

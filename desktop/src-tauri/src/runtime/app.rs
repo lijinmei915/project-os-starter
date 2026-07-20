@@ -1,7 +1,9 @@
 use crate::runtime::agent_runs::PersistedAgentRun;
+use crate::runtime::patch::PatchDraft;
 use crate::runtime::provider::{
     ModelCatalog, ModelHealthCache, ModelHealthEntry, ProviderConfig, ProviderProfile,
 };
+use base64::Engine;
 use futures_util::StreamExt;
 use notify::{
     Config as NotifyConfig, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher,
@@ -257,6 +259,23 @@ struct TerminalSession {
     writer: Box<dyn Write + Send>,
 }
 
+// portable-pty creates an isolated Unix session for each terminal. Killing
+// only its shell leaves foreground tools (such as Codex) and their children
+// alive, so closing a tab must terminate the PTY's whole foreground group.
+fn terminate_terminal_session(session: &mut TerminalSession) {
+    #[cfg(unix)]
+    if let Some(group_leader) = session.master.process_group_leader() {
+        if group_leader > 0 {
+            // A negative PID targets the process group, which is isolated by
+            // portable-pty's setsid call when the terminal was created.
+            unsafe {
+                libc::kill(-group_leader, libc::SIGKILL);
+            }
+        }
+    }
+    let _ = session.child.kill();
+}
+
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ReadonlyPlan {
@@ -277,6 +296,13 @@ struct ReadonlyPlan {
 struct PlanAttachment {
     name: String,
     mime_type: String,
+    data_url: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SaveTerminalImageInput {
+    name: String,
     data_url: String,
 }
 
@@ -629,24 +655,6 @@ struct EngineeringFilePreview {
     language: String,
     truncated: bool,
     size: u64,
-}
-
-#[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct PatchDraft {
-    summary: String,
-    diff: String,
-    files: Vec<String>,
-    #[serde(default)]
-    allowed_files: Vec<String>,
-    #[serde(default)]
-    context_files: Vec<String>,
-    #[serde(default)]
-    draft_attempt: usize,
-    #[serde(default)]
-    failure_reason: String,
-    guardrails: Vec<String>,
-    trace: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -2642,6 +2650,12 @@ async fn generate_patch_draft(
         .get("plan")
         .ok_or_else(|| "任务缺少 plan，无法生成 patch 草案".to_string())?;
     let files = extract_plan_files(plan, &root);
+    if let Some(reason) = crate::runtime::patch::draft_ineligibility_reason(plan, &files) {
+        if !request_id.is_empty() {
+            runtime_requests.finish(&request_id);
+        }
+        return Ok(build_not_applicable_patch_draft(&title, &files, &reason));
+    }
     let contexts = read_patch_context_files(&root, &files)?;
 
     if configured_provider.enabled {
@@ -2762,15 +2776,24 @@ fn apply_patch_draft(input: ApplyPatchDraftInput) -> Result<ApplyPatchResult, St
         .get("patchDraft")
         .cloned()
         .ok_or_else(|| "任务还没有 patch 草案".to_string())?;
+    if draft
+        .get("notApplicable")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
+        return Err(
+            "当前任务没有已确认的工程改动，不能应用 Patch。请先运行检查或调整计划范围。"
+                .to_string(),
+        );
+    }
     let diff = patch_diff_from_draft(&draft)?;
-
     if diff.contains("PATCH_DRAFT_PENDING") {
         return Err("当前还是占位草案，不能应用。请先生成真实 patch。".to_string());
     }
     if !diff.contains("@@") || !diff.contains("--- ") || !diff.contains("+++ ") {
         return Err("patch 草案不是可应用的 unified diff".to_string());
     }
-    validate_apply_patch_diff(diff)?;
+    crate::runtime::patch::validate_apply_diff_paths(diff)?;
     let allowed_files = draft
         .get("allowedFiles")
         .and_then(Value::as_array)
@@ -2835,53 +2858,6 @@ fn patch_diff_from_draft(draft: &Value) -> Result<&str, String> {
         .and_then(Value::as_str)
         .filter(|value| !value.trim().is_empty())
         .ok_or_else(|| "patch 草案为空".to_string())
-}
-
-/// The desktop execution path must enforce the same path boundary before an
-/// approval is created or a diff reaches `git apply`. Preview and the Node
-/// Tool Gateway are not security boundaries for a native command.
-fn validate_apply_patch_diff(diff: &str) -> Result<(), String> {
-    let headers = diff
-        .lines()
-        .filter(|line| line.starts_with("--- ") || line.starts_with("+++ "))
-        .collect::<Vec<_>>();
-    if headers.len() < 2 || headers.len() % 2 != 0 {
-        return Err("patch 草案缺少完整的文件头。".to_string());
-    }
-    for header in headers {
-        let path = header[4..].split('\t').next().unwrap_or("").trim();
-        validate_apply_patch_path(path)?;
-    }
-    Ok(())
-}
-
-fn validate_apply_patch_path(path: &str) -> Result<(), String> {
-    if path == "/dev/null" {
-        return Ok(());
-    }
-    let relative = path
-        .strip_prefix("a/")
-        .or_else(|| path.strip_prefix("b/"))
-        .unwrap_or(path);
-    let candidate = Path::new(relative);
-    if relative.is_empty()
-        || candidate.is_absolute()
-        || candidate.components().any(|component| {
-            matches!(
-                component,
-                Component::ParentDir | Component::RootDir | Component::Prefix(_)
-            )
-        })
-    {
-        return Err("patch 不允许访问项目目录之外的路径。".to_string());
-    }
-    if candidate
-        .components()
-        .any(|component| component.as_os_str().to_string_lossy().starts_with(".env"))
-    {
-        return Err("patch 不允许修改受保护的环境文件。".to_string());
-    }
-    Ok(())
 }
 
 #[tauri::command]
@@ -3239,11 +3215,12 @@ async fn generate_provider_patch_draft(
     let mut draft: PatchDraft = serde_json::from_str(content)
         .map_err(|err| format!("patch draft JSON 解析失败: {}", err))?;
     draft.diff = crate::runtime::patch::normalize_hermes_unified_diff(&draft.diff, contexts)?;
-    draft.files = patch_files_from_diff(&draft.diff);
+    draft.files = crate::runtime::patch::files_from_unified_diff(&draft.diff);
     draft.allowed_files = contexts.iter().map(|(path, _)| path.clone()).collect();
     draft.context_files = draft.allowed_files.clone();
     draft.draft_attempt = usize::from(retry_reason.is_some()) + 1;
     draft.failure_reason = retry_reason.unwrap_or("").to_string();
+    draft.not_applicable = false;
     draft
         .guardrails
         .push("当前只是 patch 草案，尚未写入文件。".to_string());
@@ -3348,7 +3325,7 @@ async fn generate_hermes_structured_patch_draft(
         .and_then(Value::as_str)
         .ok_or_else(|| "Hermes structured final 缺少 diff".to_string())?;
     let diff = crate::runtime::patch::normalize_hermes_unified_diff(diff, contexts)?;
-    let files = patch_files_from_diff(&diff);
+    let files = crate::runtime::patch::files_from_unified_diff(&diff);
     Ok(PatchDraft {
         summary,
         diff,
@@ -3357,6 +3334,7 @@ async fn generate_hermes_structured_patch_draft(
         context_files: contexts.iter().map(|(path, _)| path.clone()).collect(),
         draft_attempt: usize::from(retry_reason.is_some()) + 1,
         failure_reason: retry_reason.unwrap_or("").to_string(),
+        not_applicable: false,
         guardrails: vec![
             "Hermes 只读取上下文并生成草案，不会写入文件。".to_string(),
             "Apply 前必须经过用户确认。".to_string(),
@@ -3558,7 +3536,7 @@ fn run_hermes_acp_prompt(
     })?;
 
     let diff = crate::runtime::patch::normalize_hermes_unified_diff(&agent_text, contexts)?;
-    let files = patch_files_from_diff(&diff);
+    let files = crate::runtime::patch::files_from_unified_diff(&diff);
     Ok(PatchDraft {
         summary: "Hermes 已生成只读改动草案，等待你确认应用。".to_string(),
         diff,
@@ -3567,6 +3545,7 @@ fn run_hermes_acp_prompt(
         context_files: contexts.iter().map(|(path, _)| path.clone()).collect(),
         draft_attempt: 1,
         failure_reason: String::new(),
+        not_applicable: false,
         guardrails: vec![
             "Hermes 只作为草案生成器，不会通过此流程写入文件。".to_string(),
             "所有工具和权限请求都会被 OmniDesk 拒绝。".to_string(),
@@ -3760,7 +3739,7 @@ fn run_hermes_acp_structured_loop(
                         .get("diff")
                         .and_then(Value::as_str)
                         .ok_or_else(|| "Hermes Patch 请求缺少 diff。".to_string())?;
-                    validate_apply_patch_diff(diff)?;
+                    crate::runtime::patch::validate_apply_diff_paths(diff)?;
                     let allowed_files = authorized_patch_files.iter().cloned().collect::<Vec<_>>();
                     crate::runtime::patch::validate_unified_diff_authorized(diff, &allowed_files)?;
                     args["allowedFiles"] = json!(allowed_files);
@@ -4107,24 +4086,6 @@ fn hermes_rejection_response(id: u64) -> Value {
     })
 }
 
-fn patch_files_from_diff(diff: &str) -> Vec<String> {
-    let mut files = diff
-        .lines()
-        .filter_map(|line| line.strip_prefix("+++ "))
-        .filter_map(|path| {
-            let path = path.trim().trim_start_matches("b/");
-            if path == "/dev/null" || !is_patch_context_path(path) {
-                None
-            } else {
-                Some(path.to_string())
-            }
-        })
-        .collect::<Vec<_>>();
-    files.sort();
-    files.dedup();
-    files
-}
-
 async fn generate_provider_chat(
     provider: &ProviderConfig,
     root: &Path,
@@ -4229,19 +4190,23 @@ async fn generate_provider_chat(
     } else {
         let mut content = String::new();
         let mut pending = String::new();
+        let mut emitted_reply_chars = 0usize;
         let mut stream = response.bytes_stream();
         while let Some(chunk) = stream.next().await {
             let chunk = chunk.map_err(|err| err.to_string())?;
             let chunk = String::from_utf8_lossy(&chunk);
             for delta in consume_openai_sse_deltas(&mut pending, &chunk) {
                 content.push_str(&delta);
+                let reply = streaming_reply_prefix(&content);
+                let reply_delta = reply.chars().skip(emitted_reply_chars).collect::<String>();
+                emitted_reply_chars += reply_delta.chars().count();
                 emit_runtime_conversation_event(
                     app,
                     request_id,
                     "model.delta",
                     "thinking",
                     "running",
-                    json!({ "chars": delta.chars().count() }),
+                    json!({ "chars": delta.chars().count(), "text": reply_delta }),
                 );
             }
         }
@@ -4294,6 +4259,43 @@ fn consume_openai_sse_deltas(pending: &mut String, chunk: &str) -> Vec<String> {
         }
     }
     deltas
+}
+
+/// Extracts the visible `reply` string from an incomplete model JSON envelope.
+/// The model still has to return valid JSON before its final result is accepted.
+fn streaming_reply_prefix(content: &str) -> String {
+    let Some(key_index) = content.find("\"reply\"") else {
+        return String::new();
+    };
+    let Some((_, value)) = content[key_index + "\"reply\"".len()..].split_once(':') else {
+        return String::new();
+    };
+    let Some(value) = value.trim_start().strip_prefix('"') else {
+        return String::new();
+    };
+
+    let mut reply = String::new();
+    let mut escaped = false;
+    for character in value.chars() {
+        if escaped {
+            match character {
+                'n' => reply.push('\n'),
+                'r' => reply.push('\r'),
+                't' => reply.push('\t'),
+                '"' => reply.push('"'),
+                '\\' => reply.push('\\'),
+                other => reply.push(other),
+            }
+            escaped = false;
+        } else if character == '\\' {
+            escaped = true;
+        } else if character == '"' {
+            break;
+        } else {
+            reply.push(character);
+        }
+    }
+    reply
 }
 
 fn chat_router_prompt(
@@ -4691,6 +4693,7 @@ fn build_local_patch_draft(
         context_files: contexts.iter().map(|(path, _)| path.clone()).collect(),
         draft_attempt: 1,
         failure_reason: failure_reason.to_string(),
+        not_applicable: false,
         guardrails: vec![
             "只生成 diff 草案，不写入文件。".to_string(),
             "不读取 .env 或 provider key 配置。".to_string(),
@@ -4703,7 +4706,30 @@ fn build_local_patch_draft(
     }
 }
 
-fn patch_draft_prompt(title: &str, plan: &Value, contexts: &[(String, String)], retry_reason: Option<&str>) -> String {
+fn build_not_applicable_patch_draft(title: &str, files: &[String], reason: &str) -> PatchDraft {
+    PatchDraft {
+        summary: format!("「{}」暂不生成文件改动：{}", title, reason),
+        diff: String::new(),
+        files: files.to_vec(),
+        allowed_files: files.to_vec(),
+        context_files: Vec::new(),
+        draft_attempt: 0,
+        failure_reason: reason.to_string(),
+        not_applicable: true,
+        guardrails: vec![
+            "该任务当前不具备可应用的工程改动，不会调用模型生成占位 diff。".to_string(),
+            "先运行检查或调整计划后，才可能生成受控 Patch。".to_string(),
+        ],
+        trace: vec!["PATCH_SEMANTIC_GATE: not-applicable".to_string()],
+    }
+}
+
+fn patch_draft_prompt(
+    title: &str,
+    plan: &Value,
+    contexts: &[(String, String)],
+    retry_reason: Option<&str>,
+) -> String {
     let context_text = contexts
         .iter()
         .map(|(path, content)| format!("--- FILE: {} ---\n{}", path, content))
@@ -5553,6 +5579,63 @@ fn run_project_os_action(input: RunProjectOsActionInput) -> Result<ProjectOsActi
 }
 
 #[tauri::command]
+fn save_terminal_image(input: SaveTerminalImageInput) -> Result<String, String> {
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let current_project = current_registry_project(&mut registry, &app_root)?;
+    let root = PathBuf::from(&current_project.path);
+    let extension = Path::new(&input.name)
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("png")
+        .to_ascii_lowercase();
+    if !matches!(
+        extension.as_str(),
+        "png" | "jpg" | "jpeg" | "gif" | "webp" | "svg"
+    ) {
+        return Err("终端图片只支持 PNG、JPG、GIF、WebP 或 SVG".to_string());
+    }
+    let (mime, encoded) = input
+        .data_url
+        .split_once(",")
+        .ok_or_else(|| "图片数据格式无效".to_string())?;
+    if !mime.starts_with("data:image/") {
+        return Err("终端只接受图片数据".to_string());
+    }
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(encoded)
+        .map_err(|err| format!("图片解码失败：{err}"))?;
+    if bytes.len() > 8 * 1024 * 1024 {
+        return Err("终端图片不能超过 8 MB".to_string());
+    }
+    let dir = crate::runtime::state_namespace::state_path_for_write(
+        &root,
+        ".project-os/tmp/terminal-images",
+    )?;
+    fs::create_dir_all(&dir).map_err(|err| err.to_string())?;
+    let safe_name: String = input
+        .name
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-' | '_'))
+        .collect();
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|err| err.to_string())?
+        .as_millis();
+    let file_name = format!(
+        "omnidesk-image-{stamp}.{}",
+        if safe_name.is_empty() {
+            extension.clone()
+        } else {
+            extension
+        }
+    );
+    let path = dir.join(file_name);
+    fs::write(&path, bytes).map_err(|err| err.to_string())?;
+    Ok(path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
 fn start_terminal_session(
     app: AppHandle,
     state: State<TerminalState>,
@@ -5580,7 +5663,7 @@ fn start_terminal_session(
     {
         let mut sessions = state.sessions.lock().map_err(|err| err.to_string())?;
         if let Some(mut existing) = sessions.remove(&session_id) {
-            let _ = existing.child.kill();
+            terminate_terminal_session(&mut existing);
         }
     }
 
@@ -5714,9 +5797,65 @@ fn stop_terminal_session(
     };
     let mut sessions = state.sessions.lock().map_err(|err| err.to_string())?;
     if let Some(mut session) = sessions.remove(&session_id) {
-        let _ = session.child.kill();
+        terminate_terminal_session(&mut session);
     }
     Ok(())
+}
+
+#[cfg(feature = "webdriver")]
+#[tauri::command]
+fn record_native_terminal_trace(stage: String) -> Result<(), String> {
+    const ALLOWED_STAGES: &[&str] = &[
+        "terminal-session.start-before",
+        "terminal-session.start-complete",
+        "terminal-session.start-error",
+        "terminal-session.effect-start",
+        "terminal-session.output-subscribed",
+        "terminal-session.effect-error",
+        "terminal-session.effect-cleanup",
+        "terminal-dock.mount",
+        "terminal-dock.xterm-created",
+        "terminal-dock.xterm-opened",
+        "terminal-dock.initial-focus-start",
+        "terminal-dock.initial-focus-complete",
+        "terminal-dock.initial-focus-error",
+        "terminal-dock.fit-start",
+        "terminal-dock.fit-complete",
+        "terminal-dock.fit-error",
+        "terminal-dock.active-effect",
+        "terminal-dock.active-focus-start",
+        "terminal-dock.active-focus-complete",
+        "terminal-dock.active-focus-error",
+        "terminal-dock.cleanup",
+    ];
+    if !ALLOWED_STAGES.contains(&stage.as_str()) {
+        return Err("WebDriver terminal trace stage is not allowed".to_string());
+    }
+
+    let root = find_workspace_root()?;
+    let path = crate::runtime::state_namespace::state_path_for_write(
+        &root,
+        ".project-os/native-terminal-trace.json",
+    )?;
+    let mut entries = fs::read_to_string(&path)
+        .ok()
+        .and_then(|content| serde_json::from_str::<Vec<Value>>(&content).ok())
+        .unwrap_or_default();
+    if entries
+        .iter()
+        .any(|entry| entry.get("stage").and_then(Value::as_str) == Some(stage.as_str()))
+    {
+        return Ok(());
+    }
+    entries.push(json!({ "at": current_timestamp_string(), "stage": stage }));
+    if entries.len() > 30 {
+        entries.drain(..entries.len() - 30);
+    }
+    fs::write(
+        &path,
+        serde_json::to_vec(&entries).map_err(|err| err.to_string())?,
+    )
+    .map_err(|err| err.to_string())
 }
 
 struct GuardedCheckSpec {
@@ -5999,6 +6138,16 @@ fn build_run_summary_markdown(task: &Value) -> String {
 }
 
 fn find_workspace_root() -> Result<PathBuf, String> {
+    #[cfg(feature = "webdriver")]
+    if let Some(test_root) = std::env::var_os("OMNIDESK_WEBDRIVER_WORKSPACE_ROOT") {
+        let root = fs::canonicalize(PathBuf::from(test_root))
+            .map_err(|err| format!("WebDriver 测试工作区不可用：{err}"))?;
+        if root.join("AGENTS.md").exists() && root.join("PROJECT.md").exists() {
+            return Ok(root);
+        }
+        return Err("WebDriver 测试工作区缺少 AGENTS.md 或 PROJECT.md".to_string());
+    }
+
     let mut current = std::env::current_dir().map_err(|err| err.to_string())?;
 
     loop {
@@ -6024,9 +6173,10 @@ fn find_workspace_root() -> Result<PathBuf, String> {
 }
 
 fn read_json(path: PathBuf) -> Option<Value> {
-    let parent = path.parent()?.to_path_buf();
-    let relative = path.file_name()?.to_str()?;
-    crate::runtime::repository::Repository::new(parent).read_json(relative)
+    let resolved = crate::runtime::state_namespace::state_path_from_absolute(&path).ok()?;
+    fs::read_to_string(resolved)
+        .ok()
+        .and_then(|content| serde_json::from_str(&content).ok())
 }
 
 fn read_text(root: &Path, relative: &str) -> String {
@@ -7199,11 +7349,16 @@ fn build_workspace_facts_preview(root: &Path, project_name: &str) -> Value {
 }
 
 fn provider_config_path(app_root: &Path) -> PathBuf {
-    app_root.join(".project-os/desktop-provider.json")
+    crate::runtime::state_namespace::state_path_for_read(
+        app_root,
+        ".project-os/desktop-provider.json",
+    )
+    .unwrap_or_else(|_| app_root.join(".project-os/desktop-provider.json"))
 }
 
 fn desktop_theme_path(app_root: &Path) -> PathBuf {
-    app_root.join(".project-os/desktop-theme.json")
+    crate::runtime::state_namespace::state_path_for_read(app_root, ".project-os/desktop-theme.json")
+        .unwrap_or_else(|_| app_root.join(".project-os/desktop-theme.json"))
 }
 
 fn write_file_atomic(path: &Path, content: &[u8]) -> Result<(), String> {
@@ -7691,7 +7846,11 @@ fn remove_dotenv_value(root: &Path, key: &str) -> Result<(), String> {
 }
 
 fn registry_path(app_root: &Path) -> PathBuf {
-    app_root.join(".project-os/desktop-registry.json")
+    crate::runtime::state_namespace::state_path_for_read(
+        app_root,
+        ".project-os/desktop-registry.json",
+    )
+    .unwrap_or_else(|_| app_root.join(".project-os/desktop-registry.json"))
 }
 
 fn load_or_seed_registry(app_root: &Path) -> Result<RegistryFile, String> {
@@ -8222,13 +8381,13 @@ mod task_storage_tests {
     #[test]
     fn native_patch_validation_rejects_secret_and_escape_paths_before_approval() {
         let safe = "--- a/README.md\n+++ b/README.md\n@@ -1 +1 @@\n-old\n+new\n";
-        assert!(validate_apply_patch_diff(safe).is_ok());
+        assert!(crate::runtime::patch::validate_apply_diff_paths(safe).is_ok());
 
         let env = "--- a/.env.local\n+++ b/.env.local\n@@ -1 +1 @@\n-old\n+new\n";
-        assert!(validate_apply_patch_diff(env).is_err());
+        assert!(crate::runtime::patch::validate_apply_diff_paths(env).is_err());
 
         let escape = "--- a/README.md\n+++ ../outside.md\n@@ -1 +1 @@\n-old\n+new\n";
-        assert!(validate_apply_patch_diff(escape).is_err());
+        assert!(crate::runtime::patch::validate_apply_diff_paths(escape).is_err());
     }
 
     #[test]
@@ -8552,6 +8711,16 @@ mod task_storage_tests {
     }
 
     #[test]
+    fn extracts_reply_prefix_from_partial_model_json() {
+        assert_eq!(streaming_reply_prefix(r#"{"reply": "正在生成"#), "正在生成");
+        assert_eq!(
+            streaming_reply_prefix(r#"{"reply": "第一行\n第二行", "intent": "chat"}"#),
+            "第一行\n第二行"
+        );
+        assert_eq!(streaming_reply_prefix(r#"{"intent": "chat"}"#), "");
+    }
+
+    #[test]
     fn task_goal_index_moves_a_task_to_its_current_goal() {
         let root = test_directory("task-goal-index");
         let project_os = root.join(".project-os");
@@ -8581,11 +8750,16 @@ mod task_storage_tests {
 
 pub fn run() {
     recover_runtime_transactions_on_start();
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .manage(TerminalState::default())
         .manage(RuntimeRequestState::default())
         .manage(WorkspaceWatcherState::default())
-        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_dialog::init());
+    // The embedded WebDriver is opt-in for dedicated test builds only.
+    // Release and ordinary development builds never expose this HTTP endpoint.
+    #[cfg(feature = "webdriver")]
+    let builder = builder.plugin(tauri_plugin_wdio_webdriver::init());
+    builder
         .invoke_handler(tauri::generate_handler![
             get_workspace_snapshot,
             update_project_capability,
@@ -8649,9 +8823,12 @@ pub fn run() {
             get_hermes_executor_status,
             run_project_os_action,
             start_terminal_session,
+            save_terminal_image,
             write_terminal_session,
             resize_terminal_session,
-            stop_terminal_session
+            stop_terminal_session,
+            #[cfg(feature = "webdriver")]
+            record_native_terminal_trace
         ])
         .run(tauri::generate_context!())
         .expect("failed to run OmniDesk");
@@ -8663,6 +8840,7 @@ fn recover_runtime_transactions_on_start() {
     let Ok(app_root) = find_workspace_root() else {
         return;
     };
+    prepare_state_namespace(&app_root);
     let mut roots = vec![app_root.clone()];
     if let Ok(registry) = load_or_seed_registry(&app_root) {
         for project in registry.projects {
@@ -8673,15 +8851,42 @@ fn recover_runtime_transactions_on_start() {
         }
     }
     for root in roots {
-        if let Err(error) =
-            crate::runtime::repository::Repository::new(&root).recover_incomplete_transactions()
-        {
-            eprintln!("OmniDesk 状态事务恢复失败（{}）：{}", root.display(), error);
-        }
+        prepare_state_namespace(&root);
     }
     if let Err(error) =
         crate::runtime::agent_runs::recover_stale(&app_root, &current_timestamp_string())
     {
         eprintln!("OmniDesk Agent Run 恢复失败：{error}");
+    }
+}
+
+fn prepare_state_namespace(root: &Path) {
+    let repository = crate::runtime::repository::Repository::new(root);
+    if let Err(error) = repository.recover_incomplete_transactions() {
+        eprintln!("OmniDesk 状态事务恢复失败（{}）：{}", root.display(), error);
+        return;
+    }
+    match crate::runtime::state_namespace::ensure_active_state_namespace(root) {
+        Ok(outcome) if !outcome.conflicts.is_empty() => {
+            eprintln!(
+                "OmniDesk 状态迁移存在 {} 个冲突，继续使用旧命名空间（{}）",
+                outcome.conflicts.len(),
+                root.display()
+            );
+        }
+        Ok(_) => {
+            if let Err(error) =
+                crate::runtime::repository::Repository::new(root).recover_incomplete_transactions()
+            {
+                eprintln!(
+                    "OmniDesk 新状态事务恢复失败（{}）：{}",
+                    root.display(),
+                    error
+                );
+            }
+        }
+        Err(error) => {
+            eprintln!("OmniDesk 状态迁移失败（{}）：{}", root.display(), error);
+        }
     }
 }

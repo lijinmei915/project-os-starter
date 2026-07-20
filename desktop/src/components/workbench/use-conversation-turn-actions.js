@@ -37,14 +37,15 @@ export function useConversationTurnActions({
       onChatTurnsChange(nextTurns);
       return true;
     }
+    const nextAction = action.nextAction || { id: "generate-patch", label: "生成文件改动", taskId: action.taskId };
     const projectedTurns = projectExecutionEvent(nextTurns, {
       events: executionReadyAgentEvents(),
       outcome: "awaiting-confirmation",
       requestId: turn.requestId,
-      text: "计划已确认。下一步生成可审阅的文件改动，不会直接写入。",
+      text: `计划已确认。下一步${nextAction.label}。`,
     });
     onChatTurnsChange(projectedTurns.map((item) => item.requestId === turn.requestId && item.role === "assistant"
-      ? { ...item, actions: [{ id: "generate-patch", label: "生成文件改动", taskId: action.taskId }] }
+      ? { ...item, actions: [{ ...nextAction, taskId: action.taskId }] }
       : item));
     return true;
   }, [activeProjectGoalTitle, chatTurns, executePendingPatchApply, focusComposer, navigateWorkbench, onChatTurnsChange, onRunChatAction, setTaskInput]);

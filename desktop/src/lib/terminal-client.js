@@ -6,6 +6,7 @@ export const resizeTerminalSession = (input) => invokeRuntimeCommand("resize_ter
 export const startTerminalSession = (input) => invokeRuntimeCommand("start_terminal_session", { input });
 export const stopTerminalSession = (input) => invokeRuntimeCommand("stop_terminal_session", { input });
 export const openNativeTerminal = () => invokeRuntimeCommand("open_native_terminal", {});
+export const saveTerminalImage = (input) => invokeRuntimeCommand("save_terminal_image", { input });
 
 export async function subscribeTerminalOutput(handler) {
   return listen("terminal://output", handler);

@@ -7,6 +7,7 @@ export function buildNonPlanConversationTurn({
   eventsForMessage,
   message,
   messageKind,
+  recommendedAction,
   requestId,
   safeDisplayText,
   stageGoalCandidate,
@@ -34,6 +35,8 @@ export function buildNonPlanConversationTurn({
     };
   }
   if (chatResult?.shouldCreatePlan) return null;
+  const pendingAction = recommendedAction || null;
+  const reply = safeDisplayText(chatResult?.reply, "我在。你可以继续说想做什么。");
   return {
     kind: "chat",
     turn: {
@@ -44,11 +47,12 @@ export function buildNonPlanConversationTurn({
       events: eventsForMessage(messageKind, chatResult),
       intent: chatResult?.intent || "chat",
       ephemeral: ["model-status", "connection-status"].includes(messageKind),
+      pendingAction,
       references: Array.isArray(chatResult?.references) ? chatResult.references : [],
       requestId,
       role: "assistant",
       statusLabel: statusLabelForMessage(messageKind),
-      text: safeDisplayText(chatResult?.reply, "我在。你可以继续说想做什么。"),
+      text: pendingAction ? `${reply}\n\n回复“可以”后生成执行计划。` : reply,
     },
   };
 }

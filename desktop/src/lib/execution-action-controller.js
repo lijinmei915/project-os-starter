@@ -1,3 +1,5 @@
+import { measureDesktopPerformance } from "./performance-baseline.js";
+
 export function createExecutionActionController({
   appendTerminalLog, beginActionFeedback, chatTurns, executeGuardedCheckCommand,
   executeTaskGuardedCheckWorkflow, finishActionFeedback, guardedCheckCapability,
@@ -10,13 +12,19 @@ export function createExecutionActionController({
     beginActionFeedback(feedbackKey, `正在运行检查：${checkLabel}`);
     setRunnerError("");
     setRunnerLoadingId(checkId);
+    const finishMeasure = measureDesktopPerformance("guarded-check", { checkId: String(checkId || "") });
+    let checkMeasure = { outcome: "failed" };
     try {
       const execution = await executeGuardedCheckCommand({ check, runCheck });
       appendTerminalLog(execution.result);
       if (execution.error) setRunnerError(execution.error);
-      finishActionFeedback(feedbackKey, execution.result.success ? "success" : "failed", execution.feedback);
+      checkMeasure = { outcome: execution.result.success ? "succeeded" : "failed" };
+      // Task and conversation checks project their result beside the initiating
+      // action, so a second global toast would duplicate and separate the outcome.
+      finishActionFeedback(feedbackKey, execution.result.success ? "success" : "failed", execution.feedback, { inline: true });
       return execution.result;
     } finally {
+      finishMeasure(checkMeasure);
       setRunnerLoadingId("");
     }
   };

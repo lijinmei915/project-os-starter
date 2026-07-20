@@ -1,247 +1,80 @@
 {
+  "schemaVersion": "omnidesk.project-state.v0.1",
+  "name": "OmniDesk",
+  "description": "OmniDesk：基于 Tauri、React 与 Local Agent Runtime 的本地 AI 工程工作台",
+  "phase": "stabilizing",
+  "stage": "OmniDesk 单内核收敛与可靠长任务 v1",
   "architecture": {
-    "desktop": "Tauri + Local Agent Core",
-    "entry": "project-setup",
-    "entryLayer": {
-      "apiBoundary": "内部服务 API 暴露全量能力；对外开放 API 仅暴露稳定原子能力并严格版本化。",
-      "capabilityAdmission": [
-        "CLI command",
-        "Gateway standard API",
-        "CI automation adapter",
-        "offline fallback",
-        "Desktop/Web reviewable artifact"
-      ],
-      "cliReuse": "本地离线直接调用 CLI；Web / CI 在线调用 Gateway 标准接口，Gateway 内部复用 CLI 内核逻辑。",
-      "cliTransition": "当前 scripts/ai-project.sh 是 Shell 过渡 wrapper；长期入口层需要迁到原生 CLI / core library，Shell wrapper 仅保留兼容和 fallback。",
-      "contextSchema": "schemas/entry-context.schema.json",
-      "dataLoop": "CLI / CI 生成的 report、patch 和修复草案同步到 Desktop / Web 查看与审核。",
-      "gatewayResponsibilities": [
-        "auth",
-        "parameter-normalization",
-        "trace-logging",
-        "rate-limit",
-        "error-wrapping",
-        "routing"
-      ],
-      "nativeCli": {
-        "binary": "project-os",
-        "commands": [
-          "config",
-          "state",
-          "context",
-          "scan",
-          "check",
-          "report",
-          "recommend",
-          "run"
-        ],
-        "legacyDelegation": [
-          "scan",
-          "check",
-          "report",
-          "recommend",
-          "run"
-        ],
-        "nativeCapabilities": [
-          "entry-context",
-          "state-sync",
-          "state-validation",
-          "state-bundle",
-          "config-init",
-          "config-validation",
-          "config-read",
-          "config-precedence",
-          "config-source-trace",
-          "persist-mode",
-          "structured-report-output",
-          "write-lock",
-          "stale-lock-cleanup"
-        ],
-        "outputModes": [
-          "file",
-          "json",
-          "both",
-          "report"
-        ],
-        "path": "cli/",
-        "persistModes": [
-          "auto",
-          "none",
-          "full"
-        ],
-        "status": "initial",
-        "structuredStdout": "project-os.cli-result.v0.1",
-        "triggerSources": [
-          "desktop",
-          "manual-cli",
-          "ci",
-          "gateway",
-          "api",
-          "ide",
-          "automation"
-        ],
-        "validatesEntryContextOnWrite": true
-      },
-      "nativeCliRationale": [
-        "Windows native cmd/PowerShell compatibility",
-        "typed arguments and error codes",
-        "structured logs",
-        "stable process interface for Gateway/CI/Desktop",
-        "cross-platform filesystem behavior"
-      ],
-      "noiseControl": {
-        "allowEmptyProviderKeys": "PROJECT_OS_ALLOW_EMPTY_PROVIDER_KEYS=1",
-        "artifactPruneScript": "scripts/prune-project-os-artifacts.sh",
-        "ciNativeCliExample": ".github/workflows/ci.yml",
-        "entryContextRetentionDefault": 50,
-        "runRetentionDefault": 20,
-        "skipBitmapScreenshots": "PROJECT_OS_SKIP_SCREENSHOT=1"
-      },
-      "principle": "用户在哪，治理能力就在哪；所有入口先标准化为 Entry Context，再进入 Gateway 和治理内核。"
-    },
-    "execution": "frontend",
-    "layers": [
-      {
-        "name": "入口层",
-        "purpose": "用户在哪，治理能力就在哪",
-        "scope": "Web / IDE 插件 / CLI / CI / API"
-      },
-      {
-        "name": "工作台应用层",
-        "purpose": "面向不同角色的功能界面",
-        "scope": "大盘 / 单项目 / 规则 / 知识"
-      },
-      {
-        "name": "治理服务层",
-        "purpose": "可插拔的治理能力集",
-        "scope": "质量 / 依赖 / 架构 / 安全 / 文档"
-      },
-      {
-        "name": "核心内核层",
-        "purpose": "所有项目共用的治理大脑",
-        "scope": "规则引擎 + AI 引擎 + 执行引擎"
-      },
-      {
-        "name": "元数据层",
-        "purpose": "先摸清家底，再谈治理",
-        "scope": "项目画像 + 资产建模 + 关系图谱"
-      },
-      {
-        "name": "接入层",
-        "purpose": "零侵入对接所有新老项目",
-        "scope": "Git / 本地目录 / CI / 制品库 / IDE"
-      }
+    "productKernel": "desktop",
+    "desktop": "Tauri + React + Local Agent Runtime",
+    "runtimeRoot": "desktop/src-tauri/src/runtime",
+    "runtimeModules": [
+      "workspace",
+      "conversations",
+      "tasks",
+      "goals",
+      "agent-runs",
+      "provider",
+      "patch",
+      "execution",
+      "repository"
     ],
-    "rules": "design-system"
-  },
-  "description": "OmniDesk：会持续学习项目的本地 AI 工程工作台，让任何新老项目都能按清晰流程被理解、治理、开发和演进",
-  "governance": {
-    "workspaceModel": {
-      "existingProjectFlow": [
-        "选择本地项目文件夹",
-        "只读扫描已有文件、git 状态、运行配置和 .project-os",
-        "生成项目接入草案",
-        "用户确认或修正关键事实",
-        "写入 .project-os/state.json 和必要治理文件",
-        "持续维护项目概览、当前进度、启动方式、风险边界和本地状态"
-      ],
-      "modes": [
-        "new-project",
-        "existing-project",
-        "temporary-readonly"
-      ],
-      "principle": "前台展示用户可理解的项目菜单，后台维护状态来源、文件映射、更新时间、可信度和更新时机。",
-      "updatedAt": "2026-07-08"
+    "previewPolicy": "read-only",
+    "stateNamespace": {
+      "current": ".project-os",
+      "target": ".omnidesk",
+      "mode": "migration-ready"
+    },
+    "legacyToolchain": {
+      "status": "frozen",
+      "role": "compatibility-only",
+      "paths": [
+        "cli",
+        "scripts",
+        "templates",
+        "adapters",
+        ".agents",
+        ".claude"
+      ]
     }
   },
-  "name": "OmniDesk",
-  "phase": "stabilizing",
-  "stage": "Project OS Console 内核收口期 / OmniDesk 工作区治理自验证期",
+  "reliability": {
+    "conversationStreaming": true,
+    "requestCancellation": true,
+    "lateResultRejection": true,
+    "agentRunPersistence": true,
+    "stageCheckpointResume": false,
+    "terminalSessionPersistence": false,
+    "evalBaseline": {
+      "cases": 12,
+      "taskSuccessRate": 1,
+      "patchApplicableRate": 0.9090909090909091,
+      "checkPassRate": 1,
+      "recoverySuccessRate": 1,
+      "generatedAt": "2026-07-19T15:51:16.394Z"
+    }
+  },
   "status": {
-    "blocked": [],
-    "doing": [
-      "OmniDesk 自身工作区治理验证",
-      "老项目接入流程建模",
-      "项目概览/当前进度/启动方式/风险边界/本地状态动态化",
-      "Desktop v0.1 信息架构和设计 token 规范打磨"
-    ],
     "done": [
-      "v1 路由契约",
-      "INSTALL FLOW",
-      "profile-based 安装（core / product / full）",
-      "版本记录 + upgrade 路径",
-      "远端三 profile 验收",
-      "README 瘦身 + INSTALL 补 upgrade 说明",
-      "AI 工程完整度报告原型",
-      "报告页新项目 / 老项目双入口",
-      "AI 项目工程助手组件契约",
-      "上下文完整度 + 工程成熟度双分数模型",
-      "check-template-sync strict 模式",
-      "可执行回归测试入口 tests/run-tests.sh",
-      "评分模型 schema 和 v0.2 数据源",
-      "GitHub Actions CI",
-      "报告页截图回归入口",
-      "报告页视觉 diff 入口",
-      "报告页桌面 / 移动端视觉 baseline",
-      "报告模块结构化数据源",
-      "报告页 CSS token 对齐",
-      "项目关系图谱生成",
-      "跨工具 adapter 验收矩阵",
-      "老项目空模板文档识别",
-      "Standalone 浏览器体检页（index.html，本地分析项目目录 / zip）",
-      "去除 HTML 双副本：唯一 HTML 在根目录 index.html，shell 只输出 .md / .json",
-      "桌面端方向确认：Tauri + Local Agent Core + Workbench UI",
-      "desktop/ Tauri v0.1 壳",
-      "desktop/ Vite + React 组件化工作台 UI",
-      "desktop/ Local Agent Core 项目快照读取",
-      "desktop/ 本地项目 registry v0.1",
-      "desktop/ 路径添加项目和 registry 切换",
-      "desktop/ Tauri 系统目录选择器",
-      "desktop/ 只读计划生成链路骨架",
-      "desktop/ 模型 provider 本地配置层",
-      "desktop/ OpenAI-compatible 只读计划调用",
-      "desktop/ macOS .app 打包和桌面图标",
-      "desktop/ 紧凑工作台 UI 重排",
-      "desktop/ 本地任务队列 v0.1",
-      "desktop/ 受控 runner v0.1",
-      "desktop/ provider 小白式配置和 profiles v0.1",
-      "desktop/ model catalog 配置文件 v0.1",
-      "desktop/ 网关模型列表刷新和当前模型可用性测试",
-      "desktop/ 本地任务记录持久化 v0.1",
-      "desktop/ patch draft 生成和 Diff 草案审阅 v0.1",
-      "desktop/ 受控 Apply Patch v0.1",
-      "desktop/ Apply 后自动验证 v0.1",
-      "desktop/ 本地 run summary 写入 v0.1",
-      "desktop/ 用户确认后合并 run summary 到 HANDOFF.md v0.1",
-      "desktop/ token layer 和组件索引登记",
-      "desktop/ Headless 组件库接入起点",
-      "desktop/ Button primitive 组件化和交互态 token 化",
-      "desktop/ Input 和 Select primitives 组件化",
-      "desktop/ Badge 和 Panel primitives 组件化",
-      "desktop/ Radix Label + Field / Notice / SectionTitle 组件化",
-      "desktop/ Radix Tabs 和 Tooltip primitives 组件化",
-      "desktop/ Radix Dialog 和 DropdownMenu primitives 组件化",
-      "desktop/ Radix Switch primitive 组件化",
-      "desktop/ workbench pattern 层起点",
-      "desktop/ 可配置主题色 token 架构",
-      "desktop/ 顶部主题菜单和本地主题偏好",
-      "desktop/ 主题设置 Rust 本地配置持久化",
-      "desktop/ 自定义主题色新增和删除",
-      "OmniDesk 北极星目标确认：用户入口 + 项目治理中枢 + 本地项目记忆",
-      "Hermes 等成熟工具定位为参照系统和可接入执行器",
-      "入口层中优补齐：.project-os/config.json、scripts 分层 wrapper、CLI report stdout 嵌入、写入锁",
-      "入口层高优补齐：陈旧锁自动清理、配置优先级固化、Shell 命令 fallback 白名单",
-      "入口层分层优化：--stale-lock-seconds 单次覆盖、用户全局 config、Shell 白名单清晰指引",
-      "入口层配置诊断：project-os config init --global、config schema 启动校验、config.values/config.sources 结构化输出",
-      "统一真相源首版：project-os state sync 受控写入 state.json、状态 schema 校验、state-bundles 回流骨架"
+      "Desktop Runtime 模块化与 Repository 事务边界",
+      "对话流式输出、取消、接管与迟到结果拒绝",
+      "受控 Patch、独立审批、检查与两轮修复",
+      "12-case 真实 Agent Eval 基线",
+      ".omnidesk 四分区 schema 与非破坏性幂等迁移器"
     ],
+    "doing": [
+      "OmniDesk 产品与文档 SSOT 单内核收敛",
+      ".omnidesk Runtime 读写切换和兼容回退",
+      "长任务 checkpoint 恢复",
+      "Eval trace 稳定证据化"
+    ],
+    "blocked": [],
     "next": [
-      "设计工作区事实的数据结构和 UI",
-      "把项目概览接入 PROJECT.md、.project-os/state.json 和 project-profile 的真实事实源",
-      "把当前进度接入 HANDOFF.md、git 状态和最近任务记录",
-      "把启动方式接入 README、package.json、docs/RUNBOOK.md 和桌面端配置",
-      "把风险边界接入 HANDOFF.md、docs/LESSONS.md 和用户确认过的风险记忆",
-      "把本地状态接入 registry、git、服务、模型 provider 和最近检查结果"
+      "接入 Runtime 启动迁移准备",
+      "切换各领域状态读写和 Preview 路径",
+      "断开并退役旧 Project OS 工具链",
+      "增加网络中断、应用重启和多文件任务恢复验收",
+      "清理历史运行产物和兼容层"
     ]
   }
 }

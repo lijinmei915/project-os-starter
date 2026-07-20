@@ -1,7 +1,7 @@
 ---
 layer: knowledge
 type: log
-last_verified: 2026-06-04
+last_verified: 2026-07-20
 teaches: "历史关键决策的原因、被放弃的备选方案和决策影响"
 use_when: "AI 需要理解某个架构选择的背景、或面临类似决策需要参考先例时"
 ---
@@ -18,7 +18,26 @@ use_when: "AI 需要理解某个架构选择的背景、或面临类似决策需
 
 ## 决策列表
 
-### Project OS
+### OmniDesk
+
+#### D019 — OmniDesk Desktop Runtime 是唯一产品内核
+
+**决定**: OmniDesk 只保留一个产品内核：`desktop/` 内的 React Workbench 与 Tauri Local Agent Runtime。早期 Project OS CLI、安装器、评分报告、模板和跨工具 adapter 全部冻结，只在状态迁移和依赖断开期间承担兼容作用；新能力不得继续落入旧工具链。
+
+**放弃**: 不再同时维护“OmniDesk 桌面产品”和“Project OS 分发产品”两条产品主线；不直接删除 `.project-os/` 或整目录改名；不让 Desktop 永久依赖旧 CLI 和 Shell 治理算法。
+
+**原因**:
+- 当前用户价值、权限边界、对话、任务、Patch、检查、终端和证据全部由 Desktop Runtime 承担。
+- 两套产品叙述共用状态、文档、CI 和测试，会持续误导 AI 路由并扩大维护面。
+- `.project-os/` 已包含真实用户任务、目标、对话和 Provider 元数据，直接删除或改名会造成数据丢失。
+
+**影响**:
+- `PROJECT.md`、`.project-os/state.json` 和 `docs/ARCHITECTURE.md` 统一描述 OmniDesk Desktop Runtime。
+- 目标状态根为 `.omnidesk/`，按 `data/runtime/cache/evidence` 分区，并通过幂等迁移兼容 `.project-os/`。
+- `cli/`、旧 scripts、templates、adapters 和 routing skill 只有在 Desktop、CI、测试及文档引用全部断开后才能删除。
+- 长任务恢复、Provider、Hermes、Patch、检查和 Eval 后续只在 Desktop Runtime 内演进。
+
+### Legacy Project OS
 
 #### D018 — Shell 统一入口只是过渡形态，长期迁到原生 CLI
 

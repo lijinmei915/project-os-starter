@@ -89,6 +89,7 @@ export function ChatComposer({
   modelTesting,
   placeholder,
   sending,
+  toolbarHint: toolbarHintOverride,
   value,
 }) {
   const fileInputRef = React.useRef(null);
@@ -114,13 +115,13 @@ export function ChatComposer({
     : currentModelStatus === "unavailable"
       ? "Not work"
       : "Checking";
-  const toolbarHint = sending
+  const toolbarHint = toolbarHintOverride || (sending
     ? "正在生成，可继续补充"
     : isListening
       ? "正在听写"
       : attachments.length
         ? `${attachments.length} 张图片`
-        : "";
+        : "");
 
   React.useEffect(() => {
     setSpeechSupported(Boolean(window.SpeechRecognition || window.webkitSpeechRecognition));
@@ -307,7 +308,7 @@ export function ChatComposer({
         }}>
           <DropdownMenuTrigger asChild>
             <button className="chatComposerStatus" type="button" aria-label="选择模型">
-              {sending || modelLoading ? <span className="chatComposerSpinner" aria-hidden="true" /> : null}
+              {modelLoading ? <span className="chatComposerSpinner" aria-hidden="true" /> : null}
               <span className="chatComposerStatusLabel">{modelLabel || "模型"}</span>
               {modelLoading ? (
                 <Loader2 className="chatComposerStatusIcon" aria-hidden="true" strokeWidth={2} />

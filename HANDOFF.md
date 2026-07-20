@@ -15,6 +15,20 @@ depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
 
 ## 接手摘要
 
+- 2026-07-20 状态命名空间迁移首批完成：新增 `desktop/schemas/state-layout.schema.json` 与 Runtime `state_namespace` 模块，将旧状态明确映射到 `.omnidesk/data`、`runtime`、`cache`、`evidence`。迁移器只复制不删除，重复执行保持幂等；目标内容不同时记录 conflict 且不覆盖，符号链接会跳过，未知路径保存在 `evidence/legacy-unclassified`。manifest 当前固定 `activeNamespace=legacy / readMode=legacy-primary`，尚未接入生产启动，也未切换领域读写，避免出现半迁移状态。验证：状态迁移定向 4/4、Runtime Rust 68/68、Patch Normalizer 5/5、文档结构与 Runtime 文档检查通过。
+
+- 2026-07-20 `OmniDesk 单内核收敛与可靠长任务 v1` 第一阶段已开始：`PROJECT.md`、`.project-os/state.json` 与 `docs/ARCHITECTURE.md` 统一将 `desktop/` 的 React Workbench + Tauri Local Agent Runtime 定义为唯一产品内核；旧 Project OS CLI、安装器、评分报告、模板和 adapter 冻结为迁移兼容层，新产品能力不得继续进入旧工具链。目标状态根明确为 `.omnidesk/`，按 `data/runtime/cache/evidence` 分区，必须以幂等、可恢复迁移兼容 `.project-os/`，不能直接改名或删除。下一批实现状态命名空间契约、迁移器和回归；本批未触碰现有桌面交互改动，也未删除旧文件。
+
+- 2026-07-20 终端会话重启边界：终端会话、tab 和屏幕输出目前仅在前端/PTY 内存；Rust 热重启会回收全部嵌入会话，旧屏幕内容无法恢复。本机未安装 `tmux` / `zellij`，不存在可 attach 的持久会话。后续如做持久终端，必须以独立、用户可见的持久 session 能力实现，默认不落盘终端输出；在任何重启/升级前先告知用户会终止的会话数。
+
+- 2026-07-20 修复终端会话“关闭后仍在运行”：Tauri 端此前只 kill PTY shell，Codex / Code host / 后台工具成为残留子进程。现在关闭 tab 或重启会向 `portable-pty` 为该会话创建的独立前台进程组发送 `SIGKILL`，然后回收 shell。`Ctrl-C` 仍只是中断当前命令，保留其非破坏性语义。Rust 64 + patch normalizer 5 和 Cargo check 通过；热重启后先前两个残留 Codex 会话已消失。前端继续使用 xterm.js；不引入 Electron `node-pty` 或不成熟 Tauri wrapper，因为问题在生命周期而非渲染组件。
+
+- 2026-07-20 修复桌面终端 Codex 卡在 `Working`：当前 OmniDesk 的 `.codex/hooks.json` 曾引用 `project-starter-pack` 的绝对脚本路径；工具调用触发 `PreToolUse hook exited with code 127` 后未正常收尾。现已改为当前项目 `.codex/hooks/*.sh` 相对路径，并逐个实际执行验证。已卡住的旧 Codex 进程不会热加载配置，需在桌面终端先停止当前任务，再重新启动 Codex/任务；新会话将使用修复后的 hook。
+
+- 2026-07-20 原生 WebDriver 终端诊断补强：测试构建通过独立端口 `1422` 运行，但此前运行时将它误判为浏览器 Preview，终端根本未启动；现仅在存在 Tauri bridge 时把 `1422` 识别为测试桌面端，普通浏览器仍只读。`test:native` 现在断言终端生命周期确实启动，并在 WKWebView 保存最多 30 个不含输出、输入、路径或密钥的阶段记录。实际点击终端 tab 仍会中断嵌入式 WebDriver session，最小 Tauri+xterm/Radix 夹具不复现，故问题继续收敛在 OmniDesk 终端组合层；常规 native smoke 不把该不稳定点击纳入门槛。
+
+- 2026-07-20 `OmniDesk 桌面端可信开发闭环与可用性收口 v1` 已推进首批：Runtime Patch semantic gate 现在要求计划声明真实工程改动且具备授权文件，检查/讨论类任务不再调用模型生成占位 diff；Apply 也会拒绝 `notApplicable` 草稿。历史“明确不写文件”但仍处于等待审批的任务在读取时被非破坏性投影为 planned，并保留迁移原因和原始证据。Patch Draft 契约和语义校验已迁入 `runtime/patch.rs`，不再由 `app.rs` 拥有。浏览器 Preview 状态栏明确不执行终端、检查或文件写入；桌面端才显示受控执行。性能采样现覆盖启动、路由、对话、终端、Patch 草稿、Patch 应用与受控检查，采样不保存文本、Diff 或输出。验证：Desktop Node 435/435、Runtime Rust 64/64、patch normalizer 5/5、Web build、Preview Smoke 3/3、bundle soft budget（796.31 KiB / 800 KiB）与 diff check 通过。官方 `tauri-driver 2.0.6` 在 macOS 明确不支持，现改用仅测试 feature 启用的 `tauri-plugin-wdio-webdriver`：macOS WKWebView 可通过本机 W3C WebDriver 驱动；`npm --prefix desktop run test:native` 会启动隔离 Tauri 实例和临时工作区，验证对话输入/发送状态，不读取密钥、不写入当前项目，生产和普通开发构建不暴露该 HTTP 端点。当前插件对终端 tab 的 W3C click 会直接中断会话，已停止将其视为验收手段；终端、审批、取消与恢复保持 Native Core 状态机回归，待插件兼容性修复后再补 UI 点击验收，不能伪造 Run 数据冒充模型执行。
+
 - 2026-07-20 `工作区资产分层治理 v1` 已完成前 3 项：`tmp/`、`.project-os/events/`、`transactions/` 和 `locks/` 已明确为本机运行产物并加入忽略；安装脚本会向目标项目同步同一边界。桌面 Runtime 和浏览器 Preview 的默认文件树共同隐藏运行状态、构建输出、依赖缓存和真实 `.env`，但保留 `.env.example`；Project OS 治理事实仍从治理工作面进入。产物清理现在支持 `--dry-run`，默认各保留 200 条 event / 已终态 transaction，永不清理 `prepared` 恢复事务。验证：native tree Rust 回归、Web build、Preview smoke、模板同步和 `bash tests/run-tests.sh` 均通过。下一项仅为收敛 `HANDOFF.md` 的历史，不应与本批混合删除。
 
 - 2026-07-19 `真实桌面任务发布验收 v1` 已完成 Provider 与受控 Patch 候选验证：当前 Llm Gateway / `gpt-5.6-luna` 在 5 个全新 Git fixture（README、React、CSS、Rust 语义、失败检查修复）均产生真实 unified diff，经 1 次 Gateway 审批、应用与对应检查后成功。每个 trace 同时含原始模型输出、usage、审批、应用与检查证据，当前位于 `/tmp/omnidesk-real-desktop-*-trace`。这验证 Hermes、Provider、桌面 patch normalizer 与受控 Tool Gateway 的真实链路；尚未模拟原生 Tauri 窗口的点击审批流程，故只作为发布候选证据，不能覆盖正式 12-case 基线。

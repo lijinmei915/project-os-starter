@@ -58,14 +58,14 @@ impl Repository {
     }
 
     pub fn read_json(&self, relative_path: &str) -> Option<Value> {
-        let path = self.resolve(relative_path).ok()?;
+        let path = self.resolve_for_read(relative_path).ok()?;
         fs::read_to_string(path)
             .ok()
             .and_then(|content| serde_json::from_str(&content).ok())
     }
 
     pub fn read_text(&self, relative_path: &str) -> Option<String> {
-        let path = self.resolve(relative_path).ok()?;
+        let path = self.resolve_for_read(relative_path).ok()?;
         fs::read_to_string(path).ok()
     }
 
@@ -75,7 +75,7 @@ impl Repository {
         &self,
         relative_directory: &str,
     ) -> Result<Vec<(String, Value)>, String> {
-        let directory = self.resolve(relative_directory)?;
+        let directory = self.resolve_for_read(relative_directory)?;
         if !directory.exists() {
             return Ok(Vec::new());
         }
@@ -104,7 +104,7 @@ impl Repository {
 
     pub fn write_json(&self, relative_path: &str, value: &Value) -> Result<(), String> {
         validate_state_schema(relative_path, value)?;
-        let path = self.resolve(relative_path)?;
+        let path = self.resolve_for_write(relative_path)?;
         let content = serde_json::to_vec_pretty(value).map_err(|err| err.to_string())?;
         write_atomic(&path, &[content, b"\n".to_vec()].concat())
     }
@@ -172,7 +172,7 @@ impl Repository {
                 if let Some(value) = mutation.value.as_ref() {
                     validate_state_schema(&mutation.relative_path, value)?;
                 }
-                let path = self.resolve(&mutation.relative_path)?;
+                let path = self.resolve_for_write(&mutation.relative_path)?;
                 let content = mutation
                     .value
                     .as_ref()
@@ -234,10 +234,11 @@ impl Repository {
             "timestamp": timestamp_string(),
             "paths": staged.iter().map(|(_, _, relative, _)| relative).collect::<Vec<_>>(),
         });
-        let event_path = self
-            .root
-            .join(".project-os/events")
-            .join(format!("{}.json", event["id"].as_str().unwrap_or("event")));
+        let event_path = crate::runtime::state_namespace::state_path_for_write(
+            &self.root,
+            ".project-os/events",
+        )?
+        .join(format!("{}.json", event["id"].as_str().unwrap_or("event")));
         write_atomic(
             &event_path,
             &[
@@ -265,7 +266,7 @@ impl Repository {
         let staged = mutations
             .iter()
             .map(|mutation| {
-                let path = self.resolve(&mutation.relative_path)?;
+                let path = self.resolve_for_write(&mutation.relative_path)?;
                 let previous = fs::read_to_string(&path).ok();
                 Ok((
                     path,
@@ -326,10 +327,11 @@ impl Repository {
             "timestamp": timestamp_string(),
             "paths": staged.iter().map(|(_, _, relative, _)| relative).collect::<Vec<_>>(),
         });
-        let event_path = self
-            .root
-            .join(".project-os/events")
-            .join(format!("{}.json", event["id"].as_str().unwrap_or("event")));
+        let event_path = crate::runtime::state_namespace::state_path_for_write(
+            &self.root,
+            ".project-os/events",
+        )?
+        .join(format!("{}.json", event["id"].as_str().unwrap_or("event")));
         write_atomic(
             &event_path,
             &[
@@ -342,7 +344,10 @@ impl Repository {
     }
 
     pub fn recover_incomplete_transactions(&self) -> Result<(), String> {
-        let directory = self.root.join(".project-os/transactions");
+        let directory = crate::runtime::state_namespace::state_path_for_read(
+            &self.root,
+            ".project-os/transactions",
+        )?;
         let Ok(entries) = fs::read_dir(&directory) else {
             return Ok(());
         };
@@ -373,9 +378,12 @@ impl Repository {
     }
 
     fn transaction_path(&self, transaction_id: &str) -> PathBuf {
-        self.root
-            .join(".project-os/transactions")
-            .join(format!("{transaction_id}.json"))
+        crate::runtime::state_namespace::state_path_for_write(
+            &self.root,
+            ".project-os/transactions",
+        )
+        .unwrap_or_else(|_| self.root.join(".project-os/transactions"))
+        .join(format!("{transaction_id}.json"))
     }
 
     fn restore_journal(&self, journal: &Value) -> Result<(), String> {
@@ -389,7 +397,7 @@ impl Repository {
                 .get("path")
                 .and_then(Value::as_str)
                 .ok_or_else(|| "事务记录缺少路径".to_string())?;
-            let path = self.resolve(relative)?;
+            let path = self.resolve_for_write(relative)?;
             match mutation.get("previous") {
                 Some(Value::Null) | None => {
                     if path.exists() {
@@ -408,7 +416,7 @@ impl Repository {
         Ok(())
     }
 
-    fn resolve(&self, relative_path: &str) -> Result<PathBuf, String> {
+    fn validate_relative(&self, relative_path: &str) -> Result<(), String> {
         let relative = Path::new(relative_path);
         if relative_path.trim().is_empty()
             || relative.is_absolute()
@@ -421,15 +429,29 @@ impl Repository {
         {
             return Err("状态路径必须位于项目根目录内".to_string());
         }
-        Ok(self.root.join(relative))
+        Ok(())
+    }
+
+    fn resolve_for_read(&self, relative_path: &str) -> Result<PathBuf, String> {
+        self.validate_relative(relative_path)?;
+        crate::runtime::state_namespace::state_path_for_read(&self.root, relative_path)
+    }
+
+    fn resolve_for_write(&self, relative_path: &str) -> Result<PathBuf, String> {
+        self.validate_relative(relative_path)?;
+        crate::runtime::state_namespace::state_path_for_write(&self.root, relative_path)
     }
 }
 
 /// Runtime records are restored across launches, so an unversioned payload is
 /// not safe to persist. Governance documents migrate on their own schedule;
-/// this strict boundary starts with new `.project-os/runs/*` state.
+/// this strict boundary starts with task, conversation, and Agent Run state.
 fn validate_state_schema(relative_path: &str, value: &Value) -> Result<(), String> {
-    if !relative_path.starts_with(".project-os/runs/") {
+    if !relative_path.starts_with(".project-os/runs/")
+        && !relative_path.starts_with(".omnidesk/data/tasks/")
+        && !relative_path.starts_with(".omnidesk/data/conversations/")
+        && !relative_path.starts_with(".omnidesk/data/agent-runs/")
+    {
         return Ok(());
     }
     if !value.is_object() {
@@ -478,7 +500,9 @@ struct RepositoryLock {
 
 impl RepositoryLock {
     fn acquire(root: &Path) -> Result<Self, String> {
-        let path = root.join(".project-os/locks/omnidesk-repository.lock");
+        let path =
+            crate::runtime::state_namespace::state_path_for_write(root, ".project-os/locks")?
+                .join("omnidesk-repository.lock");
         let parent = path.parent().ok_or_else(|| "锁目录无效".to_string())?;
         fs::create_dir_all(parent).map_err(|err| err.to_string())?;
         for _ in 0..20 {
@@ -578,6 +602,41 @@ mod tests {
             .join(".project-os/events")
             .join(format!("{}.json", event["id"].as_str().unwrap()))
             .exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn active_namespace_routes_logical_legacy_paths_to_partitioned_storage() {
+        let root = test_root("active-namespace");
+        write_atomic(
+            &root.join(".project-os/goals.json"),
+            br#"{"schemaVersion":"omnidesk.goals.v0.1","goals":[]}"#,
+        )
+        .unwrap();
+        crate::runtime::state_namespace::ensure_active_state_namespace(&root).unwrap();
+
+        let repository = Repository::new(&root);
+        repository
+            .transaction(
+                "update-goals",
+                &[JsonMutation::upsert(
+                    ".project-os/goals.json",
+                    json!({ "schemaVersion": "omnidesk.goals.v0.1", "goals": [{ "id": "g1" }] }),
+                )],
+            )
+            .unwrap();
+
+        assert_eq!(
+            repository.read_json(".project-os/goals.json").unwrap()["goals"][0]["id"],
+            "g1"
+        );
+        assert_eq!(
+            fs::read_to_string(root.join(".project-os/goals.json")).unwrap(),
+            r#"{"schemaVersion":"omnidesk.goals.v0.1","goals":[]}"#
+        );
+        assert!(root.join(".omnidesk/data/goals.json").is_file());
+        assert!(root.join(".omnidesk/runtime/events").is_dir());
+        assert!(root.join(".omnidesk/runtime/transactions").is_dir());
         fs::remove_dir_all(root).unwrap();
     }
 

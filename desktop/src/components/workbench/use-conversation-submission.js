@@ -31,6 +31,7 @@ export function useConversationSubmission({
   activeRequestRef,
   activeTask,
   actionFromAssistantCommitment,
+  actionFromAssistantRecommendation,
   actionPromptsForMessage,
   agentEventsForMessageKind,
   attachments,
@@ -67,6 +68,7 @@ export function useConversationSubmission({
   setChatLoadingLabel,
   setChatStartedAt,
   setPendingTurn,
+  setStreamingReply,
   setTaskInput,
   snapshot,
   stageGoalCandidateFromMessage,
@@ -162,10 +164,15 @@ export function useConversationSubmission({
         userTurn,
       }),
       "execute-action": async (command) => {
+        const resolvedTurns = command.resolvePendingAction
+          ? requestBaseTurns.map((turn) => turn.pendingAction?.id === command.resolvePendingAction.id
+            ? { ...turn, actions: [], pendingAction: null, resolvedActionId: command.resolvePendingAction.id }
+            : turn)
+          : requestBaseTurns;
         beginRequest(activeRequestRef, requestId, requestStartedAt);
         setTaskInput("");
         clearAttachments();
-        onChatTurnsChange([...requestBaseTurns, userTurn]);
+        onChatTurnsChange([...resolvedTurns, userTurn]);
         const result = await executeConversationActionRequest({
           action: command.action,
           adapters: createConversationActionAdapters({
@@ -195,7 +202,7 @@ export function useConversationSubmission({
           return true;
         }
         if (!settleRequest(activeRequestRef, requestId, result.requestStatus)) return true;
-        if (result.turn) onChatTurnsChange([...requestBaseTurns, userTurn, result.turn]);
+        if (result.turn) onChatTurnsChange([...resolvedTurns, userTurn, result.turn]);
         setPendingTurn(null);
         clearSubmittedInput();
         return result.handled;
@@ -205,6 +212,10 @@ export function useConversationSubmission({
       activeProjectGoalTitle,
       clearSubmittedInput,
       executePendingPatchApply,
+      executePendingPlan: async (action) => immediateHandlers["execute-action"]({
+        action: { id: "generate-plan", task: action.task },
+        resolvePendingAction: action,
+      }),
       executionReadyEvents: executionReadyAgentEvents,
       handlers: immediateHandlers,
       onChatTurnsChange,
@@ -238,6 +249,7 @@ export function useConversationSubmission({
       : classifyConversationIntent(nextInput, submittedAttachments.length > 0);
     setChatLoadingLabel(loadingLabelForMessageKind(messageKind));
     setChatLoadingEvents(loadingEventsForMessageKind(messageKind));
+    setStreamingReply("");
     setChatLoading(true);
 
     let chatResult;
@@ -278,6 +290,11 @@ export function useConversationSubmission({
       return;
     }
     const commitmentAction = actionFromAssistantCommitment(chatResult?.reply, contextualTask, `generate-plan-${requestId}`);
+    const recommendedAction = commitmentAction ? null : actionFromAssistantRecommendation(
+      chatResult?.reply,
+      contextualTask,
+      `recommend-plan-${requestId}`,
+    );
     const shouldCreatePlan = shouldGenerateConversationPlan({
       actionFromCommitment: commitmentAction,
       attachmentsCount: submittedAttachments.length,
@@ -296,6 +313,7 @@ export function useConversationSubmission({
       eventsForMessage: agentEventsForMessageKind,
       message: nextInput,
       messageKind,
+      recommendedAction,
       requestId,
       safeDisplayText,
       stageGoalCandidate: stageGoalCandidateFromMessage(nextInput, chatResult),
@@ -304,6 +322,7 @@ export function useConversationSubmission({
     if (nonPlanResult) {
       if (!settleRequest(activeRequestRef, requestId, "succeeded")) return;
       onChatTurnsChange([...requestBaseTurns, userTurn, nonPlanResult.turn]);
+      setStreamingReply("");
       releaseConversationAttachments(submittedAttachments);
       return;
     }
@@ -338,6 +357,7 @@ export function useConversationSubmission({
     if (!settleRequest(activeRequestRef, requestId, actionResult.requestStatus)) return;
     if (actionResult.turn) onChatTurnsChange([...requestBaseTurns, userTurn, actionResult.turn]);
     setPendingTurn(null);
+    setStreamingReply("");
     releaseConversationAttachments(submittedAttachments);
   };
 }

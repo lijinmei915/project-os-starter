@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatTerminalContext, formatTerminalContextForInput } from "../../lib/terminal-context";
 import { measureDesktopPerformance } from "../../lib/performance-baseline";
+import { traceNativeTerminalStage } from "../../lib/native-test-trace";
 import { appendTerminalCommandLog, clearTerminalSessionRefs, closeTerminalSessionState, nextTerminalSessionId } from "../../lib/terminal-session-controller";
 import { resourceBudget } from "../../lib/resource-budget";
 
@@ -101,7 +102,9 @@ export function useTerminalSession({ isTauri, terminalClient }) {
         setTerminalChunksBySession((current) => ({ ...current, [sessionId]: [] }));
         clearTerminalSessionRefs({ lastTerminalPromptRef, terminalClearRequestedRef, terminalGenerationBySessionRef, terminalInputBufferRef, terminalLastOutputRef, terminalPassthroughRef }, sessionId);
       }
+      traceNativeTerminalStage("terminal-session.start-before");
       const session = await terminalClient.startTerminalSession({ sessionId, cols: 120, rows: 32 });
+      traceNativeTerminalStage("terminal-session.start-complete");
       terminalGenerationBySessionRef.current = { ...terminalGenerationBySessionRef.current, [sessionId]: Number(session.generation || 0) };
       setTerminalSessions((current) => [...current.filter((item) => (item.sessionId || item.session_id || item.id) !== sessionId), session]);
       setTerminalTextBySession((current) => ({ ...current, [sessionId]: current[sessionId] || `Connected to ${session.shell} at ${session.cwd}\n` }));
@@ -109,6 +112,7 @@ export function useTerminalSession({ isTauri, terminalClient }) {
       if (activate) setActiveTerminalSessionId(sessionId);
       return true;
     } catch (err) {
+      traceNativeTerminalStage("terminal-session.start-error");
       setTerminalError(err instanceof Error ? err.message : String(err));
       return false;
     }
@@ -124,6 +128,7 @@ export function useTerminalSession({ isTauri, terminalClient }) {
     let unlisten = null;
     const start = async () => {
       try {
+        traceNativeTerminalStage("terminal-session.effect-start");
         unlisten = await terminalClient.subscribeTerminalOutput((event) => {
           const finishMeasure = measureDesktopPerformance("terminal-output");
           const payload = event.payload || {};
@@ -161,9 +166,11 @@ export function useTerminalSession({ isTauri, terminalClient }) {
           setTerminalTextBySession((current) => ({ ...current, [sessionId]: nextText }));
           finishMeasure({ sessionId, textLength: nextText.length });
         });
+        traceNativeTerminalStage("terminal-session.output-subscribed");
         if (cancelled) { unlisten?.(); return; }
         await startTerminalSession("main", { activate: true });
       } catch (err) {
+        traceNativeTerminalStage("terminal-session.effect-error");
         if (!cancelled) {
           setTerminalError(err instanceof Error ? err.message : String(err));
           setTerminalTextBySession((current) => ({ ...current, main: current.main || "终端启动失败。" }));
@@ -172,6 +179,7 @@ export function useTerminalSession({ isTauri, terminalClient }) {
     };
     start();
     return () => {
+      traceNativeTerminalStage("terminal-session.effect-cleanup");
       cancelled = true;
       unlisten?.();
       new Set(["main", ...terminalSessionsRef.current.map((item) => item.sessionId || item.session_id || item.id).filter(Boolean)]).forEach((sessionId) => terminalClient.stopTerminalSession({ sessionId }).catch(() => {}));
@@ -193,7 +201,7 @@ export function useTerminalSession({ isTauri, terminalClient }) {
             terminalClearRequestedRef.current = { ...terminalClearRequestedRef.current, [sessionId]: true };
             terminalPassthroughRef.current = { ...terminalPassthroughRef.current, [sessionId]: true };
             setTerminalTextBySession((current) => ({ ...current, [sessionId]: "" }));
-            setTerminalChunksBySession((current) => ({ ...current, [sessionId]: [] }));
+    setTerminalChunksBySession((current) => ({ ...current, [sessionId]: [] }));
             delete terminalLastOutputRef.current[sessionId];
           }
           terminalInputBufferRef.current = { ...terminalInputBufferRef.current, [sessionId]: "" };

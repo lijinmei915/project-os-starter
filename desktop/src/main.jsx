@@ -119,7 +119,7 @@ import * as workspaceGoalClient from "./lib/workspace-goal-client";
 import * as workspaceRegistryClient from "./lib/workspace-registry-client";
 import * as workspaceCapabilityClient from "./lib/workspace-capability-client";
 import * as workspaceFileClient from "./lib/workspace-file-client";
-import { actionFromAssistantCommitment, buildChatRequestContext, buildConversationRecord, contextualizeUserMessage, isDialogueActionRequest, mergeConversationRecords } from "./lib/conversation-record";
+import { actionFromAssistantCommitment, actionFromAssistantRecommendation, buildChatRequestContext, buildConversationRecord, contextualizeUserMessage, isDialogueActionRequest, mergeConversationRecords } from "./lib/conversation-record";
 import { taskIdForRequest } from "./lib/request-lifecycle";
 import { resolveWorkspaceContext, resolveWorkspaceGoal } from "./lib/workspace-context";
 import { conversationStates, executeRegisteredConversationAction, guardedCheckCapabilities, guardedCheckCapability, migrateConversationRecord, normalizeConversationReferences, normalizeConversationTurns, planProgressEvents, projectExecutionEvent, recoverConversationRuntime } from "./conversation-runtime";
@@ -1679,6 +1679,7 @@ function AgentWorkspace({
   terminalSessions,
   activeTerminalSessionId,
   terminalError,
+  onSaveTerminalImage,
   loading,
   error,
   readonlyPlan,
@@ -1765,9 +1766,9 @@ function AgentWorkspace({
     tasks,
   });
   const {
-    activeRequestRef, chatLoading, chatLoadingEvents, chatLoadingLabel, chatStartedAt, lastSubmissionRef,
+    activeRequestRef, chatLoading, chatLoadingEvents, chatLoadingLabel, chatStartedAt, lastSubmissionRef, streamingReply,
     pendingTurn, resetConversationRequest, setChatLoading, setChatLoadingEvents, setChatLoadingLabel,
-    setChatStartedAt, setPendingTurn, stopCurrentResponse,
+    setChatStartedAt, setPendingTurn, setStreamingReply, stopCurrentResponse,
   } = useConversationRequestState({ cancelRuntimeRequest, chatTurns, initialLoadingEvents: loadingEventsForMessageKind("chat"), onChatTurnsChange, onStopPlan });
   const { activeWorkspaceTab, changeWorkspaceTab, closeWorkspaceTab, resetWorkspaceTabs, setActiveWorkspaceTab, setWorkspaceTabs, workspaceTabs } = useWorkspaceTabs({
     onSelectEngineeringFile,
@@ -1847,6 +1848,7 @@ function AgentWorkspace({
     activeRequestRef,
     activeTask,
     actionFromAssistantCommitment,
+    actionFromAssistantRecommendation,
     actionPromptsForMessage,
     agentEventsForMessageKind,
     attachments,
@@ -1883,6 +1885,7 @@ function AgentWorkspace({
     setChatLoadingLabel,
     setChatStartedAt,
     setPendingTurn,
+    setStreamingReply,
     setTaskInput,
     snapshot,
     stageGoalCandidateFromMessage,
@@ -1926,6 +1929,7 @@ function AgentWorkspace({
         pendingTurn={pendingTurn}
         phase={snapshot.phase}
         starterPrompts={chatStarterPrompts}
+        streamingReply={streamingReply}
         tasks={tasks}
         turns={chatTurns}
       />
@@ -1973,7 +1977,7 @@ function AgentWorkspace({
                 onGetHermesExecutorStatus={onGetHermesExecutorStatus}
               /></TabsContent>}
         tabs={workspaceTabs}
-        terminal={{ activeSessionId: activeTerminalSessionId, chunks: terminalChunks, draftRequest: terminalDraftRequest, error: terminalError, logs: terminalLogs, onCloseTerminalSession, onNewTerminalSession, onOpenNativeTerminal, onRestartTerminalSession, onResizeTerminalSession, onRunCheck: onRunTerminalCheck, onSelectTerminalSession, onWriteTerminalData, runningId: terminalRunningId, session: terminalSession, sessions: terminalSessions, text: terminalText }}
+        terminal={{ activeSessionId: activeTerminalSessionId, chunks: terminalChunks, draftRequest: terminalDraftRequest, error: terminalError, logs: terminalLogs, onCloseTerminalSession, onNewTerminalSession, onOpenNativeTerminal, onRestartTerminalSession, onResizeTerminalSession, onRunCheck: onRunTerminalCheck, onSaveTerminalImage, onSelectTerminalSession, onWriteTerminalData, runningId: terminalRunningId, session: terminalSession, sessions: terminalSessions, text: terminalText }}
         trace={snapshot.trace}
       />
 
@@ -4600,6 +4604,7 @@ function App() {
           terminalSessions={terminalSessions}
           activeTerminalSessionId={activeTerminalSessionId}
           terminalError={terminalError}
+          onSaveTerminalImage={terminalClient.saveTerminalImage}
           loading={loading}
           error={error}
           readonlyPlan={readonlyPlan}
@@ -4716,6 +4721,7 @@ function App() {
 }
 
 function ActionFeedbackToast({ feedback }) {
+  if (feedback.status === "running") return null;
   const variant = feedback.status === "failed" ? "danger" : feedback.status === "running" ? "running" : "success";
   return (
     <div className={`appToast appToast-${variant}`} role="status" aria-live="polite">

@@ -1,0 +1,12 @@
+{
+  "identifier": "ai.project-os.desktop.webdriver-test",
+  "build": {
+    "beforeDevCommand": "npm run web:dev -- --port 1422",
+    "devUrl": "http://127.0.0.1:1422"
+  },
+  "app": {
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' http://127.0.0.1:1422 ws://127.0.0.1:1422; img-src 'self' asset: http://asset.localhost data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'"
+    }
+  }
+}

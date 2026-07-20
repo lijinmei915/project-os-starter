@@ -14,6 +14,7 @@
     "eval:agent:suite": "node scripts/run-agent-eval-suite.mjs",
     "check:agent-eval": "node scripts/check-agent-eval-report.mjs",
     "test:smoke": "playwright test --config playwright.config.mjs",
+    "test:native": "node scripts/run-native-webdriver-smoke.mjs",
     "build": "tauri build"
   },
   "dependencies": {

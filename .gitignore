@@ -30,6 +30,7 @@ CLAUDE.md
 !templates/project/adapters/CLAUDE.md
 .codex/
 .claude/settings.local.json
+.omnidesk/
 .project-os/reports/
 .project-os/entry-contexts/
 .project-os/graph/

@@ -1,7 +1,7 @@
 ---
 layer: knowledge
 type: log
-last_verified: 2026-07-19
+last_verified: 2026-07-20
 teaches: "历史踩坑记录、错误模式和已确立的避坑约束"
 use_when: "AI 即将做类似操作前检查是否有已知的坑、或犯错后需要记录新教训时"
 ---
@@ -13,6 +13,78 @@ use_when: "AI 即将做类似操作前检查是否有已知的坑、或犯错后
 > 不要写什么：成功经验、普通进展、重复的 changelog 内容、当前状态摘要。
 > 每次犯错后立即记录。
 > 格式：犯的错 / 根本原因 / 加了什么规则。
+
+### 2026-07-20 脏工作树中的共享 Rust 大文件不能直接全文件格式化
+
+**犯的错**：为格式化新增的状态迁移代码，直接对已有大量未提交改动的 `runtime/app.rs` 运行 `rustfmt`，把本轮范围外的旧代码也做了机械重排，扩大了差异。
+
+**根本原因**：把“格式化命令可以机械执行”误解成“可以忽略脏工作树的文件所有权和差异范围”；共享大文件并不具备独立格式化边界。
+
+**加了什么规则**：脏工作树中的共享文件只格式化本轮新增且独立拥有的文件；对已有用户改动的大文件必须手工保持局部格式，先比较 `git diff --numstat` 再决定是否运行 formatter。若误触发，使用 HEAD 基线加忽略空白的语义差异重建，恢复范围外格式并再次运行编译与回归。
+
+### 2026-07-20 终端会话重启前必须显式告知终止边界
+
+**犯的错**：修复 PTY 生命周期后触发桌面 Rust 热重启，用户未关闭的嵌入终端会话被回收，界面只显示新建的 `main` 会话。
+
+**根本原因**：当前终端会话、屏幕缓冲与 tab 列表仅存在应用内存；进程重启后既不能恢复 PTY，也没有持久会话后端。此前没有在重启前明确提示这一限制。
+
+**加了什么规则**：开发重启或应用升级前必须明确告知会终止多少临时终端会话；不得把会话销毁描述为无影响的热更新。持久终端必须作为独立能力通过受控 session service 或可选 terminal multiplexer 实现，不能默认把终端输出落盘。
+
+### 2026-07-20 PTY 会话关闭必须终止进程组
+
+**犯的错**：桌面终端关闭或重启时只调用 PTY shell 的 `child.kill()`。Codex、Code host 和后台任务作为 shell 的派生进程继续运行，用户关闭 tab 后仍看到任务卡在 `Working`，会话也无法真正删除。
+
+**根本原因**：`portable-pty` 为每个会话建立独立 Unix session，但终止逻辑没有向该 PTY 的前台进程组发送信号。
+
+**加了什么规则**：关闭或重启终端必须先终止 PTY 的独立前台进程组，再结束 shell；`Ctrl-C` 只负责中断当前命令，关闭 tab 负责回收整个会话。不得用替换前端终端组件掩盖后端进程生命周期缺陷。
+
+### 2026-07-20 Codex hook 不能引用其他项目的绝对路径
+
+**犯的错**：OmniDesk 的 `.codex/hooks.json` 仍指向 `project-starter-pack` 的 hook 脚本。终端内 Codex 调用工具时得到 `PreToolUse hook exited with code 127`，任务停在 `Working`，但终端输入区已出现。
+
+**根本原因**：接入时复制了另一个项目的绝对路径；目标项目虽然拥有同名本地脚本，配置没有同步改写。
+
+**加了什么规则**：项目 hook 一律使用项目根目录可解析的相对路径，如 `bash .codex/hooks/<name>.sh`。接入或迁移后必须校验 JSON，并从目标项目根目录实际执行所有 hook；不得把其他项目的绝对 hook 路径带入运行配置。
+
+### 2026-07-20 原生 WebDriver 的隔离端口不能被误判为浏览器 Preview
+
+**犯的错**：原生 WebDriver 使用独立 Vite 端口 `1422`，但运行时只把 `1420` 识别为桌面开发窗口，导致测试构建静默走 Preview 分支，终端会话没有真正启动。
+
+**根本原因**：运行时来源判断把“loopback 非 1420”直接等同于浏览器 Preview，没有区分“带 Tauri bridge 的测试 WebView”和普通浏览器。
+
+**加了什么规则**：专用 `1422` 端口仅在检测到 Tauri bridge 时作为原生 WebDriver Runtime；没有 bridge 的页面仍保持 Preview 只读边界。原生 smoke 必须断言终端生命周期已启动，不能仅验证输入控件。
+
+### 2026-07-20 原生 WebDriver 不能只等待服务端口
+
+**犯的错**：首版 macOS 原生 smoke 在 WebDriver `/status` 返回 ready 后立即定位 React 控件，偶发得到 `Unable to locate element`。
+
+**根本原因**：嵌入式 WebDriver 的 HTTP 服务先于 WKWebView 中的 Vite / React 首屏渲染完成；服务可连接不代表应用交互树已经存在。
+
+**加了什么规则**：原生 UI 测试必须分别等待 driver ready 和目标控件可定位，控件等待使用有界重试；不能以端口或窗口创建作为页面可交互的证据。
+
+### 2026-07-20 测试 feature 的 permission 不能进入默认 capability
+
+**犯的错**：把 `wdio-webdriver:default` 写入默认 capability 后，未启用 WebDriver feature 的辅助二进制解析不到该 permission，导致 patch normalizer 回归构建失败。
+
+**根本原因**：测试插件的 permission metadata 只会在插件 feature 编译时注册，默认 capability 却对所有二进制和 feature 组合生效。
+
+**加了什么规则**：测试专用插件默认不得向通用 capability 注入 permission；只有插件确实通过前端 command 权限提供能力时，才为测试构建提供专用 capability。嵌入式 HTTP WebDriver 不需要 Tauri command permission。
+
+### 2026-07-20 Tauri CLI 不能由原生 smoke 直接终止
+
+**犯的错**：原生 WebDriver smoke 直接终止它启动的 Tauri CLI 后，调用测试的 Node 进程也被连带终止，成功日志和失败错误都无法可靠返回。
+
+**根本原因**：Tauri CLI 会管理 dev server 与应用子进程，并在收到终止信号时清理其进程组；测试进程不能假设它是独立的普通子进程。
+
+**加了什么规则**：原生 smoke 在完成 WebDriver session 后按子进程树从叶到根关闭 Tauri CLI、Vite 与应用进程，再移除临时夹具；不得向进程组广播终止信号，主测试进程必须先正常返回结果。
+
+### 2026-07-20 嵌入式 macOS WebDriver 的终端覆盖必须先完成最小复现
+
+**犯的错**：OmniDesk 的终端 tab 在嵌入式 WebDriver 会话中中断后，过早将它归因为插件与 xterm 的通用兼容性问题。
+
+**根本原因**：独立的 Tauri+xterm，以及 Tauri+xterm+React/Radix Tabs 夹具均可通过相同 W3C click，说明问题仍在 OmniDesk 的终端生命周期、事件订阅或工作台组合中，不能据此向上游提交问题。
+
+**加了什么规则**：不能为迁就测试驱动而改变生产终端的焦点、尺寸或 PTY 行为，也不能在最小夹具无法复现时向上游报错。原生自动化只覆盖已稳定的工作面；终端、审批、取消与恢复继续通过 Native Core 的隔离 fixture 状态机回归验证，后续按 OmniDesk 生命周期逐层拆分。
 
 ### 2026-07-20 新增辅助二进制后必须声明桌面默认启动项
 
@@ -1008,3 +1080,11 @@ use_when: "AI 即将做类似操作前检查是否有已知的坑、或犯错后
 **根本原因**：坐标不是稳定的 UI selector，macOS 输入法和 WebView 焦点也不属于可复现的应用交互契约。该路径无法证明按钮、审批或写入流程的真实行为。
 
 **加了什么规则**：原生窗口验收必须使用稳定的 Tauri/WebDriver/应用内测试入口，或由用户在窗口内手动执行后读取运行证据；不得以坐标点击、全局按键或截图观察作为可签收的端到端自动化。出现误输入时保留用户数据，不擅自删除。
+
+### 2026-07-20 原生 Tabs 验收不能依赖 Radix 的内部 value 属性
+
+**现象**：原生终端诊断脚本找不到“终端”工作区标签，误报终端未渲染。
+
+**根本原因**：Radix Tabs 将触发器的值用于生成 `aria-controls` 关联，而不会把 `value` 直接输出为 DOM 属性；旧脚本选择器依赖了不存在的 `value="terminal"`。
+
+**加了什么规则**：原生 UI 验收优先使用稳定的无障碍关联属性（如 `aria-controls`）或可见语义，不依赖组件库内部实现属性。修正选择器后必须重新跑原生诊断，确认终端挂载、xterm 初始化和会话启动证据完整。

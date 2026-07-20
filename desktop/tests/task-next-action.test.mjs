@@ -19,6 +19,17 @@ test("requires explicit confirmation after a generated draft is visible", () => 
   assert.deepEqual(taskExecutionFlow({ id: "task-1", patchDraft: { diff: "--- a/file" } }).map((step) => step.status), ["done", "current", "pending", "pending"]);
 });
 
+test("runs checks instead of offering an inapplicable draft for a validation task", () => {
+  const next = taskNextAction({
+    id: "task-check",
+    patchDraft: { notApplicable: true },
+    plan: { candidateChanges: ["先不写文件，只形成下一步建议。"], checks: ["bash scripts/check-runtime.sh ."] },
+    status: "planned",
+  });
+  assert.equal(next.action, "run-check");
+  assert.equal(next.label, "运行基础检查");
+});
+
 test("routes analysis tasks back to contextual conversation", () => {
   assert.deepEqual(taskConversationAction({ id: "risk-1", title: "检查当前项目还有哪些风险", status: "running" }), {
     action: "continue-chat",

@@ -38,6 +38,23 @@ test("keeps a repair draft on the source task and waits for a separate approval"
   assert.equal(result.task.executionEvidence.at(-1).kind, "draft");
 });
 
+test("keeps a validation-only task out of the approval state", async () => {
+  const result = await executePatchDraftWorkflow({
+    generatePatch: async () => ({
+      diff: "",
+      failureReason: "任务计划明确不修改工程文件；当前应先运行检查。",
+      notApplicable: true,
+    }),
+    persistTask: async (task) => task,
+    task: { id: "check-1", status: "planned" },
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.task.status, "planned");
+  assert.equal(result.task.executionEvidence.at(-1).status, "not-applicable");
+  assert.match(result.feedback, /不生成文件改动/);
+});
+
 test("rejects a generated Patch Draft when the request was superseded", async () => {
   let active = true;
   let persistCalls = 0;

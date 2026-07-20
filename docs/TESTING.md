@@ -216,6 +216,14 @@ npm --prefix desktop run web:build
 cargo check --manifest-path desktop/src-tauri/Cargo.toml
 ```
 
+macOS 原生窗口 smoke 不使用官方 `tauri-driver`。它通过仅测试构建启用的嵌入式 WebDriver 驱动 WKWebView，并使用临时工作区，不能读取密钥或写入当前项目：
+
+```bash
+npm --prefix desktop run test:native
+```
+
+该命令验证原生窗口的 DOM/React 输入与发送状态。它不把浏览器 Preview 当成桌面证据，不执行终端、检查、Patch 或模型请求。更高风险的写入与审批流程仍应在独立 fixture 中逐项补充。
+
 ### 9. CI 自动化检查
 
 目标：把本地回归测试接入 GitHub，让 push 和 pull request 后自动复查。
