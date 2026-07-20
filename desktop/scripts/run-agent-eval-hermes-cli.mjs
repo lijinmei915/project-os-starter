@@ -12,6 +12,16 @@ const argument = (name) => {
   return index >= 0 ? process.argv[index + 1] : "";
 };
 
+function providerStatePath() {
+  try {
+    const manifest = JSON.parse(fs.readFileSync(path.join(root, ".omnidesk", "namespace.json"), "utf8"));
+    if (manifest?.activeNamespace === "omnidesk") return path.join(root, ".omnidesk", "data", "desktop-provider.json");
+  } catch {
+    // Legacy workspaces remain readable until their namespace is activated.
+  }
+  return path.join(root, ".project-os", "desktop-provider.json");
+}
+
 function readDotenvValue(key) {
   if (!key) return "";
   const dotenv = path.join(root, ".env.local");
@@ -26,7 +36,7 @@ function readDotenvValue(key) {
 function providerEnvironment() {
   const fallback = { apiKeyEnv: "", model: "" };
   let provider = fallback;
-  try { provider = JSON.parse(fs.readFileSync(path.join(root, ".project-os/desktop-provider.json"), "utf8")); } catch { /* reported below */ }
+  try { provider = JSON.parse(fs.readFileSync(providerStatePath(), "utf8")); } catch { /* reported below */ }
   const configuredKeyName = String(provider.apiKeyEnv || "").trim();
   const keyName = String(process.env.OMNIDESK_AGENT_EVAL_API_KEY_ENV || configuredKeyName || "").trim();
   const apiKey = process.env[keyName] || readDotenvValue(keyName);

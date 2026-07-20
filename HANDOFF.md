@@ -15,6 +15,8 @@ depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
 
 ## 接手摘要
 
+- 2026-07-21 受保护 Agent Eval 已切换到 active `.omnidesk`：workflow 写入 `.omnidesk/namespace.json` 和 `.omnidesk/data/desktop-provider.json`，每个 run 的 results、report 与 trace 固化到 `.omnidesk/evidence/agent-eval/<run-id>` 并作为 artifact 上传；Hermes runner 根据 manifest 选择 active Provider，未激活迁移的旧工作区仍可读取 legacy Provider。验证：Agent Eval workflow YAML、离线 deterministic suite 与 state namespace 测试通过；真实模型调用仍只在受保护 environment 执行。
+
 - 2026-07-21 本地总回归已完成单内核收敛：`tests/run-tests.sh` 从 466 行 Project OS 分发/安装/报告/图谱测试收缩为 OmniDesk 离线发布门槛，覆盖 tracked state、仓库文档契约、Desktop Node、Web build、首屏预算、离线 Eval 基线和 Runtime Rust。它不再调用 CLI、installer、模板、AI 工程报告或图谱生成，也不再写入临时 `.project-os` 运行产物。验证：完整入口通过，Desktop Node 442/442、Runtime Rust 71/71、Patch Normalizer 5/5、首屏 796.88/800 KiB、Eval 基线均通过。
 
 - 2026-07-20 常规 CI 已完成单内核收敛：`.github/workflows/ci.yml` 只保留 `Desktop runtime regression` 与 `Repository contracts`。原 `Project OS regression` 中的 CLI 编译、`bin/project-os` 状态同步、`tests/run-tests.sh`、installer/模板回归、AI 工程报告生成和 `.project-os` artifact 上传已全部移出 CI；仓库契约仅校验 tracked state/manifest JSON、frontmatter、文档结构与密钥安全。YAML 解析和新 job 的实际命令均通过。受保护 Agent Eval 仍使用 legacy Provider 逻辑路径，下一批不能直接删除整个旧工具目录。
