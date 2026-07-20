@@ -1,166 +1,112 @@
 ---
 layer: knowledge
 type: spec
-last_verified: 2026-07-09
-teaches: "本地开发环境配置、依赖安装、环境变量和外部服务对接"
-use_when: "AI 需要帮用户启动项目、排查环境问题、或配置新的外部依赖时"
+last_verified: 2026-07-21
+depends_on: [README.md, INSTALL.md, docs/ARCHITECTURE.md, docs/TESTING.md]
+teaches: "OmniDesk Desktop Runtime 的本地依赖、Provider 配置与开发验证"
+use_when: "维护者需要启动 Desktop、配置模型或排查本地环境时"
 ---
 
 # 环境说明
 
-> 用途：说明本地运行、依赖、环境变量和外部服务。
-> 什么时候更新：启动命令、依赖版本、环境变量、外部服务或账号权限变化时。
-> 不要写什么：产品路线、交接流水、一次性调试日志。
-
-本文回答：开发者和 AI 在这个项目里怎么把环境跑起来。
+> 用途：说明 OmniDesk Desktop 的开发依赖、启动命令、Provider 配置和本地验证。
+> 什么时候更新：Node/Rust/Tauri 依赖、Provider 存储或启动命令变化时。
+> 不要写什么：旧 Project OS installer、CLI 配置、模板 profile 或报告生成流程。
 
 ## 运行环境
 
-当前源仓库是 Markdown + Bash 脚本项目。
+OmniDesk 是 `desktop/` 中的 Tauri + React + Local Agent Runtime 应用。
 
-基础依赖：
-- `bash`
-- `git`
-- `find`
-- `grep`
-- `diff`
-- `mktemp`
+必需依赖：
 
-推荐依赖：
-- `rg`：更快的文本搜索
-- `node`：运行 `tests/visual-diff.mjs` 做截图像素 diff 自测和对比
-- Chrome / Chromium：生成报告页截图和视觉 diff
-- Rust / Cargo：运行 `desktop/` Tauri 桌面端壳
+- Node.js 22+ 与 npm
+- Rust stable 与 Cargo
+- Tauri 所需的系统 WebView 开发依赖
+
+macOS 使用系统 WebKit。Linux CI 所需的 GTK、WebKit 和应用指示器包以 `.github/workflows/ci.yml` 为准。浏览器 Preview 不替代 Desktop Runtime，不能验证写入、终端、受控检查或恢复。
 
 ## 常用命令
 
 ```bash
-bash scripts/check-runtime.sh .
-bash scripts/check-ai-project.sh . --write-report
-bash scripts/check-template-sync.sh .
+npm ci --prefix desktop
+npm --prefix desktop run dev
 ```
 
-启动桌面端 v0.1：
+只启动只读 Preview：
 
 ```bash
-cd desktop
-npm install
-npm run dev
+npm --prefix desktop run web:dev
 ```
 
-桌面端 UI 已使用 Vite + React 组件工程；`npm run dev` 会自动启动 Vite dev server 并打开 Tauri。
-
-如果提示 `cargo: command not found`，先安装 Rust：
+构建 Web 前端：
 
 ```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-```
-
-试装到临时目录：
-
-```bash
-tmp_dir="$(mktemp -d)"
-mkdir -p "$tmp_dir/target"
-bash scripts/install-project-os.sh "$tmp_dir/target" --profile core
-bash "$tmp_dir/target/scripts/check-runtime.sh" "$tmp_dir/target"
+npm --prefix desktop run web:build
 ```
 
 ## 环境变量
 
+Provider profile、模型健康缓存和隔离密钥均由 Desktop Runtime 管理：
+
+- profile 元数据位于 active `.omnidesk/data/`；未迁移项目才临时回退到 `.project-os/`。
+- API Key 仅从本机环境或 Runtime 管理的本地密钥存储读取，不能写入源码、文档、测试 fixture 或提交到 Git。
+- Provider 返回成功不等于任务成功；Patch、独立审批、检查与最终证据都完成后才可结案。
+
 | 变量 | 用途 |
-|------|------|
-| `DEEPSEEK_API_KEY` | 可选。接入 DeepSeek 时使用的本地 API key，只能放在本机环境变量或 `.env.local` |
-| `PROJECT_OS_SOURCE` | 指定安装源仓库路径；不设置时自动使用脚本所在仓库 |
-| `CHROME_BIN` | 指定用于截图回归的 Chrome / Chromium 可执行文件 |
-| `ALLOW_LOCAL_BROWSER_SCREENSHOT` | 设置为 `1` 时，允许脚本使用本机 `/Applications/Google Chrome.app` 截图 |
-| `UPDATE_VISUAL_BASELINE` | 设置为 `1` 时，刷新 `tests/screenshots/baseline/` 下的视觉基准图 |
-| `VISUAL_DIFF_STRICT` | 设置为 `1` 时，缺浏览器、缺 baseline 或视觉差异超阈值都会失败 |
-| `VISUAL_DIFF_THRESHOLD` | 视觉 diff 允许的像素变化比例，默认 `0.01` |
-| `VISUAL_DIFF_PIXEL_DELTA` | 单像素差异敏感度，默认 `16` |
-| `BROWSER_SCREENSHOT_TIMEOUT` | 浏览器截图命令超时时间，默认 `30` 秒 |
-| `PROJECT_OS_ALLOW_EMPTY_PROVIDER_KEYS` | 设置为 `1` 时，允许纯本地扫描跳过空 provider key warning |
-| `PROJECT_OS_SKIP_SCREENSHOT` | 设置为 `1` 时，截图回归只做 HTML marker 检查，不尝试 bitmap capture |
-| `PROJECT_OS_RETENTION_ENTRY_CONTEXTS` | Entry Context 保留数量，默认 `50` |
-| `PROJECT_OS_RETENTION_RUNS` | Runner 记录和日志保留数量，默认 `20` |
-| `PROJECT_OS_GLOBAL_CONFIG` | 可选。指定用户全局 Project OS 配置文件；不设置时默认读取 `$HOME/.project-os/config.json` |
+|---|---|
+| `PROJECT_OS_ALLOW_EMPTY_PROVIDER_KEYS` | 纯本地密钥扫描时允许未配置 Provider Key |
+| `TAURI_WEBDRIVER_PORT` | 原生 WebDriver smoke 的测试端口 |
+| `OMNIDESK_WEBDRIVER_WORKSPACE_ROOT` | 原生 smoke 使用的隔离工作区，仅测试构建设置 |
+| `OMNIDESK_AGENT_EVAL_*` | 仅受保护 Agent Eval workflow 使用的 Provider 环境变量 |
 
-Project OS 支持两层长期配置：
-
-- 用户全局配置：`$PROJECT_OS_GLOBAL_CONFIG` 指向的文件，或默认 `$HOME/.project-os/config.json`
-- 仓库本地配置：当前项目的 `.project-os/config.json`
-
-配置适合放长期稳定的 CLI 默认行为，例如：
-
-- `cli.defaultPersist`: `auto` / `none` / `full`
-- `cli.defaultOutput`: `file` / `json` / `both` / `report`
-- `cli.lockWrites`: 是否启用 `.project-os/locks/project-os.lock`
-- `cli.staleLockSeconds`: 残留锁自动清理阈值，`0` 表示不自动清理
-- `retention.entryContexts` / `retention.runs`: 历史产物保留数量
-
-优先级固定为：命令行参数 > 仓库 `.project-os/config.json` > 用户全局 config > `PROJECT_OS_*` 环境变量 > 内置默认值。环境变量仍可用于一次性覆盖或 CI 降噪，但不再作为长期配置的唯一入口。
-
-初始化用户全局配置：
-
-```bash
-project-os config init --global
-```
-
-也可以显式指定路径：
-
-```bash
-project-os config init --global --path "$HOME/.project-os/config.json"
-```
-
-CLI 启动时会校验用户全局 config 和仓库 config 的格式；配置错误会立即失败并指出具体字段。结构化输出会包含 `config.values` 和 `config.sources`，用于排查某个参数来自命令行、仓库配置、用户全局配置还是环境变量。
-
-单次覆盖 lock 超时时间：
-
-```bash
-bin/project-os report . --stale-lock-seconds 30
-```
-
-本地密钥使用方式：
-
-```bash
-cp .env.example .env.local
-```
-
-然后只在 `.env.local` 中填写真实值。`.env.local`、`.env` 和其他 `.env.*` 文件不能提交到 git。
-
-检查本地密钥是否安全：
-
-```bash
-bash scripts/check-secrets.sh .
-```
-
-如果只是本地纯扫描，不需要模型 provider，可降噪运行：
+本仓库可使用 `.env.local` 保存本地开发密钥，但该文件必须保持忽略。提交前运行：
 
 ```bash
 PROJECT_OS_ALLOW_EMPTY_PROVIDER_KEYS=1 bash scripts/check-secrets.sh .
 ```
 
-## 外部服务
+`PROJECT_OS_ALLOW_EMPTY_PROVIDER_KEYS` 只用于纯本地扫描时抑制空 Provider Key 警告，不会为运行时注入密钥。
 
-当前源仓库默认不依赖数据库、云服务或第三方 API。
-如果后续接入 DeepSeek 或其他模型服务，只允许代码读取环境变量，例如 `DEEPSEEK_API_KEY`，不要把真实 key 写入源码、文档、报告或测试夹具。
+## 状态迁移
 
-## 权限说明
+Runtime 启动时将 legacy `.project-os/` 非破坏性迁移到 `.omnidesk/`：
 
-- 安装脚本会写入目标目录。
-- 冲突文件会备份到 `.project-os/backups/`。
-- 检查报告写入 `.project-os/reports/` 时，应视为生成物。
+```txt
+.omnidesk/data      用户数据与配置
+.omnidesk/runtime   checkpoint、事务与运行事件
+.omnidesk/cache     可重建缓存与派生状态
+.omnidesk/evidence  Eval、Patch 与验证证据
+```
+
+迁移会跳过符号链接、保持源数据、拒绝冲突覆盖，并以 manifest 原子切换 active namespace。迁移验收完成前不要手动删除 `.project-os/`。
 
 ## 常见问题
 
-### 脚本提示 source and target are the same directory
+### 浏览器页面不能执行任务
 
-说明你在源仓库里把源仓库安装到自己。此时不用安装，直接运行：
+`http://127.0.0.1:1420/` 是只读 Preview。请通过 `npm --prefix desktop run dev` 启动桌面窗口，再在工作区内选择受控权限与模型连接。
+
+### 启动时找不到 Cargo 或 WebView 依赖
+
+先安装 Rust stable，并按 Tauri 对应平台的系统依赖完成配置；Linux 的参考安装命令见 CI workflow。完成后运行 `cargo check --manifest-path desktop/src-tauri/Cargo.toml` 验证。
+
+### 旧状态没有立即显示
+
+不要手动复制或删除 `.project-os/`。启动 Runtime 后检查 `.omnidesk/namespace.json`；若出现冲突，Runtime 会保留 legacy 回退和迁移证据。
+
+## 本地验证
 
 ```bash
-bash scripts/check-runtime.sh .
+npm --prefix desktop test
+npm --prefix desktop run web:build
+cargo check --manifest-path desktop/src-tauri/Cargo.toml
+bash tests/run-tests.sh
 ```
 
-### 目标项目已有 README
+原生窗口 smoke 使用临时工作区：
 
-默认推荐使用 `core` profile，避免覆盖已有 `README.md`。
-如果需要治理文档，先运行完整度检查，再决定是否补齐。
+```bash
+npm --prefix desktop run test:native
+```
+
+真实 Provider Eval 只在受保护环境运行，详见 `docs/TESTING.md`。
