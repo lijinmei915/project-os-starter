@@ -41,6 +41,7 @@ jobs:
           mkdir -p "$HOME/.hermes"
           node -e 'const fs=require("fs"); const base=JSON.stringify(process.env.OMNIDESK_AGENT_EVAL_API_BASE); const model=JSON.stringify(process.env.OMNIDESK_AGENT_EVAL_MODEL); fs.writeFileSync(process.env.HOME+"/.hermes/config.yaml", `model:\n  provider: "omnidesk-gateway"\n  base_url: ${base}\n  api_mode: "chat_completions"\n  default: ${model}\n  key_env: "OMNIDESK_AGENT_EVAL_KEY"\ncustom_providers:\n  - name: "omnidesk-gateway"\n    base_url: ${base}\n    model: ${model}\n    api_mode: "chat_completions"\n    key_env: "OMNIDESK_AGENT_EVAL_KEY"\n`);'
           OMNIDESK_AGENT_EVAL_API_KEY_ENV=OMNIDESK_AGENT_EVAL_KEY npm --prefix desktop run eval:agent:suite -- --output "../$eval_root/results.json" --trace-dir "../$eval_root/traces"
+          node desktop/scripts/check-agent-eval-traces.mjs --results "$eval_root/results.json" --trace-dir "$eval_root/traces"
           npm --prefix desktop run eval:agent -- --results "../$eval_root/results.json" --output "../$eval_root/report.json"
           npm --prefix desktop run check:agent-eval -- --baseline evals/agent-eval-report.json --candidate "../$eval_root/report.json"
       - if: always()
