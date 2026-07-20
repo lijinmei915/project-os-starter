@@ -34,7 +34,7 @@ const governanceMeta = {
     updatesWhen: "AI 行为边界、路由、权限或文档归属规则变化时更新。",
   },
   "设计实现": {
-    files: ["docs/ARCHITECTURE.md", "docs/CODE_STRUCTURE.md", "docs/DESIGN_STANDARDS.md", "desktop/src/*"],
+    files: ["docs/ARCHITECTURE.md", "docs/DESIGN_STANDARDS.md", "desktop/src/*"],
     governanceRole: "方案治理入口，把架构、契约、界面规范和实现结构连接到代码。",
     maturity: "只读",
     nextAction: "补设计实现健康状态，并能从架构/契约/规范缺口生成治理任务。",
@@ -81,7 +81,7 @@ const itemMeta = {
   "界面规范": { statusSource: "docs/DESIGN_STANDARDS.md" },
   "Token": { statusSource: "docs/design/tokens.md" },
   "组件": { statusSource: "docs/design/component-index.md" },
-  "实现结构": { statusSource: "docs/CODE_STRUCTURE.md" },
+  "实现结构": { statusSource: "docs/ARCHITECTURE.md" },
   "检查项": { statusSource: "docs/TESTING.md" },
   "验收报告": {
     statusSource: ".project-os/goal-validation-report.json",
@@ -211,7 +211,7 @@ export const projectGovernanceFlow = [
     items: [
       { id: "project-identity", title: "项目概览", description: "名称、用途和阶段。", relatedFiles: ["PROJECT.md", ".project-os/state.json"] },
       { id: "project-progress", title: "项目进展", description: "项目到哪一步，以及唯一下一步。", relatedFiles: ["PROJECT.md", "HANDOFF.md"] },
-      { id: "project-runbook", title: "启动方式", description: "启动入口与运行环境。", relatedFiles: ["README.md", "desktop/package.json", "docs/RUNBOOK.md", "docs/DESKTOP_APP.md"] },
+      { id: "project-runbook", title: "启动方式", description: "启动入口与运行环境。", relatedFiles: ["README.md", "desktop/package.json", "docs/RUNBOOK.md", "docs/ARCHITECTURE.md"] },
       { id: "project-risks", title: "风险边界", description: "已知风险和边界。", relatedFiles: ["HANDOFF.md", "docs/LESSONS.md"] },
       { id: "local-project-state", title: "项目接入", description: "接入登记和治理准备。", relatedFiles: [".project-os/state.json", ".project-os/desktop-registry.json"] },
     ],
@@ -260,7 +260,7 @@ export const projectGovernanceFlow = [
           { id: "component-library", title: "组件", description: "真实组件、组合模式、状态和源码位置。", relatedFiles: ["docs/design/component-index.md", "desktop/src/components/*"] },
         ],
       },
-      { id: "code-structure", title: "实现结构", description: "目录和模块职责。", relatedFiles: ["docs/CODE_STRUCTURE.md", "desktop/src/main.jsx", "desktop/src-tauri/src/main.rs"] },
+      { id: "code-structure", title: "实现结构", description: "目录和模块职责。", relatedFiles: ["docs/ARCHITECTURE.md", "desktop/src/main.jsx", "desktop/src-tauri/src/main.rs"] },
     ],
   },
   {

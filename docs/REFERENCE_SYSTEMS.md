@@ -2,7 +2,7 @@
 layer: knowledge
 type: spec
 last_verified: 2026-07-18
-depends_on: [docs/ARCHITECTURE.md, docs/DESKTOP_APP.md]
+depends_on: [docs/ARCHITECTURE.md, docs/PRODUCT_PLAN.md]
 teaches: "OmniDesk 和 Hermes、Claude Projects、Cursor 等成熟工具的关系、借鉴边界和接入策略"
 use_when: "评估是否接入成熟治理工程、比较 Hermes 等工具、或决定 OmniDesk 该借鉴什么不借鉴什么时"
 ---

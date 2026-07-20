@@ -74,13 +74,6 @@
       "forbiddenOverlap": ["当前交接待办", "未来路线图主体"]
     },
     {
-      "file": "docs/CODE_STRUCTURE.md",
-      "responsibility": "代码、组件、脚本和目录分类规则",
-      "ssotFor": ["代码结构怎么分层"],
-      "requiredSections": ["使用方式", "分类规则", "分类总览"],
-      "forbiddenOverlap": ["架构决策原因", "环境变量"]
-    },
-    {
       "file": "docs/DECISIONS.md",
       "responsibility": "架构和产品治理决策记录",
       "ssotFor": ["为什么做过某个架构决定"],
@@ -102,15 +95,8 @@
       "forbiddenOverlap": ["单次页面实现流水", "具体业务文案全文", "当前交接流水"]
     },
     {
-      "file": "docs/DESKTOP_APP.md",
-      "responsibility": "桌面端产品方向、技术选型、本地 Agent Core 和执行权限边界",
-      "ssotFor": ["桌面端怎么做", "本地 Agent Core 怎么接入 coding"],
-      "requiredSections": ["核心结论", "产品定位", "技术选择", "架构形态", "Coding 形态", "阶段路线"],
-      "forbiddenOverlap": ["一次性开发任务流水", "完整 IDE 功能清单", "具体 UI 文案"]
-    },
-    {
       "file": "docs/DOCUMENTATION.md",
-      "responsibility": "文档边界、SSOT、结构契约和文档治理规则",
+      "responsibility": "OmniDesk 文档边界、SSOT、结构契约和文档治理规则",
       "ssotFor": ["文档应该怎么写", "信息应该归哪个文件"],
       "requiredSections": ["SSOT 原则", "文档结构契约", "文档治理机器校验"],
       "forbiddenOverlap": ["当前交接流水", "业务功能细节"]
@@ -145,31 +131,24 @@
     },
     {
       "file": "docs/NAMING.md",
-      "responsibility": "文件、目录、schema、报告和模板命名规则",
+      "responsibility": "OmniDesk 文件、目录、状态分区和契约命名规则",
       "ssotFor": ["文档应该怎么命名"],
-      "requiredSections": ["总原则", "根目录主流文件", "docs/ 工程文档", "schemas/ 机器可读契约"],
+      "requiredSections": ["总原则", "根目录主流文件", "docs/ 工程文档", "状态与证据目录", "代码与测试命名"],
       "forbiddenOverlap": ["文档内容职责", "当前任务流水"]
     },
     {
       "file": "docs/PRODUCT_PLAN.md",
-      "responsibility": "产品愿景、阶段路线和长期规划边界",
+      "responsibility": "OmniDesk 产品愿景、阶段路线和长期规划边界",
       "ssotFor": ["长期产品路线"],
       "requiredSections": ["产品愿景", "当前阶段判断"],
       "forbiddenOverlap": ["当前交接流水", "具体测试命令"]
     },
     {
       "file": "docs/PROJECT_MEMORY_AND_RUNNER.md",
-      "responsibility": "项目记忆、后台执行器、写回规则和人工确认边界",
-      "ssotFor": ["项目记忆和后台执行器怎么工作"],
-      "requiredSections": ["核心结论", "项目记忆", "后台执行器", "人工确认边界", "检查闭环"],
+      "responsibility": "OmniDesk 项目记忆、Agent Run、恢复和人工确认边界",
+      "ssotFor": ["项目记忆和 Agent Run 怎么工作"],
+      "requiredSections": ["核心结论", "项目记忆", "Agent Run", "人工确认边界", "检查闭环"],
       "forbiddenOverlap": ["具体 UI 文案", "长期产品路线", "某次任务流水"]
-    },
-    {
-      "file": "docs/RECOMMENDATION_ENGINE.md",
-      "responsibility": "推荐引擎证据、信号、缺口、推荐和 UI 呈现规则",
-      "ssotFor": ["推荐引擎如何推导下一步"],
-      "requiredSections": ["输入证据", "Signal", "Gap", "Recommendation", "验收"],
-      "forbiddenOverlap": ["具体模板全文", "UI 视觉规范主体"]
     },
     {
       "file": "docs/REFERENCE_SYSTEMS.md",
@@ -180,24 +159,10 @@
     },
     {
       "file": "docs/RUNBOOK.md",
-      "responsibility": "常见操作、故障处理、发布前检查和恢复方式",
+      "responsibility": "OmniDesk 常见操作、故障处理、发布前检查和恢复方式",
       "ssotFor": ["常见操作和故障怎么处理"],
-      "requiredSections": ["本地自检", "同步模板", "发布前检查", "故障处理"],
+      "requiredSections": ["本地自检", "发布前检查", "状态迁移与恢复", "故障处理"],
       "forbiddenOverlap": ["测试策略主体", "架构设计原因"]
-    },
-    {
-      "file": "docs/SKILL_ENGINEERING.md",
-      "responsibility": "Skill 类型、触发边界、生成策略和验收方式",
-      "ssotFor": ["Skill 工程怎么生成"],
-      "requiredSections": ["核心判断", "内部推导层级", "生成策略"],
-      "forbiddenOverlap": ["具体 skill 全文", "项目交接流水"]
-    },
-    {
-      "file": "docs/TEMPLATE_GOVERNANCE.md",
-      "responsibility": "模板文件分层、映射、增删流程和预设治理",
-      "ssotFor": ["模板文件怎么治理"],
-      "requiredSections": ["文件分层", "当前文件映射", "新增模板文件流程"],
-      "forbiddenOverlap": ["文档内容 SSOT 表", "当前交接流水"]
     },
     {
       "file": "docs/TESTING.md",
@@ -205,13 +170,6 @@
       "ssotFor": ["怎么测试和验收"],
       "requiredSections": ["测试分层", "收尾时最小检查"],
       "forbiddenOverlap": ["环境变量清单", "具体架构决策原因"]
-    },
-    {
-      "file": "docs/WIZARD_PRESETS.md",
-      "responsibility": "向导状态识别、预设映射和文件补齐矩阵",
-      "ssotFor": ["项目状态识别和补齐策略怎么映射文件"],
-      "requiredSections": ["文件分层", "状态识别结构", "完整覆盖矩阵"],
-      "forbiddenOverlap": ["推荐引擎评分公式", "模板正文"]
     }
   ]
 }

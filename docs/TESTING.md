@@ -41,28 +41,18 @@ npm --prefix desktop run test:native
 
 `tests/run-tests.sh` 是本地完整回归入口，覆盖文档契约、Desktop Node、Web build、bundle 预算、离线 Eval 基线和 Runtime Rust 测试。`test:native` 是独立的原生窗口 smoke；它不能用浏览器 Preview 或离线测试替代。
 
-### 2. Prompt 行为测试
+### 2. Agent 交互契约
 
-目标：确认助手按 project-setup 的协作流程工作，而不是凭习惯乱问、乱读、乱改。
+目标：确认对话、任务和受控执行遵守同一个 Runtime 状态机，而不是把 Provider 响应直接当作任务完成。
 
 检查项：
-- 新项目是否先问“项目是什么”，再问阶段、目标、技术栈
-- 第 9 组是否先读取全局偏好并复述给用户确认
-- 老项目 review 是否判断“职责是否承接”，而不是机械补齐所有模板
-- 用户说“跳过”时，助手是否保留 `TODO:`，而不是编造答案
-- 用户只是分享信息时，助手是否没有主动扩大成实现任务
+- 对话的取消、接管和迟到结果不会覆盖当前 request。
+- Patch 草稿必须通过授权文件、路径、hunk 与上下文校验。
+- 工程写入和检查各自等待独立审批。
+- 检查失败只在同一任务内产生有界修复草稿，达到上限后保留失败证据。
+- Preview 对写入、终端、检查与恢复始终只读拒绝。
 
-参考场景：
-- `examples/prompt-simulation.md`
-
-跨工具验收：
-- `tests/cross-tool-matrix.md`
-
-推荐准备测试目录：
-
-```bash
-bash scripts/create-test-fixtures.sh /tmp/project-os-fixtures
-```
+对应回归位于 `desktop/tests/*.test.mjs` 与 Runtime Rust 测试；真实模型、网络中断和原生重启证据只在隔离 fixture 与受保护 Eval 中验收。
 
 ### 3. 产品规划偏离检查
 

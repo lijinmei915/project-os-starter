@@ -197,9 +197,9 @@ use_when: "AI 需要理解某个架构选择的背景、或面临类似决策需
 
 ---
 
-#### D009 — 跨工具验收先验证 adapter 分发和 SSOT
+#### D009 — 已退役的跨工具 adapter 分发验收
 
-**决定**: v0.2 的跨工具成熟度先以 adapter 分发、入口文件生成和 `AGENTS.md` 单一规则源头为自动化验收标准。
+**决定**: 这是旧 Project OS v0.2 的 adapter 分发验收决策，现已退役；OmniDesk 不再维护跨工具入口生成或其自动化矩阵。
 
 **放弃**: 不把当前自动化结果描述为“真实 Claude / Codex / Cursor / Gemini 会话全部完整验证”。
 
@@ -209,9 +209,8 @@ use_when: "AI 需要理解某个架构选择的背景、或面临类似决策需
 - 真实工具会话仍适合在发布前抽样复查，而不是作为每次本地回归的硬依赖。
 
 **影响**:
-- `tests/run-tests.sh` 验证 `CLAUDE.md` / `CODEX.md` / `.cursor/rules/project-os.md` / `GEMINI.md` 均能安装且引用 `AGENTS.md`。
-- `tests/cross-tool-matrix.md` 记录自动化覆盖范围和人工抽样边界。
-- 工程成熟度 `100/100` 表示 v0.2 模型闭环，不等于所有真实业务项目无需 review。
+- 历史 adapter 验收材料随旧分发链退役。
+- 现行产品验收以 Desktop Runtime、原生 smoke 与受保护 Agent Eval 为准。
 
 ---
 
@@ -332,7 +331,7 @@ use_when: "AI 需要理解某个架构选择的背景、或面临类似决策需
 - Tauri 更轻，权限模型更适合把文件、命令、密钥和 provider 调用收束到 Local Agent Core。
 
 **影响**:
-- 新的桌面端方向以 `docs/DESKTOP_APP.md` 为 SSOT。
+- 当前 Desktop Runtime 的方向以 `docs/ARCHITECTURE.md` 与 `docs/PRODUCT_PLAN.md` 为 SSOT。
 - 后续 `desktop/` 先加载 Vite + React 组件化工作台，再逐步接项目 registry、本地扫描、模型计划和受控执行。
 - 写文件和命令执行必须经过白名单工具、diff review 和检查闭环。
 

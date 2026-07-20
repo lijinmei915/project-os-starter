@@ -2,7 +2,7 @@
 layer: knowledge
 type: spec
 last_verified: 2026-07-20
-depends_on: [AGENTS.md, PROJECT.md, docs/DESKTOP_APP.md]
+depends_on: [AGENTS.md, PROJECT.md, docs/PRODUCT_PLAN.md]
 teaches: "OmniDesk Desktop Runtime 的系统边界、模块职责、状态所有权和运行路径"
 use_when: "AI 需要判断架构影响范围、模块所有权、执行边界或迁移顺序时"
 ---

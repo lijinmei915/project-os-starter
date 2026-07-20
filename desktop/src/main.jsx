@@ -192,7 +192,7 @@ const fallbackSnapshot = {
   tree: [
     { label: "project-os-starter", depth: 0, kind: "folder" },
     { label: "docs", depth: 1, kind: "folder" },
-    { label: "DESKTOP_APP.md", depth: 2, kind: "file" },
+    { label: "ARCHITECTURE.md", depth: 2, kind: "file" },
     { label: "desktop", depth: 1, kind: "folder" },
     { label: "main.jsx", depth: 2, kind: "file" },
     { label: "PROJECT.md", depth: 1, kind: "file" },
@@ -2297,7 +2297,7 @@ const designImplementationTopics = {
     task: "审阅界面规范",
   },
   "code-structure": {
-    files: ["docs/CODE_STRUCTURE.md", "desktop/src/main.jsx", "desktop/src-tauri/src/main.rs"],
+    files: ["docs/ARCHITECTURE.md", "desktop/src/main.jsx", "desktop/src-tauri/src/main.rs"],
     task: "审阅实现结构",
   },
 };

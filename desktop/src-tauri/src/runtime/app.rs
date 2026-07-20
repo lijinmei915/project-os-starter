@@ -2775,7 +2775,6 @@ fn build_local_readonly_plan(context: PlanContext) -> ReadonlyPlan {
         "HANDOFF.md".to_string(),
     ];
     for path in [
-        "docs/DESKTOP_APP.md",
         "docs/ARCHITECTURE.md",
         "docs/PRODUCT_PLAN.md",
     ] {
