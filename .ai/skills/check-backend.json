@@ -1,9 +1,0 @@
-{
-  "name": "check-backend",
-  "description": "检查当前项目的后端规范执行度",
-  "trigger": "检查后端, backend check",
-  "action": {
-    "type": "shell",
-    "command": "bash scripts/check-backend.sh ."
-  }
-}

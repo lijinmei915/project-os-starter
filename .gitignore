@@ -15,19 +15,15 @@ bin/project-os
 .cache/
 *.log
 
-# AI 工程特有（本地生成物，不入库）
-.ai/cache/
-.ai/logs/
-.ai/incoming/
+# OmniDesk 本地生成物，不入库
 .cursor/
 .claude/cache/
 .claude/logs/
 *.ai-tmp
 .github/copilot-instructions/cache/
 
-# Local Project OS / personal files
+# Local runtime / personal files
 CLAUDE.md
-!templates/project/adapters/CLAUDE.md
 .codex/
 .claude/settings.local.json
 .omnidesk/

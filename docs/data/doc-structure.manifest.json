@@ -53,13 +53,6 @@
       "forbiddenOverlap": ["完整目录树", "测试命令细节"]
     },
     {
-      "file": "docs/AUTO_GROWTH.md",
-      "responsibility": "自动反思、规则修剪和长期成长机制",
-      "ssotFor": ["自动成长机制"],
-      "requiredSections": [],
-      "forbiddenOverlap": ["当前交接流水", "具体任务执行记录"]
-    },
-    {
       "file": "docs/BACKEND.md",
       "responsibility": "后端技术选择、API、数据存储、安全和后端约定",
       "ssotFor": ["后端技术边界"],
@@ -114,13 +107,6 @@
       "ssotFor": ["前端技术边界"],
       "requiredSections": ["1. 技术栈选型", "2. 状态管理", "3. 样式与组件库"],
       "forbiddenOverlap": ["后端 API 细节", "产品路线"]
-    },
-    {
-      "file": "docs/KNOWLEDGE_SCHEMA.md",
-      "responsibility": "知识图谱、frontmatter 和语义元数据规范",
-      "ssotFor": ["知识结构化字段"],
-      "requiredSections": ["两层元数据并存", "Frontmatter 字段", "新增文件接入规则"],
-      "forbiddenOverlap": ["文档职责分配表", "当前交接流水"]
     },
     {
       "file": "docs/LESSONS.md",

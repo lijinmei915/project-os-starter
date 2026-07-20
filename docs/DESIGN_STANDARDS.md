@@ -6,35 +6,26 @@ teaches: "设计 token 体系、布局规则、组件库策略和视觉边界"
 use_when: "AI 要调整 UI 样式、选颜色/字号/间距、或判断设计方案是否合规时"
 ---
 
-# Project OS 设计规范总入口
+# OmniDesk 设计规范总入口
 
 > 用途：定义当前设计边界、token 方向、布局规则和组件库策略。
 > 什么时候更新：设计系统范围、token 分类、组件库接入策略或 UI 约束变化时。
 > 不要写什么：前端实现流水、当前交接、与设计无关的工程决策。
-> 当前桌面端允许接入 Headless / shadcn-style 组件层；组件视觉必须映射到 Project OS tokens。
+> 当前桌面端允许接入 Headless / shadcn-style 组件层；组件视觉必须映射到 OmniDesk tokens。
 > 具体 token、布局和组件索引见 `docs/design/*.md`。
 
 ---
 
 ## 当前状态
 
-Project OS 现在已有 `desktop/` Tauri + React 前端运行层，并开始接入 Headless / shadcn-style 本地组件层。
-
-但 AI 项目工程助手报告页已经形成静态 HTML 原型和轻量组件契约：
-
-- 报告页由 `scripts/check-ai-project.sh` 生成
-- 报告页当前沉淀为 9 个核心组件和 2 个页面组合模式
-- 组件契约登记在 `docs/design/ai-project-assistant/components.md`
-- TS 数据源和类型契约登记在 `docs/design/ai-project-assistant/components.ts`、`docs/design/ai-project-assistant/data.ts`
-- 组件索引登记在 `docs/design/component-index.md`
-- 桌面端 v0.1 使用 `desktop/src/styles.css` 中的 Desktop token layer，不能在后续组件里继续散落硬编码颜色、字号、间距和状态色。
+OmniDesk 以 `desktop/` 的 Tauri + React 工作台为唯一用户界面。设计 token、组件索引和工作区可视化规范分别由 `docs/design/` 与 `desktop/src/styles.css` 维护；旧静态报告模板已退役。
 
 设计规范的作用是：
 
 - 约束未来 UI 生成时必须先经过 `design-system`
 - 明确 Design Tokens 的基础分类和当前 v0.1 数值表
 - 防止 AI 在没有规则时自由发挥 UI 风格
-- 防止静态报告页和未来组件工程之间出现两套不一致的视觉规则
+- 防止工作台组件和 Runtime 证据页面出现两套不一致的视觉规则
 
 ---
 

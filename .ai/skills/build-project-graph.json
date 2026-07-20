@@ -1,9 +1,0 @@
-{
-  "name": "build-project-graph",
-  "description": "生成 Project OS 轻量项目关系图，帮助判断文件职责、引用关系和影响范围",
-  "trigger": "生成项目关系图, build project graph, project graph",
-  "action": {
-    "type": "shell",
-    "command": "bash scripts/build-project-graph.sh ."
-  }
-}

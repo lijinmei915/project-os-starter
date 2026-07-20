@@ -1,1 +1,0 @@
-../../docs/WIZARD_PRESETS.md

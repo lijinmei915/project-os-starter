@@ -1,1 +1,0 @@
-../../docs/CODE_STRUCTURE.md

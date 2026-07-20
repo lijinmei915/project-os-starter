@@ -1,1 +1,0 @@
-../../docs/TEMPLATE_GOVERNANCE.md

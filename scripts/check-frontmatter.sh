@@ -33,8 +33,7 @@ function walk(dir, out = []) {
     const full = path.join(dir, entry.name);
     const rel = path.relative(root, full);
     if (entry.isDirectory()) {
-      if ([".git", "node_modules", ".project-os"].includes(entry.name)) continue;
-      if (rel.startsWith("templates/project/templates/")) continue;
+      if ([".git", "node_modules", ".project-os", ".omnidesk"].includes(entry.name)) continue;
       walk(full, out);
     } else if (entry.isFile() && entry.name.endsWith(".md")) {
       if (rel.includes("/design/proposals/")) continue;
@@ -85,10 +84,7 @@ const files = [
   "PROJECT.md",
   "HANDOFF.md",
   "README.md",
-  ...rootMarkdownFiles(path.join(root, "docs")),
-  ...rootMarkdownFiles(path.join(root, "templates/project-docs")),
-  ...rootMarkdownFiles(path.join(root, "templates/project-docs", "docs")),
-  ...rootMarkdownFiles(path.join(root, "templates/project", "docs"))
+  ...rootMarkdownFiles(path.join(root, "docs"))
 ];
 
 const uniqueFiles = [...new Set(files)].filter(rel => fs.existsSync(path.join(root, rel)));
@@ -112,7 +108,7 @@ for (const rel of uniqueFiles) {
   if (fm.depends_on) {
     for (const dep of dependencyItems(fm.depends_on)) {
       const normalized = cleanScalar(dep);
-      if (!fs.existsSync(path.join(root, normalized)) && !fs.existsSync(path.join(root, "templates/project-docs", normalized)) && !fs.existsSync(path.join(root, "templates/project", normalized))) {
+      if (!fs.existsSync(path.join(root, normalized))) {
         fail(`${rel}: depends_on target not found: ${normalized}`);
       }
     }

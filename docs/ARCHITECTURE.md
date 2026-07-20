@@ -59,7 +59,7 @@ Workbench UI
 | `docs/` | 长期架构、测试、决策和运行说明 |
 | `.omnidesk/` | 当前产品状态根；由 namespace manifest 激活后承担 Runtime 读写 |
 | `.project-os/` | 非破坏性迁移源；只在未激活或冲突回退时继续读写，最终退役 |
-| `scripts/`, `templates/`, `adapters/` | 冻结的旧工具链；CLI 与 governance bridge 已退役，剩余目录待依赖断开后删除 |
+| `scripts/` | 仅保留文档结构、frontmatter 与密钥安全的仓库校验；不承载产品语义 |
 
 ## 运行路径
 
@@ -94,7 +94,7 @@ Provider 返回成功不等于任务成功。只有 Patch、应用、检查和�
 
 ### 恢复
 
-Agent Run 已持久化 attempt、审批、观察和终态。目标恢复模型还需增加 request checkpoint、当前阶段、上下文摘要和最后确认点，使应用重启后能从阶段边界继续，而不是整轮重试。
+Agent Run 已持久化 attempt、审批、观察、request checkpoint、当前阶段、上下文摘要和最后确认点。重启后会从已持久化的阶段边界继续，并保留原审批，不会整轮重试或自动重放 Patch/检查。当前仍缺少原生窗口重启的端到端发布证据；离线状态机回归不能替代该证据。
 
 ### 状态迁移
 

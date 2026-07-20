@@ -42,7 +42,7 @@ use_when: "AI 要修改 OmniDesk 文档、判断信息归属或调整文档结�
 3. `desktop/`：产品代码、原生运行时、Eval 和测试。
 4. `.omnidesk/`：本地用户数据、运行事件、缓存和证据，不作为受版本控制的产品文档。
 
-旧 `templates/`、installer、adapter、routing skill 和 CLI 文档不属于新产品结构。它们在依赖审计完成前只能以迁移材料存在，不得作为新能力说明或验收依据。
+旧 `templates/`、installer、adapter、routing skill、CLI 和图谱评分链已经退役，不属于产品结构，也不得作为新能力说明或验收依据。
 
 ## 文档治理机器校验
 

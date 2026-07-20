@@ -15,6 +15,8 @@ depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
 
 ## 接手摘要
 
+- 2026-07-21 已物理删除旧 Project OS 的 `.ai/` 规则镜像、`templates/` 分发树，以及 installer、模板同步、评分、图谱、推荐和知识库脚本；仅保留仓库 frontmatter、文档结构与密钥安全校验脚本。同步退役旧图谱、目录映射、自动成长和知识 schema 文档，知识登记不再包含已删除来源。Runtime 恢复文档现明确：checkpoint、审批和阶段已持久化，当前缺口是原生窗口重启的端到端证据。验证：完整 `bash tests/run-tests.sh` 通过，含文档结构 22、frontmatter 19、Desktop Node 443/443、Web build/800 KiB 预算、Eval baseline、Rust 73+5。`.project-os` 仍是迁移兼容源，不能删除；旧静态报告入口与其设计材料仍待单独退役。
+
 - 2026-07-21 已将产品与工作区说明收敛到 OmniDesk Desktop Runtime：重写文档治理、命名、产品路线、运行手册与 Agent Run 说明，删除旧 `CODE_STRUCTURE`、`DESKTOP_APP`、推荐引擎、向导、模板治理、Skill 分发和跨工具测试文档。Desktop 静态工作区与只读计划上下文只引用 `ARCHITECTURE.md`，不再展示 CLI、多入口或模板分发语义。验证：文档结构 24、frontmatter 53、Desktop Node 443/443、Cargo check 与 diff check 通过。下一批需移除模板、installer、评分/图谱脚本及其 registry 索引；`.project-os` 仍是迁移兼容源，暂不能删除。
 
 - 2026-07-21 已删除 `docs/ROUTING.md` 及 `.agents/`、`.claude/` 中的 Project OS 路由、命令、hook 和 skill 分发副本；文档清单与知识登记同步移除该退役规则。Desktop 工作区的协作、安全边界来源统一指向 `AGENTS.md`，不再展示不存在的路由或 Skill 入口。验证：文档结构 30、frontmatter 59、Desktop Node 443/443 与 diff check 通过。下一步先重写或退役仍描述旧分发链的治理文档，再按消费者审计删除 templates 与 installer scripts；`.project-os` 仍是迁移兼容源，暂不能删除。

@@ -88,40 +88,7 @@ npm --prefix desktop run test:native
 - Supabase / API 请求至少验证成功、失败、loading 三种状态
 - UI 改动至少记录手测结果；高风险 UI 流程建议补截图或端到端测试
 
-### 6. AI 工程成熟度检查
-
-目标：让 AI Engineering Kit 不只检查“有没有文件”，还检查“能不能验证、发布、交接和复查”。
-
-当前 v0.2 维度：
-
-- 评分与状态源：`PROJECT.md` 与 `.project-os/state.json` 是否一致，评分模型是否有 schema 和 v0.2 数据源
-- 测试与质量门禁：是否有可执行测试入口、fixtures、CI、严格模板同步
-- 报告与组件工程：HTML 报告是否可生成，报告 UI 是否脱离 shell 内联，组件契约和截图验收是否存在
-- 分发与发布：是否有版本号、发布前检查、安装 profile 自动回归
-- 老项目与跨工具：adapter 和跨工具验收矩阵是否完成
-- 交接治理：`HANDOFF.md`、`CHANGELOG.md`、`DECISIONS.md` 是否记录当前工程化路线
-
-推荐命令：
-
-```bash
-bash scripts/ai-project.sh report .
-```
-
-预期：
-
-```txt
-AI 工程上下文完整度：.../100
-AI 工程成熟度：.../100
-```
-
-评分模型来源：
-
-- `schemas/ai-project-score.schema.json`：定义评分模型结构
-- `schemas/ai-project-score.v0.2.json`：记录当前上下文完整度和工程成熟度的维度、分值和检测方式
-- `schemas/ai-project-report.schema.json`：定义报告模块数据结构
-- `schemas/ai-project-report.v0.1.json`：记录报告模块标题、评分 section 分组和说明文案
-
-### 7. 可执行回归测试
+### 6. 可执行回归测试
 
 目标：把源仓库维护者原本手动做的检查收进一个可重复入口。
 
@@ -143,7 +110,7 @@ bash tests/run-tests.sh
 
 说明：该入口不执行旧 CLI、installer、模板分发、AI 工程报告、图谱或截图报告测试。原生窗口与真实 Provider 路径分别由 `test:native` 和受保护 Agent Eval 工作流覆盖。
 
-### 8. Fact / Slot Runtime 验收
+### 7. Fact / Slot Runtime 验收
 
 目标：确保浏览器 Preview 与 Tauri Desktop 虽然读取方式不同，但生成一致的事实和工作面。
 
@@ -174,7 +141,7 @@ npm --prefix desktop run test:native
 
 该命令验证原生窗口的 DOM/React 输入与发送状态，并从 active `.omnidesk/cache`（未迁移 fixture 才回退 `.project-os`）读取原生终端 trace。它不把浏览器 Preview 当成桌面证据，不执行终端、检查、Patch 或模型请求。更高风险的写入与审批流程仍应在独立 fixture 中逐项补充。
 
-### 9. CI 自动化检查
+### 8. CI 自动化检查
 
 目标：把本地回归测试接入 GitHub，让 push 和 pull request 后自动复查。
 

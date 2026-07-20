@@ -270,7 +270,7 @@ use_when: "AI 需要理解某个架构选择的背景、或面临类似决策需
 
 #### D013 — 文档元数据用 YAML frontmatter，与人读引用块并存
 
-**决定**: 每个文档在文件最顶部加 YAML frontmatter（`layer` / `type` / `last_verified` / `depends_on`），作为机器可读元数据；原有 `> 用途 / 什么时候更新 / 不要写什么` 引用块保留，作为人读元数据。规范见 `docs/KNOWLEDGE_SCHEMA.md`。
+**决定**: 每个文档在文件最顶部加 YAML frontmatter（`layer` / `type` / `last_verified` / `depends_on`），作为机器可读元数据；原有 `> 用途 / 什么时候更新 / 不要写什么` 引用块保留，作为人读元数据。现行规范见 `docs/DOCUMENTATION.md`。
 
 **放弃**: 不复用现有 `>` 引用块做机器解析（格式松散、不稳定）；不引入独立元数据文件（与文档分离易失同步）；不上 tree-sitter / AST 解析（我们是文档治理工具，知识载体是 .md，不是任意代码）。
 
@@ -283,7 +283,7 @@ use_when: "AI 需要理解某个架构选择的背景、或面临类似决策需
 - `build-project-graph.sh` 解析 frontmatter，输出 archLayer / lastVerified / stale / declares_dependency。
 - `check-ai-project.sh` 按元数据完整度和新鲜度评分（v0.4）。
 - `architecture-diagram.html` 读图谱按 archLayer 自动渲染。
-- 新增文档必须按 `docs/KNOWLEDGE_SCHEMA.md` 补 frontmatter。
+- 新增文档必须按 `docs/DOCUMENTATION.md` 补 frontmatter。
 
 ---
 

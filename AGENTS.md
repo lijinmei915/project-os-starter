@@ -38,7 +38,7 @@ use_when: "AI 首次进入仓库、修改 Desktop Runtime、状态、Agent 执�
 - 不要把 `README.md`、旧模板或历史 handoff 当作运行规则。
 - 不要新增 Project OS 安装器、跨工具 routing、模板分发、AI 工程评分或报告能力。
 - 不要在 Desktop Runtime 中调用旧 CLI、Shell governance 或 installer。
-- 不要删除 `.project-os/`、`cli/`、`templates/`、`adapters/`、`.agents/`、`.claude/`，除非已证明无迁移、文档、构建或测试消费者。
+- 不要删除 `.project-os/`，直到迁移、文档、构建和测试消费者全部完成退役验证。
 - 不要把 Provider 返回成功标为任务完成；只有 Patch、审批、检查和最终证据闭环才是完成。
 
 ## State And Execution
