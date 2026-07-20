@@ -50,6 +50,7 @@ export function listAgentRuns() {
 export async function resumeHermesAgent(run) {
   if (!run?.id) throw new Error("缺少可恢复的 Agent Run。");
   const resumed = await invokeRuntimeCommand("resume_agent_run", { input: { id: run.id } });
+  if (resumed.status === "awaiting-approval") return resumed;
   return runHermesAgent(resumed.prompt, resumed.requestId, resumed.maxSteps);
 }
 
