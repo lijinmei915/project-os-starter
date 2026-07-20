@@ -32,7 +32,7 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 - 状态事务：Runtime Repository 使用 schema、锁和原子事务维护跨实体一致性。
 - 浏览器 Preview：仅用于只读预览和 UI 验证，不执行文件写入、终端或受控检查。
 - 当前状态根：Runtime 启动时会先恢复旧事务，再将 `.project-os/` 非破坏性迁移到 `.omnidesk/`；无冲突时原子激活新命名空间，有冲突时保持 legacy 读写并留下证据。
-- 评测：`desktop/evals/` 保存固定 12-case 基线；真实 Provider Eval 在受保护环境运行。
+- 评测：`desktop/evals/` 保存固定 12-case 基线；受保护 Provider Eval `29767685402` 已产生并上传真实报告与 trace。
 
 详细模块边界见 `docs/ARCHITECTURE.md`，测试与发布门槛见 `docs/TESTING.md`。
 
@@ -52,6 +52,7 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 - Desktop 工作区已移除旧 CLI、模板、adapter 与 routing Skill 的可见入口，仅呈现 OmniDesk Runtime 的模型、受控工具、安全边界、工程文件与证据。
 - 常规 CI 已删除旧 CLI 编译、installer 回归、AI 工程报告生成和 `.project-os` 报告上传，只保留 Desktop Runtime 回归与轻量仓库契约检查。
 - 受保护 Agent Eval 使用 active `.omnidesk/data` Provider 配置，并将每次真实结果、报告与 trace 固化到 `.omnidesk/evidence/agent-eval/<run-id>` 后上传。
+- 受保护 Eval `29767685402` 已通过：12/12 case 完成，任务成功率 100%、Patch 可应用率 90.9%、检查通过率 100%、恢复成功率 100%；artifact 中包含四文件目标改绑、初始失败检查与修复、网络中断恢复的原始 trace。
 - 根目录旧静态站、在线站/截图/报告模型测试、AI 工程评分报告 schema 与历史设计提案已删除；Desktop 只保留任务执行与目标验收证据。
 - 原生窗口重启会把待审批 Agent Run 标记为中断、保留审批 token，并恢复到等待审批状态。
 - `.project-os` 退役预检会逐文件校验 active `.omnidesk`；当前源目录存在 9 处历史内容差异，必须先按保留策略归档，不可直接删除。
@@ -60,7 +61,6 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 
 - 将产品与文档 SSOT 收敛到 OmniDesk Desktop Runtime。
 - 继续断开遗留文档和迁移兼容层对旧 Project OS 分发工具链的真实依赖。
-- 继续补齐 Provider 网络中断与大型多文件修复的受保护 Eval 证据；模型请求本身不能从中断 token 续传，但已持久化的工具边界不会重放。
 - 将 Eval 原始 trace 从临时目录固化为可携带的发布证据。
 
 当前风险：
@@ -68,12 +68,10 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 - 活跃 Provider 请求不能从中断 token 续传；重启后只能从最近持久化阶段重新请求模型，不能续接原网络流。
 - 终端会话和屏幕输出仍在内存，Runtime 重启会终止会话。
 - `.project-os/` 仍作为非破坏性迁移源和 tracked 治理兼容文件；预检发现 9 处与 active namespace 不一致的历史文件，当前不能删除。
-- 受保护 Eval 仍需要真实 Provider 凭据；本机离线回归不能替代其网络中断与多文件轨迹。
 - 受保护 Agent Eval 现使用 active `.omnidesk` 命名空间；迁移兼容映射仍被旧项目读取路径使用，不能提前删除。
 - 命名空间映射仍接受 `.project-os/...` 作为兼容逻辑路径；在旧调用者退役前，不能把字符串搜索结果误判为物理旧路径仍在被读写。
 
 ## 下一步重点
 
-1. 在受保护环境运行真实 Provider Eval，补齐网络中断与大型多文件修复 trace。
-2. 为 9 处不一致 legacy 文件执行显式保留归档，再由用户确认清理 `.project-os`。
-3. 完成真实 Eval、归档与删除后的全量验收，移除迁移兼容层。
+1. 为 9 处不一致 legacy 文件执行显式保留归档，再由用户确认清理 `.project-os`。
+2. 完成归档与删除后的全量验收，移除迁移兼容层。
