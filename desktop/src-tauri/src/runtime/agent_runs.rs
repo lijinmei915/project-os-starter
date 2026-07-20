@@ -117,7 +117,7 @@ pub fn recover_stale(root: &Path, timestamp: &str) -> Result<(), String> {
         for mut run in list_from_repository(repository)? {
             if !matches!(
                 run.status.as_str(),
-                "queued" | "running" | "applying" | "verifying"
+                "queued" | "running" | "awaiting-approval" | "applying" | "verifying"
             ) {
                 continue;
             }
@@ -298,6 +298,27 @@ mod tests {
         assert_eq!(approved.status, "awaiting-approval");
         assert_eq!(approved.approval_token, "token-1");
         assert_eq!(approved.approval.unwrap()["status"], "approved");
+    }
+
+    #[test]
+    fn resume_keeps_a_pending_approval_checkpoint() {
+        let root = std::env::temp_dir().join(format!(
+            "omnidesk-agent-checkpoint-{}",
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        let mut run = new_hermes_run(
+            "run-checkpoint".to_string(), "request-1".to_string(), "project-1".to_string(),
+            "test".to_string(), 20, String::new(), "now",
+        );
+        run.status = "awaiting-approval".to_string();
+        run.summary = "等待写入审批。".to_string();
+        run.approval = Some(json!({ "token": "approval-1", "status": "pending" }));
+        persist(&root, &run).unwrap();
+        recover_stale(&root, "later").unwrap();
+        let resumed = resume(&root, "run-checkpoint", "resume").unwrap();
+        assert_eq!(resumed.status, "awaiting-approval");
+        assert_eq!(resumed.checkpoint.phase, "awaiting-approval");
+        assert_eq!(resumed.approval.as_ref().unwrap()["token"], "approval-1");
     }
 
     #[test]
