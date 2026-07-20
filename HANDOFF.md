@@ -15,7 +15,9 @@ depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
 
 ## 接手摘要
 
-- 2026-07-20 常规 CI 已完成单内核收敛：`.github/workflows/ci.yml` 只保留 `Desktop runtime regression` 与 `Repository contracts`。原 `Project OS regression` 中的 CLI 编译、`bin/project-os` 状态同步、`tests/run-tests.sh`、installer/模板回归、AI 工程报告生成和 `.project-os` artifact 上传已全部移出 CI；仓库契约仅校验 tracked state/manifest JSON、frontmatter、文档结构与密钥安全。YAML 解析和新 job 的实际命令均通过。剩余旧产品测试仍在本地 `tests/run-tests.sh`，受保护 Agent Eval 仍使用 legacy Provider 逻辑路径，下一批不能直接删除整个旧工具目录。
+- 2026-07-21 本地总回归已完成单内核收敛：`tests/run-tests.sh` 从 466 行 Project OS 分发/安装/报告/图谱测试收缩为 OmniDesk 离线发布门槛，覆盖 tracked state、仓库文档契约、Desktop Node、Web build、首屏预算、离线 Eval 基线和 Runtime Rust。它不再调用 CLI、installer、模板、AI 工程报告或图谱生成，也不再写入临时 `.project-os` 运行产物。验证：完整入口通过，Desktop Node 442/442、Runtime Rust 71/71、Patch Normalizer 5/5、首屏 796.88/800 KiB、Eval 基线均通过。
+
+- 2026-07-20 常规 CI 已完成单内核收敛：`.github/workflows/ci.yml` 只保留 `Desktop runtime regression` 与 `Repository contracts`。原 `Project OS regression` 中的 CLI 编译、`bin/project-os` 状态同步、`tests/run-tests.sh`、installer/模板回归、AI 工程报告生成和 `.project-os` artifact 上传已全部移出 CI；仓库契约仅校验 tracked state/manifest JSON、frontmatter、文档结构与密钥安全。YAML 解析和新 job 的实际命令均通过。受保护 Agent Eval 仍使用 legacy Provider 逻辑路径，下一批不能直接删除整个旧工具目录。
 
 - 2026-07-20 Desktop 已断开旧 Project OS 治理执行链：Tauri Runtime 不再编译 `runtime::governance`，不再暴露 `run_project_os_action`，也不再通过 `bin/project-os` 或治理 Shell 脚本执行扫描、报告、建议和清理。受控检查现仅允许 Desktop Node、Web build 与 Cargo check；Preview 的“刷新事实”只重新读取只读 snapshot。旧 `governance.rs` 暂留给 CLI 兼容调用，本地 `tests/run-tests.sh` 和文档仍有真实旧工具依赖，未提前删除。命名空间迁移曾使共享 Repository 在旧 CLI crate 缺少 `runtime::state_namespace`，现以冻结兼容桥补齐并加入消费 crate 回归约束。验证：Desktop Node 442/442、Runtime Rust 71/71、Patch Normalizer 5/5、CLI Rust 16/16、Web build、首屏 796.88/800 KiB、Desktop 生产引用扫描和全仓库 `tests/run-tests.sh` 通过。
 

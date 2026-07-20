@@ -53,7 +53,7 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 正在做：
 
 - 将产品与文档 SSOT 收敛到 OmniDesk Desktop Runtime。
-- 继续断开仓库测试和文档对旧 Project OS 分发工具链的真实依赖。
+- 继续断开遗留文档、受保护 Eval 和迁移兼容层对旧 Project OS 分发工具链的真实依赖。
 - 将长任务恢复从“整轮重试”提升为持久化 checkpoint 后按阶段恢复。
 - 将 Eval 原始 trace 从临时目录固化为可携带的发布证据。
 
@@ -62,14 +62,14 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 - 活跃 Provider 请求不能从中断 token 续传，只能基于 checkpoint 重新执行当前阶段。
 - 终端会话和屏幕输出仍在内存，Runtime 重启会终止会话。
 - `.project-os/` 仍作为非破坏性迁移源和 tracked 治理兼容文件；在 `AGENTS.md` 和旧工具链改用新 SSOT 前不能删除。
-- 旧 CLI、scripts、templates、adapters 与本地全量测试、文档仍有真实依赖，不能直接整目录删除；Desktop 生产运行时与常规 CI 已不再依赖它们。
+- 旧 CLI、scripts、templates、adapters 与部分遗留文档、受保护 Eval 和迁移兼容层仍有真实依赖，不能直接整目录删除；Desktop 生产运行时、常规 CI 和本地总回归已不再依赖它们。
 - 受保护 Agent Eval 仍通过 legacy `.project-os/desktop-provider.json` 逻辑路径注入临时 Provider；切换到 active `.omnidesk` artifact 前不能删除兼容映射。
 - 命名空间映射仍接受 `.project-os/...` 作为兼容逻辑路径；在旧调用者退役前，不能把字符串搜索结果误判为物理旧路径仍在被读写。
 
 ## 下一步重点
 
-1. 拆除 `tests/run-tests.sh` 中 CLI、installer、模板分发、报告和图谱的旧产品回归，只保留仍有 owner 的仓库契约。
-2. 删除不再被 Desktop 或 CI 使用的 governance bridge，并继续收敛 CLI、scripts、templates、adapters 与 routing skill。
+1. 将受保护 Eval 的临时 Provider 与 trace artifact 切换到 active `.omnidesk` 命名空间。
+2. 删除不再被 Desktop、CI 或本地回归使用的 governance bridge，并继续收敛 CLI、scripts、templates、adapters 与 routing skill。
 3. 持久化长任务 request checkpoint、阶段、上下文摘要和最后确认点，并覆盖网络中断、应用重启和多文件恢复。
 4. 将 Eval 原始 trace 固化为稳定 artifact，补齐原生端、中断和大型任务发布门槛。
 5. 完成全量验收后按保留策略清理 `.project-os` 历史产物和兼容层。

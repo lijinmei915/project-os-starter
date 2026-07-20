@@ -70,18 +70,19 @@
       "Runtime 启动激活、冲突回退与 Preview 路径切换",
       "状态目录与 Agent 工程文件读取隔离",
       "Desktop Runtime 与旧 Project OS governance 执行链断开",
-      "常规 CI 与旧 CLI、installer 和 AI 工程报告链断开"
+      "常规 CI 与旧 CLI、installer 和 AI 工程报告链断开",
+      "本地总回归与旧 CLI、installer、模板、报告和图谱链断开"
     ],
     "doing": [
       "OmniDesk 产品与文档 SSOT 单内核收敛",
-      "仓库测试与文档的旧 Project OS 依赖退役",
+      "遗留文档、受保护 Eval 与迁移兼容层的旧 Project OS 依赖退役",
       "长任务 checkpoint 恢复",
       "Eval trace 稳定证据化"
     ],
     "blocked": [],
     "next": [
-      "拆除 tests/run-tests.sh 的旧 CLI、installer、模板和报告回归",
-      "删除无生产或 CI 消费者的 governance bridge",
+      "将受保护 Eval 的临时 Provider 和 trace artifact 切换到 active .omnidesk 命名空间",
+      "删除无生产、CI 或本地回归消费者的 governance bridge",
       "增加网络中断、应用重启和多文件任务恢复验收",
       "清理历史运行产物和兼容层"
     ]

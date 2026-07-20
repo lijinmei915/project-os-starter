@@ -1,9 +1,9 @@
 ---
 layer: knowledge
 type: guide
-last_verified: 2026-07-09
-teaches: "常用操作命令、检查流程、发布步骤和故障处理手册"
-use_when: "AI 需要执行日常运维操作、排查故障、或指导用户完成发布流程时"
+last_verified: 2026-07-21
+teaches: "OmniDesk 的本地自检、发布门槛和运行故障处理"
+use_when: "AI 需要执行 OmniDesk 日常自检、排查运行问题或指导发布时"
 ---
 
 # 运行手册
@@ -18,67 +18,25 @@ use_when: "AI 需要执行日常运维操作、排查故障、或指导用户完
 
 ```bash
 bash tests/run-tests.sh
-bash scripts/check-runtime.sh .
-bash scripts/ai-project.sh report .
-bash scripts/build-project-graph.sh .
-bash scripts/check-template-sync.sh . --strict
-bash tests/screenshot-regression.sh
+npm --prefix desktop run test:native
 ```
 
 预期：
 
 ```txt
-Result: completed with 0 warning(s).
-AI 工程上下文完整度：.../100
-AI 工程成熟度：.../100
+OmniDesk regression passed
 ```
 
-本地纯扫描降噪：
-
-```bash
-PROJECT_OS_ALLOW_EMPTY_PROVIDER_KEYS=1 PROJECT_OS_SKIP_SCREENSHOT=1 bash tests/run-tests.sh
-```
+旧 Project OS 模板同步、临时安装和 AI 工程报告已冻结，不属于 OmniDesk 发布或故障处理流程。
 
 ## 同步模板
 
-源仓库 runtime 变化后：
-
-```bash
-bash scripts/sync-templates.sh .
-bash scripts/check-template-sync.sh . --strict
-```
-
-说明：
-只同步目标项目需要的 runtime 模板，不同步源仓库自己的交接历史。
-
-## 安装到临时项目验收
-
-优先运行完整回归入口：
-
-```bash
-bash tests/run-tests.sh
-```
-
-需要手动拆开排查时，再运行：
-
-```bash
-tmp_dir="$(mktemp -d)"
-mkdir -p "$tmp_dir/core" "$tmp_dir/product" "$tmp_dir/full"
-
-bash scripts/install-project-os.sh "$tmp_dir/core" --profile core
-bash "$tmp_dir/core/scripts/check-runtime.sh" "$tmp_dir/core"
-
-bash scripts/install-project-os.sh "$tmp_dir/product" --profile product
-bash "$tmp_dir/product/scripts/check-runtime.sh" "$tmp_dir/product"
-
-bash scripts/install-project-os.sh "$tmp_dir/full" --profile full
-bash "$tmp_dir/full/scripts/check-runtime.sh" "$tmp_dir/full"
-```
+旧模板、安装 profile 与 adapter 仅作为迁移源保留。它们不再作为常规发布入口、CI 门槛或新项目接入方案；删除前必须先完成状态迁移和依赖审计。
 
 ## 发布前检查
 
 1. 运行本地自检
-2. 试装 `core` / `product` / `full`
+2. 运行原生窗口 smoke（受支持环境）
 3. 查看 `git diff --stat`
 4. 更新 `PROJECT.md` / `HANDOFF.md`
 5. 如有结构性改动，更新 `docs/CHANGELOG.md`
@@ -89,12 +47,7 @@ GitHub 上的 CI 会在 push 和 pull request 时自动运行：
 .github/workflows/ci.yml
 ```
 
-当前 CI 会执行 shell 语法检查、JSON 解析、`tests/run-tests.sh`、报告生成和 tracked files 变更检查。
-CI 还会运行原生 `project-os` CLI，生成 `Entry Context` 并验证 `project-os.cli-result.v0.1` 结构化输出。
-如果运行环境提供可用浏览器，截图回归会额外生成报告页截图。
-如果仓库存在截图 baseline，截图回归会继续做真实像素 diff。
-报告页模板位于 `templates/report/ai-project-report.html`，如果 HTML 报告生成失败，优先检查该模板是否随 `core` profile 一起安装。
-跨工具 adapter 分发由 `tests/run-tests.sh` 里的 adapter install 段覆盖。
+当前 CI 运行 Desktop Runtime 回归，以及 tracked state/manifest JSON、frontmatter、文档结构和密钥安全。受保护 Agent Eval 另外保留真实 trace artifact；常规 CI 不调用模型密钥。
 
 ## 恢复方式
 
