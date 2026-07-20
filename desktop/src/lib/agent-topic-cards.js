@@ -39,7 +39,7 @@ export function buildAgentTopicCards({
     "current-goal": [["当前目标", currentGoalTitle], ["目标状态", activeGoal ? goalStatusLabel(activeGoal.status) : "空"], ["目标总数", `${goalCount}`]],
     "acceptance-criteria": [["验收状态", snapshot?.goalValidationReport?.status || "missing"], ["检查项", validationChecks.length ? `${passedChecks}/${validationChecks.length}` : "待补齐"], ["来源", ".project-os/goal-validation.json"]],
     "goal-history": [["已完成", `${domains?.doneGoals || 0}`], ["进行中", `${domains?.openGoals || 0}`], ["历史来源", ".project-os/goals.json"]],
-    "collaboration-boundary": [["规则来源", "AGENTS.md"], ["路由来源", "docs/ROUTING.md"], ["状态", "已接入"]],
+    "collaboration-boundary": [["规则来源", "AGENTS.md"], ["状态", "已接入"]],
     "execution-permissions": [["自动边界", "受控命令"], ["确认边界", "写入/发布/高风险"], ["状态", "规则已接入"]],
     "documentation-rules": [["文档边界", "DOCUMENTATION"], ["命名规则", "NAMING"], ["状态", "已接入"]],
     "system-architecture": [["架构来源", "docs/ARCHITECTURE.md"], ["实现入口", "desktop/src"], ["状态", "待细化"]],

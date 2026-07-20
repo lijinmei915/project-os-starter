@@ -53,7 +53,6 @@
     {"id":"docs/PROJECT_MEMORY_AND_RUNNER.md","teaches":"Project OS Console 的项目记忆、后台执行器、写回规则和人工确认边界","useWhen":"设计云上开发、后台体检、Goal Runner、自动生成和项目状态写回时","layer":"governance","type":"spec","stale":false},
     {"id":"docs/RECOMMENDATION_ENGINE.md","teaches":"Project OS 推荐引擎如何用项目证据推导缺口、推荐文件、原因、置信度和检查方式","useWhen":"AI 要解释为什么推荐某个文件、修改推荐逻辑、或把向导从规则映射升级为证据驱动时","layer":"knowledge","type":"spec","stale":false},
     {"id":"docs/REFERENCE_SYSTEMS.md","teaches":"OmniDesk 和 Hermes、Claude Projects、Cursor 等成熟工具的关系、借鉴边界和接入策略","useWhen":"评估是否接入成熟治理工程、比较 Hermes 等工具、或决定 OmniDesk 该借鉴什么不借鉴什么时","layer":"knowledge","type":"spec","stale":false},
-    {"id":"docs/ROUTING.md","teaches":"Project OS 的请求分流、安装入口、v1 路由契约和固定第一响应","useWhen":"AI 需要判断用户请求该进入 INSTALL、INIT、AUDIT、HYBRID、CLARIFICATION 或领域 skill 时","layer":"governance","type":"spec","stale":false},
     {"id":"docs/RUNBOOK.md","teaches":"常用操作命令、检查流程、发布步骤和故障处理手册","useWhen":"AI 需要执行日常运维操作、排查故障、或指导用户完成发布流程时","layer":"knowledge","type":"guide","stale":false},
     {"id":"docs/SKILL_ENGINEERING.md","teaches":"Agent Skill 工程的证据推导、文件边界、生成策略和分发约束","useWhen":"AI 要生成、评审或收口一个 Agent Skill / Codex Skill / Project OS Skill 工程时","layer":"knowledge","type":"spec","stale":false},
     {"id":"docs/TEMPLATE_GOVERNANCE.md","teaches":"模板文件的归属层、自动勾选条件和新增模板的接入流程","useWhen":"AI 要新增模板文件、修改向导自动勾选逻辑、或检查模板是否同步时","layer":"governance","type":"spec","stale":false},

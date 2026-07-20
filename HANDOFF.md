@@ -15,6 +15,8 @@ depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
 
 ## 接手摘要
 
+- 2026-07-21 已删除 `docs/ROUTING.md` 及 `.agents/`、`.claude/` 中的 Project OS 路由、命令、hook 和 skill 分发副本；文档清单与知识登记同步移除该退役规则。Desktop 工作区的协作、安全边界来源统一指向 `AGENTS.md`，不再展示不存在的路由或 Skill 入口。验证：文档结构 30、frontmatter 59、Desktop Node 443/443 与 diff check 通过。下一步先重写或退役仍描述旧分发链的治理文档，再按消费者审计删除 templates 与 installer scripts；`.project-os` 仍是迁移兼容源，暂不能删除。
+
 - 2026-07-21 `adapters/` 六个跨工具分发文件已物理删除。`REFERENCE_SYSTEMS.md` 改为描述 OmniDesk Runtime 内置的 Hermes ACP/Provider 边界，工作区元数据也不再保留 adapter 状态源；Hermes 仍只能生成草案，写入继续经授权、Diff 校验与独立审批。验证：文档结构、frontmatter、Desktop Node 443/443 与 diff check 通过。旧 installer、模板和 routing 文档中的历史引用仍待同批退役，不能把它们误作活入口。
 
 - 2026-07-21 `README.md` 与 `INSTALL.md` 已改为 OmniDesk Desktop 的启动、验证和状态迁移入口，不再宣传 Project OS 安装 profile、模板复制、adapter 生成或旧 CLI。Desktop 项目接入改由 Runtime 的工作区选择、扫描与权限控制承担。验证：文档结构、frontmatter 与 diff check 通过。此后旧 installer、templates 与 adapters 不再拥有对外入口消费者，但旧治理文档内部引用仍需按批清理。

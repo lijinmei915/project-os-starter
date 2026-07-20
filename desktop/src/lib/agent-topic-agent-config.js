@@ -18,7 +18,7 @@ export function agentConfigCapabilitySpec(topicId, provider) {
       title: "安全边界", status: "规则已接入", tone: "success",
       value: "让接入项目明确哪些动作必须确认、哪些文件不能动、哪些信息不能外传。",
       next: "把 AGENTS.md 的禁止行为、确认动作和密钥规则整理成可视化边界。",
-      files: ["AGENTS.md", "docs/ROUTING.md", "docs/DOCUMENTATION.md", "docs/LESSONS.md"],
+      files: ["AGENTS.md", "docs/DOCUMENTATION.md", "docs/LESSONS.md"],
     },
   };
   return specs[topicId] || null;

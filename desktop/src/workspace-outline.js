@@ -26,7 +26,7 @@ const governanceMeta = {
     updatesWhen: "目标、用户、场景、范围或成功标准变化时更新。",
   },
   "工作规则": {
-    files: ["AGENTS.md", "docs/ROUTING.md", "docs/DOCUMENTATION.md", "docs/NAMING.md"],
+    files: ["AGENTS.md", "docs/DOCUMENTATION.md", "docs/NAMING.md"],
     governanceRole: "协作治理入口，约束 AI 行为、权限、文档归属和路由。",
     maturity: "闭环",
     nextAction: "规则变化时同步模板并跑对应治理检查。",
@@ -113,7 +113,6 @@ const itemMeta = {
   "脚本模板": { statusSource: "scripts/*" },
   "模型连接": { statusSource: ".project-os/desktop-provider.json" },
   "工具白名单": { statusSource: "desktop/src-tauri/src/main.rs" },
-  "Skill 能力": { statusSource: ".agents/skills/*" },
   "安全边界": { statusSource: "docs/AI_SAFETY.md" },
 };
 
@@ -236,8 +235,8 @@ export const projectGovernanceFlow = [
     icon: "shield",
     description: "协作方式和权限。",
     items: [
-      { id: "collaboration-boundary", title: "协作边界", description: "AI 和用户如何分工。", relatedFiles: ["AGENTS.md", "docs/ROUTING.md"] },
-      { id: "execution-permissions", title: "执行权限", description: "自动和确认边界。", relatedFiles: ["AGENTS.md", "docs/ROUTING.md"] },
+      { id: "collaboration-boundary", title: "协作边界", description: "AI 和用户如何分工。", relatedFiles: ["AGENTS.md"] },
+      { id: "execution-permissions", title: "执行权限", description: "自动和确认边界。", relatedFiles: ["AGENTS.md"] },
       { id: "documentation-rules", title: "文档规则", description: "信息归属位置。", relatedFiles: ["docs/DOCUMENTATION.md", "docs/NAMING.md"] },
     ],
   },

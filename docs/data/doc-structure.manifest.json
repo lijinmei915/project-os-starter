@@ -179,13 +179,6 @@
       "forbiddenOverlap": ["具体 UI 微调", "一次性竞品截图流水", "未经确认的市场宣传结论"]
     },
     {
-      "file": "docs/ROUTING.md",
-      "responsibility": "Project OS 路由模式、入口响应和验收输入规则",
-      "ssotFor": ["AI 请求应该怎么分流"],
-      "requiredSections": ["Project OS Installation Entry", "路由模式", "增量意图契约"],
-      "forbiddenOverlap": ["产品介绍", "具体页面实现"]
-    },
-    {
       "file": "docs/RUNBOOK.md",
       "responsibility": "常见操作、故障处理、发布前检查和恢复方式",
       "ssotFor": ["常见操作和故障怎么处理"],
