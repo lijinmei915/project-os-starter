@@ -3764,6 +3764,10 @@ async fn run_hermes_agent(
     running_run.revision = 1;
     running_run.updated_at = current_timestamp_string();
     running_run.summary = "Hermes 正在读取上下文并形成结果。".to_string();
+    running_run.checkpoint.phase = "running".to_string();
+    running_run.checkpoint.context_summary = running_run.summary.clone();
+    running_run.checkpoint.last_confirmation = None;
+    running_run.checkpoint.next_action = "resume-stage".to_string();
     let running_evidence_at = running_run.updated_at.clone();
     crate::runtime::agent_runs::append_evidence(
         &mut running_run,
@@ -3816,6 +3820,16 @@ async fn run_hermes_agent(
         .as_ref()
         .ok()
         .and_then(|value| value.approval.clone());
+    finished_run.checkpoint.phase = finished_run.status.clone();
+    finished_run.checkpoint.context_summary = finished_run.summary.clone();
+    finished_run.checkpoint.last_confirmation = finished_run.approval.clone();
+    finished_run.checkpoint.next_action = if finished_run.status == "awaiting-approval" {
+        "resume-approval".to_string()
+    } else if matches!(finished_run.status.as_str(), "failed" | "cancelled" | "succeeded") {
+        "none".to_string()
+    } else {
+        "resume-stage".to_string()
+    };
     let evidence_phase = if finished_run.status == "awaiting-approval" { "approval" } else { "result" };
     let evidence_details = result.as_ref().map(|value| json!({
         "step": value.step,

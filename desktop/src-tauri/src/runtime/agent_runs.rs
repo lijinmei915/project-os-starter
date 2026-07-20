@@ -6,6 +6,15 @@ use std::path::Path;
 const AGENT_RUN_SCHEMA_VERSION: &str = "omnidesk.agent-run.v0.1";
 const AGENT_RUN_DIRECTORY: &str = ".project-os/runs/agent-runs";
 
+#[derive(Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentRunCheckpoint {
+    pub phase: String,
+    pub context_summary: String,
+    pub last_confirmation: Option<Value>,
+    pub next_action: String,
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct PersistedAgentRun {
@@ -35,6 +44,8 @@ pub struct PersistedAgentRun {
     pub repair_attempt: usize,
     #[serde(default)]
     pub evidence: Vec<Value>,
+    #[serde(default)]
+    pub checkpoint: AgentRunCheckpoint,
 }
 
 pub fn append_evidence(run: &mut PersistedAgentRun, phase: &str, summary: impl Into<String>, details: Value, timestamp: &str) {
@@ -110,6 +121,13 @@ pub fn recover_stale(root: &Path, timestamp: &str) -> Result<(), String> {
             ) {
                 continue;
             }
+            let prior_phase = run.status.clone();
+            run.checkpoint = AgentRunCheckpoint {
+                phase: prior_phase,
+                context_summary: run.summary.clone(),
+                last_confirmation: run.approval.clone(),
+                next_action: if run.approval.is_some() { "resume-approval".to_string() } else { "resume-stage".to_string() },
+            };
             run.status = "interrupted".to_string();
             run.revision += 1;
             run.updated_at = timestamp.to_string();
@@ -130,11 +148,15 @@ pub fn resume(root: &Path, id: &str, timestamp: &str) -> Result<PersistedAgentRu
         if run.prompt.trim().is_empty() {
             return Err("该 Agent Run 没有保存执行提示，不能恢复。".to_string());
         }
-        run.status = "awaiting-approval".to_string();
+        run.status = if run.checkpoint.next_action == "resume-approval" && run.approval.is_some() {
+            "awaiting-approval".to_string()
+        } else {
+            "queued".to_string()
+        };
         run.attempt += 1;
         run.revision += 1;
         run.updated_at = timestamp.to_string();
-        run.summary = "已恢复，等待重新启动 Hermes。".to_string();
+        run.summary = format!("已从 {} 阶段恢复，等待 {}。", run.checkpoint.phase, if run.status == "awaiting-approval" { "原审批" } else { "重新调度" });
         Ok((run.clone(), vec![mutation(&run)?]))
     })
 }
@@ -199,6 +221,12 @@ pub fn new_hermes_run(
         approval: None,
         approval_token,
         repair_attempt: 0,
+        checkpoint: AgentRunCheckpoint {
+            phase: "queued".to_string(),
+            context_summary: "Agent Run 已创建。".to_string(),
+            last_confirmation: None,
+            next_action: "start".to_string(),
+        },
         evidence: vec![json!({
             "phase": "result",
             "recordedAt": timestamp,
@@ -222,7 +250,7 @@ mod tests {
                 .unwrap()
                 .as_nanos()
         ));
-        let running = new_hermes_run(
+        let mut running = new_hermes_run(
             "run-running".to_string(),
             "request-1".to_string(),
             "project-1".to_string(),
@@ -231,6 +259,7 @@ mod tests {
             String::new(),
             "now",
         );
+        running.status = "running".to_string();
         let mut done = running.clone();
         done.id = "run-done".to_string();
         done.status = "succeeded".to_string();
@@ -238,6 +267,9 @@ mod tests {
         persist(&root, &done).unwrap();
         recover_stale(&root, "later").unwrap();
         assert_eq!(load(&root, "run-running").unwrap().status, "interrupted");
+        let recovered = load(&root, "run-running").unwrap();
+        assert_eq!(recovered.checkpoint.phase, "running");
+        assert_eq!(recovered.checkpoint.next_action, "resume-stage");
         assert_eq!(load(&root, "run-done").unwrap().status, "succeeded");
     }
 
