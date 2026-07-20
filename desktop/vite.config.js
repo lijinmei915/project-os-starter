@@ -8,6 +8,7 @@ import react from "@vitejs/plugin-react";
 import { reconcileTaskFileNames } from "./src/lib/task-manifest.js";
 import { guardedCheckCapability } from "./src/conversation-runtime/capabilities.js";
 import { runtimeOperations } from "./src/lib/runtime-operation-contract.js";
+import { namespaceManifestPath, resolvedStateRelativePath } from "./src/lib/state-namespace.js";
 
 const execFileAsync = promisify(execFile);
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -37,19 +38,36 @@ function embeddedBrowserCompatibility() {
   };
 }
 const previewFiles = new Map([
-  ["/.project-os/desktop-provider.json", path.join(rootDir, ".project-os/desktop-provider.json")],
-  ["/.project-os/model-catalog.json", path.join(rootDir, ".project-os/model-catalog.json")],
-  ["/.project-os/model-health.json", path.join(rootDir, ".project-os/model-health.json")],
-  ["/.project-os/project-profile.json", path.join(rootDir, ".project-os/project-profile.json")],
-  ["/.project-os/project-capabilities.json", path.join(rootDir, ".project-os/project-capabilities.json")],
-  ["/.project-os/workspace-facts.json", path.join(rootDir, ".project-os/workspace-facts.json")],
-  ["/.project-os/desktop-registry.json", path.join(rootDir, ".project-os/desktop-registry.json")],
-  ["/.project-os/task-backlog.json", path.join(rootDir, ".project-os/task-backlog.json")],
-  ["/.project-os/goals.json", path.join(rootDir, ".project-os/goals.json")],
-  ["/.project-os/goal-validation.json", path.join(rootDir, ".project-os/goal-validation.json")],
-  ["/.project-os/goal-validation-report.json", path.join(rootDir, ".project-os/goal-validation-report.json")],
-  ["/.project-os/goal-signoff-history.json", path.join(rootDir, ".project-os/goal-signoff-history.json")],
+  ["/.project-os/desktop-provider.json", ".project-os/desktop-provider.json"],
+  ["/.project-os/model-catalog.json", ".project-os/model-catalog.json"],
+  ["/.project-os/model-health.json", ".project-os/model-health.json"],
+  ["/.project-os/project-profile.json", ".project-os/project-profile.json"],
+  ["/.project-os/project-capabilities.json", ".project-os/project-capabilities.json"],
+  ["/.project-os/workspace-facts.json", ".project-os/workspace-facts.json"],
+  ["/.project-os/desktop-registry.json", ".project-os/desktop-registry.json"],
+  ["/.project-os/task-backlog.json", ".project-os/task-backlog.json"],
+  ["/.project-os/goals.json", ".project-os/goals.json"],
+  ["/.project-os/goal-validation.json", ".project-os/goal-validation.json"],
+  ["/.project-os/goal-validation-report.json", ".project-os/goal-validation-report.json"],
+  ["/.project-os/goal-signoff-history.json", ".project-os/goal-signoff-history.json"],
 ]);
+
+export function stateNamespaceActive(projectRoot) {
+  try {
+    const manifest = JSON.parse(fs.readFileSync(path.join(projectRoot, namespaceManifestPath), "utf8"));
+    return manifest?.activeNamespace === "omnidesk";
+  } catch {
+    return false;
+  }
+}
+
+export function resolvedProjectRelativePath(projectRoot, relativePath) {
+  return resolvedStateRelativePath(relativePath, stateNamespaceActive(projectRoot));
+}
+
+export function resolvedProjectPath(projectRoot, relativePath) {
+  return path.join(projectRoot, resolvedProjectRelativePath(projectRoot, relativePath));
+}
 
 function sendJson(res, statusCode, payload) {
   res.statusCode = statusCode;
@@ -160,11 +178,7 @@ function generatePatchDraftPreview(input = {}) {
 }
 
 function readProjectJson(relativePath, fallback) {
-  try {
-    return JSON.parse(fs.readFileSync(path.join(rootDir, relativePath), "utf8"));
-  } catch {
-    return fallback;
-  }
+  return readJsonAt(rootDir, relativePath, fallback);
 }
 
 function runbookCommandsPreview(projectRoot) {
@@ -184,7 +198,7 @@ function runbookCommandsPreview(projectRoot) {
 
 function isIgnoredPreviewPath(filePath) {
   const name = path.basename(filePath);
-  return [".git", ".project-os", "node_modules", "target", "dist", "build", "tmp", ".cache", ".next", ".nuxt", ".vite", ".turbo", "coverage", ".DS_Store", "__pycache__"].includes(name)
+  return [".git", ".project-os", ".omnidesk", "node_modules", "target", "dist", "build", "tmp", ".cache", ".next", ".nuxt", ".vite", ".turbo", "coverage", ".DS_Store", "__pycache__"].includes(name)
     || (name.startsWith(".env") && name !== ".env.example");
 }
 
@@ -223,7 +237,7 @@ function buildTreePreview(projectRoot) {
 
 function safePreviewPath(relativePath) {
   const text = String(relativePath || "").trim();
-  if (!text || text.startsWith(".env") || text.includes("/.env") || text.includes(".project-os/desktop-provider")) return "";
+  if (!text || text.startsWith(".env") || text.includes("/.env") || text === ".omnidesk" || text.startsWith(".omnidesk/") || text.includes(".project-os/desktop-provider")) return "";
   const normalized = path.normalize(text);
   if (path.isAbsolute(normalized) || normalized.startsWith("..") || normalized.includes(`..${path.sep}`)) return "";
   return normalized;
@@ -239,7 +253,7 @@ function readEngineeringFilePreview(input) {
   const relativePath = safePreviewPath(input?.path);
   if (!relativePath) return { error: "这个文件暂不支持预览。" };
 
-  const filePath = path.resolve(projectRoot, relativePath);
+  const filePath = path.resolve(resolvedProjectPath(projectRoot, relativePath));
   if (!filePath.startsWith(path.resolve(projectRoot))) return { error: "只能预览当前项目内的文件。" };
   if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) return { error: "没有找到这个文件。" };
 
@@ -260,7 +274,7 @@ function readEngineeringFilePreview(input) {
 function agentToolIgnoredPreview(filePath) {
   const parts = filePath.split(path.sep);
   const name = path.basename(filePath);
-  return parts.some((part) => [".git", "node_modules", "target", "dist", "build", ".next", ".nuxt", ".vite", ".turbo", ".cache", "coverage", "__pycache__"].includes(part))
+  return parts.some((part) => [".git", ".project-os", ".omnidesk", "node_modules", "target", "dist", "build", ".next", ".nuxt", ".vite", ".turbo", ".cache", "coverage", "__pycache__"].includes(part))
     || name.startsWith(".env") || name.endsWith(".lock") || name === "desktop-provider.json";
 }
 
@@ -323,7 +337,7 @@ function executeAgentReadToolPreview(input = {}) {
 
 function listAgentRunsPreview() {
   const { projectRoot } = currentPreviewProject();
-  const directory = path.join(projectRoot, ".project-os", "runs", "agent-runs");
+  const directory = resolvedProjectPath(projectRoot, ".project-os/runs/agent-runs");
   if (!fs.existsSync(directory)) return [];
   return fs.readdirSync(directory).filter((name) => name.endsWith(".json")).map((name) => {
     try { return JSON.parse(fs.readFileSync(path.join(directory, name), "utf8")); } catch { return null; }
@@ -356,11 +370,11 @@ function currentPreviewProject() {
 }
 
 function desktopTasksDir(projectRoot) {
-  return path.join(projectRoot, ".project-os/runs/desktop-tasks");
+  return resolvedProjectPath(projectRoot, ".project-os/runs/desktop-tasks");
 }
 
 function desktopConversationsDir(projectRoot) {
-  return path.join(projectRoot, ".project-os/runs/desktop-conversations");
+  return resolvedProjectPath(projectRoot, ".project-os/runs/desktop-conversations");
 }
 
 function safeTaskFileName(id) {
@@ -403,9 +417,9 @@ function listDesktopConversationsPreview() {
     .slice(0, 50);
 }
 
-function readJsonAt(projectRoot, relativePath, fallback) {
+export function readJsonAt(projectRoot, relativePath, fallback) {
   try {
-    return JSON.parse(fs.readFileSync(path.join(projectRoot, relativePath), "utf8"));
+    return JSON.parse(fs.readFileSync(resolvedProjectPath(projectRoot, relativePath), "utf8"));
   } catch {
     return fallback;
   }
@@ -422,7 +436,7 @@ const factSourcePaths = ["README.md", "PROJECT.md", "HANDOFF.md", "AGENTS.md", "
 
 function factSourceFingerprints(projectRoot) {
   return Object.fromEntries(factSourcePaths.flatMap((relative) => {
-    try { const stat = fs.statSync(path.join(projectRoot, relative)); return [[relative, `${stat.mtimeMs}:${stat.size}`]]; } catch { return []; }
+    try { const stat = fs.statSync(resolvedProjectPath(projectRoot, relative)); return [[relative, `${stat.mtimeMs}:${stat.size}`]]; } catch { return []; }
   }));
 }
 
@@ -437,7 +451,7 @@ function detectedProjectCapabilities(projectRoot) {
   const saved = readJsonAt(projectRoot, ".project-os/project-capabilities.json", { capabilities: [] });
   const savedWorkspaceCapabilities = saved.workspaceCapabilities || saved.capabilities || [];
   const savedById = new Map(savedWorkspaceCapabilities.map((item) => [item.id, item]));
-  const exists = (...paths) => paths.some((relative) => fs.existsSync(path.join(projectRoot, relative)));
+  const exists = (...paths) => paths.some((relative) => fs.existsSync(resolvedProjectPath(projectRoot, relative)));
   const specs = [
     ["project-overview", "enabled", ["core"]],
     ["tasks", "enabled", ["core"]],
@@ -458,7 +472,7 @@ function detectedProjectCapabilities(projectRoot) {
       id,
       status: detectedStatus,
       source: detectedStatus === "enabled" ? "core" : "scan",
-      signals: signals.filter((signal) => signal === "core" || fs.existsSync(path.join(projectRoot, signal))),
+      signals: signals.filter((signal) => signal === "core" || fs.existsSync(resolvedProjectPath(projectRoot, signal))),
     };
   });
   const packageText = ["package.json", "desktop/package.json"].map((relative) => {
@@ -703,7 +717,7 @@ function readDotenvValuePreview(key, projectRoot = rootDir) {
 
 function providerRevisionPreview(projectRoot) {
   try {
-    const stat = fs.statSync(path.join(projectRoot, ".project-os/desktop-provider.json"));
+    const stat = fs.statSync(resolvedProjectPath(projectRoot, ".project-os/desktop-provider.json"));
     return `${Math.floor(stat.mtimeMs)}-${stat.size}`;
   } catch {
     return "missing";
@@ -824,11 +838,12 @@ function projectOsPreviewFiles() {
           sendJson(res, result.error ? 500 : 200, result);
           return;
         }
-        const filePath = previewFiles.get(req.url || "");
-        if (!filePath) {
+        const relativeFilePath = previewFiles.get(req.url || "");
+        if (!relativeFilePath) {
           next();
           return;
         }
+        const filePath = resolvedProjectPath(rootDir, relativeFilePath);
         fs.readFile(filePath, "utf8", (err, content) => {
           if (err) {
             res.statusCode = 404;
@@ -852,7 +867,7 @@ export default defineConfig({
     strictPort: true,
     watch: {
       // Runtime data is owned by the desktop adapter, not the preview server.
-      ignored: ["**/.project-os/**"],
+      ignored: ["**/.project-os/**", "**/.omnidesk/**"],
     },
   },
   build: {

@@ -15,7 +15,7 @@ depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
 
 ## 接手摘要
 
-- 2026-07-20 状态命名空间迁移首批完成：新增 `desktop/schemas/state-layout.schema.json` 与 Runtime `state_namespace` 模块，将旧状态明确映射到 `.omnidesk/data`、`runtime`、`cache`、`evidence`。迁移器只复制不删除，重复执行保持幂等；目标内容不同时记录 conflict 且不覆盖，符号链接会跳过，未知路径保存在 `evidence/legacy-unclassified`。manifest 当前固定 `activeNamespace=legacy / readMode=legacy-primary`，尚未接入生产启动，也未切换领域读写，避免出现半迁移状态。验证：状态迁移定向 4/4、Runtime Rust 68/68、Patch Normalizer 5/5、文档结构与 Runtime 文档检查通过。
+- 2026-07-20 状态命名空间已接入生产 Runtime 与 Preview：启动会先恢复 legacy 事务，幂等复制到 `.omnidesk/data|runtime|cache|evidence`，无冲突时激活 `omnidesk-primary`，有冲突时继续使用 legacy 且不覆盖源或目标。Repository、Workspace、Provider、Task、Conversation、Agent Run、原生工作区投影和 Vite Preview 均经过同一逻辑路径映射；文件树、治理扫描和 Agent 读取工具隐藏两个物理状态目录。本批同时修复 macOS `/var -> /private/var` canonical root 使 Agent Tool 误判所有文件越界的问题。验证：Desktop Node 443/443、Runtime Rust 72/72、Patch Normalizer 5/5、Web build、Runtime docs、diff check 和首屏 797.81 KiB / 800 KiB 软预算通过。
 
 - 2026-07-20 `OmniDesk 单内核收敛与可靠长任务 v1` 第一阶段已开始：`PROJECT.md`、`.project-os/state.json` 与 `docs/ARCHITECTURE.md` 统一将 `desktop/` 的 React Workbench + Tauri Local Agent Runtime 定义为唯一产品内核；旧 Project OS CLI、安装器、评分报告、模板和 adapter 冻结为迁移兼容层，新产品能力不得继续进入旧工具链。目标状态根明确为 `.omnidesk/`，按 `data/runtime/cache/evidence` 分区，必须以幂等、可恢复迁移兼容 `.project-os/`，不能直接改名或删除。下一批实现状态命名空间契约、迁移器和回归；本批未触碰现有桌面交互改动，也未删除旧文件。
 

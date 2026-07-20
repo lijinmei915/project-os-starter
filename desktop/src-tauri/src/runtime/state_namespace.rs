@@ -222,6 +222,11 @@ pub fn state_path_for_write(root: &Path, relative_path: &str) -> Result<PathBuf,
     state_path_for_read(root, relative_path)
 }
 
+pub fn state_path_exists(root: &Path, relative_path: &str) -> bool {
+    state_path_for_read(root, relative_path)
+        .is_ok_and(|path| path.exists())
+}
+
 pub fn legacy_relative_from_absolute(path: &Path) -> Option<(PathBuf, String)> {
     let components = path.components().collect::<Vec<_>>();
     let legacy_index = components.iter().position(|component| {
@@ -442,6 +447,33 @@ mod tests {
             serde_json::from_slice(&fs::read(root.join(NAMESPACE_MANIFEST)).unwrap()).unwrap();
         assert_eq!(manifest["migration"]["status"], "conflicted");
         assert_eq!(manifest["activeNamespace"], "legacy");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn activation_refuses_conflicts_and_keeps_legacy_reads() {
+        let root = test_root("activation-conflict");
+        write_atomic(&root.join(".project-os/state.json"), br#"{"source":"legacy"}"#).unwrap();
+        write_atomic(
+            &root.join(".omnidesk/data/state.json"),
+            br#"{"source":"omnidesk"}"#,
+        )
+        .unwrap();
+
+        let outcome = ensure_active_state_namespace(&root).unwrap();
+        assert_eq!(
+            outcome.conflicts,
+            vec![".omnidesk/data/state.json".to_string()]
+        );
+        assert!(!namespace_is_active(&root));
+        assert_eq!(
+            state_path_for_read(&root, ".project-os/state.json").unwrap(),
+            root.join(".project-os/state.json")
+        );
+        assert_eq!(
+            fs::read(state_path_for_read(&root, ".project-os/state.json").unwrap()).unwrap(),
+            br#"{"source":"legacy"}"#
+        );
         fs::remove_dir_all(root).unwrap();
     }
 

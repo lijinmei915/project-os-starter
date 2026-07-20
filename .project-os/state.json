@@ -17,13 +17,16 @@
       "provider",
       "patch",
       "execution",
+      "state-namespace",
+      "agent-tools",
       "repository"
     ],
     "previewPolicy": "read-only",
     "stateNamespace": {
-      "current": ".project-os",
-      "target": ".omnidesk",
-      "mode": "migration-ready"
+      "current": ".omnidesk",
+      "legacy": ".project-os",
+      "manifest": ".omnidesk/namespace.json",
+      "mode": "active-with-conflict-fallback"
     },
     "legacyToolchain": {
       "status": "frozen",
@@ -43,6 +46,7 @@
     "requestCancellation": true,
     "lateResultRejection": true,
     "agentRunPersistence": true,
+    "stateNamespaceMigration": true,
     "stageCheckpointResume": false,
     "terminalSessionPersistence": false,
     "evalBaseline": {
@@ -60,19 +64,20 @@
       "对话流式输出、取消、接管与迟到结果拒绝",
       "受控 Patch、独立审批、检查与两轮修复",
       "12-case 真实 Agent Eval 基线",
-      ".omnidesk 四分区 schema 与非破坏性幂等迁移器"
+      ".omnidesk 四分区 schema 与非破坏性幂等迁移器",
+      "Runtime 启动激活、冲突回退与 Preview 路径切换",
+      "状态目录与 Agent 工程文件读取隔离"
     ],
     "doing": [
       "OmniDesk 产品与文档 SSOT 单内核收敛",
-      ".omnidesk Runtime 读写切换和兼容回退",
+      "旧 Project OS 工具链依赖盘点与退役",
       "长任务 checkpoint 恢复",
       "Eval trace 稳定证据化"
     ],
     "blocked": [],
     "next": [
-      "接入 Runtime 启动迁移准备",
-      "切换各领域状态读写和 Preview 路径",
-      "断开并退役旧 Project OS 工具链",
+      "建立旧工具链生产依赖清单和退役门槛",
+      "逐项断开 Desktop、CI、测试与文档引用",
       "增加网络中断、应用重启和多文件任务恢复验收",
       "清理历史运行产物和兼容层"
     ]

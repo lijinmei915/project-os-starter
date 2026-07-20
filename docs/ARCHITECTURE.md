@@ -57,8 +57,8 @@ Workbench UI
 | `desktop/evals/` | Agent 能力数据集、基线报告和发布门槛 |
 | `desktop/tests/` | 前端契约、工作流、状态机和边界回归 |
 | `docs/` | 长期架构、测试、决策和运行说明 |
-| `.omnidesk/` | 目标产品状态根；迁移完成前可能尚不存在 |
-| `.project-os/` | 兼容状态根；迁移完成后只允许回退读取，最终退役 |
+| `.omnidesk/` | 当前产品状态根；由 namespace manifest 激活后承担 Runtime 读写 |
+| `.project-os/` | 非破坏性迁移源；只在未激活或冲突回退时继续读写，最终退役 |
 | `cli/`, `scripts/`, `templates/`, `adapters/` | 冻结的旧工具链，待依赖断开后删除 |
 
 ## 运行路径
@@ -100,15 +100,15 @@ Agent Run 已持久化 attempt、审批、观察和终态。目标恢复模型�
 
 ```txt
 .project-os 检测
-  -> 迁移版本与锁
+  -> 恢复未完成 legacy 事务
   -> 分类复制到 .omnidesk
-  -> schema 校验
+  -> 内容比对与冲突检查
   -> 原子切换 active namespace
-  -> 兼容期回退读取
+  -> 恢复新 namespace 事务
   -> 验收后删除旧兼容数据
 ```
 
-迁移必须幂等、可审计、可恢复。不得用目录直接改名替代迁移，也不得在验证成功前删除源数据。
+迁移必须幂等、可审计、可恢复。不得用目录直接改名替代迁移，也不得在验证成功前删除源数据。出现任一目标内容冲突时，manifest 必须保持 `legacy / legacy-primary`；激活 `omnidesk / omnidesk-primary` 后不再回读可能已过期的 legacy 内容。
 
 ## 模块职责
 
@@ -123,6 +123,7 @@ Agent Run 已持久化 attempt、审批、观察和终态。目标恢复模型�
 | `patch` | unified diff 归一化、授权路径、hunk 和上下文校验 |
 | `execution` | 受控写入、检查、审计和执行结果 |
 | `repository` | schema、锁、原子事务、事件和异常恢复 |
+| `state_namespace` | 四分区路径映射、非破坏性迁移、冲突回退和激活 manifest |
 
 跨模块写入必须由 Runtime 领域服务在一个 Repository 事务内完成。React 只消费投影和调用明确 operation，不承担跨实体补偿逻辑。
 
@@ -138,6 +139,8 @@ Agent Run 已持久化 attempt、审批、观察和终态。目标恢复模型�
 | `evidence/` | Eval trace、Patch、检查和发布验收证据 | 按基线与发布策略保留 |
 
 Provider 密钥继续存放在受保护的环境文件或系统密钥能力中，不进入 Repository event、trace 或普通 JSON 状态。
+
+工程文件树、Agent 读取工具和默认治理扫描都必须隐藏 `.project-os/` 与 `.omnidesk/` 两个物理目录。界面在兼容期可继续使用 `.project-os/...` 逻辑路径，但真实读写必须经过 namespace resolver。
 
 ## 架构约束
 

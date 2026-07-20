@@ -71,7 +71,8 @@ fn source_fingerprints(root: &Path) -> serde_json::Map<String, Value> {
     source_paths()
         .into_iter()
         .filter_map(|relative| {
-            let metadata = fs::metadata(root.join(relative)).ok()?;
+            let path = crate::runtime::state_namespace::state_path_for_read(root, relative).ok()?;
+            let metadata = fs::metadata(path).ok()?;
             let modified = metadata
                 .modified()
                 .ok()?
@@ -131,7 +132,7 @@ pub fn detected_capabilities(root: &Path) -> Value {
         ("files", "enabled", vec!["core"]),
         (
             "goals",
-            if root.join(".project-os/goals.json").exists() {
+            if crate::runtime::state_namespace::state_path_exists(root, ".project-os/goals.json") {
                 "detected"
             } else {
                 "available"
@@ -179,8 +180,8 @@ pub fn detected_capabilities(root: &Path) -> Value {
         ),
         (
             "agent-configuration",
-            if root.join(".project-os/desktop-provider.json").exists()
-                || root.join(".project-os/model-catalog.json").exists()
+            if crate::runtime::state_namespace::state_path_exists(root, ".project-os/desktop-provider.json")
+                || crate::runtime::state_namespace::state_path_exists(root, ".project-os/model-catalog.json")
             {
                 "detected"
             } else {
@@ -202,7 +203,7 @@ pub fn detected_capabilities(root: &Path) -> Value {
         let saved_item = saved_items.and_then(|items| items.iter().find(|item| item.get("id").and_then(Value::as_str) == Some(id)));
         let saved_status = saved_item.and_then(|item| item.get("status")).and_then(Value::as_str).unwrap_or("available");
         if saved_status == "dismissed" || rank(saved_status) >= rank(detected_status) { return saved_item.cloned().unwrap_or_else(|| json!({ "id": id, "status": saved_status, "source": "migration" })); }
-        let found_signals = signals.into_iter().filter(|signal| *signal == "core" || root.join(signal).exists()).collect::<Vec<_>>();
+        let found_signals = signals.into_iter().filter(|signal| *signal == "core" || crate::runtime::state_namespace::state_path_exists(root, signal)).collect::<Vec<_>>();
         json!({ "id": id, "status": detected_status, "source": if detected_status == "enabled" { "core" } else { "scan" }, "signals": found_signals })
     }).collect::<Vec<_>>();
     let package_text = read_text(root, "package.json") + &read_text(root, "desktop/package.json");
@@ -236,7 +237,7 @@ pub fn detected_capabilities(root: &Path) -> Value {
         ("cli", root.join("cli").exists(), vec!["cli"]),
         (
             "ai",
-            root.join(".project-os/model-catalog.json").exists() || package_text.contains("openai"),
+            crate::runtime::state_namespace::state_path_exists(root, ".project-os/model-catalog.json") || package_text.contains("openai"),
             vec![".project-os/model-catalog.json"],
         ),
         (
@@ -252,7 +253,7 @@ pub fn detected_capabilities(root: &Path) -> Value {
     ];
     let domain_capabilities = domain_specs.into_iter().map(|(id, detected, signals)| json!({
         "id": id, "status": if detected { "detected" } else { "available" }, "source": "scan",
-        "signals": signals.into_iter().filter(|signal| root.join(signal).exists()).collect::<Vec<_>>()
+        "signals": signals.into_iter().filter(|signal| crate::runtime::state_namespace::state_path_exists(root, signal)).collect::<Vec<_>>()
     })).collect::<Vec<_>>();
     json!({ "schemaVersion": "project-os.project-capabilities.v0.1", "updatedAt": saved.as_ref().and_then(|value| value.get("updatedAt")).and_then(Value::as_str).unwrap_or(""), "capabilities": capabilities.clone(), "workspaceCapabilities": capabilities, "domainCapabilities": domain_capabilities })
 }

@@ -7,7 +7,8 @@ use std::process::Command;
 pub fn list_files(root: &Path, relative: &str) -> Result<Value, String> {
     const MAX_ITEMS: usize = 200;
     const MAX_DEPTH: usize = 4;
-    let start = resolve_path(root, relative, true)?;
+    let root = canonical_root(root)?;
+    let start = resolve_path(&root, relative, true)?;
     let mut queue = VecDeque::from([(start, 0usize)]);
     let mut items = Vec::new();
     let mut truncated = false;
@@ -19,13 +20,13 @@ pub fn list_files(root: &Path, relative: &str) -> Result<Value, String> {
         entries.sort_by_key(|entry| entry.file_name());
         for entry in entries {
             let path = entry.path();
-            if is_ignored_under_root(root, &path) {
+            if is_ignored_under_root(&root, &path) {
                 continue;
             }
             let Ok(canonical) = path.canonicalize() else {
                 continue;
             };
-            if !canonical.starts_with(root) {
+            if !canonical.starts_with(&root) {
                 continue;
             }
             let kind = if canonical.is_dir() {
@@ -35,7 +36,7 @@ pub fn list_files(root: &Path, relative: &str) -> Result<Value, String> {
             } else {
                 continue;
             };
-            items.push(json!({ "path": relative_path(root, &canonical), "kind": kind }));
+            items.push(json!({ "path": relative_path(&root, &canonical), "kind": kind }));
             if items.len() >= MAX_ITEMS {
                 truncated = true;
                 break;
@@ -55,7 +56,8 @@ pub fn list_files(root: &Path, relative: &str) -> Result<Value, String> {
 
 pub fn read_file(root: &Path, relative: &str) -> Result<Value, String> {
     const MAX_BYTES: usize = 80 * 1024;
-    let path = resolve_path(root, relative, false)?;
+    let root = canonical_root(root)?;
+    let path = resolve_path(&root, relative, false)?;
     let bytes = fs::read(&path).map_err(|err| err.to_string())?;
     if bytes.iter().take(512).any(|byte| *byte == 0) {
         return Err("不支持读取二进制文件".to_string());
@@ -63,7 +65,7 @@ pub fn read_file(root: &Path, relative: &str) -> Result<Value, String> {
     let truncated = bytes.len() > MAX_BYTES;
     let content = String::from_utf8_lossy(&bytes[..bytes.len().min(MAX_BYTES)]).to_string();
     Ok(
-        json!({ "summary": format!("读取 {}", relative_path(root, &path)), "path": relative_path(root, &path), "content": content, "size": bytes.len(), "truncated": truncated }),
+        json!({ "summary": format!("读取 {}", relative_path(&root, &path)), "path": relative_path(&root, &path), "content": content, "size": bytes.len(), "truncated": truncated }),
     )
 }
 
@@ -71,7 +73,8 @@ pub fn search_project(root: &Path, relative: &str, query: &str) -> Result<Value,
     const MAX_FILES: usize = 1000;
     const MAX_HITS: usize = 100;
     const MAX_FILE_BYTES: u64 = 256 * 1024;
-    let start = resolve_path(root, relative, true)?;
+    let root = canonical_root(root)?;
+    let start = resolve_path(&root, relative, true)?;
     let needle = query.trim().to_lowercase();
     if needle.is_empty() {
         return Err("搜索内容不能为空".to_string());
@@ -85,13 +88,13 @@ pub fn search_project(root: &Path, relative: &str, query: &str) -> Result<Value,
             .filter_map(Result::ok)
         {
             let path = entry.path();
-            if is_ignored_under_root(root, &path) {
+            if is_ignored_under_root(&root, &path) {
                 continue;
             }
             let Ok(canonical) = path.canonicalize() else {
                 continue;
             };
-            if !canonical.starts_with(root) {
+            if !canonical.starts_with(&root) {
                 continue;
             }
             if canonical.is_dir() {
@@ -117,7 +120,7 @@ pub fn search_project(root: &Path, relative: &str, query: &str) -> Result<Value,
             };
             for (index, line) in content.lines().enumerate() {
                 if line.to_lowercase().contains(&needle) {
-                    hits.push(json!({ "path": relative_path(root, &canonical), "line": index + 1, "text": line.chars().take(500).collect::<String>() }));
+                    hits.push(json!({ "path": relative_path(&root, &canonical), "line": index + 1, "text": line.chars().take(500).collect::<String>() }));
                     if hits.len() >= MAX_HITS {
                         break;
                     }
@@ -167,6 +170,8 @@ fn is_ignored(path: &Path) -> bool {
         matches!(
             component.as_os_str().to_string_lossy().as_ref(),
             ".git"
+                | ".project-os"
+                | ".omnidesk"
                 | "node_modules"
                 | "target"
                 | "dist"
@@ -192,10 +197,13 @@ fn is_ignored_under_root(root: &Path, path: &Path) -> bool {
     path.strip_prefix(root).map(is_ignored).unwrap_or(true)
 }
 
+fn canonical_root(root: &Path) -> Result<PathBuf, String> {
+    root.canonicalize()
+        .map_err(|err| format!("项目目录不可访问: {}", err))
+}
+
 fn resolve_path(root: &Path, relative: &str, directory: bool) -> Result<PathBuf, String> {
-    let root = root
-        .canonicalize()
-        .map_err(|err| format!("项目目录不可访问: {}", err))?;
+    let root = canonical_root(root)?;
     let relative = relative.trim();
     let candidate = if relative.is_empty() || relative == "." {
         root.to_path_buf()
@@ -233,4 +241,43 @@ fn relative_path(root: &Path, path: &Path) -> String {
         .unwrap_or(path)
         .to_string_lossy()
         .replace('\\', "/")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn test_root(label: &str) -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        std::env::temp_dir().join(format!("omnidesk-agent-tools-{label}-{nonce}"))
+    }
+
+    #[test]
+    fn read_tools_hide_both_runtime_state_namespaces() {
+        let root = test_root("state-boundary");
+        fs::create_dir_all(root.join("src")).unwrap();
+        fs::create_dir_all(root.join(".project-os")).unwrap();
+        fs::create_dir_all(root.join(".omnidesk/data")).unwrap();
+        fs::write(root.join("src/main.rs"), "fn main() {}\n").unwrap();
+        fs::write(root.join(".project-os/state.json"), "{}\n").unwrap();
+        fs::write(root.join(".omnidesk/data/state.json"), "{}\n").unwrap();
+
+        let listing = list_files(&root, ".").unwrap();
+        let paths = listing["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|item| item["path"].as_str())
+            .collect::<Vec<_>>();
+        assert!(paths.contains(&"src"), "listed paths: {paths:?}");
+        assert!(!paths.iter().any(|path| path.starts_with(".project-os")));
+        assert!(!paths.iter().any(|path| path.starts_with(".omnidesk")));
+        assert!(read_file(&root, ".project-os/state.json").is_err());
+        assert!(read_file(&root, ".omnidesk/data/state.json").is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
 }

@@ -877,162 +877,6 @@ struct UpdateProjectCapabilityInput {
     candidate_modules: Vec<String>,
 }
 
-#[allow(dead_code)]
-fn detected_project_capabilities(root: &Path) -> Value {
-    let saved = read_json(root.join(".project-os/project-capabilities.json"));
-    let saved_items = saved
-        .as_ref()
-        .and_then(|value| {
-            value
-                .get("workspaceCapabilities")
-                .or_else(|| value.get("capabilities"))
-        })
-        .and_then(Value::as_array);
-    let specs = [
-        ("project-overview", "enabled", vec!["core"]),
-        ("tasks", "enabled", vec!["core"]),
-        ("files", "enabled", vec!["core"]),
-        (
-            "goals",
-            if root.join(".project-os/goals.json").exists() {
-                "detected"
-            } else {
-                "available"
-            },
-            vec![".project-os/goals.json"],
-        ),
-        (
-            "rules",
-            if root.join("AGENTS.md").exists() {
-                "detected"
-            } else {
-                "available"
-            },
-            vec!["AGENTS.md"],
-        ),
-        (
-            "design-implementation",
-            if root.join("src").exists()
-                || root.join("desktop").exists()
-                || root.join("docs/ARCHITECTURE.md").exists()
-            {
-                "recommended"
-            } else {
-                "available"
-            },
-            vec!["src", "desktop", "docs/ARCHITECTURE.md"],
-        ),
-        (
-            "validation-delivery",
-            if root.join("tests").exists() || root.join("docs/TESTING.md").exists() {
-                "recommended"
-            } else {
-                "available"
-            },
-            vec!["tests", "docs/TESTING.md"],
-        ),
-        (
-            "knowledge-memory",
-            if root.join("HANDOFF.md").exists() || root.join("docs/DECISIONS.md").exists() {
-                "detected"
-            } else {
-                "available"
-            },
-            vec!["HANDOFF.md", "docs/DECISIONS.md"],
-        ),
-        (
-            "agent-configuration",
-            if root.join(".project-os/desktop-provider.json").exists()
-                || root.join(".project-os/model-catalog.json").exists()
-            {
-                "detected"
-            } else {
-                "available"
-            },
-            vec![
-                ".project-os/desktop-provider.json",
-                ".project-os/model-catalog.json",
-            ],
-        ),
-    ];
-    let rank = |status: &str| match status {
-        "enabled" => 3,
-        "recommended" => 2,
-        "detected" => 1,
-        _ => 0,
-    };
-    let capabilities = specs.into_iter().map(|(id, detected_status, signals)| {
-        let saved_item = saved_items.and_then(|items| items.iter().find(|item| item.get("id").and_then(Value::as_str) == Some(id)));
-        let saved_status = saved_item.and_then(|item| item.get("status")).and_then(Value::as_str).unwrap_or("available");
-        if saved_status == "dismissed" {
-            return saved_item.cloned().unwrap();
-        }
-        if rank(saved_status) >= rank(detected_status) {
-            return saved_item.cloned().unwrap_or_else(|| json!({ "id": id, "status": saved_status, "source": "migration" }));
-        }
-        let found_signals = signals.into_iter().filter(|signal| *signal == "core" || root.join(signal).exists()).collect::<Vec<_>>();
-        json!({ "id": id, "status": detected_status, "source": if detected_status == "enabled" { "core" } else { "scan" }, "signals": found_signals })
-    }).collect::<Vec<_>>();
-    let package_text = read_text(root, "package.json") + &read_text(root, "desktop/package.json");
-    let domain_specs = [
-        (
-            "frontend",
-            root.join("src").exists()
-                || package_text.contains("react")
-                || package_text.contains("vue"),
-            vec!["src", "desktop/package.json"],
-        ),
-        (
-            "backend",
-            root.join("server").exists()
-                || root.join("backend").exists()
-                || root.join("api").exists(),
-            vec!["server", "backend", "api"],
-        ),
-        (
-            "database",
-            root.join("prisma").exists()
-                || root.join("migrations").exists()
-                || root.join("schema.sql").exists(),
-            vec!["prisma", "migrations", "schema.sql"],
-        ),
-        (
-            "desktop",
-            root.join("desktop/src-tauri").exists() || root.join("src-tauri").exists(),
-            vec!["desktop/src-tauri", "src-tauri"],
-        ),
-        ("cli", root.join("cli").exists(), vec!["cli"]),
-        (
-            "ai",
-            root.join(".project-os/model-catalog.json").exists() || package_text.contains("openai"),
-            vec![".project-os/model-catalog.json"],
-        ),
-        (
-            "testing",
-            root.join("tests").exists() || root.join("test").exists(),
-            vec!["tests", "test"],
-        ),
-        (
-            "deployment",
-            root.join(".github/workflows").exists() || root.join("Dockerfile").exists(),
-            vec![".github/workflows", "Dockerfile"],
-        ),
-    ];
-    let domain_capabilities = domain_specs.into_iter().map(|(id, detected, signals)| json!({
-        "id": id,
-        "status": if detected { "detected" } else { "available" },
-        "source": "scan",
-        "signals": signals.into_iter().filter(|signal| root.join(signal).exists()).collect::<Vec<_>>()
-    })).collect::<Vec<_>>();
-    json!({
-        "schemaVersion": "project-os.project-capabilities.v0.1",
-        "updatedAt": saved.as_ref().and_then(|value| value.get("updatedAt")).and_then(Value::as_str).unwrap_or(""),
-        "capabilities": capabilities.clone(),
-        "workspaceCapabilities": capabilities,
-        "domainCapabilities": domain_capabilities
-    })
-}
-
 #[tauri::command]
 fn update_project_capability(input: UpdateProjectCapabilityInput) -> Result<Value, String> {
     let app_root = find_workspace_root()?;
@@ -1180,9 +1024,14 @@ fn refresh_workspace_facts_preview() -> Result<Value, String> {
 }
 
 fn should_ignore_watch_path(path: &Path) -> bool {
-    let in_project_os = path
+    let in_runtime_state = path
         .components()
-        .any(|component| component.as_os_str() == ".project-os");
+        .any(|component| {
+            matches!(
+                component.as_os_str().to_string_lossy().as_ref(),
+                ".project-os" | ".omnidesk"
+            )
+        });
     let fact_file = path
         .file_name()
         .and_then(|value| value.to_str())
@@ -1213,7 +1062,7 @@ fn should_ignore_watch_path(path: &Path) -> bool {
                 | "workflows"
         )
     });
-    if !in_project_os && !fact_file && !fact_directory {
+    if !in_runtime_state && !fact_file && !fact_directory {
         return true;
     }
     path.components().any(|component| {
@@ -1635,6 +1484,7 @@ fn preview_project_path(input: PreviewProjectInput) -> Result<Value, String> {
         .and_then(|value| value.to_str())
         .unwrap_or("workspace");
     let has = |file_name: &str| root.join(file_name).exists();
+    let has_omnidesk_state = runtime_state_exists(&root, ".project-os");
     let has_project_manifest = has("package.json") || has("pyproject.toml") || has("Cargo.toml");
     let mut risks = Vec::new();
     if !has(".git") {
@@ -1648,7 +1498,7 @@ fn preview_project_path(input: PreviewProjectInput) -> Result<Value, String> {
         "project": {
             "name": name,
             "hasGit": has(".git"),
-            "hasProjectOs": has(".project-os")
+            "hasProjectOs": has_omnidesk_state
         },
         "detected": {
             "packageJson": has("package.json"),
@@ -1869,7 +1719,7 @@ fn read_engineering_file(
     let root = PathBuf::from(&current_project.path)
         .canonicalize()
         .map_err(|err| format!("项目目录不可访问: {}", err))?;
-    let path = root.join(relative);
+    let path = crate::runtime::state_namespace::state_path_for_read(&root, relative)?;
     let canonical = path
         .canonicalize()
         .map_err(|_| format!("没有找到这个文件：{}", relative))?;
@@ -4585,6 +4435,8 @@ fn is_patch_context_path(path: &str) -> bool {
         || path.contains("..")
         || path.starts_with(".env")
         || path.contains("/.env")
+        || path == ".omnidesk"
+        || path.starts_with(".omnidesk/")
         || path.contains(".project-os/desktop-provider")
     {
         return false;
@@ -4600,6 +4452,8 @@ fn is_safe_engineering_preview_path(path: &str) -> bool {
     if relative.is_absolute()
         || path.starts_with(".env")
         || path.contains("/.env")
+        || path == ".omnidesk"
+        || path.starts_with(".omnidesk/")
         || path.contains(".project-os/desktop-provider")
     {
         return false;
@@ -6169,7 +6023,7 @@ fn find_workspace_root() -> Result<PathBuf, String> {
         }
     }
 
-    Err("未找到 Project OS 工作区根目录".to_string())
+    Err("未找到 OmniDesk 工作区根目录".to_string())
 }
 
 fn read_json(path: PathBuf) -> Option<Value> {
@@ -6177,6 +6031,14 @@ fn read_json(path: PathBuf) -> Option<Value> {
     fs::read_to_string(resolved)
         .ok()
         .and_then(|content| serde_json::from_str(&content).ok())
+}
+
+fn runtime_state_exists(root: &Path, relative_path: &str) -> bool {
+    crate::runtime::state_namespace::state_path_exists(root, relative_path)
+}
+
+fn runtime_state_path(root: &Path, relative_path: &str) -> Option<PathBuf> {
+    crate::runtime::state_namespace::state_path_for_read(root, relative_path).ok()
 }
 
 fn read_text(root: &Path, relative: &str) -> String {
@@ -6523,7 +6385,6 @@ fn dependency_summary(root: &Path) -> Vec<String> {
 
 fn project_directory_summary(root: &Path) -> Vec<String> {
     let candidates = [
-        ".project-os",
         "src",
         "desktop",
         "cli",
@@ -6584,8 +6445,8 @@ fn detected_stack(root: &Path) -> Vec<String> {
             stack.push("Vite".to_string());
         }
     }
-    if root.join(".project-os").exists() {
-        stack.push("Project OS".to_string());
+    if runtime_state_exists(root, ".project-os") {
+        stack.push("OmniDesk".to_string());
     }
     stack.sort();
     stack.dedup();
@@ -6619,7 +6480,9 @@ fn git_status_summary(root: &Path) -> String {
 fn should_skip_governance_dir(name: &str) -> bool {
     matches!(
         name,
-        "node_modules"
+        ".project-os"
+            | ".omnidesk"
+            | "node_modules"
             | "target"
             | "dist"
             | "build"
@@ -6696,9 +6559,6 @@ fn collect_governance_files(root: &Path) -> Vec<String> {
                 continue;
             };
             let relative = relative.to_string_lossy().replace('\\', "/");
-            if relative.contains(".project-os/desktop-provider") {
-                continue;
-            }
             files.push(relative);
             if files.len() >= MAX_FILES {
                 break;
@@ -6820,6 +6680,13 @@ fn governance_file_status(root: &Path, changed: &HashSet<String>, file: &str) ->
     }
     if file.starts_with(".project-os/runs/") {
         return "generated";
+    }
+    if file.starts_with(".project-os/") {
+        return if runtime_state_exists(root, file) {
+            "found"
+        } else {
+            "missing"
+        };
     }
     if changed.contains(file) {
         return "changed";
@@ -7038,7 +6905,7 @@ fn build_health_score(
         !overview.trim().is_empty(),
         !profile.phase_summary.trim().is_empty(),
         !profile.architecture_summary.trim().is_empty(),
-        root.join(".project-os/project-profile.json").exists(),
+        runtime_state_exists(root, ".project-os/project-profile.json"),
     ]);
     let governed_file_count = governance_domains
         .iter()
@@ -7049,7 +6916,7 @@ fn build_health_score(
         governed_file_count >= 8,
         root.join("PROJECT.md").exists() || root.join("README.md").exists(),
         root.join("HANDOFF.md").exists(),
-        root.join(".project-os/state.json").exists(),
+        runtime_state_exists(root, ".project-os/state.json"),
     ]);
     let run_validation = score_from_checks(&[
         !scripts.trim().is_empty(),
@@ -7066,9 +6933,9 @@ fn build_health_score(
         root.join("HANDOFF.md").exists(),
     ]);
     let continuous_governance = score_from_checks(&[
-        root.join(".project-os").exists(),
-        root.join(".project-os/runs").exists(),
-        root.join(".project-os/workspace-facts.json").exists(),
+        runtime_state_exists(root, ".project-os"),
+        runtime_state_exists(root, ".project-os/runs"),
+        runtime_state_exists(root, ".project-os/workspace-facts.json"),
         root.join(".github/workflows").exists() || root.join(".gitlab-ci.yml").exists(),
     ]);
     let dimensions = vec![
@@ -7173,10 +7040,10 @@ fn build_workspace_facts_preview(root: &Path, project_name: &str) -> Value {
     let local_state = format!(
         "{} {}",
         git_status,
-        if root.join(".project-os").exists() {
-            "已发现 .project-os 工作区状态。"
+        if runtime_state_exists(root, ".project-os") {
+            "已发现 OmniDesk 工作区状态。"
         } else {
-            "未发现 .project-os 工作区状态。"
+            "未发现 OmniDesk 工作区状态。"
         }
     );
     let health_score = build_health_score(
@@ -7198,7 +7065,7 @@ fn build_workspace_facts_preview(root: &Path, project_name: &str) -> Value {
     json!({
         "schemaVersion": "project-os.workspace-facts.v0.1",
         "generatedAt": now,
-        "mode": if root.join(".project-os").exists() { "existing-project" } else { "temporary-readonly" },
+        "mode": if runtime_state_exists(root, ".project-os") { "existing-project" } else { "temporary-readonly" },
         "status": "connected",
         "healthScore": health_score,
         "governanceLevel": {
@@ -7272,8 +7139,8 @@ fn build_workspace_facts_preview(root: &Path, project_name: &str) -> Value {
             { "source": "PROJECT.md", "kind": "project-status", "status": if root.join("PROJECT.md").exists() { "found" } else { "missing" }, "note": "项目状态展示层。" },
             { "source": "HANDOFF.md", "kind": "handoff", "status": if root.join("HANDOFF.md").exists() { "found" } else { "missing" }, "note": "当前交接和风险来源。" },
             { "source": "desktop/package.json", "kind": "run-config", "status": if root.join("desktop/package.json").exists() { "found" } else { "missing" }, "note": "桌面端启动脚本来源。" },
-            { "source": ".project-os/state.json", "kind": "project-state", "status": if root.join(".project-os/state.json").exists() { "found" } else { "missing" }, "note": "机器可读项目状态。" },
-            { "source": ".project-os/project-profile.json", "kind": "project-profile", "status": if root.join(".project-os/project-profile.json").exists() { "found" } else { "missing" }, "note": "结构化项目档案。" }
+            { "source": ".project-os/state.json", "kind": "project-state", "status": if runtime_state_exists(root, ".project-os/state.json") { "found" } else { "missing" }, "note": "机器可读项目状态。" },
+            { "source": ".project-os/project-profile.json", "kind": "project-profile", "status": if runtime_state_exists(root, ".project-os/project-profile.json") { "found" } else { "missing" }, "note": "结构化项目档案。" }
         ],
         "governanceDomains": governance_domains,
         "recommendations": [
@@ -7999,11 +7866,11 @@ fn project_health(project: &RegistryFileProject) -> (String, String) {
     if !root.exists() || !root.is_dir() {
         return ("missing".to_string(), "路径失效".to_string());
     }
-    let has_state = root.join(".project-os/state.json").is_file();
+    let has_state = runtime_state_exists(&root, ".project-os/state.json");
     let has_project = root.join("PROJECT.md").is_file();
     let has_handoff = root.join("HANDOFF.md").is_file();
     if has_state && has_project && has_handoff {
-        return ("ready".to_string(), "已接入 · Project OS".to_string());
+        return ("ready".to_string(), "已接入 · OmniDesk".to_string());
     }
     if has_state || has_project || has_handoff || root.join("AGENTS.md").is_file() {
         return ("partial".to_string(), "缺少关键文件".to_string());
@@ -8072,7 +7939,9 @@ fn project_id_from_path(path: &str) -> String {
 }
 
 fn count_run_records(root: &Path) -> usize {
-    let runs_dir = root.join(".project-os/runs");
+    let Some(runs_dir) = runtime_state_path(root, ".project-os/runs") else {
+        return 0;
+    };
     fs::read_dir(runs_dir)
         .ok()
         .into_iter()
@@ -8268,6 +8137,7 @@ fn is_ignored_path(path: &Path) -> bool {
                 name,
                 ".git"
                     | ".project-os"
+                    | ".omnidesk"
                     | "node_modules"
                     | "target"
                     | "dist"
@@ -8316,6 +8186,7 @@ mod task_storage_tests {
         let dir = test_directory("tree-asset-policy");
         fs::create_dir_all(dir.join("src")).unwrap();
         fs::create_dir_all(dir.join(".project-os/events")).unwrap();
+        fs::create_dir_all(dir.join(".omnidesk/data")).unwrap();
         fs::create_dir_all(dir.join("tmp")).unwrap();
         fs::create_dir_all(dir.join("target")).unwrap();
         fs::write(dir.join("src/main.rs"), "fn main() {}\n").unwrap();
@@ -8330,6 +8201,7 @@ mod task_storage_tests {
         assert!(labels.contains(&"src".to_string()));
         assert!(labels.contains(&".env.example".to_string()));
         assert!(!labels.contains(&".project-os".to_string()));
+        assert!(!labels.contains(&".omnidesk".to_string()));
         assert!(!labels.contains(&"tmp".to_string()));
         assert!(!labels.contains(&"target".to_string()));
         assert!(!labels.contains(&".env.local".to_string()));

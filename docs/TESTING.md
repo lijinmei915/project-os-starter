@@ -202,6 +202,9 @@ bash tests/run-tests.sh
 
 检查项：
 - 旧项目没有 capability manifest 时保持兼容。
+- 状态命名空间未激活时读取 legacy，无冲突激活后优先读取 `.omnidesk/`，且不改写 `.project-os/` 源数据。
+- 任一迁移冲突必须阻止 namespace 激活；符号链接、路径逃逸和非授权状态目录不得进入新状态根。
+- Desktop 与 Preview 的文件树、Agent 读取工具均不展示 `.project-os/` 或 `.omnidesk/` 物理目录。
 - 父能力或模块未启用时，Slot 在 Selector 执行前被门控。
 - Fact 变化只重算直接依赖的 Slot，其他描述符保持不变。
 - 事件严格按 `source.changed -> fact.invalidated -> fact.updated -> selector.recomputed -> slot.updated` 输出。
