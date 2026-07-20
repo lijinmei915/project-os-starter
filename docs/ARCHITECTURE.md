@@ -59,7 +59,7 @@ Workbench UI
 | `docs/` | 长期架构、测试、决策和运行说明 |
 | `.omnidesk/` | 当前产品状态根；由 namespace manifest 激活后承担 Runtime 读写 |
 | `.project-os/` | 非破坏性迁移源；只在未激活或冲突回退时继续读写，最终退役 |
-| `cli/`, `scripts/`, `templates/`, `adapters/` | 冻结的旧工具链，待依赖断开后删除 |
+| `scripts/`, `templates/`, `adapters/` | 冻结的旧工具链；CLI 与 governance bridge 已退役，剩余目录待依赖断开后删除 |
 
 ## 运行路径
 
