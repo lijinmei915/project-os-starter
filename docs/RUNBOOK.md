@@ -47,7 +47,7 @@ npm --prefix desktop run test:native
 
 出现迁移问题时：
 
-1. 保留 `.project-os` 和 `.omnidesk`，不要手工移动或删除目录。
+1. 保留 `.project-os` 和 `.omnidesk`，不要手工移动或删除目录；只有 Runtime 退役预检全绿且用户明确确认后才允许清理旧目录。
 2. 查看 active namespace manifest 和 `.omnidesk/evidence/` 的迁移证据。
 3. 重新启动 Desktop Runtime；它会恢复 prepared 事务而不会覆盖冲突文件。
 4. 如仍失败，导出最小的无密钥 evidence 后按 Runtime 模块排查。

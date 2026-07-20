@@ -173,6 +173,7 @@ struct WorkspaceSnapshot {
     goal_signoff_history: Value,
     goals: Value,
     project_goals: Value,
+    state_retirement: Value,
     trace: Vec<String>,
 }
 
@@ -868,6 +869,12 @@ struct UpdateProjectCapabilityInput {
     candidate_modules: Vec<String>,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ArchiveLegacyStateInput {
+    confirmation: String,
+}
+
 #[tauri::command]
 fn update_project_capability(input: UpdateProjectCapabilityInput) -> Result<Value, String> {
     let app_root = find_workspace_root()?;
@@ -892,6 +899,19 @@ fn update_project_capability(input: UpdateProjectCapabilityInput) -> Result<Valu
 }
 
 #[tauri::command]
+fn archive_legacy_state_for_retirement(
+    input: ArchiveLegacyStateInput,
+) -> Result<crate::runtime::state_namespace::LegacyRetentionArchive, String> {
+    if input.confirmation.trim() != "ARCHIVE_LEGACY_STATE" {
+        return Err("归档 legacy 差异需要明确确认".to_string());
+    }
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let project = current_registry_project(&mut registry, &app_root)?;
+    crate::runtime::state_namespace::archive_legacy_retirement_differences(&PathBuf::from(project.path))
+}
+
+#[tauri::command]
 fn get_workspace_snapshot() -> Result<WorkspaceSnapshot, String> {
     let app_root = find_workspace_root()?;
     let mut registry = load_or_seed_registry(&app_root)?;
@@ -907,6 +927,10 @@ fn get_workspace_snapshot() -> Result<WorkspaceSnapshot, String> {
     let workspace_facts = projection.workspace_facts;
     let project_capabilities = crate::runtime::workspace::detected_capabilities(&root);
     let fact_freshness = crate::runtime::workspace::fact_freshness(&root);
+    let state_retirement = serde_json::to_value(
+        crate::runtime::state_namespace::legacy_retirement_readiness(&root)?,
+    )
+    .map_err(|error| error.to_string())?;
     let run_count = count_run_records(&root);
     let (file_count, docs_count) = count_workspace_files(&root);
 
@@ -990,6 +1014,7 @@ fn get_workspace_snapshot() -> Result<WorkspaceSnapshot, String> {
         goal_signoff_history,
         goals,
         project_goals,
+        state_retirement,
         trace: vec![
             format!("ROOT: {}", root.display()),
             format!("REGISTRY: {} project(s)", registry.projects.len()),
@@ -2170,7 +2195,6 @@ async fn generate_readonly_plan(
     let configured_provider = load_or_seed_provider_config(&app_root)?;
     let root = PathBuf::from(&current_project.path);
     let state = read_json(root.join(".project-os/state.json"));
-    let recommendations = read_json(root.join(".project-os/recommendations/recommend-next.json"));
 
     let project_name = state
         .as_ref()
@@ -2191,7 +2215,6 @@ async fn generate_readonly_plan(
         project_name: project_name.clone(),
         stage: stage.clone(),
         root: root.clone(),
-        recommendations,
         provider: configured_provider.clone(),
     };
 
@@ -2764,7 +2787,6 @@ struct PlanContext {
     project_name: String,
     stage: String,
     root: PathBuf,
-    recommendations: Option<Value>,
     provider: ProviderConfig,
 }
 
@@ -2806,17 +2828,6 @@ fn build_local_readonly_plan(context: PlanContext) -> ReadonlyPlan {
         candidate_changes
             .push("可能涉及 desktop/src-tauri/src/main.rs 和 Tauri capability。".to_string());
         checks.push("cargo check --manifest-path desktop/src-tauri/Cargo.toml".to_string());
-    }
-
-    if context
-        .recommendations
-        .as_ref()
-        .and_then(|json| json.pointer("/summary/recommendationCount"))
-        .and_then(Value::as_u64)
-        .unwrap_or(0)
-        > 0
-    {
-        files_to_read.push(".project-os/reports/ai-project-report.json".to_string());
     }
 
     checks.sort();
@@ -5772,6 +5783,58 @@ fn record_native_terminal_trace(stage: String) -> Result<(), String> {
     .map_err(|err| err.to_string())
 }
 
+#[cfg(feature = "webdriver")]
+#[tauri::command]
+fn seed_native_agent_run_for_recovery() -> Result<crate::runtime::agent_runs::PersistedAgentRun, String> {
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let project = current_registry_project(&mut registry, &app_root)?;
+    let timestamp = current_timestamp_string();
+    let mut run = crate::runtime::agent_runs::new_hermes_run(
+        "native-recovery-run".to_string(),
+        "native-recovery-request".to_string(),
+        project.id,
+        "Native WebDriver recovery fixture. Do not execute tools.".to_string(),
+        1,
+        String::new(),
+        &timestamp,
+    );
+    let approval = json!({
+        "token": "native-recovery-approval",
+        "status": "pending",
+        "name": "apply_patch",
+        "arguments": {
+            "allowedFiles": ["README.md"],
+            "diff": "diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1 +1 @@\n-# Native WebDriver fixture\n+# Native WebDriver fixture\n"
+        }
+    });
+    run.status = "awaiting-approval".to_string();
+    run.summary = "原生恢复夹具正在等待 Patch 审批。".to_string();
+    run.approval = Some(approval.clone());
+    run.checkpoint.phase = "awaiting-approval".to_string();
+    run.checkpoint.context_summary = run.summary.clone();
+    run.checkpoint.last_confirmation = Some(approval);
+    run.checkpoint.next_action = "resume-approval".to_string();
+    run.checkpoint.tool_name = "apply_patch".to_string();
+    run.checkpoint.allowed_files = vec!["README.md".to_string()];
+    crate::runtime::agent_runs::append_evidence(
+        &mut run,
+        "approval",
+        "Native WebDriver recovery fixture created.",
+        json!({ "fixture": true }),
+        &timestamp,
+    );
+    crate::runtime::agent_runs::persist(&app_root, &run)?;
+    Ok(run)
+}
+
+#[cfg(feature = "webdriver")]
+#[tauri::command]
+fn read_native_agent_run_for_recovery() -> Result<crate::runtime::agent_runs::PersistedAgentRun, String> {
+    let app_root = find_workspace_root()?;
+    crate::runtime::agent_runs::load(&app_root, "native-recovery-run")
+}
+
 struct GuardedCheckSpec {
     id: &'static str,
     label: &'static str,
@@ -8564,6 +8627,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_workspace_snapshot,
             update_project_capability,
+            archive_legacy_state_for_retirement,
             refresh_workspace_facts_preview,
             start_workspace_file_watcher,
             add_registry_project,
@@ -8629,7 +8693,11 @@ pub fn run() {
             resize_terminal_session,
             stop_terminal_session,
             #[cfg(feature = "webdriver")]
-            record_native_terminal_trace
+            record_native_terminal_trace,
+            #[cfg(feature = "webdriver")]
+            seed_native_agent_run_for_recovery,
+            #[cfg(feature = "webdriver")]
+            read_native_agent_run_for_recovery
         ])
         .run(tauri::generate_context!())
         .expect("failed to run OmniDesk");

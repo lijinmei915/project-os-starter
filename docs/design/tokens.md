@@ -1,16 +1,14 @@
 # Token 规范
 
-> 用途：定义 Project OS 报告页和后续 UI 的设计 token 命名、数值和使用边界。
+> 用途：定义 OmniDesk Desktop UI 的设计 token 命名、数值和使用边界。
 > 什么时候更新：颜色、字号、间距、圆角、阴影、焦点态或主题策略变化时。
 > 不要写什么：一次性页面样式、具体组件实现流水、与设计无关的工程决策。
 
-当前 token 目标不是做一套大而全主题系统，而是先让 AI 项目工程助手报告页有稳定视觉来源。
+当前 token 目标不是做一套大而全主题系统，而是让 Desktop Runtime 的真实工作台有稳定视觉来源。
 
 当前落地状态：
-- `templates/report/ai-project-report.html` 已建立 `:root` token / alias 层
 - `desktop/src/styles.css` 已建立桌面端 `--desktop-*` token / alias 层
 - 当前工作台核心组件已优先使用 semantic token 和 component token
-- 早期兼容报告区通过 `--bg` / `--panel` / `--text` 等 alias 继续工作
 
 ---
 
@@ -439,10 +437,10 @@
 
 ## 落地顺序
 
-1. 先让 `templates/report/ai-project-report.html` 的 `:root` 对齐本文 token。
+1. 先让 `desktop/src/styles.css` 的 token layer 对齐本文 token。
 2. 再把重复 hex / rgba 替换为 semantic token。
 3. 再补组件级 token slot。
-4. 最后再考虑是否接入真实前端组件层。
+4. 最后再评估新的共享组件边界。
 
 ## 禁止
 

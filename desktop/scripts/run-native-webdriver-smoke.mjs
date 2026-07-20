@@ -145,20 +145,19 @@ function childProcessIds(parentPid) {
   return ids;
 }
 
-function stopApp() {
+function stopApp({ cleanup = false } = {}) {
   if (!app || app.exitCode !== null) {
-    fs.rmSync(fixture, { recursive: true, force: true });
+    if (cleanup) fs.rmSync(fixture, { recursive: true, force: true });
     return;
   }
   for (const pid of childProcessIds(app.pid)) {
     try { process.kill(pid, "SIGTERM"); } catch {}
   }
-  fs.rmSync(fixture, { recursive: true, force: true });
+  app = undefined;
+  if (cleanup) fs.rmSync(fixture, { recursive: true, force: true });
 }
 
-let failure;
-try {
-  writeFixture();
+function startApp() {
   app = spawn("npm", ["exec", "tauri", "--", "dev", "--features", "webdriver", "--no-watch", "--config", "src-tauri/tauri.webdriver.conf.json"], {
     cwd: desktopRoot,
     detached: true,
@@ -169,13 +168,37 @@ try {
     },
     stdio: "ignore"
   });
+}
 
+async function openSession() {
   await waitForDriver();
   const session = await request("/session", {
     method: "POST",
     body: JSON.stringify({ capabilities: { alwaysMatch: {} } })
   });
   sessionId = session.sessionId;
+}
+
+async function closeSession() {
+  if (sessionId) await request(`/session/${sessionId}`, { method: "DELETE" }).catch(() => {});
+  sessionId = undefined;
+}
+
+async function invokeNative(command, payload = {}) {
+  const source = `const done = arguments[arguments.length - 1]; window.__TAURI_INTERNALS__.invoke(${JSON.stringify(command)}, ${JSON.stringify(payload)}).then(done, (error) => done({ __omnideskError: String(error) }));`;
+  const value = await request(`/session/${sessionId}/execute/async`, {
+    method: "POST",
+    body: JSON.stringify({ script: source, args: [] })
+  });
+  if (value?.__omnideskError) throw new Error(value.__omnideskError);
+  return value;
+}
+
+let failure;
+try {
+  writeFixture();
+  startApp();
+  await openSession();
 
   const input = await waitForElement('textarea[aria-label="任务输入"]');
   const send = await waitForElement('button[aria-label="发送"]');
@@ -197,6 +220,24 @@ try {
     && !startupLocalTrace.some((entry) => entry?.stage === "terminal-session.effect-start")) {
     const runtimeIdentity = await script("return { hasBridge: Boolean(window.__TAURI_INTERNALS__ || window.__TAURI__ || window.__TAURI_METADATA__), href: window.location.href, port: window.location.port }").catch(() => ({}));
     throw new Error(`原生测试构建没有写入终端启动阶段记录：${JSON.stringify({ runtimeIdentity, startupLocalTrace, startupTrace })}`);
+  }
+
+  const seeded = await invokeNative("seed_native_agent_run_for_recovery");
+  if (seeded?.status !== "awaiting-approval" || seeded?.approval?.token !== "native-recovery-approval") {
+    throw new Error(`原生恢复夹具未创建等待审批 Run：${JSON.stringify(seeded)}`);
+  }
+  await closeSession();
+  stopApp();
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  startApp();
+  await openSession();
+  const interrupted = await invokeNative("read_native_agent_run_for_recovery");
+  if (interrupted?.status !== "interrupted" || interrupted?.checkpoint?.nextAction !== "resume-approval" || interrupted?.approval?.token !== "native-recovery-approval") {
+    throw new Error(`原生重启未保留审批 checkpoint：${JSON.stringify(interrupted)}`);
+  }
+  const resumed = await invokeNative("resume_agent_run", { input: { id: "native-recovery-run" } });
+  if (resumed?.status !== "awaiting-approval" || resumed?.approval?.token !== "native-recovery-approval") {
+    throw new Error(`原生恢复没有回到原审批：${JSON.stringify(resumed)}`);
   }
 
   if (diagnoseTerminal) {
@@ -229,13 +270,13 @@ try {
     }
   }
 
-  console.log(`原生 WebDriver smoke 通过：可定位并驱动输入与发送状态${diagnoseTerminal ? "，并完成终端诊断" : ""}；未提交消息，未写入 fixture。`);
+  console.log(`原生 WebDriver smoke 通过：可定位并驱动输入与发送状态，重启后恢复原审批${diagnoseTerminal ? "，并完成终端诊断" : ""}；未提交消息，未写入工程文件。`);
 } catch (error) {
   failure = error instanceof Error ? error : new Error(String(error));
   console.error(`原生 WebDriver smoke 失败：${failure.message}`);
 } finally {
-  if (sessionId) await request(`/session/${sessionId}`, { method: "DELETE" }).catch(() => {});
-  stopApp();
+  await closeSession();
+  stopApp({ cleanup: true });
 }
 
 if (failure) process.exitCode = 1;

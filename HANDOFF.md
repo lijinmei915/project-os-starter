@@ -1,7 +1,7 @@
 ---
 layer: knowledge
 type: status
-last_verified: 2026-07-20
+last_verified: 2026-07-21
 teaches: "当前交接上下文、风险点和下一步建议"
 use_when: "新的 AI 会话接手工作、需要了解最近做了什么和接下来该做什么时"
 depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
@@ -14,6 +14,16 @@ depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
 > 不要写什么：长期路线图、完整产品介绍、详细架构说明或历史流水账。
 
 ## 接手摘要
+
+- 2026-07-21 12-case Eval 的多文件与网络恢复证据已加固，未手写更新 baseline：`goal-rebind` 升级为四份关联文件的一致性 Patch，并要求受保护 trace 证明四份授权文件实际改变；`interrupted-run` 的本地 Runtime trace 记录 `network-unavailable`、未接受 Provider 响应、重启后保留原审批。真实 Provider 网络中断和这份更高难度 Patch 的新基线仍须由 protected workflow 产出。验证：Desktop Node 443/443、Eval baseline 检查、diff check 通过。
+
+- 2026-07-21 已补上 legacy 历史差异的保留路径：Runtime command `archive_legacy_state_for_retirement` 仅在确认值为 `ARCHIVE_LEGACY_STATE` 时执行，复制切换后不一致的 `.project-os` 源文件到 `.omnidesk/evidence/legacy-retirement/<id>/source/` 并写 manifest；不会删除旧目录。该命令为后续用户确认的实际退役准备证据。验证：Rust namespace 9/9、Cargo check 通过。
+
+- 2026-07-21 对当前工作区实际运行 `.project-os -> .omnidesk` 退役预检：共 2,320 个 legacy 文件，漏迁 0、符号链接 0，但有 9 个与 active namespace 字节不一致，涉及旧图谱、模型健康、旧报告和历史对话。它们是切换后新状态覆盖/更新造成的历史差异，不能把目录删除确认扩大为数据删除；应先为差异内容执行保留归档，再由用户明确确认清理。`PROJECT.md`、tracked `.project-os/state.json` 与 active `.omnidesk/data/state.json` 已同步该事实。验证：两份状态 JSON、frontmatter、文档结构和 diff check 通过。
+
+- 2026-07-21 `.project-os` 最终退役前置证据已补齐：Runtime 会在 Workspace snapshot 中输出只读退役预检，逐文件核验 active `.omnidesk` 是否完整、字节一致且无符号链接；未激活、漏迁、内容不一致或符号链接均不可删。它不执行删除，旧目录仍必须等用户明确确认后由后续受控流程处理。验证：Rust namespace 8/8、Cargo check、diff check 通过。
+
+- 2026-07-21 用户确认后，根目录 Project OS 静态站 `index.html`、在线站点/截图/报告模型测试、AI 工程评分报告 schema 与相关历史设计提案已物理删除；Desktop 工作台同步移除旧评分报告入口，只保留目标验收与任务运行证据。`.project-os/` 没有删除，仍是 `.omnidesk/` 迁移兼容源。原生 WebDriver smoke 已实际通过：重启应用后待审批 Agent Run 被标为 `interrupted`、保留审批 token，并可恢复为 `awaiting-approval`。验证：Desktop Node 443/443、Cargo check、Desktop build、原生 smoke 通过；完整仓库门槛仍待本批收尾后运行。
 
 - 2026-07-21 已物理删除旧 Project OS 的 `.ai/` 规则镜像、`templates/` 分发树，以及 installer、模板同步、评分、图谱、推荐和知识库脚本；仅保留仓库 frontmatter、文档结构与密钥安全校验脚本。同步退役旧图谱、目录映射、自动成长和知识 schema 文档，知识登记不再包含已删除来源。Runtime 恢复文档现明确：checkpoint、审批和阶段已持久化，当前缺口是原生窗口重启的端到端证据。验证：完整 `bash tests/run-tests.sh` 通过，含文档结构 22、frontmatter 19、Desktop Node 443/443、Web build/800 KiB 预算、Eval baseline、Rust 73+5。`.project-os` 仍是迁移兼容源，不能删除；旧静态报告入口与其设计材料仍待单独退役。
 

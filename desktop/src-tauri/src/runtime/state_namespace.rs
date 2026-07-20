@@ -1,7 +1,9 @@
 use crate::runtime::repository::write_atomic;
+use serde::Serialize;
 use serde_json::{json, Value};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const LEGACY_STATE_ROOT: &str = ".project-os";
 pub const STATE_ROOT: &str = ".omnidesk";
@@ -32,6 +34,35 @@ pub struct MigrationOutcome {
     pub unchanged: usize,
     pub conflicts: Vec<String>,
     pub skipped: Vec<String>,
+}
+
+/// A destructive legacy-root cleanup is only safe after every source file has
+/// been proved to exist unchanged in the active namespace. This report is
+/// read-only; deletion still requires a separate explicit approval.
+#[derive(Debug, Default, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LegacyRetirementReadiness {
+    pub namespace_active: bool,
+    pub legacy_exists: bool,
+    pub ready: bool,
+    pub missing_targets: Vec<String>,
+    pub mismatched_targets: Vec<String>,
+    pub skipped: Vec<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LegacyRetentionArchive {
+    pub archive_relative: String,
+    pub files: Vec<LegacyRetentionArchiveFile>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LegacyRetentionArchiveFile {
+    pub legacy_relative: String,
+    pub active_target: String,
+    pub bytes: usize,
 }
 
 impl MigrationOutcome {
@@ -181,6 +212,125 @@ pub fn ensure_active_state_namespace(root: &Path) -> Result<MigrationOutcome, St
         activate_state_namespace(root, &outcome, root.join(LEGACY_STATE_ROOT).is_dir())?;
     }
     Ok(outcome)
+}
+
+/// Produces the evidence required before an explicitly approved cleanup can
+/// delete `.project-os`. It re-reads all legacy files instead of trusting a
+/// historical migration manifest because source data can change after cutover.
+pub fn legacy_retirement_readiness(root: &Path) -> Result<LegacyRetirementReadiness, String> {
+    let legacy_root = root.join(LEGACY_STATE_ROOT);
+    let mut readiness = LegacyRetirementReadiness {
+        namespace_active: namespace_is_active(root),
+        legacy_exists: legacy_root.is_dir(),
+        ..LegacyRetirementReadiness::default()
+    };
+
+    if !readiness.legacy_exists {
+        readiness.ready = readiness.namespace_active;
+        return Ok(readiness);
+    }
+
+    let mut files = Vec::new();
+    collect_regular_files(
+        &legacy_root,
+        &legacy_root,
+        &mut files,
+        &mut readiness.skipped,
+    )?;
+    files.sort();
+
+    for relative in files {
+        let legacy_relative = relative.to_string_lossy().replace('\\', "/");
+        let (_, target_relative) = migration_target(&legacy_relative)?;
+        let source = legacy_root.join(&relative);
+        let target = root.join(&target_relative);
+        if !target.is_file() {
+            readiness.missing_targets.push(target_relative);
+            continue;
+        }
+        if fs::read(&source).map_err(|error| error.to_string())?
+            != fs::read(&target).map_err(|error| error.to_string())?
+        {
+            readiness.mismatched_targets.push(target_relative);
+        }
+    }
+
+    readiness.missing_targets.sort();
+    readiness.mismatched_targets.sort();
+    readiness.skipped.sort();
+    readiness.ready = readiness.namespace_active
+        && readiness.missing_targets.is_empty()
+        && readiness.mismatched_targets.is_empty()
+        && readiness.skipped.is_empty();
+    Ok(readiness)
+}
+
+/// Archives only legacy files that diverged after cutover. This is a separate,
+/// explicit retention action: it never removes `.project-os`, and callers must
+/// use the archive as evidence before requesting a destructive cleanup.
+pub fn archive_legacy_retirement_differences(root: &Path) -> Result<LegacyRetentionArchive, String> {
+    let readiness = legacy_retirement_readiness(root)?;
+    if !readiness.namespace_active {
+        return Err("状态命名空间尚未激活，不能归档 legacy 差异".to_string());
+    }
+    if !readiness.legacy_exists {
+        return Err("未发现需要归档的 legacy 状态目录".to_string());
+    }
+    if !readiness.missing_targets.is_empty() || !readiness.skipped.is_empty() {
+        return Err("legacy 状态仍有漏迁或符号链接，不能归档后清理".to_string());
+    }
+
+    let archive_id = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+        .to_string();
+    let archive_relative = format!("{STATE_ROOT}/evidence/legacy-retirement/{archive_id}");
+    let archive_root = root.join(&archive_relative);
+    let legacy_root = root.join(LEGACY_STATE_ROOT);
+    let mut files = Vec::new();
+    let mut skipped = Vec::new();
+    collect_regular_files(&legacy_root, &legacy_root, &mut files, &mut skipped)?;
+    if !skipped.is_empty() {
+        return Err("legacy 状态包含符号链接，不能归档后清理".to_string());
+    }
+    files.sort();
+
+    let mut archived = Vec::new();
+    for relative in files {
+        let legacy_relative = relative.to_string_lossy().replace('\\', "/");
+        let (_, active_target) = migration_target(&legacy_relative)?;
+        let source = legacy_root.join(&relative);
+        let target = root.join(&active_target);
+        let source_content = fs::read(&source).map_err(|error| error.to_string())?;
+        if target.is_file()
+            && source_content == fs::read(&target).map_err(|error| error.to_string())?
+        {
+            continue;
+        }
+        let archive_file = archive_root.join("source").join(&relative);
+        write_atomic(&archive_file, &source_content)?;
+        archived.push(LegacyRetentionArchiveFile {
+            legacy_relative,
+            active_target,
+            bytes: source_content.len(),
+        });
+    }
+    archived.sort_by(|left, right| left.legacy_relative.cmp(&right.legacy_relative));
+    let manifest = json!({
+        "schemaVersion": "omnidesk.legacy-retention-archive.v1",
+        "archiveRoot": archive_relative,
+        "legacyRoot": LEGACY_STATE_ROOT,
+        "files": archived.clone(),
+    });
+    write_atomic(
+        &archive_root.join("manifest.json"),
+        &[serde_json::to_vec_pretty(&manifest).map_err(|error| error.to_string())?, b"\n".to_vec()].concat(),
+    )?;
+    Ok(LegacyRetentionArchive {
+        archive_relative,
+        files: archived,
+    })
 }
 
 pub fn namespace_is_active(root: &Path) -> bool {
@@ -343,8 +493,6 @@ fn collect_regular_files(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::{SystemTime, UNIX_EPOCH};
-
     fn test_root(label: &str) -> PathBuf {
         let stamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -520,6 +668,77 @@ mod tests {
         let outcome = migrate_legacy_state(&root).unwrap();
         assert_eq!(outcome.skipped, vec!["link.json".to_string()]);
         assert!(!root.join(".omnidesk/data/link.json").exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn retirement_readiness_requires_an_active_lossless_namespace() {
+        let root = test_root("retirement-ready");
+        write_atomic(&root.join(".project-os/goals.json"), br#"{\"goals\":[]}"#).unwrap();
+
+        let before_activation = legacy_retirement_readiness(&root).unwrap();
+        assert!(!before_activation.ready);
+        assert!(before_activation
+            .missing_targets
+            .contains(&".omnidesk/data/goals.json".to_string()));
+
+        ensure_active_state_namespace(&root).unwrap();
+        let ready = legacy_retirement_readiness(&root).unwrap();
+        assert!(ready.ready);
+
+        write_atomic(
+            &root.join(".project-os/goals.json"),
+            br#"{\"goals\":[\"changed\"]}"#,
+        )
+        .unwrap();
+        let changed_legacy = legacy_retirement_readiness(&root).unwrap();
+        assert!(!changed_legacy.ready);
+        assert_eq!(
+            changed_legacy.mismatched_targets,
+            vec![".omnidesk/data/goals.json"]
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn retention_archive_preserves_only_diverged_legacy_files() {
+        let root = test_root("retention-archive");
+        write_atomic(&root.join(".project-os/state.json"), br#"{\"version\":1}"#).unwrap();
+        write_atomic(&root.join(".project-os/goals.json"), br#"{\"goals\":[]}"#).unwrap();
+        ensure_active_state_namespace(&root).unwrap();
+        write_atomic(
+            &root.join(".project-os/state.json"),
+            br#"{\"version\":0,\"legacy\":true}"#,
+        )
+        .unwrap();
+
+        let archive = archive_legacy_retirement_differences(&root).unwrap();
+        assert_eq!(archive.files.len(), 1);
+        assert_eq!(archive.files[0].legacy_relative, "state.json");
+        assert_eq!(
+            fs::read(root.join(&archive.archive_relative).join("source/state.json")).unwrap(),
+            br#"{\"version\":0,\"legacy\":true}"#
+        );
+        assert!(root.join(".project-os/state.json").exists());
+        assert!(root.join(&archive.archive_relative).join("manifest.json").exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn retirement_readiness_rejects_legacy_symlinks() {
+        use std::os::unix::fs::symlink;
+
+        let root = test_root("retirement-symlink");
+        let outside = root.join("outside.json");
+        write_atomic(&root.join(".project-os/state.json"), br#"{}"#).unwrap();
+        write_atomic(&outside, b"outside").unwrap();
+        symlink(&outside, root.join(".project-os/link.json")).unwrap();
+        ensure_active_state_namespace(&root).unwrap();
+
+        let readiness = legacy_retirement_readiness(&root).unwrap();
+        assert!(!readiness.ready);
+        assert_eq!(readiness.skipped, vec!["link.json"]);
         fs::remove_dir_all(root).unwrap();
     }
 }

@@ -1,6 +1,6 @@
 # 组件目录说明
 
-> 用途：登记报告页和未来前端中的可复用组件、分层和代码位置。
+> 用途：登记 OmniDesk Desktop 中的可复用组件、分层和代码位置。
 > 什么时候更新：新增共享组件、组件状态、组件源码位置或组件命名变化时。
 > 不要写什么：一次性页面截图、当前任务流水、未落地的组件猜想。
 
@@ -9,10 +9,7 @@
 - 已开始接入 Radix / shadcn-style 本地组件层
 - 桌面端已有 `desktop/src/main.jsx` 函数组件和 `desktop/src/styles.css` token layer
 - 已建立 `desktop/src/components/ui` 作为桌面端 primitive 组件入口
-- 已沉淀 AI 项目工程助手报告页的轻量组件契约
 - 桌面端已提供 `设计实现 / 界面规范 / 组件` 可视化目录，按真实源码登记 Primitive、Pattern 和 Composition
-- 当前报告页由 `templates/report/ai-project-report.html` 渲染静态 HTML
-- 组件契约通过 `data-component`、`data-variant`、`data-state` 和 TypeScript 数据源承载
 
 ## 组件分层
 
@@ -33,18 +30,9 @@
 
 | 组件 / Pattern | 分层 | 文档 | 数据 / 契约 | 当前承载 |
 |----------------|------|------|-------------|----------|
-| `ProductHeader` | Pattern | `docs/design/ai-project-assistant/components.md` | `docs/design/ai-project-assistant/components.ts` / `data.ts` | `templates/report/ai-project-report.html` |
-| `SegmentedSwitch` | Primitive | `docs/design/ai-project-assistant/components.md` | `docs/design/ai-project-assistant/components.ts` / `data.ts` | `templates/report/ai-project-report.html` |
-| `MetaPanel` | Deprecated Pattern | `docs/design/ai-project-assistant/components.md` | `docs/design/ai-project-assistant/components.ts` | 历史/备用状态卡，当前页面不在 Header 使用 |
-| `SectionHeading` | Pattern | `docs/design/ai-project-assistant/components.md` | `docs/design/ai-project-assistant/components.ts` / `data.ts` | `templates/report/ai-project-report.html` |
-| `SectionBlock` | Pattern | `docs/design/ai-project-assistant/components.md` | `docs/design/ai-project-assistant/components.ts` | `templates/report/ai-project-report.html` |
-| `DocumentGrid` | Pattern | `docs/design/ai-project-assistant/components.md` | `docs/design/ai-project-assistant/components.ts` / `data.ts` | `templates/report/ai-project-report.html` |
-| `OptionCard` | Pattern | `docs/design/ai-project-assistant/components.md` | `docs/design/ai-project-assistant/components.ts` / `data.ts` | `templates/report/ai-project-report.html` |
-| `ChecklistItem` | Pattern | `docs/design/ai-project-assistant/components.md` | `docs/design/ai-project-assistant/components.ts` / `data.ts` | `templates/report/ai-project-report.html` |
-| `AddItemCard` | Pattern | `docs/design/ai-project-assistant/components.md` | `docs/design/ai-project-assistant/components.ts` / `data.ts` | `templates/report/ai-project-report.html` |
-| `WritePlanPanel` | Pattern | `docs/design/ai-project-assistant/components.md` | `docs/design/ai-project-assistant/components.ts` / `data.ts` | `templates/report/ai-project-report.html` |
-| `TextField` | Primitive | `docs/design/ai-project-assistant/components.md` | `docs/design/ai-project-assistant/components.ts` / `data.ts` | `templates/report/ai-project-report.html` |
-| `Button` | Primitive | `docs/design/ai-project-assistant/components.md` | `docs/design/ai-project-assistant/components.ts` / `data.ts` | `templates/report/ai-project-report.html` |
+| `Button` | Primitive | 本文 | `desktop/src/components/ui/button.jsx` | 任务和页面动作 |
+| `Input` | Primitive | 本文 | `desktop/src/components/ui/input.jsx` | 表单和对话输入 |
+| `Badge` | Primitive | 本文 | `desktop/src/components/ui/badge.jsx` | 状态展示 |
 
 ## 桌面端 v0.1 组件现状
 

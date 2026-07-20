@@ -14,15 +14,22 @@ function writeFixture(root, traceOverrides = {}) {
   const results = [
     { caseId: "failed-check-repair", execution: { tracePath: "/ignored" } },
     { caseId: "goal-rebind", execution: { tracePath: "/ignored" } },
+    { caseId: "interrupted-run", execution: { tracePath: "/ignored" } },
   ];
   fs.writeFileSync(path.join(root, "results.json"), JSON.stringify({ results }));
   fs.writeFileSync(path.join(traces, "failed-check-repair.trace.json"), JSON.stringify({ initialCheck: { exitCode: 1, success: false }, ...traceOverrides.failed }));
   fs.writeFileSync(path.join(traces, "goal-rebind.trace.json"), JSON.stringify({
-    authorizedFiles: ["task.json", "goals.json"],
-    changedFiles: ["task.json", "goals.json"],
+    authorizedFiles: ["task.json", "goals.json", "task-index.json", "goal-audit.json"],
+    changedFiles: ["task.json", "goals.json", "task-index.json", "goal-audit.json"],
     changedFilesAuthorized: true,
     changedRequiredFiles: true,
     ...traceOverrides.goal,
+  }));
+  fs.writeFileSync(path.join(traces, "interrupted-run.trace.json"), JSON.stringify({
+    networkInterruption: { classification: "network-unavailable", providerResponseAccepted: false },
+    interrupted: { status: "interrupted" },
+    resumed: { status: "awaiting-approval" },
+    ...traceOverrides.interrupted,
   }));
   return { results: path.join(root, "results.json"), traces };
 }
@@ -36,6 +43,12 @@ test("requires failure and authorization evidence for real repair and multi-file
     const invalid = writeFixture(path.join(root, "invalid"), { goal: { changedFiles: ["task.json"], changedRequiredFiles: false } });
     assert.throws(
       () => execFileSync(process.execPath, [checker, "--results", invalid.results, "--trace-dir", invalid.traces], { stdio: "pipe" }),
+      /Agent Eval trace evidence invalid/,
+    );
+
+    const invalidNetwork = writeFixture(path.join(root, "invalid-network"), { interrupted: { networkInterruption: { classification: "unavailable", providerResponseAccepted: false } } });
+    assert.throws(
+      () => execFileSync(process.execPath, [checker, "--results", invalidNetwork.results, "--trace-dir", invalidNetwork.traces], { stdio: "pipe" }),
       /Agent Eval trace evidence invalid/,
     );
   } finally {

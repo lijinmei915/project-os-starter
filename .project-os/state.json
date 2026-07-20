@@ -76,19 +76,22 @@
       "Agent Run 持久化阶段 checkpoint、审批恢复和同一 Run 证据续接",
       "Desktop 工作区移除冻结的 CLI、模板、adapter 与 routing Skill 入口",
       "旧 CLI crate 与 Desktop governance bridge 已退役",
-      "Desktop Runbook、Preview 与工程资产投影不再消费旧治理脚本、模板或 adapter"
+      "Desktop Runbook、Preview 与工程资产投影不再消费旧治理脚本、模板或 adapter",
+      "旧静态站、AI 工程评分报告与历史设计提案已退役",
+      "原生重启恢复待审批 Agent Run 已验证",
+      "迁移兼容层退役预检已接入 Workspace snapshot"
     ],
     "doing": [
       "OmniDesk 产品与文档 SSOT 单内核收敛",
       "遗留文档与迁移兼容层的旧 Project OS 依赖退役",
-      "长任务中断、重启与多文件恢复验收",
-      "Eval trace 稳定证据化"
+    "Provider 网络中断与大型多文件修复的受保护 Eval 证据",
+    "迁移兼容层的历史差异保留与最终退役"
     ],
     "blocked": [],
     "next": [
-      "审计并删除无生产、CI、本地回归或文档兼容消费者的 installer、scripts、templates、adapters 与 routing skill",
-      "增加网络中断、应用重启和多文件任务恢复验收",
-      "清理历史运行产物和兼容层"
+    "在受保护环境运行真实 Provider Eval，补齐网络中断与大型多文件 trace",
+    "归档 9 处不一致 legacy 文件后，由用户确认清理 .project-os",
+    "删除兼容层后完成全量验收"
     ]
   }
 }

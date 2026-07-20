@@ -94,7 +94,7 @@ Provider 返回成功不等于任务成功。只有 Patch、应用、检查和�
 
 ### 恢复
 
-Agent Run 已持久化 attempt、审批、观察、request checkpoint、当前阶段、上下文摘要和最后确认点。重启后会从已持久化的阶段边界继续，并保留原审批，不会整轮重试或自动重放 Patch/检查。当前仍缺少原生窗口重启的端到端发布证据；离线状态机回归不能替代该证据。
+Agent Run 已持久化 attempt、审批、观察、request checkpoint、当前阶段、上下文摘要和最后确认点。重启后会从已持久化的阶段边界继续，并保留原审批，不会整轮重试或自动重放 Patch/检查。原生 WebDriver smoke 已验证“重启后中断并恢复原审批”；真实 Provider 网络中断和大规模多文件修复仍由受保护 Eval 证明。
 
 ### 状态迁移
 
@@ -105,10 +105,11 @@ Agent Run 已持久化 attempt、审批、观察、request checkpoint、当前�
   -> 内容比对与冲突检查
   -> 原子切换 active namespace
   -> 恢复新 namespace 事务
-  -> 验收后删除旧兼容数据
+  -> 重新逐文件比对退役预检
+  -> 用户明确确认后删除旧兼容数据
 ```
 
-迁移必须幂等、可审计、可恢复。不得用目录直接改名替代迁移，也不得在验证成功前删除源数据。出现任一目标内容冲突时，manifest 必须保持 `legacy / legacy-primary`；激活 `omnidesk / omnidesk-primary` 后不再回读可能已过期的 legacy 内容。
+迁移必须幂等、可审计、可恢复。不得用目录直接改名替代迁移，也不得在验证成功前删除源数据。退役预检要求 namespace 已激活、所有 legacy 常规文件在目标分区中存在且字节一致、没有符号链接、漏迁或冲突；它只给出可删结论，不触发删除。若切换后的 active 状态与 legacy 历史内容不同，必须先以独立确认动作将差异文件归档到 `.omnidesk/evidence/legacy-retirement/<id>/source/` 并写入 manifest，之后才能请求删除。出现任一目标内容冲突时，manifest 必须保持 `legacy / legacy-primary`；激活 `omnidesk / omnidesk-primary` 后不再回读可能已过期的 legacy 内容。
 
 ## 模块职责
 

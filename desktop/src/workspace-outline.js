@@ -271,7 +271,7 @@ export const projectGovernanceFlow = [
     description: "验收、测试和交付结果。",
     items: [
       { id: "validation-checks", title: "检查项", description: "当前项目可运行的检查。", relatedFiles: ["docs/TESTING.md", "desktop/package.json", "desktop/src-tauri/Cargo.toml"] },
-      { id: "validation-report", title: "验收报告", description: "目标验收和检查结果。", relatedFiles: [".project-os/goal-validation-report.json", ".project-os/reports/ai-project-report.json"] },
+      { id: "validation-report", title: "验收报告", description: "目标验收和检查结果。", relatedFiles: [".project-os/goal-validation-report.json"] },
       { id: "run-records", title: "运行记录", description: "检查、扫描和执行历史。", relatedFiles: [".project-os/runs/*", ".project-os/runs/desktop-summary.md"] },
     ],
   },
@@ -434,7 +434,7 @@ export const projectGovernanceOutline = [
         icon: "clipboard",
         description: "检查、验收和推荐形成的可追溯证据。",
         items: [
-          { id: "report-artifacts", title: "报告与证据", description: "报告、推荐和验证产物。", relatedFiles: [".project-os/reports/*", ".project-os/recommendations/*", ".project-os/goal-validation-report.json"] },
+          { id: "report-artifacts", title: "报告与证据", description: "验收和任务执行产生的可追溯证据。", relatedFiles: [".project-os/goal-validation-report.json", ".project-os/runs/*"] },
         ],
       },
       {

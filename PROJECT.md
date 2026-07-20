@@ -1,7 +1,7 @@
 ---
 layer: knowledge
 type: status
-last_verified: 2026-07-20
+last_verified: 2026-07-21
 teaches: "OmniDesk 当前产品内核、阶段、可靠性基线和唯一下一步"
 use_when: "AI 需要判断 OmniDesk 当前状态、架构边界或下一步工作时"
 depends_on: [AGENTS.md, docs/ARCHITECTURE.md, docs/PRODUCT_PLAN.md]
@@ -22,7 +22,7 @@ depends_on: [AGENTS.md, docs/ARCHITECTURE.md, docs/PRODUCT_PLAN.md]
 
 OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生成计划和 Patch 草稿、执行独立审批、运行检查、有限修复并保存可审计证据。它不是 Project OS 安装器、AI 工程评分工具或跨工具模板分发产品。
 
-`Project OS` 是本仓库早期产品阶段留下的兼容命名和工具链。旧 CLI 与 Desktop governance bridge 已退役；安装脚本、模板、报告与 adapter 已冻结，不再承载新产品能力，待其余消费者断开后删除。
+`Project OS` 是本仓库早期产品阶段留下的兼容命名和工具链。旧 CLI、Desktop governance bridge、安装脚本、模板、静态报告、adapter 与 routing skill 均已退役；`.project-os/` 仅保留为用户状态迁移兼容源。
 
 ## 当前架构
 
@@ -44,7 +44,7 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 - Agent Run 持久化、独立审批、Patch 应用、检查、最多两轮修复，以及工具边界的阶段 checkpoint 恢复。
 - Workspace、Conversation、Task、Goal、Provider、Execution 的 Runtime 模块与 Repository 事务边界。
 - 正式 12-case Eval：任务成功率 100%、Patch 可应用率 90.9%、检查通过率 100%、恢复成功率 100%。
-- 当前工作树回归：Desktop Node 442/442、Runtime Rust 71/71、Patch Normalizer 5/5；Web build 与 800 KiB 首屏软预算通过。
+- 当前工作树回归：Desktop Node 443/443、Runtime Rust 75/75、Patch Normalizer 5/5、原生 WebDriver smoke；Web build 与 800 KiB 首屏软预算通过。
 - `.omnidesk/` v1 四分区 schema、非破坏性迁移器和启动激活已接入生产 Runtime：支持幂等复制、冲突拒绝、符号链接跳过和 legacy 回退。
 - Repository、Workspace、Provider、Task、Conversation、Agent Run 与 Preview 均通过同一逻辑路径映射读写；文件树和 Agent 读取工具隐藏两个物理状态目录。
 - Desktop Runtime 已停止编译旧 `governance` bridge，不再暴露 `run_project_os_action`，受控检查只执行 Desktop Node、Web build 与 Cargo 检查；浏览器 Preview 的事实刷新只重新读取只读 snapshot。
@@ -52,27 +52,28 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 - Desktop 工作区已移除旧 CLI、模板、adapter 与 routing Skill 的可见入口，仅呈现 OmniDesk Runtime 的模型、受控工具、安全边界、工程文件与证据。
 - 常规 CI 已删除旧 CLI 编译、installer 回归、AI 工程报告生成和 `.project-os` 报告上传，只保留 Desktop Runtime 回归与轻量仓库契约检查。
 - 受保护 Agent Eval 使用 active `.omnidesk/data` Provider 配置，并将每次真实结果、报告与 trace 固化到 `.omnidesk/evidence/agent-eval/<run-id>` 后上传。
+- 根目录旧静态站、在线站/截图/报告模型测试、AI 工程评分报告 schema 与历史设计提案已删除；Desktop 只保留任务执行与目标验收证据。
+- 原生窗口重启会把待审批 Agent Run 标记为中断、保留审批 token，并恢复到等待审批状态。
+- `.project-os` 退役预检会逐文件校验 active `.omnidesk`；当前源目录存在 9 处历史内容差异，必须先按保留策略归档，不可直接删除。
 
 正在做：
 
 - 将产品与文档 SSOT 收敛到 OmniDesk Desktop Runtime。
 - 继续断开遗留文档和迁移兼容层对旧 Project OS 分发工具链的真实依赖。
-- 继续补齐长任务的原生中断、重启与多文件恢复验收；模型请求本身不能从中断 token 续传，但已持久化的工具边界不会重放。
+- 继续补齐 Provider 网络中断与大型多文件修复的受保护 Eval 证据；模型请求本身不能从中断 token 续传，但已持久化的工具边界不会重放。
 - 将 Eval 原始 trace 从临时目录固化为可携带的发布证据。
 
 当前风险：
 
 - 活跃 Provider 请求不能从中断 token 续传；重启后只能从最近持久化阶段重新请求模型，不能续接原网络流。
 - 终端会话和屏幕输出仍在内存，Runtime 重启会终止会话。
-- `.project-os/` 仍作为非破坏性迁移源和 tracked 治理兼容文件；在 `AGENTS.md` 和旧工具链改用新 SSOT 前不能删除。
-- 旧 CLI、scripts、templates、adapters 与部分遗留文档、受保护 Eval 和迁移兼容层仍有真实依赖，不能直接整目录删除；Desktop 生产运行时、常规 CI 和本地总回归已不再依赖它们。
+- `.project-os/` 仍作为非破坏性迁移源和 tracked 治理兼容文件；预检发现 9 处与 active namespace 不一致的历史文件，当前不能删除。
+- 受保护 Eval 仍需要真实 Provider 凭据；本机离线回归不能替代其网络中断与多文件轨迹。
 - 受保护 Agent Eval 现使用 active `.omnidesk` 命名空间；迁移兼容映射仍被旧项目读取路径使用，不能提前删除。
 - 命名空间映射仍接受 `.project-os/...` 作为兼容逻辑路径；在旧调用者退役前，不能把字符串搜索结果误判为物理旧路径仍在被读写。
 
 ## 下一步重点
 
-1. 将受保护 Eval 的临时 Provider 与 trace artifact 切换到 active `.omnidesk` 命名空间。
-2. 审计并删除不再被 Desktop、CI、本地回归或文档兼容层使用的 installer、scripts、templates、adapters 与 routing skill。
-3. 持久化长任务 request checkpoint、阶段、上下文摘要和最后确认点，并覆盖网络中断、应用重启和多文件恢复。
-4. 将 Eval 原始 trace 固化为稳定 artifact，补齐原生端、中断和大型任务发布门槛。
-5. 完成全量验收后按保留策略清理 `.project-os` 历史产物和兼容层。
+1. 在受保护环境运行真实 Provider Eval，补齐网络中断与大型多文件修复 trace。
+2. 为 9 处不一致 legacy 文件执行显式保留归档，再由用户确认清理 `.project-os`。
+3. 完成真实 Eval、归档与删除后的全量验收，移除迁移兼容层。

@@ -78,7 +78,7 @@ Runtime 启动时将 legacy `.project-os/` 非破坏性迁移到 `.omnidesk/`：
 .omnidesk/evidence  Eval、Patch 与验证证据
 ```
 
-迁移会跳过符号链接、保持源数据、拒绝冲突覆盖，并以 manifest 原子切换 active namespace。迁移验收完成前不要手动删除 `.project-os/`。
+迁移会跳过符号链接、保持源数据、拒绝冲突覆盖，并以 manifest 原子切换 active namespace。退役前 Runtime 会重新核验每个 legacy 常规文件已迁入、内容字节一致且没有符号链接；如 active namespace 在切换后已更新，先使用受控归档动作把差异源文件保存到 `.omnidesk/evidence/legacy-retirement/`。迁移验收完成并获得用户明确确认前不要手动删除 `.project-os/`。
 
 ## 常见问题
 

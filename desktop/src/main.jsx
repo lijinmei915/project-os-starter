@@ -2720,7 +2720,7 @@ function ValidationReportPanel({ onOpenSource, snapshot }) {
   const checks = Array.isArray(report.checks) ? report.checks : [];
   const passed = checks.filter((check) => check?.success).length;
   const status = goalValidationStatusLabel(report.status || "missing");
-  const sources = [".project-os/goal-validation-report.json", ".project-os/reports/ai-project-report.json"];
+  const sources = [".project-os/goal-validation-report.json"];
   return (
     <section className="overviewSurface validationReportSurface">
       <OverviewPageHeader
@@ -2949,94 +2949,6 @@ function RunbookPanel({ onOpenSource, onSendToTerminal, report, snapshot }) {
   const store = buildProjectFactStore({ report, snapshot });
   const descriptors = compileRunbookSlots({ capabilityManifest: snapshot?.projectCapabilities, components: { RunbookSlot }, contract: projectRunbookContract, store });
   return descriptors.map((descriptor) => <descriptor.component key={descriptor.id} model={descriptor.props} onOpenSource={onOpenSource} onSendToTerminal={onSendToTerminal} />);
-}
-
-function ReportArtifactsPanel({ snapshot }) {
-  const validationReport = snapshot?.goalValidationReport || {};
-  const checks = Array.isArray(validationReport.checks) ? validationReport.checks : [];
-  const passedChecks = checks.filter((check) => check.success).length;
-  const reportArtifacts = [
-    {
-      label: "AI 工程治理报告",
-      path: ".project-os/reports/ai-project-report.json",
-      purpose: "结构化记录项目评分、缺口和治理建议，是可视化报告的数据源。",
-      status: "治理数据",
-    },
-    {
-      label: "Markdown 报告",
-      path: ".project-os/reports/ai-project-report.md",
-      purpose: "适合人工快速阅读和交接摘录。",
-      status: "文本报告",
-    },
-    {
-      label: "报告截图",
-      path: ".project-os/reports/ai-project-report-preview.png",
-      purpose: "用于视觉回归或把报告结果作为截图证据沉淀。",
-      status: "视觉证据",
-    },
-    {
-      label: "目标验收报告",
-      path: ".project-os/goal-validation-report.json",
-      purpose: "记录最近一次目标验收的检查结果，通过或失败都从这里追溯。",
-      status: validationReport.status || "unknown",
-    },
-  ];
-
-  return (
-    <section className="reportSurface">
-      <header className="runbookHero">
-        <div>
-          <span>可视化报告是什么</span>
-          <strong>工程治理报告产物</strong>
-          <p>它不是单独的漂亮页面，而是把扫描、评分、推荐、验收和视觉证据沉淀成可追溯产物。</p>
-        </div>
-        <Badge>{validationReport.status === "passed" ? "验收通过" : statusLabel(validationReport.status)}</Badge>
-      </header>
-      <div className="agentTopicPanel">
-        <div className="agentTopicCard">
-          <span>报告产物</span>
-          <strong>{reportArtifacts.length}</strong>
-        </div>
-        <div className="agentTopicCard">
-          <span>最近验收</span>
-          <strong>{validationReport.status === "passed" ? "通过" : statusLabel(validationReport.status)}</strong>
-        </div>
-        <div className="agentTopicCard">
-          <span>检查项</span>
-          <strong>{passedChecks}/{checks.length || 0}</strong>
-        </div>
-      </div>
-      <div className="reportArtifactList">
-        {reportArtifacts.map((artifact) => (
-          <article className="reportArtifactItem" key={artifact.path}>
-            <header>
-              <div>
-                <span>{artifact.label}</span>
-                <strong>{artifact.path}</strong>
-              </div>
-              <Badge>{artifact.status}</Badge>
-            </header>
-            <p>{artifact.purpose}</p>
-          </article>
-        ))}
-      </div>
-      {checks.length ? (
-        <div className="agentTopicList">
-          {checks.map((check) => (
-            <div className="agentPatchItem" key={check.id || check.label}>
-              <div className="agentPatchItemHeader">
-                <div>
-                  <strong>{check.label || check.id}</strong>
-                  <span>{check.command}</span>
-                </div>
-                <Badge status={check.success ? "done" : "failed"}>{check.success ? "通过" : "失败"}</Badge>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : null}
-    </section>
-  );
 }
 
 function WorkspaceFactsPreview({ globalOverview = false, onCreateGovernanceTask, onNavigate, onRequestProjectAccess, provider, report, snapshot, tasks = [] }) {
@@ -3481,7 +3393,7 @@ function EngineeringFileTab({
     isDataContractsTopic, isDecisionRecordsTopic, isDesignImplementationTopic, isDocumentationRulesTopic,
     isExecutionPermissionsTopic, isGoalHistoryTopic, isGovernanceFilesTopic, isHandoffRecordsTopic,
     isLessonsLearnedTopic, isLocalProjectStateTopic, isMemorySurfaceTopic, isOverviewTopic,
-    isReportTopic, isRiskBoundaryTopic, isRunbookTopic, isRunRecordsTopic, isSystemArchitectureTopic,
+    isRiskBoundaryTopic, isRunbookTopic, isRunRecordsTopic, isSystemArchitectureTopic,
     isTaskExecutionTopic, isTokenLibraryTopic, isValidationChecksTopic, isValidationReportTopic,
     selectedTopic, surface, topicRouteId, usesDedicatedSurface,
   } = resolveEngineeringTopicSurface({ dedicatedSurfaceByTopic, selectedEngineeringFile, workspaceRouteById });
@@ -3570,9 +3482,6 @@ function EngineeringFileTab({
     const localProjectStatePanel = isLocalProjectStateTopic && snapshot?.workspaceFacts
       ? <LocalProjectStatePanel onOpenSource={openSourceFile} report={snapshot.workspaceFacts} snapshot={snapshot} />
       : null;
-    const reportPanel = isReportTopic
-      ? <ReportArtifactsPanel snapshot={snapshot} />
-      : null;
     const governanceFilesPanel = isGovernanceFilesTopic && snapshot?.workspaceFacts
       ? <GovernanceFilesHealthSection onCreateGovernanceTask={onCreateGovernanceTask} onReadEngineeringFile={onReadEngineeringFile} report={snapshot.workspaceFacts} />
       : null;
@@ -3627,8 +3536,8 @@ function EngineeringFileTab({
     const topicBody = (
       <EngineeringTopicSurfaceComposer
         capabilityPanel={capabilityPanel}
-        capabilitySupplementPanels={[currentProgressPanel, runbookPanel, reportPanel, governanceFilesPanel, designImplementationPanel, componentLibraryPanel, tokenLibraryPanel]}
-        dedicatedPanels={[agentConfigSurfacePanel, assetSurfacePanel, memorySurfacePanel, taskExecutionPanel, currentGoalPanel, acceptanceCriteriaPanel, goalHistoryPanel, collaborationBoundaryPanel, executionPermissionsPanel, documentationRulesPanel, systemArchitecturePanel, dataContractsPanel, codeStructurePanel, validationChecksPanel, validationReportPanel, runRecordsPanel, handoffRecordsPanel, decisionRecordsPanel, lessonsLearnedPanel, currentProgressPanel, runbookPanel, riskBoundaryPanel, localProjectStatePanel, reportPanel, governanceFilesPanel, designImplementationPanel, componentLibraryPanel, tokenLibraryPanel]}
+        capabilitySupplementPanels={[currentProgressPanel, runbookPanel, governanceFilesPanel, designImplementationPanel, componentLibraryPanel, tokenLibraryPanel]}
+        dedicatedPanels={[agentConfigSurfacePanel, assetSurfacePanel, memorySurfacePanel, taskExecutionPanel, currentGoalPanel, acceptanceCriteriaPanel, goalHistoryPanel, collaborationBoundaryPanel, executionPermissionsPanel, documentationRulesPanel, systemArchitecturePanel, dataContractsPanel, codeStructurePanel, validationChecksPanel, validationReportPanel, runRecordsPanel, handoffRecordsPanel, decisionRecordsPanel, lessonsLearnedPanel, currentProgressPanel, runbookPanel, riskBoundaryPanel, localProjectStatePanel, governanceFilesPanel, designImplementationPanel, componentLibraryPanel, tokenLibraryPanel]}
         fallback={<Notice variant="info">这是项目治理地图。用户只看事项，OmniDesk 在背后维护对应文件、状态来源和更新时机。</Notice>}
         isOverviewTopic={isOverviewTopic}
         overviewPanel={<WorkspaceFactsPreview globalOverview={selectedTopic.id === "workbench-overview"} onCreateGovernanceTask={onCreateGovernanceTask} onNavigate={onNavigateWorkbench} onRequestProjectAccess={onRequestProjectAccess} provider={provider} report={workspaceFacts} snapshot={snapshot} tasks={tasks} />}

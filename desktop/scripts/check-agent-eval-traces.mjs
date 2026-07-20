@@ -38,11 +38,20 @@ for (const result of results) {
     }
   }
 
+  if (caseId === "interrupted-run") {
+    if (trace?.networkInterruption?.classification !== "network-unavailable"
+      || trace?.networkInterruption?.providerResponseAccepted !== false
+      || trace?.interrupted?.status !== "interrupted"
+      || trace?.resumed?.status !== "awaiting-approval") {
+      fail("interrupted-run must prove network classification and approval-bound recovery");
+    }
+  }
+
   if (caseId === "goal-rebind") {
     const authorized = Array.isArray(trace?.authorizedFiles) ? trace.authorizedFiles : [];
     const changed = Array.isArray(trace?.changedFiles) ? trace.changedFiles : [];
-    if (trace?.changedFilesAuthorized !== true || trace?.changedRequiredFiles !== true || changed.length < 2) {
-      fail("goal-rebind must prove two authorized file changes");
+    if (trace?.changedFilesAuthorized !== true || trace?.changedRequiredFiles !== true || changed.length < 4) {
+      fail("goal-rebind must prove four authorized file changes");
     }
     if (changed.some((file) => !authorized.includes(file))) fail("goal-rebind changed a file outside its authorization");
   }

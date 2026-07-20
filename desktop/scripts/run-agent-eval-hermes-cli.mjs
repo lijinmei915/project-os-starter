@@ -112,14 +112,25 @@ const patchCases = Object.freeze({
     files: {
       "task.json": "{\n  \"id\": \"task-1\",\n  \"goalId\": \"goal-old\",\n  \"goalTitle\": \"Old goal\"\n}\n",
       "goals.json": "{\n  \"goals\": [\n    { \"id\": \"goal-old\", \"title\": \"Old goal\", \"taskIds\": [\"task-1\"] },\n    { \"id\": \"goal-new\", \"title\": \"New goal\", \"taskIds\": [] }\n  ]\n}\n",
+      "task-index.json": "{\n  \"taskToGoal\": { \"task-1\": \"goal-old\" },\n  \"goalToTasks\": { \"goal-old\": [\"task-1\"], \"goal-new\": [] }\n}\n",
+      "goal-audit.json": "{\n  \"entries\": [{ \"taskId\": \"task-1\", \"goalId\": \"goal-old\", \"goalTitle\": \"Old goal\", \"event\": \"bound\" }]\n}\n",
     },
-    prompt: "Return only unified diffs that rebind task.json task-1 from goal-old to goal-new. Update task.json goalId and goalTitle, remove task-1 from goal-old taskIds, and add task-1 to goal-new taskIds in goals.json. Do not modify any other data. Do not use tools, do not explain, and do not use markdown fences.",
+    minimumChangedFiles: 4,
+    prompt: "Return only unified diffs that rebind task-1 from goal-old / Old goal to goal-new / New goal consistently in all four authorized files. In task.json update goalId and goalTitle. In goals.json remove task-1 from goal-old taskIds and add it to goal-new taskIds. In task-index.json update taskToGoal.task-1, remove task-1 from goalToTasks.goal-old, and add it to goalToTasks.goal-new. In goal-audit.json update the only entry's goalId, goalTitle, and event to `rebound`. Do not modify any other data. Do not use tools, do not explain, and do not use markdown fences.",
     verify(fixture) {
       const task = JSON.parse(fs.readFileSync(path.join(fixture, "task.json"), "utf8"));
       const goals = JSON.parse(fs.readFileSync(path.join(fixture, "goals.json"), "utf8")).goals;
+      const index = JSON.parse(fs.readFileSync(path.join(fixture, "task-index.json"), "utf8"));
+      const audit = JSON.parse(fs.readFileSync(path.join(fixture, "goal-audit.json"), "utf8")).entries?.[0];
       const oldGoal = goals.find((goal) => goal.id === "goal-old");
       const newGoal = goals.find((goal) => goal.id === "goal-new");
-      return task.goalId === "goal-new" && task.goalTitle === "New goal" && !oldGoal.taskIds.includes("task-1") && newGoal.taskIds.includes("task-1");
+      return task.goalId === "goal-new" && task.goalTitle === "New goal"
+        && !oldGoal.taskIds.includes("task-1") && newGoal.taskIds.includes("task-1")
+        && index.taskToGoal?.["task-1"] === "goal-new"
+        && !index.goalToTasks?.["goal-old"]?.includes("task-1")
+        && index.goalToTasks?.["goal-new"]?.includes("task-1")
+        && audit?.taskId === "task-1" && audit?.goalId === "goal-new"
+        && audit?.goalTitle === "New goal" && audit?.event === "rebound";
     },
   },
   "conversation-archive": {
@@ -260,7 +271,7 @@ async function runPatchCase(caseId, definition) {
     ? String(runGit(fixture, ["diff", "--name-only"]).stdout || "").split(/\r?\n/).filter(Boolean)
     : [];
   const changedFilesAuthorized = changedFiles.every((file) => authorizedFiles.includes(file));
-  const requiredChangedFileCount = caseId === "goal-rebind" ? 2 : 1;
+  const requiredChangedFileCount = Number(definition.minimumChangedFiles || 1);
   const changedRequiredFiles = changedFiles.length >= requiredChangedFileCount;
   let fixtureCheckPassed = false;
   let fixtureCheckError = "";
