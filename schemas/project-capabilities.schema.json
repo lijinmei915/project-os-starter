@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-os.local/schemas/project-capabilities.schema.json",
+  "title": "Project Capabilities",
+  "description": "Project-level activation state for capabilities supported by the complete OmniDesk workspace registry.",
+  "type": "object",
+  "required": ["schemaVersion", "updatedAt", "workspaceCapabilities", "domainCapabilities"],
+  "properties": {
+    "schemaVersion": { "const": "project-os.project-capabilities.v0.1" },
+    "updatedAt": { "type": "string" },
+    "capabilities": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/capability" }
+    },
+    "workspaceCapabilities": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/capability" }
+    },
+    "domainCapabilities": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/domainCapability" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "capability": {
+      "type": "object",
+      "required": ["id", "status"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "enum": ["project-overview", "goals", "tasks", "files", "rules", "design-implementation", "validation-delivery", "knowledge-memory", "agent-configuration"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["available", "detected", "recommended", "enabled", "dismissed"]
+        },
+        "source": {
+          "type": "string",
+          "enum": ["core", "scan", "conversation", "user", "migration"]
+        },
+        "signals": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "enabledAt": { "type": "string" }
+        ,"modules": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/moduleCapability" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "moduleCapability": {
+      "type": "object",
+      "required": ["id", "status"],
+      "properties": {
+        "id": { "type": "string" },
+        "status": { "type": "string", "enum": ["available", "detected", "recommended", "enabled", "dismissed"] },
+        "source": { "type": "string", "enum": ["scan", "conversation", "user", "migration"] },
+        "signals": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "domainCapability": {
+      "type": "object",
+      "required": ["id", "status"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "enum": ["frontend", "backend", "database", "desktop", "cli", "ai", "testing", "deployment"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["available", "detected", "recommended", "enabled", "dismissed"]
+        },
+        "source": {
+          "type": "string",
+          "enum": ["scan", "conversation", "user", "migration"]
+        },
+        "signals": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

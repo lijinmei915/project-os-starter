@@ -1,9 +1,9 @@
 {
   "schemaVersion": "project-os.goal-validation.v0.1",
-  "updatedAt": "2026-07-08T05:23:16.525Z",
+  "updatedAt": "2026-07-18T10:38:01.672Z",
   "goal": {
-    "id": "desktop-v0.1-direction-confirmation",
-    "title": "Project OS Console 内核收口期 / Desktop v0.1 方向确认期",
+    "id": "统一对话-任务与目标的上下文和状态契约-1784370357360",
+    "title": "统一对话、任务与目标的上下文和状态契约",
     "status": "signed-off"
   },
   "criteria": [

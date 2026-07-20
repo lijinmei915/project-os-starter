@@ -17,6 +17,43 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  desktop:
+    name: Desktop runtime regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Install Desktop native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Install Desktop dependencies
+        run: npm ci --prefix desktop
+
+      - name: Install browser for Desktop smoke tests
+        run: cd desktop && npx playwright install --with-deps chromium
+
+      - name: Run Desktop regression gates
+        run: |
+          npm --prefix desktop test
+          npm --prefix desktop run check:agent-eval
+          npm --prefix desktop run web:build
+          npm --prefix desktop run check:bundle
+          npm --prefix desktop run test:smoke
+          cargo check --manifest-path desktop/src-tauri/Cargo.toml
+          cargo test --manifest-path desktop/src-tauri/Cargo.toml
+
   project-os:
     name: Project OS regression
     runs-on: ubuntu-latest

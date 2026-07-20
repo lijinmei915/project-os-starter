@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "project-os.project-goals.v0.1",
+  "activeProjectGoalId": "omnidesk-local-ai-workbench",
+  "projectGoals": [
+    {
+      "id": "omnidesk-local-ai-workbench",
+      "title": "让 OmniDesk 成为可持续治理本地项目的 AI 工作台",
+      "summary": "用户只说想做什么，OmniDesk 负责理解需求、治理项目、拆解任务、执行检查并沉淀项目记忆。",
+      "status": "active",
+      "stageGoalIds": [
+        "workspace-asset-governance-v1-20260720",
+        "agent-real-desktop-release-acceptance-v1-20260720",
+        "agent-production-loop-v1-1-20260720",
+        "agent-development-loop-v1-20260719-151357",
+        "workspace-usable-loop-20260707",
+        "desktop-v0.1-direction-confirmation",
+        "goal-2026-07-16T03-37-16Z",
+        "优化对话历史治理-1784354518762",
+        "完成对话历史管理闭环验收-1784355087943",
+        "统一对话-任务与目标的上下文和状态契约-1784370357360"
+      ],
+      "createdAt": "2026-07-16T00:00:00.000Z",
+      "updatedAt": "2026-07-20T03:02:00.000Z"
+    }
+  ],
+  "updatedAt": "2026-07-20T03:02:00.000Z"
+}

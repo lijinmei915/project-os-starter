@@ -1,41 +1,46 @@
+import { invoke } from "@tauri-apps/api/core";
+import { previewOperation } from "./runtime-operation-contract.js";
+
 export function isTauriRuntime() {
-  return typeof window !== "undefined" && Boolean(
-    window.__TAURI_INTERNALS__ || window.__TAURI__ || window.__TAURI_METADATA__
-  );
+  if (typeof window === "undefined") return false;
+  const hasTauriBridge = Boolean(window.__TAURI_INTERNALS__ || window.__TAURI__ || window.__TAURI_METADATA__);
+  if (!hasTauriBridge) return false;
+  const { hostname, port, protocol } = window.location || {};
+  const isLoopbackHttp = ["http:", "https:"].includes(protocol) && ["127.0.0.1", "localhost", "::1"].includes(hostname);
+  return !isLoopbackHttp || port === "1420";
 }
 
 export async function invokeTauriCommand(command, payload) {
-  const { invoke } = await import("@tauri-apps/api/core");
   return invoke(command, payload);
 }
 
-const previewCommands = {
-  read_engineering_file: {
-    endpoint: "/__project-os/read-engineering-file",
-    error: "读取文件失败。",
-  },
-  run_project_os_action: {
-    endpoint: "/__project-os/run-project-os-action",
-    error: "治理动作执行失败。",
-  },
-  save_desktop_conversation: {
-    endpoint: "/__project-os/save-desktop-conversation",
-    error: "保存对话失败。",
-  },
-  delete_desktop_conversation: {
-    endpoint: "/__project-os/delete-desktop-conversation",
-    error: "删除对话失败。",
-  },
-};
+export async function invokeRuntimeCommand(command, payload) {
+  if (isTauriRuntime()) return invokeTauriCommand(command, payload);
+  return invokePreviewCommand(command, payload);
+}
+
+export async function invokeWorkspaceOperation({ input, previewCommand, tauriCommand }) {
+  if (isTauriRuntime()) return invokeTauriCommand(tauriCommand, input === undefined ? undefined : { input });
+  return invokePreviewCommand(previewCommand, input);
+}
 
 export async function invokePreviewCommand(command, payload) {
   if (command === "open_native_terminal") {
     throw new Error("浏览器预览不能打开系统终端，请在桌面 App 窗口里使用。");
   }
-  const spec = previewCommands[command];
-  if (!spec) {
-    throw new Error("当前是浏览器预览，只能查看界面；请在桌面 App 窗口里保存配置。");
+  if (command === "run_hermes_agent") {
+    throw new Error("浏览器预览不能运行 Hermes，请在桌面 App 窗口里使用。");
   }
+  if (command === "resume_agent_run") {
+    throw new Error("浏览器预览不能恢复 Hermes 运行，请在桌面 App 窗口里使用。");
+  }
+  if (command === "approve_agent_run") {
+    throw new Error("浏览器预览不能批准 Hermes 运行，请在桌面 App 窗口里使用。");
+  }
+  if (command === "execute_approved_agent_tool") {
+    throw new Error("浏览器预览不能执行已批准工具，请在桌面 App 窗口里使用。");
+  }
+  const spec = previewOperation(command);
   const response = await fetch(spec.endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

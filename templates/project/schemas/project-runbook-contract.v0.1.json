@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "project-os.project-runbook-contract.v0.1",
+  "allowedSelectors": ["selectRunbook"],
+  "allowedComponents": ["RunbookSlot"],
+  "facts": [
+    { "id": "runbook.summary", "primary": ".project-os/workspace-facts.json" },
+    { "id": "runbook.commands", "primary": "scanner:package-scripts" },
+    { "id": "runbook.context", "primary": "runtime:snapshot" }
+  ],
+  "slots": [
+    { "id": "project-runbook.main", "surface": "project-runbook", "region": "body", "order": 10, "selector": "selectRunbook", "component": "RunbookSlot", "renderWhen": "always", "dependencies": ["runbook.summary", "runbook.commands", "runbook.context"], "capability": { "id": "project-overview", "moduleId": "project-runbook" } }
+  ],
+  "eventOrder": ["source.changed", "fact.invalidated", "fact.updated", "selector.recomputed", "slot.updated"]
+}

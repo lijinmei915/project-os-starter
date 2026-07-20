@@ -110,7 +110,7 @@ EOF
 if command -v cargo >/dev/null 2>&1; then
   cargo run --quiet --manifest-path "$root/cli/Cargo.toml" -- state sync "$runner_fixture" --set phase=stabilizing --set stage=Synced --output json >/tmp/project-os-state-sync.log
   if command -v node >/dev/null 2>&1; then
-    node -e 'const fs=require("fs"); const r=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); if(r.schemaVersion!=="project-os.state-sync-result.v0.1" || r.status!=="passed" || !r.bundle) process.exit(1); const s=JSON.parse(fs.readFileSync(process.argv[2],"utf8")); if(s.phase!=="stabilizing" || s.stage!=="Synced") process.exit(1); if(!fs.existsSync(r.bundle)) process.exit(1);' /tmp/project-os-state-sync.log "$runner_fixture/.project-os/state.json"
+    node -e 'const fs=require("fs"),path=require("path"); const r=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); if(r.schemaVersion!=="project-os.state-sync-result.v0.1" || r.status!=="passed" || !r.bundle) process.exit(1); const s=JSON.parse(fs.readFileSync(process.argv[2],"utf8")); if(s.phase!=="stabilizing" || s.stage!=="Synced" || !fs.existsSync(r.bundle)) process.exit(1); const events=fs.readdirSync(path.join(process.argv[3],".project-os/events")); const event=events.map(name=>JSON.parse(fs.readFileSync(path.join(process.argv[3],".project-os/events",name),"utf8"))).find(item=>item.operation==="sync-cli-state"); if(!event || !event.paths.includes(".project-os/state.json") || !event.paths.some(p=>p.startsWith(".project-os/state-bundles/"))) process.exit(1);' /tmp/project-os-state-sync.log "$runner_fixture/.project-os/state.json" "$runner_fixture"
   fi
   cp "$runner_fixture/.project-os/state.json" "$runner_fixture/.project-os/state.valid.json"
   node -e 'const fs=require("fs"); const s=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); s.phase="wrong"; fs.writeFileSync(process.argv[1], JSON.stringify(s, null, 2));' "$runner_fixture/.project-os/state.json"
@@ -204,7 +204,7 @@ cat > "$runner_fixture/.project-os/config.json" <<'EOF'
     "defaultPersist": "full",
     "defaultOutput": "json",
     "lockWrites": true,
-    "staleLockSeconds": 1
+    "staleLockSeconds": 30
   }
 }
 EOF
@@ -250,22 +250,30 @@ fi
 
 log "artifact pruning"
 prune_fixture="$tmp_dir/prune-fixture"
-mkdir -p "$prune_fixture/.project-os/entry-contexts" "$prune_fixture/.project-os/runs/logs" "$prune_fixture/.project-os/state-bundles"
+mkdir -p "$prune_fixture/.project-os/entry-contexts" "$prune_fixture/.project-os/runs/logs" "$prune_fixture/.project-os/state-bundles" "$prune_fixture/.project-os/events" "$prune_fixture/.project-os/transactions"
 for index in 01 02 03 04 05; do
   printf '{}\n' > "$prune_fixture/.project-os/entry-contexts/$index.json"
   printf '{}\n' > "$prune_fixture/.project-os/runs/$index.json"
   printf '{}\n' > "$prune_fixture/.project-os/state-bundles/$index.json"
+  printf '{"state":"committed"}\n' > "$prune_fixture/.project-os/transactions/$index.json"
+  printf '{}\n' > "$prune_fixture/.project-os/events/$index.json"
   mkdir -p "$prune_fixture/.project-os/runs/logs/$index"
 done
-PROJECT_OS_RETENTION_ENTRY_CONTEXTS=2 PROJECT_OS_RETENTION_RUNS=2 bash "$root/scripts/prune-project-os-artifacts.sh" "$prune_fixture" >/dev/null
+printf '{"state":"prepared"}\n' > "$prune_fixture/.project-os/transactions/99-prepared.json"
+PROJECT_OS_RETENTION_ENTRY_CONTEXTS=2 PROJECT_OS_RETENTION_RUNS=2 PROJECT_OS_RETENTION_EVENTS=2 PROJECT_OS_RETENTION_TRANSACTIONS=2 bash "$root/scripts/prune-project-os-artifacts.sh" "$prune_fixture" >/dev/null
 entry_count="$(find "$prune_fixture/.project-os/entry-contexts" -maxdepth 1 -name '*.json' | wc -l | tr -d ' ')"
 run_count="$(find "$prune_fixture/.project-os/runs" -maxdepth 1 -name '*.json' | wc -l | tr -d ' ')"
 state_bundle_count="$(find "$prune_fixture/.project-os/state-bundles" -maxdepth 1 -name '*.json' | wc -l | tr -d ' ')"
 log_count="$(find "$prune_fixture/.project-os/runs/logs" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
-if [ "$entry_count" != "2" ] || [ "$run_count" != "2" ] || [ "$state_bundle_count" != "2" ] || [ "$log_count" != "2" ]; then
+event_count="$(find "$prune_fixture/.project-os/events" -maxdepth 1 -name '*.json' | wc -l | tr -d ' ')"
+transaction_count="$(find "$prune_fixture/.project-os/transactions" -maxdepth 1 -name '*.json' | wc -l | tr -d ' ')"
+if [ "$entry_count" != "2" ] || [ "$run_count" != "2" ] || [ "$state_bundle_count" != "2" ] || [ "$log_count" != "2" ] || [ "$event_count" != "2" ] || [ "$transaction_count" != "3" ]; then
   echo "ERROR: artifact pruning failed"
   exit 1
 fi
+PROJECT_OS_RETENTION_EVENTS=0 PROJECT_OS_RETENTION_TRANSACTIONS=0 bash "$root/scripts/prune-project-os-artifacts.sh" "$prune_fixture" --dry-run > "$tmp_dir/prune-dry-run.log"
+assert_contains "$tmp_dir/prune-dry-run.log" 'candidate:'
+assert_file "$prune_fixture/.project-os/transactions/99-prepared.json"
 
 log "recommendation engine"
 recommend_fixture="$tmp_dir/recommend-fixture"

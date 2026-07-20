@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "project-os.project-overview-contract.v0.1",
+  "allowedSelectors": ["selectProjectHeader", "selectCorePositioning", "selectTechnologyOverview", "selectEngineeringStructure"],
+  "allowedComponents": ["ProjectOverviewHeader", "ProjectOverviewSectionSlot"],
+  "facts": [
+    { "id": "project.name", "primary": ".project-os/desktop-registry.json", "fallbacks": [".project-os/workspace-facts.json", ".project-os/state.json"] },
+    { "id": "project.version", "primary": "desktop/package.json", "fallbacks": ["package.json", "Cargo.toml"] },
+    { "id": "project.phase", "primary": ".project-os/state.json", "fallbacks": [".project-os/workspace-facts.json"] },
+    { "id": "project.description", "primary": ".project-os/project-profile.json", "fallbacks": [".project-os/state.json", "PROJECT.md"] },
+    { "id": "project.updated-at", "primary": ".project-os/fact-freshness.json", "fallbacks": [".project-os/workspace-facts.json"] },
+    { "id": "product.goal", "primary": ".project-os/project-profile.json", "fallbacks": ["PROJECT.md"] },
+    { "id": "product.core-capabilities", "primary": ".project-os/project-profile.json", "fallbacks": [".project-os/workspace-facts.json"] },
+    { "id": "technology.stack", "primary": "scanner:package-cargo", "fallbacks": [".project-os/workspace-facts.json"] },
+    { "id": "technology.dependencies", "primary": "scanner:package-cargo", "fallbacks": [".project-os/workspace-facts.json"] },
+    { "id": "engineering.directories", "primary": "scanner:project-tree", "fallbacks": [".project-os/workspace-facts.json"] }
+  ],
+  "slots": [
+    { "id": "project-overview.header", "surface": "project-overview", "region": "header", "order": 10, "selector": "selectProjectHeader", "component": "ProjectOverviewHeader", "renderWhen": "always", "dependencies": ["project.name", "project.version", "project.phase", "project.description", "project.updated-at"], "actions": ["refresh-project-facts", "open-source"], "capability": { "id": "project-overview", "moduleId": "project-identity" } },
+    { "id": "project-overview.core-positioning", "surface": "project-overview", "region": "body", "order": 20, "selector": "selectCorePositioning", "component": "ProjectOverviewSectionSlot", "renderWhen": "has-data", "dependencies": ["product.goal", "product.core-capabilities"], "capability": { "id": "project-overview", "moduleId": "project-identity" } },
+    { "id": "project-overview.technology", "surface": "project-overview", "region": "body", "order": 30, "selector": "selectTechnologyOverview", "component": "ProjectOverviewSectionSlot", "renderWhen": "has-data", "dependencies": ["technology.stack", "technology.dependencies"], "actions": ["open-architecture"], "capability": { "id": "project-overview", "moduleId": "project-identity" } },
+    { "id": "project-overview.engineering-structure", "surface": "project-overview", "region": "body", "order": 40, "selector": "selectEngineeringStructure", "component": "ProjectOverviewSectionSlot", "renderWhen": "has-data", "dependencies": ["engineering.directories"], "capability": { "id": "project-overview", "moduleId": "project-identity" } }
+  ],
+  "eventOrder": ["source.changed", "fact.invalidated", "fact.updated", "selector.recomputed", "slot.updated"]
+}

@@ -27,19 +27,36 @@ function topicKey(parts) {
 }
 
 function nodeKey(node, fallback = "") {
-  return node?.id || fallback || node?.title || "";
+  return node?.routeId || node?.id || fallback || node?.title || "";
 }
 
 function itemKey({ child, item, node }) {
-  return item.id || topicKey([nodeKey(node, node.title), child ? nodeKey(child, child.title) : "", item.title]);
+  return item.routePath || item.routeId || item.id || topicKey([nodeKey(node, node.title), child ? nodeKey(child, child.title) : "", item.title]);
+}
+
+function collectItemKeys(items, context) {
+  return (items || []).flatMap((item) => [
+    itemKey({ ...context, item }),
+    ...collectItemKeys(item.items, { ...context, child: item }),
+  ]);
+}
+
+function firstLeaf(items) {
+  for (const item of items || []) {
+    if (item.items?.length) {
+      const leaf = firstLeaf(item.items);
+      if (leaf) return leaf;
+    } else {
+      return item;
+    }
+  }
+  return null;
 }
 
 function collectTopicKeys(outline) {
   return outline.flatMap((node) => {
-    const childKeys = (node.children || []).flatMap((child) => (
-      child.items || []
-    ).map((item) => itemKey({ child, item, node })));
-    const ownKeys = (node.items || []).map((item) => itemKey({ item, node }));
+    const childKeys = (node.children || []).flatMap((child) => collectItemKeys(child.items, { child, node }));
+    const ownKeys = collectItemKeys(node.items, { node });
     return [...childKeys, ...ownKeys];
   });
 }
@@ -60,6 +77,9 @@ function goalCounts(snapshot) {
 }
 
 function mappedMeta(node, snapshot) {
+  const capability = (snapshot?.projectCapabilities?.workspaceCapabilities || snapshot?.projectCapabilities?.capabilities || []).find((item) => item.id === node.capabilityId);
+  if (capability?.status === "recommended") return "建议";
+  if (capability?.status === "detected") return "已识别";
   const counts = goalCounts(snapshot);
   const reportStatus = snapshot?.goalValidationReport?.status;
   const profileFields = Array.isArray(snapshot?.projectProfile?.missingFields)
@@ -76,7 +96,7 @@ function mappedMeta(node, snapshot) {
     "复盘沉淀": counts.completed ? `${counts.completed} 历史` : node.meta,
     "项目状态": compactMeta(snapshot?.phase, node.meta),
     "任务执行": counts.open || counts.draft ? `${counts.open + counts.draft} 活跃` : "空",
-    "工程资产": `${snapshot?.docsCount || 0} docs`,
+    "项目资源": `${snapshot?.docsCount || 0} docs`,
     "Agent 配置": snapshot?.projectName ? "本地" : node.meta,
   };
   return projectMeta[node.title] || node.meta;
@@ -92,7 +112,10 @@ export function WorkspaceTree({ activeTopicPath, actions, inlineAction, onSelect
   const allTopicKeys = useMemo(() => collectTopicKeys(outline), [outline]);
   const allTopicsOpen = allTopicKeys.length > 0 && allTopicKeys.every((key) => topicOpenByKey[key]);
 
-  const isNodeOpen = (key) => nodeOpenByKey[key] !== false;
+  const isNodeOpen = (node) => {
+    const key = nodeKey(node);
+    return nodeOpenByKey[key] ?? node.defaultOpen ?? true;
+  };
   const isTopicOpen = (key) => topicOpenByKey[key] === true;
   const expandedMode = allTopicsOpen;
 
@@ -119,6 +142,9 @@ export function WorkspaceTree({ activeTopicPath, actions, inlineAction, onSelect
       group: child?.title || node.title,
       governanceRole: item.governanceRole || child?.governanceRole || node.governanceRole,
       id: item.id,
+      routeId: item.routeId,
+      routePath: item.routePath,
+      surface: item.surface,
       maturity: item.maturity || child?.maturity || node.maturity,
       nextAction: item.nextAction || child?.nextAction || node.nextAction,
       path,
@@ -136,9 +162,12 @@ export function WorkspaceTree({ activeTopicPath, actions, inlineAction, onSelect
       group: node.title,
       governanceRole: node.governanceRole,
       id: node.id,
+      routeId: node.routeId,
+      routePath: node.routePath,
+      surface: node.surface,
       maturity: node.maturity,
       nextAction: node.nextAction,
-      path: node.id || node.title,
+      path: node.routePath || node.id,
       statusSource: node.statusSource,
       updatesWhen: node.updatesWhen,
       relatedFiles: node.files || [],
@@ -147,7 +176,7 @@ export function WorkspaceTree({ activeTopicPath, actions, inlineAction, onSelect
     });
   };
 
-  const renderTopics = (node, child) => {
+  const renderTopics = (node, child, depth = 0) => {
     const items = child.items || [];
     if (!items.length) return null;
 
@@ -156,6 +185,33 @@ export function WorkspaceTree({ activeTopicPath, actions, inlineAction, onSelect
         <div className="treeFileList">
           {items.map((item) => {
             const path = itemKey({ child, item, node });
+            if (item.items?.length) {
+              const nestedKeys = collectItemKeys(item.items, { child: item, node });
+              const groupOpen = isTopicOpen(path) || nestedKeys.some((key) => isTopicOpen(key));
+              return (
+                <div className="treeTopicGroup" key={path}>
+                  <button
+                    className={`treeFile treeTopic treeTopic-group${groupOpen ? " active" : ""}`}
+                    onClick={() => {
+                      const nextOpen = !groupOpen;
+                      setTopicOpenByKey((current) => ({
+                        ...current,
+                        [path]: nextOpen,
+                        ...Object.fromEntries(nestedKeys.map((key) => [key, nextOpen])),
+                      }));
+                      const leaf = firstLeaf(item.items);
+                      if (nextOpen && leaf) openTopic({ child: item, item: leaf, node });
+                    }}
+                    title={item.description}
+                    type="button"
+                  >
+                    <span>{item.title}</span>
+                    <span className="treeTopicGroupMeta">{groupOpen ? "收起" : item.meta || "展开"}</span>
+                  </button>
+                  {groupOpen ? <div className={`treeTopicNested treeTopicNested-${depth + 1}`}>{renderTopics(node, item, depth + 1)}</div> : null}
+                </div>
+              );
+            }
             return (
               <button
                 className={`treeFile treeTopic${activeTopicPath === path ? " active" : ""}`}
@@ -208,10 +264,10 @@ export function WorkspaceTree({ activeTopicPath, actions, inlineAction, onSelect
         const isActive = activeNodeId === nodeId || expandedMode;
         const children = node.children || [];
         const hasChildren = children.length > 0;
-        const showChildren = hasChildren && isActive && nodeOpenByKey[nodeId] !== false;
+        const showChildren = hasChildren && isActive && isNodeOpen(node);
         const activeChild = activeChildByNode[nodeId] || nodeKey(children[0]);
-        const ownTopicKeys = (node.items || []).map((item) => itemKey({ item, node }));
-        const ownTopicOpen = ownTopicKeys.some((key) => isTopicOpen(key)) || (isActive && !hasChildren && ownTopicKeys.length > 0 && isNodeOpen(nodeId));
+        const ownTopicKeys = collectItemKeys(node.items, { node });
+        const ownTopicOpen = ownTopicKeys.some((key) => isTopicOpen(key)) || (isActive && !hasChildren && ownTopicKeys.length > 0 && isNodeOpen(node));
 
         return (
           <div className="workspaceGroup treeNode treeNode-root" key={nodeId}>
@@ -251,7 +307,7 @@ export function WorkspaceTree({ activeTopicPath, actions, inlineAction, onSelect
                     const ChildIcon = iconFor(child);
                     const childId = nodeKey(child);
                     const childActive = childId === activeChild;
-                    const childTopicKeys = (child.items || []).map((item) => itemKey({ child, item, node }));
+                    const childTopicKeys = collectItemKeys(child.items, { child, node });
                     const showTopics = childTopicKeys.some((key) => isTopicOpen(key));
 
                     return (
@@ -262,12 +318,14 @@ export function WorkspaceTree({ activeTopicPath, actions, inlineAction, onSelect
                             if (childActive) {
                               const nextOpen = !childTopicKeys.every((key) => isTopicOpen(key));
                               setTopicOpenByKey((current) => ({ ...current, ...Object.fromEntries(childTopicKeys.map((key) => [key, nextOpen])) }));
-                              if (child.items?.length) openTopic({ child, item: child.items[0], node });
+                              const leaf = firstLeaf(child.items);
+                              if (leaf) openTopic({ child, item: leaf, node });
                               return;
                             }
                             setActiveChildByNode((current) => ({ ...current, [nodeId]: childId }));
                             setTopicOpenByKey((current) => ({ ...current, ...Object.fromEntries(childTopicKeys.map((key) => [key, true])) }));
-                            if (child.items?.length) openTopic({ child, item: child.items[0], node });
+                            const leaf = firstLeaf(child.items);
+                            if (leaf) openTopic({ child, item: leaf, node });
                           }}
                           type="button"
                         >

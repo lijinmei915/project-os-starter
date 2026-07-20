@@ -430,8 +430,20 @@ if [ -f "$target_abs/.gitignore" ]; then
     printf '.project-os/reports/\n' >> "$target_abs/.gitignore"
     log "updated .gitignore: added .project-os/reports/"
   fi
+  if ! grep -q '\.project-os/events/' "$target_abs/.gitignore"; then
+    printf '.project-os/events/\n' >> "$target_abs/.gitignore"
+    log "updated .gitignore: added .project-os/events/"
+  fi
+  if ! grep -q '\.project-os/transactions/' "$target_abs/.gitignore"; then
+    printf '.project-os/transactions/\n' >> "$target_abs/.gitignore"
+    log "updated .gitignore: added .project-os/transactions/"
+  fi
+  if ! grep -q '^tmp/$' "$target_abs/.gitignore"; then
+    printf 'tmp/\n' >> "$target_abs/.gitignore"
+    log "updated .gitignore: added tmp/"
+  fi
 else
-  printf '.DS_Store\n.project-os/backups/\n.project-os/reports/\n' > "$target_abs/.gitignore"
+  printf '.DS_Store\n.project-os/backups/\n.project-os/reports/\n.project-os/events/\n.project-os/transactions/\ntmp/\n' > "$target_abs/.gitignore"
   log "created .gitignore"
 fi
 

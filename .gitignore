@@ -37,10 +37,16 @@ CLAUDE.md
 .project-os/desktop-provider.json
 .project-os/desktop-registry.json
 .project-os/desktop-theme.json
+.project-os/fact-freshness.json
 .project-os/model-health.json
 .project-os/recommendations/
 .project-os/runs/
 .project-os/state-bundles/
+.project-os/events/
+.project-os/transactions/
+.project-os/locks/
+tmp/
+desktop/test-results/
 tests/screenshots/*.png
 tests/screenshots/current/
 tests/screenshots/diff/

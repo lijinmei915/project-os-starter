@@ -62,7 +62,7 @@ else
 fi
 
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  if git grep -n -E 'sk-[A-Za-z0-9_-]{20,}|DEEPSEEK_API_KEY=[^[:space:]#]+' -- \
+  if git grep -n -E '(^|[^A-Za-z0-9_-])sk-[A-Za-z0-9_-]{20,}([^A-Za-z0-9_-]|$)|DEEPSEEK_API_KEY=[^[:space:]#]+' -- \
     ':!*.png' ':!*.jpg' ':!*.jpeg' ':!*.gif' ':!*.webp' \
     ':!scripts/check-secrets.sh' ':!templates/project/scripts/check-secrets.sh' \
     >"$secret_scan_tmp" 2>/dev/null; then

@@ -14,7 +14,6 @@ export function SectionTitle({ actions, className, collapseControl, inlineAction
         <span className="uiSectionTitleCollapse">{collapseControl}</span>
       ) : null}
       <span>{title}</span>
-      {inlineAction ? <span className="uiSectionTitleInlineAction">{inlineAction}</span> : null}
     </>
   );
 
@@ -33,6 +32,7 @@ export function SectionTitle({ actions, className, collapseControl, inlineAction
       ) : (
         <span className="uiSectionTitleMain">{titleContent}</span>
       )}
+      {inlineAction ? <span className="uiSectionTitleInlineAction">{inlineAction}</span> : null}
       {actions ? <span className="uiSectionTitleActions">{actions}</span> : null}
       {meta !== undefined ? <em>{meta}</em> : null}
     </div>

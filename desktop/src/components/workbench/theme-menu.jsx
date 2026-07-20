@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { Sun } from "lucide-react";
 import { Button } from "../ui/button";
 import {
@@ -80,7 +81,6 @@ async function loadDesktopTheme() {
   if (!window.__TAURI_INTERNALS__) {
     return readStoredTheme();
   }
-  const { invoke } = await import("@tauri-apps/api/core");
   return invoke("get_desktop_theme");
 }
 
@@ -89,7 +89,6 @@ async function saveDesktopTheme(theme) {
     window.localStorage.setItem(storageKey, JSON.stringify(theme));
     return theme;
   }
-  const { invoke } = await import("@tauri-apps/api/core");
   return invoke("save_desktop_theme", { input: theme });
 }
 

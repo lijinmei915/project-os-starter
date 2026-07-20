@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-os.local/schemas/project-fact.schema.json",
+  "title": "Project Fact",
+  "type": "object",
+  "required": ["id", "value", "status", "sources", "selectedSource", "observedAt", "freshness"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)+$" },
+    "value": {},
+    "status": { "type": "string", "enum": ["confirmed", "inferred", "missing", "conflict"] },
+    "sources": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/source" } },
+    "selectedSource": { "type": ["string", "null"] },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "observedAt": { "type": "string" },
+    "freshness": { "type": "string", "enum": ["fresh", "stale", "unknown"] }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "source": {
+      "type": "object",
+      "required": ["path", "role"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "role": { "type": "string", "enum": ["primary", "fallback", "evidence"] },
+        "selector": { "type": "string" },
+        "value": {},
+        "status": { "type": "string", "enum": ["confirmed", "inferred", "missing"] },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

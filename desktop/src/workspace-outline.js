@@ -1,6 +1,7 @@
+import { requireWorkspaceRoute } from "./workspace-route-registry.js";
+
 const governanceMeta = {
   "工作台": {
-    id: "workbench-overview",
     files: ["PROJECT.md", "HANDOFF.md", "docs/RUNBOOK.md", ".project-os/state.json"],
     governanceRole: "工作台总览入口，回答当前项目状态、进度、启动方式、风险和本地接入状态。",
     maturity: "状态化",
@@ -9,7 +10,6 @@ const governanceMeta = {
     updatesWhen: "项目接入、当前进度、启动方式、风险或本地状态变化时更新。",
   },
   "认识项目": {
-    id: "understand-project",
     files: ["PROJECT.md", ".project-os/state.json", "README.md", "HANDOFF.md"],
     governanceRole: "项目事实入口，回答这个项目是什么、到哪一步、当前风险是什么。",
     maturity: "状态化",
@@ -18,7 +18,6 @@ const governanceMeta = {
     updatesWhen: "接入项目、项目阶段变化、启动方式变化或风险变化时更新。",
   },
   "定义目标": {
-    id: "define-goal",
     files: ["docs/PRODUCT_PLAN.md", "PROJECT.md", "HANDOFF.md"],
     governanceRole: "目标治理入口，负责范围、验收标准和目标历史。",
     maturity: "状态化",
@@ -27,7 +26,6 @@ const governanceMeta = {
     updatesWhen: "目标、用户、场景、范围或成功标准变化时更新。",
   },
   "工作规则": {
-    id: "work-rules",
     files: ["AGENTS.md", "docs/ROUTING.md", "docs/DOCUMENTATION.md", "docs/NAMING.md"],
     governanceRole: "协作治理入口，约束 AI 行为、权限、文档归属和路由。",
     maturity: "闭环",
@@ -36,7 +34,6 @@ const governanceMeta = {
     updatesWhen: "AI 行为边界、路由、权限或文档归属规则变化时更新。",
   },
   "设计实现": {
-    id: "design-implementation",
     files: ["docs/ARCHITECTURE.md", "docs/CODE_STRUCTURE.md", "docs/DESIGN_STANDARDS.md", "desktop/src/*"],
     governanceRole: "方案治理入口，把架构、契约、界面规范和实现结构连接到代码。",
     maturity: "只读",
@@ -45,7 +42,6 @@ const governanceMeta = {
     updatesWhen: "架构、数据模型、界面规范或代码结构变化时更新。",
   },
   "验证交付": {
-    id: "validate-delivery",
     files: ["docs/TESTING.md", "docs/RUNBOOK.md", "scripts/*", ".project-os/runs/*"],
     governanceRole: "质量治理入口，负责检查项、验收报告和运行记录。",
     maturity: "状态化",
@@ -54,7 +50,6 @@ const governanceMeta = {
     updatesWhen: "检查命令、验收标准、交付产物或质量记录变化时更新。",
   },
   "复盘沉淀": {
-    id: "retrospective-memory",
     files: ["HANDOFF.md", "docs/LESSONS.md", "docs/DECISIONS.md", "docs/CHANGELOG.md"],
     governanceRole: "经验治理入口，把交接、决策、教训和变更历史沉淀下来。",
     maturity: "状态化",
@@ -65,64 +60,62 @@ const governanceMeta = {
 };
 
 const itemMeta = {
-  "项目概览": { id: "project-identity", statusSource: ".project-os/state.json" },
-  "当前进度": { id: "project-progress", statusSource: "HANDOFF.md" },
+  "项目概览": { statusSource: ".project-os/state.json" },
+  "当前进度": { statusSource: "HANDOFF.md" },
   "启动方式": {
-    id: "project-runbook",
     statusSource: "docs/RUNBOOK.md",
     maturity: "可验证",
     governanceRole: "本地运行入口，回答怎么启动、怎么构建、怎么检查和从哪里看运行说明。",
     nextAction: "把启动命令、构建命令和检查命令做成可读命令面板，避免停留在文档说明。",
   },
-  "风险边界": { id: "project-risks", statusSource: "HANDOFF.md" },
-  "本地状态": { id: "local-project-state", statusSource: ".project-os/state.json" },
-  "当前目标": { id: "current-goal", statusSource: ".project-os/goals.json" },
-  "验收标准": { id: "acceptance-criteria", statusSource: ".project-os/goal-validation.json" },
-  "目标历史": { id: "goal-history", statusSource: ".project-os/goals.json" },
-  "协作边界": { id: "collaboration-boundary", statusSource: "AGENTS.md" },
-  "执行权限": { id: "execution-permissions", statusSource: "AGENTS.md" },
-  "文档规则": { id: "documentation-rules", statusSource: "docs/DOCUMENTATION.md" },
-  "系统架构": { id: "system-architecture", statusSource: "docs/ARCHITECTURE.md" },
-  "数据契约": { id: "data-contracts", statusSource: "schemas/*" },
-  "界面规范": { id: "ui-standards", statusSource: "docs/DESIGN_STANDARDS.md" },
-  "实现结构": { id: "code-structure", statusSource: "docs/CODE_STRUCTURE.md" },
-  "检查项": { id: "validation-checks", statusSource: "docs/TESTING.md" },
+  "风险边界": { statusSource: "HANDOFF.md" },
+  "项目接入": { statusSource: ".project-os/state.json" },
+  "当前阶段目标": { statusSource: ".project-os/goals.json" },
+  "验收标准": { statusSource: ".project-os/goal-validation.json" },
+  "目标历史": { statusSource: ".project-os/goals.json" },
+  "协作边界": { statusSource: "AGENTS.md" },
+  "执行权限": { statusSource: "AGENTS.md" },
+  "文档规则": { statusSource: "docs/DOCUMENTATION.md" },
+  "系统架构": { statusSource: "docs/ARCHITECTURE.md" },
+  "数据契约": { statusSource: "schemas/*" },
+  "界面规范": { statusSource: "docs/DESIGN_STANDARDS.md" },
+  "Token": { statusSource: "docs/design/tokens.md" },
+  "组件": { statusSource: "docs/design/component-index.md" },
+  "实现结构": { statusSource: "docs/CODE_STRUCTURE.md" },
+  "检查项": { statusSource: "docs/TESTING.md" },
   "验收报告": {
-    id: "validation-report",
     statusSource: ".project-os/goal-validation-report.json",
     maturity: "状态化",
     governanceRole: "目标验收结果入口，回答最近一次验收是否通过、哪些检查失败、下一步怎么处理。",
     nextAction: "把验收结果、检查项和失败修复入口展示成报告工作面。",
   },
-  "运行记录": { id: "run-records", statusSource: ".project-os/runs/*" },
-  "交接记录": { id: "handoff-records", statusSource: "HANDOFF.md" },
-  "决策记录": { id: "decision-records", statusSource: "docs/DECISIONS.md" },
-  "经验教训": { id: "lessons-learned", statusSource: "docs/LESSONS.md" },
-  "项目事实": { id: "project-facts", statusSource: ".project-os/workspace-facts.json" },
-  "用户偏好": { id: "user-preferences", statusSource: "OmniDesk global: user-profile.json" },
-  "长期记忆": { id: "long-term-memory", statusSource: ".project-os/memory/*" },
-  "会话摘要": { id: "conversation-summary", statusSource: ".project-os/conversations/*" },
-  "当前任务": { id: "active-task", statusSource: ".project-os/runs/desktop-tasks/*" },
-  "任务队列": { id: "task-queue", statusSource: ".project-os/runs/desktop-tasks/*" },
-  "Patch 草案": { id: "patch-drafts", statusSource: ".project-os/runs/desktop-tasks/*" },
-  "执行终端": { id: "execution-terminal", statusSource: ".project-os/runs/*" },
-  "执行结果": { id: "execution-results", statusSource: ".project-os/runs/desktop-summary.md" },
-  "工程文件": { id: "engineering-files", statusSource: "project tree" },
-  "治理文件": { id: "governance-files", statusSource: ".project-os/workspace-facts.json" },
+  "运行记录": { statusSource: ".project-os/runs/*" },
+  "交接记录": { statusSource: "HANDOFF.md" },
+  "决策记录": { statusSource: "docs/DECISIONS.md" },
+  "经验教训": { statusSource: "docs/LESSONS.md" },
+  "项目事实": { statusSource: ".project-os/workspace-facts.json" },
+  "用户偏好": { statusSource: "OmniDesk global: user-profile.json" },
+  "长期记忆": { statusSource: ".project-os/memory/*" },
+  "会话摘要": { statusSource: ".project-os/conversations/*" },
+  "当前任务": { statusSource: ".project-os/runs/desktop-tasks/*" },
+  "任务队列": { statusSource: ".project-os/runs/desktop-tasks/*" },
+  "执行终端": { statusSource: ".project-os/runs/*" },
+  "执行结果": { statusSource: ".project-os/runs/desktop-summary.md" },
+  "工程文件": { statusSource: "project tree" },
+  "治理文件": { statusSource: ".project-os/workspace-facts.json" },
   "报告产物": {
-    id: "report-artifacts",
     statusSource: ".project-os/reports/*",
     maturity: "状态化",
     governanceRole: "工程治理报告入口，展示扫描、评分、推荐和验收等生成产物，不是普通视觉页面。",
     nextAction: "明确每个报告产物的来源、用途和下一步动作，避免用户不知道报告能干嘛。",
   },
-  "Schema": { id: "schema-assets", statusSource: "schemas/*" },
-  "脚本模板": { id: "script-templates", statusSource: "scripts/*" },
-  "模型连接": { id: "model-connections", statusSource: ".project-os/desktop-provider.json" },
-  "工具白名单": { id: "tool-allowlist", statusSource: "desktop/src-tauri/src/main.rs" },
-  "Skill 能力": { id: "skill-capabilities", statusSource: ".agents/skills/*" },
-  "适配器": { id: "adapters", statusSource: "adapters/*" },
-  "安全边界": { id: "security-boundary", statusSource: "docs/AI_SAFETY.md" },
+  "Schema": { statusSource: "schemas/*" },
+  "脚本模板": { statusSource: "scripts/*" },
+  "模型连接": { statusSource: ".project-os/desktop-provider.json" },
+  "工具白名单": { statusSource: "desktop/src-tauri/src/main.rs" },
+  "Skill 能力": { statusSource: ".agents/skills/*" },
+  "适配器": { statusSource: "adapters/*" },
+  "安全边界": { statusSource: "docs/AI_SAFETY.md" },
 };
 
 function slug(value) {
@@ -134,11 +127,16 @@ function slug(value) {
 
 function enrichItem(item, parentId) {
   const meta = itemMeta[item.title] || {};
-  const id = meta.id || `${parentId}-${slug(item.title)}`;
+  const id = item.id || meta.id || `${parentId}-${slug(item.title)}`;
+  const route = requireWorkspaceRoute(id);
   return {
     ...item,
     ...meta,
     id,
+    route,
+    routeId: route.id,
+    routePath: route.path,
+    surface: route.surface,
     files: item.relatedFiles || item.files || [],
     governanceRole: item.governanceRole || meta.governanceRole || `${item.title} 的专属治理工作面，承载对应状态、证据和后续动作。`,
     maturity: item.maturity || meta.maturity || "只读",
@@ -150,12 +148,17 @@ function enrichItem(item, parentId) {
 function enrichNode(node, parentId = "") {
   const meta = governanceMeta[node.title] || {};
   const id = node.id || meta.id || [parentId, slug(node.title)].filter(Boolean).join("-");
+  const route = requireWorkspaceRoute(id);
   return {
     ...node,
     ...meta,
     id,
+    route,
+    routeId: route.id,
+    routePath: route.path,
+    surface: route.surface,
     children: (node.children || []).map((child) => enrichNode(child, id)),
-    items: (node.items || []).map((item) => enrichItem(item, id)),
+    items: (node.items || []).map((item) => item.items?.length ? enrichNode(item, id) : enrichItem(item, id)),
     governanceRole: node.governanceRole || meta.governanceRole || `${node.title} 的治理域。`,
     maturity: node.maturity || meta.maturity || "只读",
     nextAction: node.nextAction || meta.nextAction || "补齐状态源、操作入口和闭环验证。",
@@ -163,74 +166,127 @@ function enrichNode(node, parentId = "") {
   };
 }
 
+const capabilityByTitle = {
+  "项目": "project-overview",
+  "目标": "goals",
+  "工作规则": "rules",
+  "设计实现": "design-implementation",
+  "验证交付": "validation-delivery",
+  "复盘沉淀": "knowledge-memory",
+};
+
+const visibleCapabilityStatuses = new Set(["enabled"]);
+
+export function workspaceOutlineForCapabilities(outline, projectCapabilities) {
+  const capabilities = projectCapabilities?.workspaceCapabilities || projectCapabilities?.capabilities || [];
+  if (!capabilities.length) return outline;
+
+  const capabilityById = new Map(capabilities.map((capability) => [capability.id, capability]));
+  const isVisible = (capabilityId) => !capabilityId || visibleCapabilityStatuses.has(capabilityById.get(capabilityId)?.status);
+  const filterModules = (node) => {
+    const capability = capabilityById.get(node.capabilityId);
+    if (!Array.isArray(capability?.modules) || !capability.modules.length) return node;
+    const enabledModules = new Set(capability.modules.filter((module) => module.status === "enabled").map((module) => module.id));
+    const filterItem = (item) => {
+      if (!enabledModules.has(item.id)) return null;
+      if (!item.items?.length) return item;
+      return { ...item, items: item.items };
+    };
+    return { ...node, items: (node.items || []).map(filterItem).filter(Boolean) };
+  };
+
+  return outline.flatMap((node) => {
+    if (!isVisible(node.capabilityId)) return [];
+    const children = (node.children || []).filter((child) => isVisible(child.capabilityId)).map(filterModules).filter((child) => !Array.isArray(child.items) || child.items.length > 0);
+    if (node.children?.length && !children.length) return [];
+    return [{ ...node, children }];
+  });
+}
+
 export const projectGovernanceFlow = [
   {
-    title: "认识项目",
+    id: "understand-project",
+    title: "项目",
     meta: "当前",
     icon: "book",
     description: "项目基本状态。",
     items: [
-      { title: "项目概览", description: "名称、用途和阶段。", relatedFiles: ["PROJECT.md", ".project-os/state.json"] },
-      { title: "当前进度", description: "当前进度和下一步。", relatedFiles: ["PROJECT.md", "HANDOFF.md"] },
-      { title: "启动方式", description: "启动、构建和检查命令。", relatedFiles: ["README.md", "desktop/package.json", "docs/RUNBOOK.md", "docs/DESKTOP_APP.md"] },
-      { title: "风险边界", description: "已知风险和边界。", relatedFiles: ["HANDOFF.md", "docs/LESSONS.md"] },
-      { title: "本地状态", description: "接入和文件状态。", relatedFiles: [".project-os/state.json", ".project-os/desktop-registry.json"] },
+      { id: "project-identity", title: "项目概览", description: "名称、用途和阶段。", relatedFiles: ["PROJECT.md", ".project-os/state.json"] },
+      { id: "project-progress", title: "项目进展", description: "项目到哪一步，以及唯一下一步。", relatedFiles: ["PROJECT.md", "HANDOFF.md"] },
+      { id: "project-runbook", title: "启动方式", description: "启动入口与运行环境。", relatedFiles: ["README.md", "desktop/package.json", "docs/RUNBOOK.md", "docs/DESKTOP_APP.md"] },
+      { id: "project-risks", title: "风险边界", description: "已知风险和边界。", relatedFiles: ["HANDOFF.md", "docs/LESSONS.md"] },
+      { id: "local-project-state", title: "项目接入", description: "接入登记和治理准备。", relatedFiles: [".project-os/state.json", ".project-os/desktop-registry.json"] },
     ],
   },
   {
-    title: "定义目标",
+    id: "define-goal",
+    title: "目标",
     meta: "路线",
     icon: "clipboard",
     description: "当前目标、验收标准和目标历史。",
     items: [
-      { title: "当前目标", description: "正在推进的目标和范围。", relatedFiles: [".project-os/goals.json", "PROJECT.md", "HANDOFF.md"] },
-      { title: "验收标准", description: "完成判断和检查条件。", relatedFiles: [".project-os/goal-validation.json", "docs/TESTING.md"] },
-      { title: "目标历史", description: "已完成、待确认和历史目标。", relatedFiles: [".project-os/goals.json", ".project-os/goal-signoff-history.json"] },
+      { id: "current-goal", title: "当前阶段目标", description: "项目目标下正在推进的阶段目标和范围。", relatedFiles: [".project-os/goals.json", "PROJECT.md", "HANDOFF.md"] },
+      { id: "acceptance-criteria", title: "验收标准", description: "完成判断和检查条件。", relatedFiles: [".project-os/goal-validation.json", "docs/TESTING.md"] },
+      { id: "goal-history", title: "目标历史", description: "已完成、待确认和历史目标。", relatedFiles: [".project-os/goals.json", ".project-os/goal-signoff-history.json"] },
     ],
   },
   {
+    id: "work-rules",
     title: "工作规则",
     meta: "规则",
     icon: "shield",
     description: "协作方式和权限。",
     items: [
-      { title: "协作边界", description: "AI 和用户如何分工。", relatedFiles: ["AGENTS.md", "docs/ROUTING.md"] },
-      { title: "执行权限", description: "自动和确认边界。", relatedFiles: ["AGENTS.md", "docs/ROUTING.md"] },
-      { title: "文档规则", description: "信息归属位置。", relatedFiles: ["docs/DOCUMENTATION.md", "docs/NAMING.md"] },
+      { id: "collaboration-boundary", title: "协作边界", description: "AI 和用户如何分工。", relatedFiles: ["AGENTS.md", "docs/ROUTING.md"] },
+      { id: "execution-permissions", title: "执行权限", description: "自动和确认边界。", relatedFiles: ["AGENTS.md", "docs/ROUTING.md"] },
+      { id: "documentation-rules", title: "文档规则", description: "信息归属位置。", relatedFiles: ["docs/DOCUMENTATION.md", "docs/NAMING.md"] },
     ],
   },
   {
+    id: "design-implementation",
     title: "设计实现",
     meta: "方案",
     icon: "wrench",
     description: "方案、架构和实现结构。",
     items: [
-      { title: "系统架构", description: "模块和依赖关系。", relatedFiles: ["docs/ARCHITECTURE.md"] },
-      { title: "数据契约", description: "对象、状态和结构化契约。", relatedFiles: ["schemas/*", "docs/data/*"] },
-      { title: "界面规范", description: "组件和设计 token。", relatedFiles: ["docs/DESIGN_STANDARDS.md", "docs/design/tokens.md", "desktop/src/styles.css"] },
-      { title: "实现结构", description: "目录和模块职责。", relatedFiles: ["docs/CODE_STRUCTURE.md", "desktop/src/main.jsx", "desktop/src-tauri/src/main.rs"] },
+      { id: "system-architecture", title: "系统架构", description: "模块和依赖关系。", relatedFiles: ["docs/ARCHITECTURE.md"] },
+      { id: "data-contracts", title: "数据契约", description: "对象、状态和结构化契约。", relatedFiles: ["schemas/*", "docs/data/*"] },
+      {
+        id: "ui-standards",
+        title: "界面规范",
+        meta: "规范",
+        icon: "package",
+        description: "可视化管理设计 Token 和组件。",
+        items: [
+          { id: "design-tokens", title: "Token", description: "颜色、字体、间距、圆角和语义状态。", relatedFiles: ["docs/design/tokens.md", "desktop/src/styles.css"] },
+          { id: "component-library", title: "组件", description: "真实组件、组合模式、状态和源码位置。", relatedFiles: ["docs/design/component-index.md", "desktop/src/components/*"] },
+        ],
+      },
+      { id: "code-structure", title: "实现结构", description: "目录和模块职责。", relatedFiles: ["docs/CODE_STRUCTURE.md", "desktop/src/main.jsx", "desktop/src-tauri/src/main.rs"] },
     ],
   },
   {
+    id: "validate-delivery",
     title: "验证交付",
     meta: "检查",
     icon: "check",
     description: "验收、测试和交付结果。",
     items: [
-      { title: "检查项", description: "当前项目可运行的检查。", relatedFiles: ["docs/TESTING.md", "scripts/check-runtime.sh", "scripts/check-ai-project.sh"] },
-      { title: "验收报告", description: "目标验收和检查结果。", relatedFiles: [".project-os/goal-validation-report.json", ".project-os/reports/ai-project-report.json"] },
-      { title: "运行记录", description: "检查、扫描和执行历史。", relatedFiles: [".project-os/runs/*", ".project-os/runs/desktop-summary.md"] },
+      { id: "validation-checks", title: "检查项", description: "当前项目可运行的检查。", relatedFiles: ["docs/TESTING.md", "scripts/check-runtime.sh", "scripts/check-ai-project.sh"] },
+      { id: "validation-report", title: "验收报告", description: "目标验收和检查结果。", relatedFiles: [".project-os/goal-validation-report.json", ".project-os/reports/ai-project-report.json"] },
+      { id: "run-records", title: "运行记录", description: "检查、扫描和执行历史。", relatedFiles: [".project-os/runs/*", ".project-os/runs/desktop-summary.md"] },
     ],
   },
   {
+    id: "retrospective-memory",
     title: "复盘沉淀",
     meta: "记忆",
     icon: "brain",
     description: "经验和下一步。",
     items: [
-      { title: "交接记录", description: "继续工作上下文。", relatedFiles: ["HANDOFF.md"] },
-      { title: "决策记录", description: "重要取舍记录。", relatedFiles: ["docs/DECISIONS.md", "docs/CHANGELOG.md"] },
-      { title: "经验教训", description: "踩坑、修正和新增约束。", relatedFiles: ["docs/LESSONS.md"] },
+      { id: "handoff-records", title: "交接记录", description: "继续工作上下文。", relatedFiles: ["HANDOFF.md"] },
+      { id: "decision-records", title: "决策记录", description: "重要取舍记录。", relatedFiles: ["docs/DECISIONS.md", "docs/CHANGELOG.md"] },
+      { id: "lessons-learned", title: "经验教训", description: "踩坑、修正和新增约束。", relatedFiles: ["docs/LESSONS.md"] },
     ],
   },
 ];
@@ -249,211 +305,209 @@ export const projectGovernanceOutline = [
     meta: "流程",
     icon: "clipboard",
     description: "从理解到复盘的项目阶段。",
-    children: projectGovernanceFlow.map((node) => enrichNode(node, "project-governance")),
+    children: projectGovernanceFlow.map((node) => ({
+      ...enrichNode(node, "project-governance"),
+      capabilityId: capabilityByTitle[node.title],
+    })),
   },
   {
     id: "task-execution",
-    title: "任务执行",
+    capabilityId: "tasks",
+    title: "目标与任务",
     meta: "执行",
     icon: "terminal",
-    description: "当前任务、队列、草案、终端和执行结果。",
+    description: "当前目标、验收标准、目标历史和关联任务。",
     children: [
       {
-        title: "当前任务",
-        meta: "当前",
+        id: "task-list-menu",
+        title: "目标与任务",
+        meta: "执行",
         icon: "clipboard",
-        description: "正在处理的任务。",
+        description: "在同一页面查看目标信息并推进关联任务。",
         items: [
-          { title: "当前任务", description: "当前任务、计划和上下文。", relatedFiles: [".project-os/runs/desktop-tasks/*"] },
+          { id: "task-list", title: "目标与任务", description: "查看目标、验收、历史和关联任务。", relatedFiles: [".project-os/goals.json", ".project-os/goal-validation.json", ".project-os/runs/desktop-tasks/*", ".project-os/task-backlog.json"] },
         ],
       },
       {
-        title: "任务队列",
-        meta: "队列",
-        icon: "clipboard",
-        description: "已创建和待确认任务。",
-        items: [
-          { title: "任务队列", description: "计划中、进行中和已完成任务。", relatedFiles: [".project-os/runs/desktop-tasks/*", ".project-os/task-backlog.json"] },
-        ],
-      },
-      {
-        title: "Patch 草案",
-        meta: "草案",
-        icon: "files",
-        description: "待确认代码草案。",
-        items: [
-          { title: "Patch 草案", description: "Diff 草案、应用结果和验证摘要。", relatedFiles: [".project-os/runs/desktop-tasks/*"] },
-        ],
-      },
-      {
+        id: "task-terminal-menu",
         title: "执行终端",
         meta: "终端",
         icon: "terminal",
         description: "命令执行入口。",
         items: [
-          { title: "执行终端", description: "本地命令、检查和输出。", relatedFiles: [".project-os/runs/*"] },
+          { id: "execution-terminal", title: "执行终端", description: "本地命令、检查和输出。", relatedFiles: [".project-os/runs/*"] },
         ],
       },
       {
+        id: "task-results-menu",
         title: "执行结果",
         meta: "结果",
         icon: "check",
         description: "任务结果和验证摘要。",
         items: [
-          { title: "执行结果", description: "执行摘要、变更和验证结果。", relatedFiles: [".project-os/runs/desktop-summary.md", "HANDOFF.md"] },
+          { id: "execution-results", title: "执行结果", description: "执行摘要、变更和验证结果。", relatedFiles: [".project-os/runs/desktop-summary.md", "HANDOFF.md"] },
         ],
       },
     ],
   },
   {
     id: "memory",
+    capabilityId: "knowledge-memory",
     title: "知识记忆",
     meta: "上下文",
     icon: "brain",
     description: "项目事实、用户偏好、长期记忆和会话摘要。",
     children: [
       {
+        id: "memory-facts-menu",
         title: "项目事实",
         meta: "事实",
         icon: "book",
         description: "项目长期事实。",
         items: [
-          { title: "项目事实", description: "项目身份、阶段、事实来源和可信度。", relatedFiles: [".project-os/workspace-facts.json", ".project-os/state.json", "PROJECT.md"] },
+          { id: "project-facts", title: "项目事实", description: "项目身份、阶段、事实来源和可信度。", relatedFiles: [".project-os/workspace-facts.json", ".project-os/state.json", "PROJECT.md"] },
         ],
       },
       {
+        id: "memory-preferences-menu",
         title: "用户偏好",
         meta: "偏好",
         icon: "brain",
         description: "长期工作偏好。",
         items: [
-          { title: "用户偏好", description: "用户画像、沟通方式和全局偏好。", relatedFiles: ["OmniDesk global: user-profile.json", "OmniDesk global: global-preferences.json"] },
+          { id: "user-preferences", title: "用户偏好", description: "用户画像、沟通方式和全局偏好。", relatedFiles: ["OmniDesk global: user-profile.json", "OmniDesk global: global-preferences.json"] },
         ],
       },
       {
+        id: "memory-long-term-menu",
         title: "长期记忆",
         meta: "记忆",
         icon: "brain",
         description: "可跨会话复用的记忆。",
         items: [
-          { title: "长期记忆", description: "沉淀后的长期上下文。", relatedFiles: [".project-os/memory/*", "docs/data/knowledge-registry.json"] },
+          { id: "long-term-memory", title: "长期记忆", description: "沉淀后的长期上下文。", relatedFiles: [".project-os/memory/*", "docs/data/knowledge-registry.json"] },
         ],
       },
       {
+        id: "memory-conversations-menu",
         title: "会话摘要",
         meta: "会话",
         icon: "book",
         description: "对话摘要和可沉淀内容。",
         items: [
-          { title: "会话摘要", description: "历史对话和摘要。", relatedFiles: [".project-os/conversations/*"] },
+          { id: "conversation-summary", title: "会话摘要", description: "历史对话和摘要。", relatedFiles: [".project-os/conversations/*"] },
         ],
       },
     ],
   },
   {
     id: "engineering-assets",
-    title: "工程资产",
-    meta: "资产",
+    capabilityId: "files",
+    title: "项目资源",
+    meta: "按需",
     icon: "files",
-    description: "文档、代码、数据契约和模板。",
+    defaultOpen: false,
+    description: "代码、项目规则和报告等由任务或对话按需引用的项目来源。",
     children: [
       {
-        title: "工程文件",
+        id: "assets-files-menu",
+        title: "代码与配置",
         meta: "代码",
         icon: "files",
-        description: "源码和工程目录。",
+        description: "源码、配置和工程入口。",
         items: [
-          { title: "工程文件", description: "源码、配置和工程目录。", relatedFiles: ["desktop/*", "cli/*", "package.json"] },
+          { id: "engineering-files", title: "代码与配置", description: "源码、配置和工程目录。", relatedFiles: ["desktop/*", "cli/*", "package.json"] },
         ],
       },
       {
-        title: "治理文件",
-        meta: "治理",
+        id: "assets-governance-menu",
+        title: "项目规则",
+        meta: "规则",
         icon: "book",
-        description: "Project OS 治理文档。",
+        description: "项目状态、协作规则和交接。",
         items: [
-          { title: "治理文件", description: "项目规则、状态、交接和运行说明。", relatedFiles: ["PROJECT.md", "HANDOFF.md", "AGENTS.md", "docs/*"] },
+          { id: "governance-files", title: "项目规则", description: "项目规则、状态、交接和运行说明。", relatedFiles: ["PROJECT.md", "HANDOFF.md", "AGENTS.md", "docs/*"] },
         ],
       },
       {
-        title: "报告产物",
+        id: "assets-reports-menu",
+        title: "报告与证据",
         meta: "报告",
         icon: "clipboard",
-        description: "扫描、评分和推荐产物。",
+        description: "检查、验收和推荐形成的可追溯证据。",
         items: [
-          { title: "报告产物", description: "报告、推荐和验证产物。", relatedFiles: [".project-os/reports/*", ".project-os/recommendations/*", ".project-os/goal-validation-report.json"] },
+          { id: "report-artifacts", title: "报告与证据", description: "报告、推荐和验证产物。", relatedFiles: [".project-os/reports/*", ".project-os/recommendations/*", ".project-os/goal-validation-report.json"] },
         ],
       },
       {
-        title: "Schema",
-        meta: "契约",
-        icon: "terminal",
-        description: "Schema 和 manifest。",
+        id: "assets-advanced-menu",
+        title: "高级资源",
+        meta: "高级",
+        icon: "settings",
+        description: "数据契约、自动化与可分发模板。",
         items: [
-          { title: "Schema", description: "结构化数据契约。", relatedFiles: ["schemas/*", "docs/data/*"] },
-        ],
-      },
-      {
-        title: "脚本模板",
-        meta: "模板",
-        icon: "package",
-        description: "脚本、模板和可分发资源。",
-        items: [
-          { title: "脚本模板", description: "运行脚本和项目模板。", relatedFiles: ["scripts/*", "templates/*", "adapters/*"] },
+          { id: "schema-assets", title: "数据契约", meta: "契约", description: "Schema、manifest 和结构化数据契约。", relatedFiles: ["schemas/*", "docs/data/*"] },
+          { id: "script-templates", title: "自动化与模板", meta: "模板", description: "运行脚本、模板和可分发资源。", relatedFiles: ["scripts/*", "templates/*", "adapters/*"] },
         ],
       },
     ],
   },
   {
     id: "agent-config",
+    capabilityId: "agent-configuration",
     title: "Agent 配置",
     meta: "配置",
     icon: "bot",
     description: "模型、技能、工具和适配器。",
     children: [
       {
+        id: "agent-models-menu",
         title: "模型连接",
         meta: "模型",
         icon: "settings",
         description: "Provider 和模型。",
         items: [
-          { title: "模型连接", description: "Provider、API Base、Key 和模型列表。", relatedFiles: [".project-os/desktop-provider.json", ".project-os/model-catalog.json", ".project-os/model-health.json"] },
+          { id: "model-connections", title: "模型连接", description: "Provider、API Base、Key 和模型列表。", relatedFiles: [".project-os/desktop-provider.json", ".project-os/model-catalog.json", ".project-os/model-health.json"] },
         ],
       },
       {
+        id: "agent-tools-menu",
         title: "工具白名单",
         meta: "工具",
         icon: "shield",
         description: "允许执行的工具和命令。",
         items: [
-          { title: "工具白名单", description: "受控检查、治理动作和终端限制。", relatedFiles: ["desktop/src-tauri/src/main.rs", "scripts/check-runtime.sh"] },
+          { id: "tool-allowlist", title: "工具白名单", description: "受控检查、治理动作和终端限制。", relatedFiles: ["desktop/src-tauri/src/main.rs", "scripts/check-runtime.sh"] },
         ],
       },
       {
+        id: "agent-skills-menu",
         title: "Skill 能力",
         meta: "技能",
         icon: "bot",
         description: "Agent 能力扩展。",
         items: [
-          { title: "Skill 能力", description: "Agent 技能定义和工程规范。", relatedFiles: [".agents/skills/*", "docs/SKILL_ENGINEERING.md"] },
+          { id: "skill-capabilities", title: "Skill 能力", description: "Agent 技能定义和工程规范。", relatedFiles: [".agents/skills/*", "docs/SKILL_ENGINEERING.md"] },
         ],
       },
       {
+        id: "agent-adapters-menu",
         title: "适配器",
         meta: "适配",
         icon: "files",
         description: "工具入口适配。",
         items: [
-          { title: "适配器", description: "Codex、Claude、Cursor 等工具入口。", relatedFiles: ["adapters/*", "CODEX.md", "CLAUDE.md"] },
+          { id: "adapters", title: "适配器", description: "Codex、Claude、Cursor 等工具入口。", relatedFiles: ["adapters/*", "CODEX.md", "CLAUDE.md"] },
         ],
       },
       {
+        id: "agent-security-menu",
         title: "安全边界",
         meta: "边界",
         icon: "shield",
         description: "确认和禁止规则。",
         items: [
-          { title: "安全边界", description: "敏感信息、确认动作和禁止操作。", relatedFiles: ["docs/AI_SAFETY.md", "docs/SECURITY.md", "AGENTS.md"] },
+          { id: "security-boundary", title: "安全边界", description: "敏感信息、确认动作和禁止操作。", relatedFiles: ["docs/AI_SAFETY.md", "docs/SECURITY.md", "AGENTS.md"] },
         ],
       },
     ],

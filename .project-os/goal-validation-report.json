@@ -1,6 +1,8 @@
 {
   "schemaVersion": "project-os.goal-validation-report.v0.1",
-  "generatedAt": "2026-07-08T05:22:14.351Z",
+  "generatedAt": "2026-07-18T10:37:47.622Z",
+  "goalId": "统一对话-任务与目标的上下文和状态契约-1784370357360",
+  "goalTitle": "统一对话、任务与目标的上下文和状态契约",
   "status": "passed",
   "checks": [
     {
@@ -9,7 +11,7 @@
       "command": "cd desktop && npm run web:build",
       "success": true,
       "code": 0,
-      "output": "> omnidesk@0.1.0 web:build\n> vite build\n\nvite v7.3.6 building client environment for production...\ntransforming...\n✓ 1897 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                     0.39 kB │ gzip:   0.27 kB\ndist/assets/index-AvwkoTuH.css     94.94 kB │ gzip:  14.92 kB\ndist/assets/index-CU_haXI-.js       0.17 kB │ gzip:   0.17 kB\ndist/assets/core-BEOw45JP.js        0.20 kB │ gzip:   0.15 kB\ndist/assets/event-CStX_PX4.js       1.41 kB │ gzip:   0.69 kB\ndist/assets/index-7eJKe7tM.js   1,061.31 kB │ gzip: 287.02 kB\n✓ built in 1.84s\n\n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit."
+      "output": "> omnidesk@0.1.0 web:build\n> vite build\n\nvite v7.3.6 building client environment for production...\ntransforming...\n✓ 2631 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                                            0.95 kB │ gzip:   0.67 kB\ndist/.vite/manifest.json                                   0.98 kB │ gzip:   0.30 kB\ndist/assets/terminal-dock-DDGTF8rc.css                     3.62 kB │ gzip:   0.99 kB\ndist/assets/index-BRevZhsc.css                           192.61 kB │ gzip:  26.82 kB\ndist/assets/assistant-ui-conversation-poc-DGT_eRaj.js    213.26 kB │ gzip:  60.68 kB\ndist/assets/terminal-dock-BdLziNLS.js                    348.65 kB │ gzip:  87.16 kB\ndist/assets/index-BMeNajKd.js                          1,231.52 kB │ gzip: 319.51 kB\n✓ built in 4.54s\n\n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit."
     },
     {
       "id": "cargo-check",
@@ -17,7 +19,7 @@
       "command": "cd desktop/src-tauri && cargo check",
       "success": true,
       "code": 0,
-      "output": "Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.55s"
+      "output": "Checking OmniDesk v0.1.0 (/Users/heqiao/Desktop/Claude练习/OmniDesk/desktop/src-tauri)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.00s"
     },
     {
       "id": "runtime",
@@ -25,7 +27,7 @@
       "command": "bash scripts/check-runtime.sh .",
       "success": true,
       "code": 0,
-      "output": "Checking AI Runtime docs in: /Users/heqiao/Desktop/Claude练习/project-starter-pack\nResult: completed with 0 warning(s)."
+      "output": "Checking AI Runtime docs in: /Users/heqiao/Desktop/Claude练习/OmniDesk\nResult: completed with 0 warning(s)."
     }
   ]
 }

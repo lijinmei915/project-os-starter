@@ -134,7 +134,7 @@
     ],
     "rules": "design-system"
   },
-  "description": "OmniDesk / Project OS Desktop：会持续学习项目的本地 AI 工程工作台，让任何新老项目都能按清晰流程被理解、治理、开发和演进",
+  "description": "OmniDesk：会持续学习项目的本地 AI 工程工作台，让任何新老项目都能按清晰流程被理解、治理、开发和演进",
   "governance": {
     "workspaceModel": {
       "existingProjectFlow": [
@@ -154,7 +154,7 @@
       "updatedAt": "2026-07-08"
     }
   },
-  "name": "project-os-starter",
+  "name": "OmniDesk",
   "phase": "stabilizing",
   "stage": "Project OS Console 内核收口期 / OmniDesk 工作区治理自验证期",
   "status": {

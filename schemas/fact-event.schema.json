@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-os.local/schemas/fact-event.schema.json",
+  "title": "Fact Pipeline Event",
+  "type": "object",
+  "required": ["type", "occurredAt", "projectId"],
+  "properties": {
+    "type": { "type": "string", "enum": ["source.changed", "fact.invalidated", "fact.updated", "selector.recomputed", "slot.updated"] },
+    "occurredAt": { "type": "string" },
+    "projectId": { "type": "string", "minLength": 1 },
+    "sourcePaths": { "type": "array", "items": { "type": "string" } },
+    "factIds": { "type": "array", "items": { "type": "string" } },
+    "selectorIds": { "type": "array", "items": { "type": "string" } },
+    "slotIds": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": false
+}

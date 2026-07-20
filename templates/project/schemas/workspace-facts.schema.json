@@ -28,12 +28,26 @@
       "required": ["name", "path", "kind"],
       "properties": {
         "name": { "type": "string" },
+        "id": { "type": "string" },
         "path": { "type": "string" },
         "kind": { "type": "string" },
+        "version": { "type": "string" },
+        "createdAt": { "type": "string" },
         "detectedStack": {
           "type": "array",
           "items": { "type": "string" }
         },
+        "dependencies": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "directories": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "coreCapabilities": { "type": "string" },
+        "owner": { "type": "string" },
+        "milestone": { "type": "string" },
         "lifecycle": { "type": "string" },
         "description": { "type": "string" }
       },

@@ -1,17 +1,78 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Terminal } from "@xterm/xterm";
-import { FitAddon } from "@xterm/addon-fit";
-import { Activity, AlertTriangle, ArrowLeftRight, ArrowRight, Brain, Check, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, ClipboardList, Eraser, ExternalLink, FileText, Loader2, MessageSquare, MoreVertical, Package, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Play, Plus, RotateCcw, Server, ShieldAlert, Square, Target, TerminalSquare, X } from "lucide-react";
-import { ChatComposer } from "./components/workbench/chat-composer";
-import { Conversation, ConversationMessage } from "./components/workbench/conversation";
+import { invoke as tauriInvoke } from "@tauri-apps/api/core";
+import { open as openTauriDialog } from "@tauri-apps/plugin-dialog";
+import { Activity, AlertTriangle, ArrowLeftRight, ArrowRight, ArrowUpDown, Bot, Brain, Check, ChevronDown, ChevronsDownUp, ChevronsUpDown, ClipboardList, Clock3, Copy, Eraser, ExternalLink, FileText, Filter, Loader2, MessageSquare, MoreVertical, Package, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Play, Plus, RotateCcw, Server, ShieldAlert, ShieldCheck, Square, TerminalSquare, X } from "lucide-react";
+import { ChatDock } from "./components/workbench/chat-dock";
+import { AppWorkbenchSurface } from "./components/workbench/app-workbench-surface";
+import { GoalStatusIcon, GoalTaskItem, ProjectProfileItem, RailDisclosure } from "./components/workbench/right-rail-components";
+import { ActiveTask } from "./components/workbench/active-task";
+import { AgentWorkspaceConversationCanvas } from "./components/workbench/agent-workspace-conversation-canvas";
+import { AgentWorkspaceAuxiliaryTabs } from "./components/workbench/agent-workspace-auxiliary-tabs";
+import { PatchDraft, ReadonlyPlan } from "./components/workbench/plan-views";
+import { AgentProcessingStatus } from "./components/workbench/conversation";
 import { ConversationHistoryItem } from "./components/workbench/conversation-history-item";
-import { InfoCallout } from "./components/workbench/info-callout";
-import { SystemSettingsMenu } from "./components/workbench/system-settings-menu";
+import { groupConversations } from "./lib/conversation-list";
+import { ComponentGovernancePanel } from "./components/workbench/component-governance-panel";
+import { ProviderPanel } from "./components/workbench/provider-panel";
+import { ProjectOverviewHeader, ProjectOverviewSectionSlot, ProjectOverviewSlotRenderer } from "./components/workbench/project-overview-renderer";
+import { TopBar } from "./components/workbench/top-bar";
+import { StatusBar } from "./components/workbench/status-bar";
 import { TaskCard } from "./components/workbench/task-card";
-import { TaskCommandBar } from "./components/workbench/task-command-bar";
-import { ThemeMenu } from "./components/workbench/theme-menu";
+import { TaskConversationContext } from "./components/workbench/task-conversation-context";
+import { TaskQueueItem, TaskRailDetail } from "./components/workbench/task-rail";
+import { useAgentTopicTaskBoard } from "./components/workbench/use-agent-topic-task-board";
+import { useAgentTopicTaskActions } from "./components/workbench/use-agent-topic-task-actions";
+import { useWorkspaceContextActions } from "./components/workbench/use-workspace-context-actions";
+import { usePlanAction } from "./components/workbench/use-plan-action";
+import { usePatchActions } from "./components/workbench/use-patch-actions";
+import { useTerminalCheckAction } from "./components/workbench/use-terminal-check-action";
+import { useGovernanceTaskActions } from "./components/workbench/use-governance-task-actions";
+import { useTaskPersistence } from "./components/workbench/use-task-persistence";
+import { useConversationSession } from "./components/workbench/use-conversation-session";
+import { useConversationNavigation } from "./components/workbench/use-conversation-navigation";
+import { useTaskSession } from "./components/workbench/use-task-session";
+import { useProviderSession } from "./components/workbench/use-provider-session";
+import { useComposerModelActions } from "./components/workbench/use-composer-model-actions";
+import { useExecutionSession } from "./components/workbench/use-execution-session";
+import { useTerminalSession } from "./components/workbench/use-terminal-session";
+import { useWorkspaceSession } from "./components/workbench/use-workspace-session";
+import { useChatAttachments } from "./components/workbench/use-chat-attachments";
+import { useWorkspaceTabs } from "./components/workbench/use-workspace-tabs";
+import { useAgentWorkspaceNavigation } from "./components/workbench/use-agent-workspace-navigation";
+import { useWorkspaceNavigationEvents } from "./components/workbench/use-workspace-navigation-events";
+import { useTaskConversationEvent } from "./components/workbench/use-task-conversation-event";
+import { useConversationTurnActions } from "./components/workbench/use-conversation-turn-actions";
+import { useConversationRequestState } from "./components/workbench/use-conversation-request-state";
+import { useConversationSubmission } from "./components/workbench/use-conversation-submission";
+import { useActionFeedback } from "./components/workbench/use-action-feedback";
+import { useProjectActivities } from "./components/workbench/use-project-activities";
+import { useConversationPersistence } from "./components/workbench/use-conversation-persistence";
+import { useWorkspaceSnapshotRefresh } from "./components/workbench/use-workspace-snapshot-refresh";
+import { useWorkspaceDataSync } from "./components/workbench/use-workspace-data-sync";
+import { useProviderDataSync } from "./components/workbench/use-provider-data-sync";
+import { useConversationSurfaceReset } from "./components/workbench/use-conversation-surface-reset";
+import { useWorkspaceEphemeralReset } from "./components/workbench/use-workspace-ephemeral-reset";
+import { useWorkspaceGoalActions } from "./components/workbench/use-workspace-goal-actions";
+import { TokenGovernancePanel } from "./components/workbench/token-governance-panel";
+import { AgentTopicPanelContent } from "./components/workbench/agent-topic-panel-content";
+import { AgentConfigSurfacePanel } from "./components/workbench/agent-config-surface-panel";
+import { ReadonlyFilePreview } from "./components/workbench/readonly-file-preview";
+import { EngineeringTopicFrame } from "./components/workbench/engineering-topic-frame";
+import { EngineeringTopicSurfaceComposer } from "./components/workbench/engineering-topic-surface-composer";
+import { AssetSurfacePanel, GovernanceSurfacePanel, MemorySurfacePanel } from "./components/workbench/workspace-static-surfaces";
 import { WorkspaceTree } from "./components/workbench/workspace-tree";
+import { ProjectFileTree } from "./components/workbench/project-file-tree";
+import { ProjectCapabilityDialog } from "./components/workbench/project-capability-dialog";
+import { useProjectSidebarState } from "./components/workbench/use-project-sidebar-state";
+import { useSidebarLayout } from "./components/workbench/use-sidebar-layout";
+import { useProjectPathCopy } from "./components/workbench/use-project-path-copy";
+import { useWorkspaceCapabilityActions } from "./components/workbench/use-workspace-capability-actions";
+import { useProviderTestRecord } from "./components/workbench/use-provider-test-record";
+import { useAgentWorkspaceInputActions } from "./components/workbench/use-agent-workspace-input-actions";
+import { useProviderComposerViewModel } from "./components/workbench/use-provider-composer-view-model";
+import { WorkspaceTabStrip } from "./components/workbench/workspace-tab-strip";
+import { OverviewPageHeader, OverviewSection, OverviewTagList } from "./components/workbench/overview-section";
 import { Button } from "./components/ui/button";
 import { Badge } from "./components/ui/badge";
 import { Dialog, DialogClose, DialogContent, DialogTrigger } from "./components/ui/dialog";
@@ -23,14 +84,57 @@ import { Panel } from "./components/ui/panel";
 import { SectionGroup } from "./components/ui/section-title";
 import { Select } from "./components/ui/select";
 import { Switch } from "./components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
-import { Tooltip, TooltipProvider } from "./components/ui/tooltip";
-import { projectGovernanceOutline } from "./workspace-outline";
-import { formatTerminalContext, formatTerminalContextForInput, formatTerminalInputForPaste } from "./lib/terminal-context";
-import { invokePreviewCommand, invokeTauriCommand, isTauriRuntime } from "./lib/runtime-api";
-import { buildChatRequestContext, buildConversationRecord, contextualizeUserMessage, isDialogueActionRequest, mergeConversationRecords } from "./lib/conversation-record";
-import "@xterm/xterm/css/xterm.css";
+import { Tabs, TabsContent } from "./components/ui/tabs";
+import { Tooltip } from "./components/ui/tooltip";
+import { projectGovernanceOutline, workspaceOutlineForCapabilities } from "./workspace-outline";
+import { workspaceRouteById } from "./workspace-route-registry";
+import { collapseDuplicateOpenTasks, taskGoalName, taskProgressSummary, taskUpdatedLabel } from "./lib/task-presentation";
+import { stageGoalCandidateFromMessage } from "./lib/stage-goal-candidate";
+import { resolvedStageGoalTurn } from "./lib/stage-goal-turn";
+import { assistantUiPocEnabled } from "./lib/assistant-ui-adapter";
+import { groupTasksByGoal, sortTasksForGoal } from "./lib/task-goal-groups";
+import { buildAgentWorkspaceViewModel } from "./lib/agent-workspace-view-model";
+import * as providerClient from "./lib/provider-client";
+import { activeProviderProfileName } from "./lib/provider-presentation";
+import { taskConversationAction, taskNextAction } from "./lib/task-next-action";
+import { taskContinuationPrompt } from "./lib/task-conversation-prompt";
+import { taskCardPrimaryAction } from "./lib/task-card-action";
+import { discoverableProjectCapabilities, projectRuntimeStatus } from "./lib/project-sidebar-view-model";
+import { buildAgentTopicViewModel, canPreviewAgentTopicFile } from "./lib/agent-topic-view-model";
+import { applyPendingConversationPatch } from "./lib/conversation-patch-apply";
+import { createProviderActionController } from "./lib/provider-action-controller";
+import { createConversationActionController } from "./lib/conversation-action-controller";
+import { createTaskLifecycleController } from "./lib/task-lifecycle-controller";
+import { createExecutionActionController } from "./lib/execution-action-controller";
+import { createWorkspaceRegistryActions } from "./lib/workspace-registry-actions";
+import { createWorkspaceFileActions } from "./lib/workspace-file-actions";
+import { resolveEngineeringTopicSurface } from "./lib/engineering-topic-surface";
+import { executeGuardedCheckCommand, executeTaskGuardedCheckWorkflow } from "./lib/guarded-check-executor";
+import { invokePreviewCommand, isTauriRuntime } from "./lib/runtime-api";
+import { cancelRuntimeRequest, chatWithModel, deleteDesktopConversation, listDesktopConversations, saveDesktopConversation } from "./lib/desktop-conversation-client";
+import { deleteDesktopTask, listDesktopTasks, saveDesktopTask } from "./lib/desktop-task-client";
+import * as executionClient from "./lib/execution-client";
+import * as terminalClient from "./lib/terminal-client";
+import * as workspaceGoalClient from "./lib/workspace-goal-client";
+import * as workspaceRegistryClient from "./lib/workspace-registry-client";
+import * as workspaceCapabilityClient from "./lib/workspace-capability-client";
+import * as workspaceFileClient from "./lib/workspace-file-client";
+import { actionFromAssistantCommitment, buildChatRequestContext, buildConversationRecord, contextualizeUserMessage, isDialogueActionRequest, mergeConversationRecords } from "./lib/conversation-record";
+import { taskIdForRequest } from "./lib/request-lifecycle";
+import { resolveWorkspaceContext, resolveWorkspaceGoal } from "./lib/workspace-context";
+import { conversationStates, executeRegisteredConversationAction, guardedCheckCapabilities, guardedCheckCapability, migrateConversationRecord, normalizeConversationReferences, normalizeConversationTurns, planProgressEvents, projectExecutionEvent, recoverConversationRuntime } from "./conversation-runtime";
+import { buildProjectFactStore, diffProjectFactStores } from "./fact-store";
+import { createProjectOverviewSlotRuntime } from "./project-overview-slot-runtime";
+import { capabilityManifestSignature } from "./capability-policy";
+import { exposeDesktopPerformanceBaseline, recordWorkbenchReady } from "./lib/performance-baseline";
+import projectOverviewContract from "../../schemas/project-overview-contract.v0.1.json";
+import projectRunbookContract from "../../schemas/project-runbook-contract.v0.1.json";
+import { compileRunbookSlots } from "./runbook-slot-runtime";
+import projectProgressContract from "../../schemas/project-progress-contract.v0.1.json";
+import { compileCurrentProgressSlots } from "./current-progress-slot-runtime";
 import "./styles.css";
+
+const AssistantUiConversationPoc = React.lazy(() => import("./components/workbench/assistant-ui-conversation-poc").then((module) => ({ default: module.AssistantUiConversationPoc })));
 
 class AppErrorBoundary extends React.Component {
   constructor(props) {
@@ -66,6 +170,7 @@ class AppErrorBoundary extends React.Component {
 
 const fallbackSnapshot = {
   projectName: "project-os-starter",
+  projectCapabilities: { capabilities: [] },
   currentProjectId: "current",
   currentProjectPath: "/Users/heqiao/Desktop/Claude练习/project-starter-pack",
   phase: "stabilizing",
@@ -190,6 +295,9 @@ const fallbackPlan = null;
 const taskStatuses = {
   planned: "planned",
   waitingApproval: "waiting approval",
+  repairPending: "repair pending",
+  waitingRepairApproval: "waiting repair approval",
+  repairFailed: "repair failed",
   running: "running",
   done: "done",
   failed: "failed",
@@ -288,156 +396,91 @@ const fallbackModelCatalog = {
   ],
 };
 
-const guardedChecks = [
-  { id: "runtime", label: "Runtime", command: "bash scripts/check-runtime.sh ." },
-  { id: "doc-structure", label: "Docs", command: "bash scripts/check-doc-structure.sh ." },
-  { id: "recommend", label: "Recommend", command: "bash scripts/recommend-next.sh ." },
-  { id: "ai-project", label: "AI Project", command: "bash scripts/check-ai-project.sh . --write-report" },
-  { id: "web-build", label: "Web Build", command: "cd desktop && npm run web:build" },
-  { id: "cargo-check", label: "Cargo", command: "cd desktop/src-tauri && cargo check" },
-];
-
 async function loadWorkspaceSnapshot() {
   if (!isTauriRuntime()) {
+    const response = await fetch("/__project-os/workspace-snapshot");
+    if (response.ok) return response.json();
     return loadPreviewWorkspaceSnapshot();
   }
 
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke("get_workspace_snapshot");
+  return tauriInvoke("get_workspace_snapshot");
 }
 
 async function refreshWorkspaceFactsPreview() {
   if (!isTauriRuntime()) {
-    return loadPreviewJson("/.project-os/workspace-facts.json", null);
+    const scan = await invokePreviewCommand("run_project_os_action", { input: { actionId: "scan" } });
+    if (!scan?.success) throw new Error(scan?.output || scan?.error || "项目扫描失败。");
+    const response = await fetch("/.project-os/workspace-facts.json", { cache: "no-store" });
+    const report = response.ok ? await response.json() : null;
+    return report ? { ...report, generatedAt: new Date().toISOString() } : report;
   }
 
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke("refresh_workspace_facts_preview");
+  return tauriInvoke("refresh_workspace_facts_preview");
 }
 
-async function runGoalValidationCheck() {
-  if (!isTauriRuntime()) {
-    const response = await fetch("/__project-os/run-goal-validation", { method: "POST" });
-    if (!response.ok) {
-      throw new Error("目标验收运行失败。");
-    }
-    await response.json();
-    return loadPreviewWorkspaceSnapshot();
-  }
-
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke("run_goal_validation");
+function factRefreshFailureStorageKey(projectKey) {
+  return `project-os:fact-refresh-failure:${encodeURIComponent(projectKey || "current-project")}`;
 }
 
-async function signOffGoalValidation() {
-  if (!isTauriRuntime()) {
-    const response = await fetch("/__project-os/sign-off-goal", { method: "POST" });
-    if (!response.ok) {
-      const payload = await response.json().catch(() => ({}));
-      throw new Error(payload.error || "目标签收失败。");
-    }
-    await response.json();
-    return loadPreviewWorkspaceSnapshot();
+function readFactRefreshFailure(projectKey) {
+  try {
+    return JSON.parse(window.localStorage.getItem(factRefreshFailureStorageKey(projectKey)) || "null");
+  } catch {
+    return null;
   }
+}
 
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke("sign_off_goal_validation");
+function writeFactRefreshFailure(projectKey, failure) {
+  try {
+    const previous = readFactRefreshFailure(projectKey);
+    window.localStorage.setItem(factRefreshFailureStorageKey(projectKey), JSON.stringify({
+      ...failure,
+      attemptedAt: new Date().toISOString(),
+      retryCount: previous?.signature === failure.signature ? Number(previous.retryCount || 0) + 1 : 1,
+    }));
+  } catch {
+    // Refresh recovery remains available for this session when storage is unavailable.
+  }
+}
+
+function clearFactRefreshFailure(projectKey) {
+  try {
+    window.localStorage.removeItem(factRefreshFailureStorageKey(projectKey));
+  } catch {
+    // Storage cleanup failure must not turn a successful refresh into an error.
+  }
 }
 
 async function createWorkspaceGoal(input) {
-  if (!isTauriRuntime()) {
-    const response = await fetch("/__project-os/create-goal", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    });
-    if (!response.ok) {
-      const payload = await response.json().catch(() => ({}));
-      throw new Error(payload.error || "目标创建失败。");
-    }
-    await response.json();
-    return loadPreviewWorkspaceSnapshot();
-  }
+  return workspaceGoalClient.createWorkspaceGoal({ input, loadWorkspaceSnapshot });
+}
 
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke("create_goal", { input });
+async function updateWorkspaceGoal(input) {
+  return workspaceGoalClient.updateWorkspaceGoal({ input, loadWorkspaceSnapshot });
+}
+
+async function archiveWorkspaceGoal(id) {
+  return workspaceGoalClient.archiveWorkspaceGoal({ id, loadWorkspaceSnapshot });
+}
+
+async function restoreWorkspaceGoal(id) {
+  return workspaceGoalClient.restoreWorkspaceGoal({ id, loadWorkspaceSnapshot });
+}
+
+async function mergeWorkspaceGoal(sourceId, targetId) {
+  return workspaceGoalClient.mergeWorkspaceGoal({ sourceId, targetId, loadWorkspaceSnapshot });
 }
 
 async function switchWorkspaceGoal(input) {
-  if (!isTauriRuntime()) {
-    const response = await fetch("/__project-os/switch-goal", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    });
-    if (!response.ok) {
-      const payload = await response.json().catch(() => ({}));
-      throw new Error(payload.error || "目标切换失败。");
-    }
-    await response.json();
-    return loadPreviewWorkspaceSnapshot();
-  }
-
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke("switch_active_goal", { input });
-}
-
-async function switchPreviewProject(id) {
-  const response = await fetch("/__project-os/switch-project", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id }),
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(payload.error || "项目切换失败。");
-  }
-  return loadPreviewWorkspaceSnapshot();
-}
-
-async function relocatePreviewProject(id, path) {
-  const response = await fetch("/__project-os/relocate-project", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id, path }),
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(payload.error || "路径更新失败。");
-  }
-  return loadPreviewWorkspaceSnapshot();
+  return workspaceGoalClient.switchWorkspaceGoal({ input, loadWorkspaceSnapshot });
 }
 
 async function confirmWorkspaceGoal(input) {
-  if (!isTauriRuntime()) {
-    const response = await fetch("/__project-os/confirm-goal", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    });
-    if (!response.ok) {
-      const payload = await response.json().catch(() => ({}));
-      throw new Error(payload.error || "目标确认失败。");
-    }
-    await response.json();
-    return loadPreviewWorkspaceSnapshot();
-  }
-
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke("confirm_goal", { input });
+  return workspaceGoalClient.confirmWorkspaceGoal({ input, loadWorkspaceSnapshot });
 }
 
-async function deleteProviderProfilePreview(profileId) {
-  const response = await fetch("/__project-os/delete-provider-profile", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ profileId }),
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(payload.error || "删除连接失败。");
-  }
-  return payload;
+async function confirmGoalDecomposition(input) {
+  return workspaceGoalClient.confirmGoalDecomposition({ input, loadWorkspaceSnapshot });
 }
 
 async function copyTextToSystemClipboard(text) {
@@ -446,8 +489,7 @@ async function copyTextToSystemClipboard(text) {
     window.location.hostname === "localhost";
 
   if (!canUseDevClipboard && isTauriRuntime()) {
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("copy_text_to_clipboard", { text });
+    await tauriInvoke("copy_text_to_clipboard", { text });
     return { ok: true };
   }
 
@@ -503,6 +545,7 @@ async function loadPreviewWorkspaceSnapshot() {
   const projectProfileFile = await loadPreviewJson("/.project-os/project-profile.json", null);
   const projectProfile = previewProjectProfile(projectProfileFile);
   const workspaceFacts = await loadPreviewJson("/.project-os/workspace-facts.json", null);
+  const projectCapabilities = await loadPreviewJson("/.project-os/project-capabilities.json", { capabilities: [] });
   const queue = Array.isArray(backlog.items) && backlog.items.length
     ? backlog.items.map((item) => ({
         id: item.id,
@@ -525,6 +568,7 @@ async function loadPreviewWorkspaceSnapshot() {
       name: project.name,
       path: project.path,
       phase: project.phase || "stabilizing",
+      accessMode: project.accessMode || "browse",
     })) : fallbackSnapshot.projects,
     queue,
     goalValidation,
@@ -533,6 +577,7 @@ async function loadPreviewWorkspaceSnapshot() {
     goals,
     projectProfile,
     workspaceFacts,
+    projectCapabilities,
   };
 }
 
@@ -568,56 +613,6 @@ function previewProjectProfile(profile) {
   return { ...next, missingFields };
 }
 
-async function loadProviderStatus() {
-  if (!isTauriRuntime()) {
-    return loadPreviewProviderStatus();
-  }
-
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke("get_provider_status");
-}
-
-async function loadModelCatalog() {
-  if (!isTauriRuntime()) {
-    return loadPreviewJson("/.project-os/model-catalog.json", fallbackModelCatalog);
-  }
-
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke("get_model_catalog");
-}
-
-async function loadModelHealth() {
-  if (!isTauriRuntime()) {
-    return loadPreviewJson("/.project-os/model-health.json", {
-      schemaVersion: "project-os.model-health.v0.1",
-      entries: [],
-    });
-  }
-
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke("get_model_health");
-}
-
-async function loadDesktopTasks() {
-  if (!isTauriRuntime()) {
-    const response = await fetch("/__project-os/desktop-tasks");
-    if (!response.ok) return [];
-    return response.json();
-  }
-
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke("list_desktop_tasks");
-}
-
-async function loadDesktopConversations() {
-  if (!isTauriRuntime()) {
-    const response = await fetch("/__project-os/desktop-conversations");
-    if (!response.ok) return [];
-    return response.json();
-  }
-  return invokeTauriCommand("list_desktop_conversations");
-}
-
 async function loadPreviewJson(path, fallback) {
   try {
     const response = await fetch(path);
@@ -626,24 +621,6 @@ async function loadPreviewJson(path, fallback) {
   } catch {
     return fallback;
   }
-}
-
-async function loadPreviewProviderStatus() {
-  const config = await loadPreviewJson("/.project-os/desktop-provider.json", fallbackProvider);
-  const profiles = Array.isArray(config.profiles) ? config.profiles : [];
-  return {
-    ...fallbackProvider,
-    ...config,
-    hasApiKey: false,
-    profiles: profiles.map((profile) => ({ ...profile, hasApiKey: false })),
-  };
-}
-
-async function invokeWorkspaceCommand(command, payload) {
-  if (!isTauriRuntime()) {
-    return invokePreviewCommand(command, payload);
-  }
-  return invokeTauriCommand(command, payload);
 }
 
 function readFileAsDataUrl(file) {
@@ -655,214 +632,86 @@ function readFileAsDataUrl(file) {
   });
 }
 
-async function persistDesktopTask(task) {
-  if (!isTauriRuntime()) {
-    const response = await fetch("/__project-os/save-desktop-task", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ task }),
-    });
-    if (!response.ok) {
-      const result = await response.json().catch(() => ({}));
-      throw new Error(result.error || "保存任务失败。");
-    }
-    return response.json();
-  }
-  return invokeWorkspaceCommand("save_desktop_task", { input: { task } });
-}
-
-async function persistDesktopConversation(conversation) {
-  if (!isTauriRuntime()) {
-    return invokePreviewCommand("save_desktop_conversation", { conversation });
-  }
-  return invokeTauriCommand("save_desktop_conversation", { input: { conversation } });
-}
-
-async function removeDesktopConversation(id) {
-  if (!isTauriRuntime()) {
-    return invokePreviewCommand("delete_desktop_conversation", { id });
-  }
-  return invokeTauriCommand("delete_desktop_conversation", { input: { id } });
-}
-
 async function pickProjectDirectory() {
   if (!isTauriRuntime()) {
     throw new Error("浏览器预览模式暂不支持系统目录选择器");
   }
 
-  const { open } = await import("@tauri-apps/plugin-dialog");
-  return open({
+  return openTauriDialog({
     directory: true,
     multiple: false,
     title: "新建或选择要加入 OmniDesk 的项目目录",
   });
 }
 
-function TopBar({
-  snapshot,
-  source,
-  error,
-  provider,
-  providerHealth,
-  modelCatalog,
-  onSaveProvider,
-  onSaveProviderSecret,
-  onDeleteProviderProfile,
-  providerError,
-  onStartConversation,
-}) {
-  const providerButtonLabel = activeProviderProfileName(provider) || "连接";
-  const health = providerHealth || { status: "unknown", label: "Checking" };
-  return (
-    <header className="topbar">
-        <div className="brand">
-        <div className="mark" aria-hidden="true">
-          <span className="markGlyph" />
-        </div>
-        <div>
-          <div className="brandTitle">OmniDesk</div>
-          <div className="brandSubtitle">超级个人工作台</div>
-        </div>
-      </div>
-      <div className="topActions">
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button className="modelStatusButton" variant="subtle" type="button" aria-label="连接设置">
-              <span className={`dot modelHealthDot modelHealthDot-${health.status}`} />
-              {providerButtonLabel}
-            </Button>
-          </DialogTrigger>
-          <DialogContent
-            className="providerDialog"
-            title="模型设置"
-            description="配置 OmniDesk 调用的大模型、API Key 和网关地址。"
-          >
-            <ProviderPanel
-              provider={provider}
-              modelCatalog={modelCatalog}
-              source={source}
-              onSaveProvider={onSaveProvider}
-              onSaveProviderSecret={onSaveProviderSecret}
-              onDeleteProviderProfile={onDeleteProviderProfile}
-              providerError={providerError}
-            />
-          </DialogContent>
-        </Dialog>
-        <ThemeMenu />
-        <SystemSettingsMenu />
-        <Tooltip content="开始一段新的对话">
-          <Button variant="primary" type="button" onClick={onStartConversation}>
-            <Plus className="buttonIcon" strokeWidth={2.25} aria-hidden="true" />
-            新对话
-          </Button>
-        </Tooltip>
-      </div>
-    </header>
-  );
-}
+const capabilityLabels = {
+  goals: "目标管理",
+  rules: "工作规则",
+  "design-implementation": "设计实现",
+  "validation-delivery": "验证交付",
+  "knowledge-memory": "知识记忆",
+  "agent-configuration": "Agent 配置",
+};
 
-function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot, tasks = [], projectActivities = {}, planLoading, terminalRunningId, onSwitchProject, onPickProject, onOpenProjectFolder, onRelocateProject, onRenameProject, onRemoveProject, onSelectEngineeringFile, onProjectActionError, onProjectActivitySeen, onProjectPathCopied, projectActionError, selectedEngineeringFile }) {
-  const [renameProject, setRenameProject] = useState(null);
-  const [renameName, setRenameName] = useState("");
-  const [projectsOpen, setProjectsOpen] = useState(true);
-  const [sidebarView, setSidebarView] = useState("workspace");
-  const [fileTreeExpanded, setFileTreeExpanded] = useState(true);
+const capabilityDescriptions = {
+  goals: "管理项目目标、验收标准和历史记录。",
+  rules: "维护 AI 协作、权限和文档规则。",
+  "design-implementation": "组织架构、数据契约、界面规范和实现结构。",
+  "validation-delivery": "管理检查项、验收报告和运行记录。",
+  "knowledge-memory": "沉淀项目事实、偏好、决策和会话摘要。",
+  "agent-configuration": "配置模型连接、工具白名单和技能。",
+};
+const workspaceModuleLabels = {
+  "system-architecture": "系统架构", "data-contracts": "数据契约", "ui-standards": "界面规范", "code-structure": "实现结构",
+  "validation-checks": "检查项", "validation-report": "验收报告", "run-records": "运行记录",
+  "model-connections": "模型连接", "tool-allowlist": "工具白名单", "security-boundary": "安全边界", "project-runbook": "启动方式"
+};
+const dedicatedSurfaceByTopic = Object.freeze({
+  "acceptance-criteria": "acceptance-criteria",
+  "collaboration-boundary": "collaboration-boundary",
+  "current-goal": "current-goal",
+  "documentation-rules": "documentation-rules",
+  "execution-permissions": "execution-permissions",
+  "goal-history": "goal-history",
+  "system-architecture": "system-architecture",
+  "data-contracts": "data-contracts",
+  "code-structure": "code-structure",
+  "validation-checks": "validation-checks",
+  "validation-report": "validation-report",
+  "run-records": "run-records",
+  "handoff-records": "handoff-records",
+  "decision-records": "decision-records",
+  "lessons-learned": "lessons-learned",
+  "task-list": "task-execution", "execution-terminal": "task-execution", "execution-results": "task-execution",
+  "project-facts": "memory-surface", "user-preferences": "memory-surface", "long-term-memory": "memory-surface", "conversation-summary": "memory-surface",
+  "engineering-files": "asset-surface", "governance-files": "asset-surface", "report-artifacts": "asset-surface", "schema-assets": "asset-surface", "script-templates": "asset-surface",
+  "model-connections": "agent-config-surface", "tool-allowlist": "agent-config-surface", "skill-capabilities": "agent-config-surface", "adapters": "agent-config-surface", "security-boundary": "agent-config-surface",
+  "project-progress": "current-progress",
+  "project-risks": "risk-boundary",
+  "project-runbook": "runbook",
+  "local-project-state": "local-project-state",
+});
 
-  const openRenameDialog = (project) => {
-    setRenameProject(project);
-    setRenameName(project.name);
-  };
+function ProjectSidebar({ collapsed, copyTextToSystemClipboard, onResizeStart, onToggleCollapsed, snapshot, tasks = [], projectActivities = {}, planLoading, terminalRunningId, onSwitchProject, onPickProject, onOpenProjectFolder, onRelocateProject, onRenameProject, onRemoveProject, onSelectEngineeringFile, onUpdateCapability, onProjectActionError, onProjectActivitySeen, onProjectPathCopied, projectActionError, selectedEngineeringFile }) {
+  const {
+    accessDialogOpen, accessSettingsProject, capabilityDialogOpen, capabilityLoadingId, confirmControlledProjectAccess, confirmProjectAccess, connectedProjectAccess, controlledConfirmOpen, dismissCapability, enableCapability, openExistingProject, openProjectAccessSettings,
+    fileTreeExpanded, openRenameDialog, projectsOpen, renameName, renameProject,
+    projectScan, revokeProjectWriteAccess, scanDetailsOpen, selectedProjectAccessMode, selectedModulesByCapability, setAccessSettingsProject, setCapabilityDialogOpen, setFileTreeExpanded, setProjectAccessDialogOpen,
+    setControlledConfirmOpen, setScanDetailsOpen, setSelectedProjectAccessMode,
+    setName, setProjectsOpen, setRenameProject, setSidebarView, setSelectedModulesByCapability,
+    sidebarView, startProjectAccess, submitRename, changeProjectAccess,
+  } = useProjectSidebarState({ onPickProject, onPreviewProject: workspaceRegistryClient.previewWorkspaceProject, onRenameProject, onSwitchProject, onUpdateCapability, projects: snapshot.projects });
 
-  const submitRename = async (event) => {
-    event.preventDefault();
-    if (!renameProject) return;
-    const ok = await onRenameProject(renameProject.id, renameName);
-    if (ok) {
-      setRenameProject(null);
-      setRenameName("");
-    }
-  };
-
-  const copyProjectPath = async (projectPath) => {
-    let systemCopyError = null;
-    const fallbackCopy = () => {
-      const textarea = document.createElement("textarea");
-      textarea.value = projectPath;
-      textarea.setAttribute("readonly", "");
-      textarea.style.position = "fixed";
-      textarea.style.left = "-9999px";
-      document.body.appendChild(textarea);
-      textarea.select();
-      const copied = document.execCommand("copy");
-      document.body.removeChild(textarea);
-      if (!copied) throw new Error("浏览器拒绝写入剪贴板");
-    };
-
-    try {
-      try {
-        await copyTextToSystemClipboard(projectPath);
-      } catch (err) {
-        systemCopyError = err;
-        if (!navigator.clipboard?.writeText) {
-          fallbackCopy();
-        } else {
-          try {
-            await navigator.clipboard.writeText(projectPath);
-          } catch {
-            fallbackCopy();
-          }
-        }
-      }
-      onProjectActionError?.("");
-      onProjectPathCopied?.(projectPath);
-      return true;
-    } catch (err) {
-      const message = systemCopyError instanceof Error
-        ? systemCopyError.message
-        : err instanceof Error
-          ? err.message
-          : String(err);
-      onProjectActionError?.(`复制路径失败：${message}`);
-      return false;
-    }
-  };
+  useProjectPathCopy({ copyTextToSystemClipboard, onProjectActionError, onProjectPathCopied });
 
   useEffect(() => {
-    const handleCopyProjectPath = (event) => {
-      const target = event.target instanceof Element ? event.target.closest("[data-copy-project-path]") : null;
-      if (!target) return;
-      const projectPath = target.getAttribute("data-copy-project-path") || "";
-      if (!projectPath) return;
-      copyProjectPath(projectPath);
-    };
-    document.addEventListener("click", handleCopyProjectPath, true);
-    return () => document.removeEventListener("click", handleCopyProjectPath, true);
-  }, []);
+    window.addEventListener("project-os:request-project-access", startProjectAccess);
+    return () => window.removeEventListener("project-os:request-project-access", startProjectAccess);
+  }, [startProjectAccess]);
 
-  const projectTasks = (project) => tasks.filter((task) => {
-    if (task.projectId && task.projectId === project.id) return true;
-    if (task.projectPath && task.projectPath === project.path) return true;
-    if (task.projectName && task.projectName === project.name) return true;
-    return false;
-  });
-
-  const projectRuntimeStatus = (project) => {
-    const relatedTasks = projectTasks(project);
-    if ((project.isCurrent && planLoading) || relatedTasks.some((task) => task.id === terminalRunningId)) {
-      return { tone: "running", label: "进行中" };
-    }
-    if (relatedTasks.some((task) => [taskStatuses.failed, "interrupted", "canceled", "cancelled", "error"].includes(task.status))) {
-      return { tone: "danger", label: "任务或会话中断" };
-    }
-    const cachedActivity = projectActivities[project.id];
-    if (cachedActivity?.tone) {
-      return cachedActivity;
-    }
-    if (project.health === "ready") return { tone: "", label: project.statusLabel || "已就绪" };
-    if (project.health === "missing") return { tone: "danger", label: project.statusLabel || "路径失效" };
-    if (project.health === "partial") return { tone: "warning", label: project.statusLabel || "缺少关键文件" };
-    return { tone: "", label: project.statusLabel || "普通项目" };
-  };
+  const projectStatus = (project) => projectRuntimeStatus(project, { planLoading, projectActivities, taskStatuses, tasks, terminalRunningId });
+  const discoverableCapabilities = discoverableProjectCapabilities(snapshot, capabilityLabels);
+  const recommendationCount = discoverableCapabilities.filter((capability) => capability.status !== "available").length;
 
   if (collapsed) {
     return (
@@ -904,7 +753,7 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
             group: "工作台",
             id: "workbench-overview",
             path: "workbench-overview",
-            title: "工作台总览",
+            title: "工作台",
             virtual: true,
           })}
         >
@@ -920,7 +769,7 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
             toggleLabel={projectsOpen ? "收起项目" : "展开项目"}
             actions={(
               <Tooltip content="添加项目">
-                <button className="sectionIconAction projectAddHeaderButton" type="button" onClick={onPickProject} aria-label="添加项目">
+                <button className="sectionIconAction projectAddHeaderButton" type="button" onClick={startProjectAccess} aria-label="添加项目">
                   <Plus strokeWidth={1.75} aria-hidden="true" />
                 </button>
               </Tooltip>
@@ -940,7 +789,7 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
                     aria-current={project.isCurrent ? "true" : undefined}
                   >
                     {(() => {
-                      const runtimeStatus = projectRuntimeStatus(project);
+                      const runtimeStatus = projectStatus(project);
                       return runtimeStatus.tone ? (
                         <span
                           className={`projectStatusDot projectStatusDot-${runtimeStatus.tone}`}
@@ -968,6 +817,7 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
                         </button>
                         <DropdownMenuItem onSelect={() => onRelocateProject(project.id)}>重新定位路径</DropdownMenuItem>
                         <DropdownMenuItem onSelect={() => openRenameDialog(project)}>修改显示名称</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => openProjectAccessSettings(project)}>接入权限</DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem className="dangerMenuItem" onSelect={() => onRemoveProject(project.id)}>
                           从工作台移除
@@ -983,7 +833,7 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
         <Dialog open={Boolean(renameProject)} onOpenChange={(open) => {
           if (!open) {
             setRenameProject(null);
-            setRenameName("");
+            setName("");
           }
         }}>
           <DialogContent
@@ -996,7 +846,7 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
                   autoFocus
                   id="project-rename-input"
                   maxLength={60}
-                  onChange={(event) => setRenameName(event.target.value)}
+                  onChange={(event) => setName(event.target.value)}
                   placeholder="输入项目名称"
                   value={renameName}
                 />
@@ -1010,9 +860,56 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
             </form>
           </DialogContent>
         </Dialog>
+        <Dialog open={accessDialogOpen} onOpenChange={setProjectAccessDialogOpen}>
+          <DialogContent title={connectedProjectAccess ? "项目已接入" : projectScan?.existingProject ? `“${projectScan.project?.name || "项目"}”已接入` : projectScan?.project?.name ? `接入“${projectScan.project.name}”` : "接入项目"} description={connectedProjectAccess ? `“${connectedProjectAccess.name}”已成为当前项目。` : projectScan?.existingProject ? `当前权限：${projectScan.existingProject.accessMode === "controlled" ? "允许受控修改" : projectScan.existingProject.accessMode === "governed" ? "接入治理" : "仅浏览"}。` : "请选择接入权限。"}>
+            {connectedProjectAccess ? <div className="projectConnectedResult"><div className="projectAccessSettingsSummary"><strong>{connectedProjectAccess.accessMode === "controlled" ? "允许受控修改" : connectedProjectAccess.accessMode === "governed" ? "接入治理" : "仅浏览"}</strong><span>{connectedProjectAccess.accessMode === "controlled" ? "确认后可修改工程文件并运行验证。" : connectedProjectAccess.accessMode === "governed" ? "可写入项目治理记录，不修改工程文件。" : "只读取、扫描并生成建议。"}</span></div><div className="projectConnectedActions"><Button onClick={() => { setProjectAccessDialogOpen(false); onSelectEngineeringFile?.({ description: "项目名称、用途和阶段。", group: "项目流程", id: "project-identity", path: "project-identity", title: "项目概览", virtual: true }); }} type="button" variant="primary">查看项目概览</Button><Button onClick={() => { setProjectAccessDialogOpen(false); window.dispatchEvent(new Event("project-os:open-conversation")); }} type="button" variant="outline">发起项目讨论</Button></div></div> : <>
+            {projectScan?.loading ? <Notice variant="muted">正在检查项目。</Notice> : projectScan?.error ? <Notice variant="danger">{projectScan.error}</Notice> : projectScan ? <div className="projectScanResult"><div className="projectScanConclusion"><strong>检查完成</strong><span>请选择接入权限。</span></div></div> : null}
+            {projectScan?.existingProject ? null : <fieldset className="projectAccessFieldset" disabled={projectScan?.loading || Boolean(projectScan?.error) || !projectScan}>
+              <legend>选择接入权限</legend>
+              <div className="projectAccessChoices" role="group" aria-label="选择接入权限">
+                {[['browse', '仅浏览', '只读取、扫描并生成建议。'], ['governed', '接入治理', '允许写入项目治理记录。'], ['controlled', '允许受控修改', '每次确认后修改工程文件并运行验证。']].map(([mode, title, description]) => <button aria-pressed={selectedProjectAccessMode === mode} className={`projectAccessChoice${selectedProjectAccessMode === mode ? " selected" : ""}`} key={mode} onClick={() => setSelectedProjectAccessMode(mode)} type="button"><span className="projectAccessChoiceTitle">{title}</span><small>{description}</small></button>)}
+              </div>
+            </fieldset>}
+            <div className="projectAccessActions">
+              <DialogClose asChild><Button type="button" variant="ghost">取消</Button></DialogClose>
+              {projectScan?.existingProject ? <Button onClick={openExistingProject} type="button" variant="primary">{projectScan.existingProject.isCurrent ? "继续使用此项目" : "切换到此项目"}</Button> : <Button disabled={projectScan?.loading || Boolean(projectScan?.error) || !projectScan} onClick={() => selectedProjectAccessMode === "controlled" ? setControlledConfirmOpen(true) : confirmProjectAccess(selectedProjectAccessMode)} type="button" variant="primary">{selectedProjectAccessMode === "browse" ? "以仅浏览方式接入" : selectedProjectAccessMode === "governed" ? "接入并管理记录" : "接入并允许受控修改"}</Button>}
+            </div>
+            </>}
+          </DialogContent>
+        </Dialog>
+        <Dialog open={controlledConfirmOpen} onOpenChange={setControlledConfirmOpen}>
+          <DialogContent title="允许受控修改？" description="之后每次修改工程文件前都会展示变更，并等待你的确认。">
+            <Notice variant="info">这项权限允许应用已确认的文件修改并运行验证；不会自动提交或发布。</Notice>
+            <div className="projectRenameActions">
+              <DialogClose asChild><Button type="button" variant="ghost">返回</Button></DialogClose>
+              <Button onClick={confirmControlledProjectAccess} type="button" variant="primary">确认并接入</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+        <Dialog open={Boolean(accessSettingsProject)} onOpenChange={(open) => { if (!open) setAccessSettingsProject(null); }}>
+          <DialogContent title="接入权限" description={accessSettingsProject ? `“${accessSettingsProject.name}”当前允许的操作范围。` : "查看项目接入权限。"}>
+            {accessSettingsProject ? <div className="projectAccessSettingsSummary"><strong>{accessSettingsProject.accessMode === "controlled" ? "允许受控修改" : accessSettingsProject.accessMode === "governed" ? "接入治理" : "仅浏览"}</strong><span>{accessSettingsProject.accessMode === "controlled" ? "确认后可修改工程文件并运行验证。" : accessSettingsProject.accessMode === "governed" ? "可写入项目治理记录，不修改工程文件。" : "只读取、扫描并生成建议。"}</span></div> : null}
+            <div className="projectRenameActions">
+              <DialogClose asChild><Button type="button" variant="ghost">关闭</Button></DialogClose>
+              {accessSettingsProject ? <>
+                {accessSettingsProject.accessMode !== "browse" ? <Button onClick={() => changeProjectAccess("browse")} type="button" variant="outline">改为仅浏览</Button> : null}
+                {accessSettingsProject.accessMode !== "governed" ? <Button onClick={() => changeProjectAccess("governed")} type="button" variant="outline">改为接入治理</Button> : null}
+                {accessSettingsProject.accessMode !== "controlled" ? <Button onClick={() => changeProjectAccess("controlled")} type="button" variant="outline">允许受控修改</Button> : null}
+              </> : null}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {sidebarView === "workspace" ? (
-          <WorkspaceTree
+          <>
+            <WorkspaceTree
+            actions={(
+              <Tooltip content={recommendationCount ? `更多能力，${recommendationCount} 项建议` : "更多能力"}>
+                <Button className="sectionIconAction" size="icon" variant="ghost" type="button" onClick={() => setCapabilityDialogOpen(true)} aria-label="更多能力">
+                  <Plus aria-hidden="true" size={15} />
+                </Button>
+              </Tooltip>
+            )}
             inlineAction={(
               <Tooltip content="切换到项目文件">
                 <button
@@ -1031,10 +928,35 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
             )}
             activeTopicPath={selectedEngineeringFile?.path}
             onSelectTopic={onSelectEngineeringFile}
-            outline={projectGovernanceOutline.filter((node) => node.id !== "workbench-overview")}
+            outline={workspaceOutlineForCapabilities(
+              projectGovernanceOutline
+                .filter((node) => node.id !== "workbench-overview")
+                .map((node) => node.id === "project-governance"
+                  ? { ...node, children: (node.children || []).filter((child) => child.id !== "define-goal") }
+                  : node),
+              snapshot?.projectCapabilities,
+            )}
             sectionTitle="工作区"
             snapshot={snapshot}
-          />
+            />
+            <ProjectCapabilityDialog
+              capabilities={discoverableCapabilities}
+              descriptions={capabilityDescriptions}
+              labels={capabilityLabels}
+              loadingId={capabilityLoadingId}
+              moduleLabels={workspaceModuleLabels}
+              onDismiss={dismissCapability}
+              onEnable={enableCapability}
+              onOpenChange={setCapabilityDialogOpen}
+              onSelectedModulesChange={(capabilityId, candidates, checked, moduleId) => setSelectedModulesByCapability((current) => ({
+                ...current,
+                [capabilityId]: checked ? [...new Set([...(current[capabilityId] || candidates), moduleId])] : (current[capabilityId] || candidates).filter((id) => id !== moduleId),
+              }))}
+              open={capabilityDialogOpen}
+              selectedModulesByCapability={selectedModulesByCapability}
+              snapshot={snapshot}
+            />
+          </>
         ) : (
           <SectionGroup
               className="leftRailSection"
@@ -1094,97 +1016,14 @@ function ProjectSidebar({ collapsed, onResizeStart, onToggleCollapsed, snapshot,
   );
 }
 
-function ProjectFileTree({ activePath, expanded, snapshot, onSelectFile }) {
-  const [query, setQuery] = useState("");
-  const [openFolders, setOpenFolders] = useState({});
-  const [closedFolders, setClosedFolders] = useState({});
-  const tree = Array.isArray(snapshot?.tree) ? snapshot.tree : [];
-  const stack = [];
-  const rows = tree.map((item, index) => {
-    const depth = Number.isFinite(item.depth) ? item.depth : 0;
-    const parentPath = depth <= 1 ? "" : stack[depth - 1] || "";
-    const path = depth === 0 ? "" : [parentPath, item.label].filter(Boolean).join("/");
-    stack[depth] = path;
-    stack.length = depth + 1;
-    return {
-      ...item,
-      depth,
-      id: `${path || item.label}-${index}`,
-      path,
-    };
-  });
-  const normalizedQuery = query.trim().toLowerCase();
-  const isFolderOpen = (path) => (expanded ? !closedFolders[path] : Boolean(openFolders[path]));
-  const visibleByFolder = (item) => {
-    if (item.depth <= 1) return true;
-    const parts = item.path.split("/");
-    for (let index = 1; index < parts.length; index += 1) {
-      const folderPath = parts.slice(0, index).join("/");
-      if (!isFolderOpen(folderPath)) return false;
-    }
-    return true;
-  };
-  const visibleRows = normalizedQuery
-    ? rows.filter((item) => `${item.label} ${item.path}`.toLowerCase().includes(normalizedQuery))
-    : rows.filter(visibleByFolder);
-
-  return (
-    <section className="projectFileTree" aria-label="项目文件">
-      <div className="projectFileSearch">
-        <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="筛选文件..."
-          aria-label="筛选文件"
-        />
-      </div>
-      <div className="projectFileTreeList">
-        {visibleRows.map((item) => {
-          const isFolder = item.kind === "folder";
-          const isActive = !isFolder && activePath === item.path;
-          const isOpen = isFolder && isFolderOpen(item.path);
-          return (
-            <button
-              className={`projectFileTreeRow${isFolder ? " folder" : " file"}${isActive ? " active" : ""}${isOpen ? " open" : ""}`}
-              key={item.id}
-              type="button"
-              style={{ "--tree-depth": Math.max(item.depth - 1, 0) }}
-              onClick={() => {
-                if (isFolder) {
-                  if (expanded) {
-                    setClosedFolders((current) => ({ ...current, [item.path]: !current[item.path] }));
-                  } else {
-                    setOpenFolders((current) => ({ ...current, [item.path]: !current[item.path] }));
-                  }
-                  return;
-                }
-                if (!item.path) return;
-                onSelectFile?.({
-                  description: "当前项目文件",
-                  group: "项目文件",
-                  path: item.path,
-                });
-              }}
-              title={item.path || item.label}
-            >
-              <span className="projectFileTreeChevron" aria-hidden="true">
-                {isFolder ? <ChevronRight strokeWidth={2} /> : null}
-              </span>
-              <span className="projectFileTreeName">{item.label}</span>
-            </button>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
 function createTaskFromPlan(plan, taskText, snapshot, options = {}) {
   const title = taskText?.trim() || plan?.summary || "未命名任务";
   const activeGoal = activeGoalFromSnapshot(snapshot);
+  const fallbackId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const id = taskIdForRequest(options.requestId, fallbackId);
 
   return {
-    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    id,
     title: title.length > 48 ? `${title.slice(0, 48)}...` : title,
     status: taskStatuses.planned,
     createdAt: new Date().toLocaleTimeString("zh-CN", {
@@ -1193,6 +1032,13 @@ function createTaskFromPlan(plan, taskText, snapshot, options = {}) {
     }),
     projectId: snapshot.currentProjectId || "",
     conversationId: options.conversationId || "",
+    requestId: options.requestId || "",
+    requestTrace: options.requestId ? {
+      outcome: "pending",
+      requestId: options.requestId,
+      startedAt: options.startedAt || new Date().toISOString(),
+      taskId: id,
+    } : null,
     goalId: activeGoal?.id || "",
     goalTitle: activeGoal?.shortTitle || activeGoal?.title || "",
     projectName: snapshot.projectName,
@@ -1209,12 +1055,15 @@ function taskStatusLabel(status) {
     [taskStatuses.running]: "进行中",
     [taskStatuses.done]: "已完成",
     [taskStatuses.failed]: "失败",
+    [taskStatuses.repairPending]: "待修复",
+    [taskStatuses.waitingRepairApproval]: "待确认修复",
+    [taskStatuses.repairFailed]: "修复失败",
   }[status] || status || "待确认";
 }
 
 function checksForPlan(plan) {
   const checks = Array.isArray(plan?.checks) ? plan.checks : [];
-  return guardedChecks.filter((check) =>
+  return guardedCheckCapabilities.filter((check) =>
     checks.some((item) => item.includes(check.command) || item.includes(check.id) || item.includes(check.label))
   );
 }
@@ -1262,6 +1111,19 @@ function previewChatResult(message, hasAttachments, snapshot = {}, tasks = [], d
     : dialogueContext?.expectedNextAction === "decide-next"
       ? `我判断先推进「${currentFocus}」。它是当前最直接的阻塞点，完成后立即运行目标验收，再决定是否处理其他风险。`
       : "";
+  const references = riskLike
+    ? [
+      { kind: "file", label: "项目状态", target: "PROJECT.md" },
+      { kind: "file", label: "任务清单", target: ".project-os/task-backlog.json" },
+    ]
+    : statusLike
+      ? [
+        { kind: "file", label: "项目状态", target: "PROJECT.md" },
+        { kind: "file", label: "当前交接", target: "HANDOFF.md" },
+      ]
+      : developLike
+        ? [{ kind: "file", label: "任务清单", target: ".project-os/task-backlog.json" }]
+        : [];
   return {
     intent: shouldCreatePlan ? "task" : questionLike ? "question" : "chat",
     reply: shouldCreatePlan
@@ -1277,29 +1139,9 @@ function previewChatResult(message, hasAttachments, snapshot = {}, tasks = [], d
             : developLike
               ? developReply
               : "我可以直接回答项目问题；如果你说“帮我改/实现/优化”，我会先生成任务计划，再进入受控开发流程。",
-    references: [
-      { kind: "file", label: "项目状态", target: "PROJECT.md" },
-      { kind: "file", label: "当前交接", target: "HANDOFF.md" },
-      { kind: "file", label: "任务清单", target: ".project-os/task-backlog.json" },
-    ],
+    references,
     shouldCreatePlan,
   };
-}
-
-function classifyConversationMessage(message, hasAttachments = false) {
-  const text = safeDisplayText(message).trim();
-  const lowerText = text.toLowerCase();
-  const compactText = text.replace(/[。！？!?,，\s]/g, "").toLowerCase();
-  if (!text && hasAttachments) return "task";
-  if (/(你是什么模型|当前.*模型|模型.*是什么|which model|what model)/i.test(text)) return "model-status";
-  if (/(网络.*可用|网络.*好了|联网|连接.*好了|provider|api.*可用|模型.*可用)/i.test(text)) return "connection-status";
-  if (/(状态|进度|下一步|总结|概况|现在)/.test(text)) return "project-status";
-  if (/(风险|检查|验证|报告)/.test(text)) return "project-inspect";
-  if (isActionRequestMessage(text, hasAttachments)) return "task";
-  if (["hi", "hello", "hey", "你好", "您好", "哈喽", "嗨", "在吗", "在么"].includes(compactText)) return "chat";
-  if (/(为什么|怎么|哪些|还有哪些|是什么|吗|呢|看一下|看看)/.test(text)) return "question";
-  if (/(开发|任务|执行|patch|改代码|实现)/.test(lowerText)) return "project-inspect";
-  return "chat";
 }
 
 function loadingLabelForMessageKind(kind) {
@@ -1309,6 +1151,7 @@ function loadingLabelForMessageKind(kind) {
     "project-inspect": "检查项目风险",
     "project-status": "整理项目状态",
     question: "组织回答",
+    "stage-goal": "识别阶段目标",
     chat: "组织回答",
     task: "整理计划",
   }[kind] || "组织回答";
@@ -1335,11 +1178,7 @@ function loadingEventsForMessageKind(kind) {
     ];
   }
   if (kind === "task") {
-    return [
-      { label: "理解请求", status: "done" },
-      { label: "读取上下文", status: "current" },
-      { label: "生成计划", status: "pending" },
-    ];
+    return planProgressEvents("understand");
   }
   return [
     { label: "读取上下文", status: "current" },
@@ -1363,8 +1202,8 @@ function agentEventsForMessageKind(kind, chatResult) {
   } else if (kind === "question" || kind === "chat") {
     events.push(createAgentEvent("thinking", "done", "组织回答", "已按当前对话上下文生成回复。"));
   }
-  if (chatResult?.providerStatus === "unavailable") {
-    events.push(createAgentEvent("error", "failed", "模型调用失败", chatResult.providerError || "Provider 暂时不可用，已切换为本地上下文回复。"));
+  if (chatResult?.providerStatus && chatResult.providerStatus !== "available") {
+    events.push(createAgentEvent("error", "failed", "模型连接未接通", chatResult.providerError || "Provider 暂时不可用，已切换为本地上下文回复。"));
   }
   return events;
 }
@@ -1376,11 +1215,19 @@ function localStatusReply({ kind, provider, providerHealth, snapshot, tasks }) {
   if (kind === "model-status") {
     if (!provider?.enabled) return `当前没有启用模型连接。已配置模型是 ${modelName}，但对话会先使用本地项目上下文。`;
     if (healthStatus === "available") return `当前使用的模型是 ${modelName}，连接为「${connectionName}」，状态可用。`;
+    if (healthStatus === "quota-exhausted") return `当前连接「${connectionName}」额度不足，系统会尝试已保存的其它可用连接；暂时无法切换时我会先用本地上下文回答。`;
+    if (healthStatus === "authentication-failed") return `当前连接「${connectionName}」认证失败，请检查 Key；我会先用本地上下文回答。`;
+    if (healthStatus === "model-unavailable") return `当前连接「${connectionName}」不支持模型 ${modelName}，请切换模型或连接。`;
+    if (healthStatus === "network-unavailable") return `当前连接「${connectionName}」网络暂时不可用，我会先用本地上下文回答。`;
     if (healthStatus === "unavailable") return `当前配置的模型是 ${modelName}，连接为「${connectionName}」，但刚才检测不可用。我会先用本地上下文回答。`;
     return `当前配置的模型是 ${modelName}，连接为「${connectionName}」。可用性还在检测中，我会先按本地上下文回答。`;
   }
   if (kind === "connection-status") {
     if (healthStatus === "available") return `模型连接现在是可用状态：${modelName}。`;
+    if (healthStatus === "quota-exhausted") return `模型连接额度不足：${modelName}。系统会尝试已保存的可用连接。`;
+    if (healthStatus === "authentication-failed") return `模型连接认证失败：${modelName}。请检查当前连接的 Key。`;
+    if (healthStatus === "model-unavailable") return `当前连接不支持模型：${modelName}。请切换模型或连接。`;
+    if (healthStatus === "network-unavailable") return `模型连接网络异常：${modelName}。恢复前会继续使用本地上下文。`;
     if (healthStatus === "unavailable") return `模型连接还没恢复：${modelName} 当前不可用。你可以刷新模型连接；在此之前我会继续用本地上下文回答。`;
     return `我不能直接判断整台机器的网络，但当前模型连接还没有明确可用结果。你可以刷新顶部连接状态，或继续问项目问题。`;
   }
@@ -1388,7 +1235,7 @@ function localStatusReply({ kind, provider, providerHealth, snapshot, tasks }) {
 }
 
 function conversationDiagnosticForResult(chatResult, providerHealth) {
-  if (chatResult?.providerStatus !== "unavailable") return null;
+  if (!chatResult?.providerStatus || chatResult.providerStatus === "available") return null;
   return {
     label: "模型连接未接通",
     message: "当前回复使用本地上下文生成。可在顶部连接状态里刷新模型，或继续直接提问。",
@@ -1407,79 +1254,14 @@ function createAgentEvent(type, status, title, detail = "") {
   };
 }
 
-function planningAgentEvents(status = "current", detail = "") {
-  return [
-    createAgentEvent("thinking", "done", "理解请求", "已识别为需要进入受控开发流程的任务。"),
-    createAgentEvent("context", status === "failed" ? "done" : "current", "读取当前项目上下文", "使用当前项目、目标、任务和治理状态生成计划。"),
-    createAgentEvent("plan", status, status === "failed" ? "计划生成未完成" : "生成执行计划", detail),
-  ];
-}
-
-function completedPlanAgentEvents() {
-  return [
-    createAgentEvent("thinking", "done", "理解请求", "已识别任务意图。"),
-    createAgentEvent("context", "done", "读取当前项目上下文", "已使用项目状态、目标和任务记录。"),
-    createAgentEvent("plan", "done", "生成执行计划", "计划已创建为本地任务，等待用户确认。"),
-    createAgentEvent("result", "current", "等待确认", "确认后进入执行、检查和交接链路。"),
-  ];
-}
-
-function taskAgentEvents(task, plan) {
-  const events = [];
-  if (!task && !plan) return events;
-  events.push(createAgentEvent("plan", "done", "执行计划已生成", plan?.summary || task?.plan?.summary || task?.title || ""));
-  if (task?.patchDraft) {
-    events.push(createAgentEvent("edit", "done", "Patch 草案已生成", `${task.patchDraft.files?.length || 0} 个候选文件。`));
-  } else if (task?.status === taskStatuses.running || task?.status === taskStatuses.waitingApproval) {
-    events.push(createAgentEvent("edit", "current", "等待生成或应用改动", "确认后进入受控 Patch / Apply 流程。"));
-  }
-  if (task?.applyResult) {
-    events.push(createAgentEvent("edit", task.applyResult.success === false ? "failed" : "done", "应用改动", task.applyResult.message || "已记录应用结果。"));
-  }
-  const runs = Array.isArray(task?.runs) ? task.runs : [];
-  runs.slice(0, 3).forEach((run) => {
-    events.push(createAgentEvent("check", run.success ? "done" : "failed", run.label || run.id || "运行检查", run.output ? cleanTerminalText(run.output).slice(0, 240) : run.command || ""));
-  });
-  if (task?.runSummary) {
-    events.push(createAgentEvent("result", "done", "运行摘要已写入", task.runSummary.path || "已保存到 Project OS 运行记录。"));
-  }
-  if (task?.handoffMerge) {
-    events.push(createAgentEvent("result", "done", "交接已更新", task.handoffMerge.path || "已合并到 HANDOFF。"));
-  }
-  if (task?.status === taskStatuses.failed) {
-    events.push(createAgentEvent("error", "failed", "任务失败", task.verificationSummary || "需要查看失败检查或重新生成修复任务。"));
-  } else if (task?.status === taskStatuses.done) {
-    events.push(createAgentEvent("result", "done", "任务完成", task.verificationSummary || "当前任务已完成。"));
-  }
-  return events;
-}
-
-function agentEventsForTurn(turn) {
-  if (turn.events?.length) return turn.events;
-  return [];
-}
-
-function shouldShowAgentTimeline(turn) {
-  const events = agentEventsForTurn(turn);
-  return Boolean(
-    events.length
-    && (turn.intent === "task" || turn.workflow?.length || events.some((event) => ["current", "failed"].includes(event.status)))
-  );
-}
-
-function timelineSummary(events) {
-  if (!events?.length) return "";
-  const failed = events.find((event) => event.status === "failed");
-  if (failed) return `${failed.title}失败`;
-  const current = events.find((event) => event.status === "current");
-  if (current) return current.title;
-  return "已完成";
-}
-
 function withTimeout(promise, timeoutMs, message) {
   let timer = null;
   const timeout = new Promise((_, reject) => {
-    timer = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+    timer = window.setTimeout(() => {
+      const error = new Error(message);
+      error.code = "REQUEST_TIMEOUT";
+      reject(error);
+    }, timeoutMs);
   });
   return Promise.race([promise, timeout]).finally(() => {
     if (timer) window.clearTimeout(timer);
@@ -1488,11 +1270,6 @@ function withTimeout(promise, timeoutMs, message) {
 
 function isActionRequestMessage(message, hasAttachments = false) {
   return isDialogueActionRequest(safeDisplayText(message), hasAttachments);
-}
-
-function isExecutionWorkspaceTab(tab, actionMode) {
-  if (tab.id === "plan" || tab.kind === "terminal" || tab.kind === "file") return true;
-  return actionMode;
 }
 
 function actionPromptsForMessage(message, intent) {
@@ -1507,7 +1284,7 @@ function actionPromptsForMessage(message, intent) {
       actions.push({ id: "open-topic", label: "查看风险与验收", target: text.includes("风险") ? "project-risks" : "validation-report" });
     }
     if (/开发|任务|执行|patch|改代码|实现/.test(text.toLowerCase())) {
-      actions.push({ id: "open-topic", label: "查看任务队列", target: "task-queue" });
+      actions.push({ id: "open-topic", label: "查看任务", target: "task-list" });
     }
     return actions.slice(0, 2);
   }
@@ -1565,102 +1342,6 @@ function safeDisplayText(value, fallback = "") {
   }
 }
 
-function cleanTerminalText(value) {
-  let text = safeDisplayText(value);
-  text = text
-    .replace(/\x1B\][^\x07]*(?:\x07|\x1B\\)/g, "")
-    .replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, "")
-    .replace(/\x1B[@-Z\\-_]/g, "")
-    .replace(/\r\n/g, "\n")
-    .replace(/\r/g, "\n");
-
-  while (text.includes("\b")) {
-    const next = text.replace(/[^\n]\x08/g, "").replace(/^\x08/gm, "");
-    if (next === text) break;
-    text = next;
-  }
-
-  return text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
-}
-
-function hasTerminalScreenControl(value) {
-  const text = safeDisplayText(value);
-  return /\x1Bc|\x1B\[[0-?]*[ -/]*[HJf]|\x1B\[[0-?]*[ -/]*[hl]/.test(text);
-}
-
-function terminalThemeForCurrentMode() {
-  const light = document.documentElement.classList.contains("theme-light");
-  if (light) {
-    return {
-      background: "#ffffff",
-      black: "#e9eaec",
-      blue: "#1f5fbf",
-      brightBlack: "#8f9399",
-      brightBlue: "#175cd3",
-      brightCyan: "#0e9384",
-      brightGreen: "#087443",
-      brightMagenta: "#6941c6",
-      brightRed: "#b42318",
-      brightWhite: "#111317",
-      brightYellow: "#b54708",
-      cursor: "#111317",
-      cyan: "#0e9384",
-      foreground: "#161a1f",
-      green: "#067647",
-      magenta: "#7f56d9",
-      red: "#d92d20",
-      selectionBackground: "#d7d9dd",
-      white: "#f3f4f6",
-      yellow: "#b54708",
-    };
-  }
-  return {
-    background: "#050908",
-    black: "#101716",
-    blue: "#7ea7ff",
-    brightBlack: "#66706f",
-    brightBlue: "#a9c2ff",
-    brightCyan: "#8ee8d3",
-    brightGreen: "#7ce4b0",
-    brightMagenta: "#d7b7ff",
-    brightRed: "#ff9a87",
-    brightWhite: "#f4fbf8",
-    brightYellow: "#ffe09a",
-    cursor: "#35e6aa",
-    cyan: "#68d8c2",
-    foreground: "#d7e3df",
-    green: "#35d892",
-    magenta: "#c8a5ff",
-    red: "#ff846f",
-    selectionBackground: "#214238",
-    white: "#d7e3df",
-    yellow: "#ffd680",
-  };
-}
-
-function isTerminalPromptEcho(text) {
-  const lines = safeDisplayText(text).split("\n").map((line) => line.trim()).filter(Boolean);
-  if (lines.length !== 1) return false;
-  return /^[\w.-]+@[\w.-]+\s+\S+\s+[%$#]$/.test(lines[0]);
-}
-
-function terminalPromptLine(text) {
-  const lines = safeDisplayText(text).split("\n").map((line) => line.trim()).filter(Boolean);
-  return lines.length ? lines[lines.length - 1] : "";
-}
-
-function collapseDuplicateTerminalPromptLines(text) {
-  const lines = safeDisplayText(text).split("\n");
-  const nextLines = [];
-  lines.forEach((line) => {
-    const trimmed = line.trim();
-    const previous = nextLines.length ? nextLines[nextLines.length - 1].trim() : "";
-    if (trimmed && trimmed === previous && isTerminalPromptEcho(trimmed)) return;
-    nextLines.push(line);
-  });
-  return nextLines.join("\n");
-}
-
 function cleanConversationText(value) {
   return safeDisplayText(value)
     .replace(/\s+/g, " ")
@@ -1699,8 +1380,11 @@ function providerModelHealth(provider, availability = {}) {
   if (entry?.status === "available") {
     return { label: "Work", status: "available", message: entry.message || "" };
   }
-  if (entry?.status === "unavailable") {
-    return { label: "Not work", status: "unavailable", message: entry.message || "" };
+  if (entry?.status === "quota-exhausted") {
+    return { label: "Quota exhausted", status: "quota-exhausted", message: entry.message || "当前连接额度不足" };
+  }
+  if (["unavailable", "authentication-failed", "model-unavailable", "network-unavailable"].includes(entry?.status)) {
+    return { label: "Not work", status: entry.status, message: entry.message || "" };
   }
   return { label: "Checking", status: "unknown" };
 }
@@ -1715,29 +1399,11 @@ function catalogModelsForProvider(provider, modelCatalog) {
   return Array.from(new Set([...models, ...current]));
 }
 
-function activeProviderProfileName(provider) {
-  const activeProfile = provider?.profiles?.find((profile) => profile.id === provider?.activeProfileId);
-  return activeProfile?.name || provider?.profileName || provider?.apiBase || "当前 API";
-}
-
-function providerConnectionLabel(profile) {
-  return profile?.name || profile?.apiBase || "未命名连接";
-}
-
 function visibleConversationPreview(conversation) {
   const title = cleanConversationText(conversation?.title);
   const preview = cleanConversationText(conversation?.preview);
   if (!preview || preview === title || isLowSignalConversationText(preview)) return "";
   return compactConversationText(preview, 34);
-}
-
-function groupedConversations(conversations) {
-  const groups = [];
-  const today = conversations.filter(Boolean);
-  if (today.length) {
-    groups.push({ label: "今天", items: today });
-  }
-  return groups;
 }
 
 function isLowSignalConversationText(text) {
@@ -1762,8 +1428,8 @@ function isNoiseTask(task) {
 
 function phaseLabel(phase) {
   return {
-    init: "初始化",
-    stabilizing: "收口中",
+    init: "启动中",
+    stabilizing: "打磨中",
     shipping: "交付中",
     maintenance: "维护中",
     archived: "已归档",
@@ -1781,9 +1447,7 @@ function goalStatusLabel(todos, fallbackPhase) {
 }
 
 function activeGoalFromSnapshot(snapshot) {
-  const goals = Array.isArray(snapshot.goals?.goals) ? snapshot.goals.goals : [];
-  if (!goals.length) return null;
-  return goals.find((goal) => goal.id === snapshot.goals?.activeGoalId) || goals[0];
+  return resolveWorkspaceGoal(snapshot);
 }
 
 function goalValidationStatusFromActiveGoal(activeGoal, validationGoal, validationReportStatus) {
@@ -1939,12 +1603,8 @@ const chatStarterPrompts = [
   "运行一轮基础检查",
 ];
 
-const executionTabs = [
-  { id: "execution", title: "执行", kind: "execution", closable: true },
-];
-
 function workspaceFileTabId(file) {
-  if (file?.virtual) return `topic:${file.id || file.title || file.path || "preview"}`;
+  if (file?.virtual) return `route:${file.routeId || file.id || file.path || "preview"}`;
   return `file:${file?.path || file?.preview?.path || file?.topic?.title || "preview"}`;
 }
 
@@ -1953,80 +1613,49 @@ function workspaceFileTabTitle(file) {
   return file?.preview?.name || file?.topic?.title || (file?.virtual ? file.title : "") || file?.path || "文件";
 }
 
-function topicItemKey({ child, item, node }) {
-  return [node?.id || node?.title, child?.id || child?.title, item?.id || item?.title].filter(Boolean).join("/");
-}
-
 function topicPayloadFromOutline(targetId) {
+  const targetRoute = workspaceRouteById(targetId);
+  if (!targetRoute) return null;
+  const payload = (entry, group, fallbacks = {}) => ({
+    description: entry.description,
+    group,
+    governanceRole: entry.governanceRole || fallbacks.governanceRole,
+    id: targetRoute.id,
+    maturity: entry.maturity || fallbacks.maturity,
+    nextAction: entry.nextAction || fallbacks.nextAction,
+    path: targetRoute.path,
+    relatedFiles: entry.relatedFiles || entry.files || [],
+    routeId: targetRoute.id,
+    routePath: targetRoute.path,
+    statusSource: entry.statusSource || fallbacks.statusSource,
+    surface: targetRoute.surface,
+    title: entry.title,
+    updatesWhen: entry.updatesWhen || fallbacks.updatesWhen,
+    virtual: true,
+  });
   for (const node of projectGovernanceOutline) {
-    if (node.id === targetId || node.title === targetId) {
-      return {
-        description: node.description,
-        group: node.title,
-        governanceRole: node.governanceRole,
-        id: node.id,
-        maturity: node.maturity,
-        nextAction: node.nextAction,
-        path: node.id || node.title,
-        relatedFiles: node.files || [],
-        statusSource: node.statusSource,
-        title: node.title,
-        updatesWhen: node.updatesWhen,
-        virtual: true,
-      };
+    if (node.routeId === targetId) {
+      return payload(node, node.title);
     }
     for (const child of node.children || []) {
-      if (child.id === targetId || child.title === targetId) {
-        return {
-          description: child.description,
-          group: child.title || node.title,
-          governanceRole: child.governanceRole || node.governanceRole,
-          id: child.id,
-          maturity: child.maturity || node.maturity,
-          nextAction: child.nextAction || node.nextAction,
-          path: child.id || child.title,
-          relatedFiles: child.files || [],
-          statusSource: child.statusSource || node.statusSource,
-          title: child.title,
-          updatesWhen: child.updatesWhen || node.updatesWhen,
-          virtual: true,
-        };
+      if (child.routeId === targetId) {
+        return payload(child, child.title || node.title, node);
       }
       for (const item of child.items || []) {
-        if (item.id === targetId || item.title === targetId) {
-          return {
-            description: item.description,
-            group: child.title || node.title,
-            governanceRole: item.governanceRole || child.governanceRole || node.governanceRole,
-            id: item.id,
-            maturity: item.maturity || child.maturity || node.maturity,
-            nextAction: item.nextAction || child.nextAction || node.nextAction,
-            path: topicItemKey({ child, item, node }),
-            relatedFiles: item.relatedFiles || [],
-            statusSource: item.statusSource || child.statusSource || node.statusSource,
-            title: item.title,
-            updatesWhen: item.updatesWhen || child.updatesWhen || node.updatesWhen,
-            virtual: true,
-          };
+        if (item.routeId === targetId) {
+          return payload(item, child.title || node.title, {
+            governanceRole: child.governanceRole || node.governanceRole,
+            maturity: child.maturity || node.maturity,
+            nextAction: child.nextAction || node.nextAction,
+            statusSource: child.statusSource || node.statusSource,
+            updatesWhen: child.updatesWhen || node.updatesWhen,
+          });
         }
       }
     }
     for (const item of node.items || []) {
-      if (item.id === targetId || item.title === targetId) {
-        return {
-          description: item.description,
-          group: node.title,
-          governanceRole: item.governanceRole || node.governanceRole,
-          id: item.id,
-          maturity: item.maturity || node.maturity,
-          nextAction: item.nextAction || node.nextAction,
-          path: topicItemKey({ item, node }),
-          relatedFiles: item.relatedFiles || [],
-          statusSource: item.statusSource || node.statusSource,
-          title: item.title,
-          updatesWhen: item.updatesWhen || node.updatesWhen,
-          virtual: true,
-        };
+      if (item.routeId === targetId) {
+        return payload(item, node.title, node);
       }
     }
   }
@@ -2034,10 +1663,14 @@ function topicPayloadFromOutline(targetId) {
 }
 
 function AgentWorkspace({
+  agentRuns = [],
   snapshot,
+  activeTaskId,
+  activeConversationTaskId,
   selectedEngineeringFile,
   activeConversationId,
   chatTurns,
+  conversationSummary,
   terminalLogs,
   terminalRunningId,
   terminalText,
@@ -2052,7 +1685,6 @@ function AgentWorkspace({
   activeTask,
   tasks,
   planLoading,
-  planError,
   runnerLoadingId,
   runnerError,
   patchLoading,
@@ -2064,7 +1696,6 @@ function AgentWorkspace({
   conversationResetKey,
   onChatTurnsChange,
   onGeneratePlan,
-  onConfirmTask,
   onGeneratePatchDraft,
   onApplyPatchDraft,
   onMergeHandoff,
@@ -2079,7 +1710,9 @@ function AgentWorkspace({
   onOpenNativeTerminal,
   onRestartTerminalSession,
   onProfileUpdated,
+  onProviderProfileUpdate,
   onStopPlan,
+  isTauri,
   provider,
   composerModelAvailability,
   composerModelOptions,
@@ -2090,675 +1723,217 @@ function AgentWorkspace({
   onSelectComposerModel,
   onTestComposerModel,
   onModelHealthChange,
+  decomposingGoal,
+  onConfirmDecomposition,
+  onGenerateDecomposition,
   goalRefinementMode,
   onSelectEngineeringFile,
   onSelectConversation,
   onSelectTask,
+  onOpenTaskConversation,
+  onSendTaskToTerminal,
+  onMarkTaskWaiting,
+  onEnsureModelAvailable,
+  onCreateTask,
+  onCreateGoal,
+  onDeleteTask,
+  onArchiveGoal,
+  onMergeGoal,
+  onRestoreGoal,
+  onCompleteTask,
   onCreateRepairTask,
   onCreateGovernanceTask,
+  onPersistTask,
+  onUpdateGoal,
   onCreateDesignGovernanceTask,
+  onSwitchProject,
+  onRequestProjectAccess,
+  onRefreshWorkspace,
+  onReadEngineeringFile,
+  onGetHermesExecutorStatus,
+  onApproveAgentRun,
+  onResumeAgentRun,
 }) {
   const [taskInput, setTaskInput] = useState("");
-  const [attachments, setAttachments] = useState([]);
-  const [pendingTurn, setPendingTurn] = useState(null);
-  const [chatLoading, setChatLoading] = useState(false);
-  const [chatLoadingLabel, setChatLoadingLabel] = useState("组织回答");
-  const [chatLoadingEvents, setChatLoadingEvents] = useState(() => loadingEventsForMessageKind("chat"));
-  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState("plan");
-  const [workspaceTabs, setWorkspaceTabs] = useState([
-    { id: "plan", title: "对话", kind: "conversation", closable: false },
-    { id: "terminal", title: "终端", kind: "terminal", closable: false },
-  ]);
-  const [closedExecutionKey, setClosedExecutionKey] = useState("");
+  const { addImageFiles, attachmentError, attachments, clearAttachments, removeAttachment } = useChatAttachments({ readFileAsDataUrl });
+  const boardState = useAgentTopicTaskBoard({
+    activeTaskId,
+    activeTask,
+    isNoiseTask,
+    snapshot,
+    statuses: taskStatuses,
+    tasks,
+  });
+  const {
+    activeRequestRef, chatLoading, chatLoadingEvents, chatLoadingLabel, chatStartedAt, lastSubmissionRef,
+    pendingTurn, resetConversationRequest, setChatLoading, setChatLoadingEvents, setChatLoadingLabel,
+    setChatStartedAt, setPendingTurn, stopCurrentResponse,
+  } = useConversationRequestState({ cancelRuntimeRequest, chatTurns, initialLoadingEvents: loadingEventsForMessageKind("chat"), onChatTurnsChange, onStopPlan });
+  const { activeWorkspaceTab, changeWorkspaceTab, closeWorkspaceTab, resetWorkspaceTabs, setActiveWorkspaceTab, setWorkspaceTabs, workspaceTabs } = useWorkspaceTabs({
+    onSelectEngineeringFile,
+    onSelectTask,
+    selectedEngineeringFile,
+    workspaceFileTabId,
+    workspaceFileTabTitle,
+  });
   const composerRef = React.useRef(null);
-  const activeRequestRef = React.useRef(null);
-  const actionMode = Boolean(activeTask || readonlyPlan);
-  const executionContextKey = activeTask?.id || readonlyPlan?.task || readonlyPlan?.summary || "";
-  const showExecutionTab = actionMode && executionContextKey !== closedExecutionKey;
+  const pendingApplyRequestRef = React.useRef(false);
   const isConversationEmpty = !chatTurns.length && !activeTask && !readonlyPlan && !loading && !error && !pendingTurn && !chatLoading;
+  const useAssistantUiPoc = assistantUiPocEnabled(window.location.search);
   const providerHealth = providerModelHealth(provider, composerModelAvailability);
-  const hasConversationPlanPrompt = chatTurns.some((turn) =>
-    Array.isArray(turn.actions) && turn.actions.some((action) => action.id === "confirm-active-task")
-  );
+  const {
+    activeTaskPosition,
+    conversationRuntime,
+    nextConversationTask,
+    previousConversationTask,
+  } = buildAgentWorkspaceViewModel({ activeTask, chatLoading, chatTurns, loading, pendingTurn, snapshot, tasks });
+  useWorkspaceNavigationEvents({ setActiveWorkspaceTab });
 
-  useEffect(() => {
-    const handleTerminalShortcut = (event) => {
-      if ((!event.metaKey && !event.ctrlKey) || event.key.toLowerCase() !== "j") return;
-      event.preventDefault();
-      setActiveWorkspaceTab((current) => current === "terminal" ? "plan" : "terminal");
-    };
-    window.addEventListener("keydown", handleTerminalShortcut);
-    return () => window.removeEventListener("keydown", handleTerminalShortcut);
-  }, []);
+  const { openTaskConversationWorkspace } = useTaskConversationEvent({
+    onOpenTaskConversation,
+    onSelectTask,
+    setActiveWorkspaceTab,
+    setWorkspaceTabs,
+    tasks,
+  });
 
-  useEffect(() => {
-    setTaskInput("");
-    setAttachments((current) => {
-      current.forEach((attachment) => URL.revokeObjectURL(attachment.url));
-      return [];
-    });
-    setPendingTurn(null);
-    activeRequestRef.current = null;
-    onChatTurnsChange([]);
-    onSelectEngineeringFile?.(null);
-    setClosedExecutionKey("");
-    setActiveWorkspaceTab("plan");
-    setWorkspaceTabs((current) => current.filter((tab) => tab.kind !== "file" && tab.kind !== "execution"));
-    composerRef.current?.focus();
-  }, [conversationResetKey]);
+  const { continueTaskInChat, navigateWorkbench, openCurrentProgress, prepareTerminalCommand, setTerminalDraftRequest, terminalDraftRequest } = useAgentWorkspaceNavigation({
+    focusComposer: () => composerRef.current?.focus(),
+    onOpenTaskConversation,
+    onSelectEngineeringFile,
+    onSwitchProject,
+    setActiveWorkspaceTab,
+    setTaskInput,
+    setWorkspaceTabs,
+    snapshot,
+    taskConversationAction,
+    taskContinuationPrompt,
+    taskGoalName,
+    taskStatusLabel,
+    topicPayloadFromOutline,
+  });
 
-  useEffect(() => {
-    if (selectedEngineeringFile) {
-      const tabId = workspaceFileTabId(selectedEngineeringFile);
-      const title = workspaceFileTabTitle(selectedEngineeringFile);
-      setWorkspaceTabs((current) => {
-        const nextTab = {
-          file: selectedEngineeringFile,
-          id: tabId,
-          title,
-          kind: "file",
-          closable: true,
-        };
-        return current.some((tab) => tab.id === tabId)
-          ? current.map((tab) => (tab.id === tabId ? { ...tab, ...nextTab } : tab))
-          : [...current, nextTab];
-      });
-      setActiveWorkspaceTab(tabId);
-    } else {
-      if (showExecutionTab) {
-        ensureExecutionTabs();
-      } else {
-        setActiveWorkspaceTab("plan");
-      }
-    }
-  }, [selectedEngineeringFile, activeTask, readonlyPlan, showExecutionTab]);
+  useConversationSurfaceReset({
+    clearAttachments,
+    composerResetKey: conversationResetKey,
+    focusComposer: () => composerRef.current?.focus(),
+    onChatTurnsChange,
+    onSelectEngineeringFile,
+    resetConversationRequest,
+    resetWorkspaceTabs,
+    setTerminalDraftRequest,
+    setTaskInput,
+  });
 
-  const closeWorkspaceTab = (event, tabId) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const tab = workspaceTabs.find((item) => item.id === tabId);
-    if (!tab?.closable) return;
-    if (tab.kind === "execution") {
-      setClosedExecutionKey(executionContextKey);
-    }
-    setWorkspaceTabs((current) => current.filter((item) => item.id !== tabId));
-    if (activeWorkspaceTab === tabId) {
-      setActiveWorkspaceTab("plan");
-    }
-  };
+  const activeProjectGoal = (() => {
+    const registry = snapshot?.projectGoals || {};
+    const items = Array.isArray(registry.projectGoals) ? registry.projectGoals : [];
+    return items.find((item) => item.id === registry.activeProjectGoalId) || null;
+  })();
 
-  const addImageFiles = async (fileList) => {
-    const files = Array.from(fileList || []).filter((file) => file.type.startsWith("image/"));
-    if (!files.length) return;
-    const nextAttachments = await Promise.all(
-      files.map(async (file) => ({
-        dataUrl: await readFileAsDataUrl(file),
-        id: `${file.name}-${file.lastModified}-${crypto.randomUUID?.() || Date.now()}`,
-        name: file.name || "截图",
-        size: file.size,
-        type: file.type,
-        url: URL.createObjectURL(file),
-      }))
-    );
-    setAttachments((current) => [
-      ...current,
-      ...nextAttachments,
-    ]);
-  };
+  const executePendingPatchApply = (input) => applyPendingConversationPatch({
+    ...input,
+    isApplyingRef: pendingApplyRequestRef,
+    onChatTurnsChange,
+    onRunChatAction,
+    pendingAction: input.pendingAction,
+    projectExecutionEvent,
+  });
 
-  const handlePaste = (event) => {
-    const files = Array.from(event.clipboardData?.files || []).filter((file) => file.type.startsWith("image/"));
-    if (!files.length) return;
-    event.preventDefault();
-    addImageFiles(files);
-  };
+  const submitTask = useConversationSubmission({
+    activeConversationId,
+    activeConversationTaskId,
+    activeProjectGoalTitle: activeProjectGoal?.title,
+    activeRequestRef,
+    activeTask,
+    actionFromAssistantCommitment,
+    actionPromptsForMessage,
+    agentEventsForMessageKind,
+    attachments,
+    buildChatRequestContext,
+    chatTurns,
+    chatWithModel,
+    conversationDiagnosticForResult,
+    conversationSummary,
+    contextualizeUserMessage,
+    executePendingPatchApply,
+    isActionRequestMessage,
+    isTauri,
+    lastSubmissionRef,
+    loadingEventsForMessageKind,
+    loadingLabelForMessageKind,
+    localStatusReply,
+    onChatTurnsChange,
+    onGeneratePlan,
+    onModelHealthChange,
+    onProfileUpdated,
+    onRunChatAction,
+    onStopPlan,
+    pendingTurn,
+    previewChatResult,
+    profilePatchesFromMessage,
+    provider,
+    providerHealth,
+    providerProfileUpdater: onProviderProfileUpdate,
+    resolveStageGoalTurn: resolvedStageGoalTurn,
+    safeDisplayText,
+    clearAttachments,
+    setChatLoading,
+    setChatLoadingEvents,
+    setChatLoadingLabel,
+    setChatStartedAt,
+    setPendingTurn,
+    setTaskInput,
+    snapshot,
+    stageGoalCandidateFromMessage,
+    taskConversationAction,
+    taskGoalName: (task) => taskGoalName(task, snapshot),
+    taskStatuses,
+    tasks,
+    taskInput,
+    withTimeout,
+  });
 
-  const removeAttachment = (id) => {
-    setAttachments((current) => {
-      const attachment = current.find((item) => item.id === id);
-      if (attachment) URL.revokeObjectURL(attachment.url);
-      return current.filter((item) => item.id !== id);
-    });
-  };
+  const handleConversationTurnAction = useConversationTurnActions({
+    activeProjectGoalTitle: activeProjectGoal?.title,
+    chatTurns,
+    executePendingPatchApply,
+    focusComposer: () => composerRef.current?.focus(),
+    navigateWorkbench,
+    onChatTurnsChange,
+    onRunChatAction,
+    setTaskInput,
+  });
 
-  const useStarterPrompt = (prompt) => {
-    setTaskInput(prompt);
-    requestAnimationFrame(() => composerRef.current?.focus());
-  };
-
-  const ensureExecutionTabs = () => {
-    setClosedExecutionKey("");
-    setWorkspaceTabs((current) => [
-      ...current,
-      ...executionTabs.filter((tab) => !current.some((item) => item.id === tab.id)),
-    ]);
-  };
-
-  const navigateWorkbench = (target) => {
-    if (!target) return;
-    if (target === "conversation") {
-      setActiveWorkspaceTab("plan");
-      return;
-    }
-    if (target === "terminal") {
-      setActiveWorkspaceTab("terminal");
-      return;
-    }
-    if (target === "execution") {
-      if (!actionMode) {
-        const topic = topicPayloadFromOutline("project-progress");
-        if (topic) onSelectEngineeringFile?.(topic);
-        return;
-      }
-      ensureExecutionTabs();
-      setActiveWorkspaceTab("execution");
-      return;
-    }
-    if (typeof target === "object" && target.type === "file" && target.path) {
-      onSelectEngineeringFile?.({
-        description: "来自工作台活动的工程文件。",
-        path: target.path,
-      });
-      return;
-    }
-    const topic = topicPayloadFromOutline(target);
-    if (topic) {
-      onSelectEngineeringFile?.(topic);
-    }
-  };
-
-  const openCurrentProgress = () => {
-    setWorkspaceTabs((current) => {
-      const progressTab = current.find((tab) =>
-        tab.kind === "file" &&
-        (tab.title === "当前进度" || tab.file?.topic?.id === "project-progress")
-      );
-      if (progressTab) setActiveWorkspaceTab(progressTab.id);
-      return current;
-    });
-  };
-
-  useEffect(() => {
-    if (showExecutionTab) {
-      ensureExecutionTabs();
-    }
-  }, [showExecutionTab]);
-
-  useEffect(() => {
-    const openConversation = () => {
-      setActiveWorkspaceTab("plan");
-    };
-    const openExecution = () => {
-      ensureExecutionTabs();
-      setActiveWorkspaceTab("execution");
-    };
-    const openTerminal = () => {
-      setActiveWorkspaceTab("terminal");
-    };
-    window.addEventListener("project-os:open-conversation", openConversation);
-    window.addEventListener("project-os:open-execution", openExecution);
-    window.addEventListener("project-os:open-terminal", openTerminal);
-    return () => {
-      window.removeEventListener("project-os:open-conversation", openConversation);
-      window.removeEventListener("project-os:open-execution", openExecution);
-      window.removeEventListener("project-os:open-terminal", openTerminal);
-    };
-  }, []);
-
-  const submitTask = async (event) => {
-    event.preventDefault();
-    setActiveWorkspaceTab("plan");
-    const nextInput = taskInput.trim();
-    if (!nextInput && !attachments.length) return;
-    const submittedAttachments = attachments.map((attachment) => ({
-      dataUrl: attachment.dataUrl,
-      id: attachment.id,
-      mimeType: attachment.type,
-      name: attachment.name,
-      url: attachment.url,
-    }));
-    const userTurn = {
-      attachments: submittedAttachments,
-      id: `${Date.now()}-user`,
-      role: "user",
-      text: nextInput || "请根据截图帮我分析并修改。",
-    };
-    const requestId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    const requestContext = buildChatRequestContext([...chatTurns, userTurn]);
-    const recentTurns = requestContext.recentTurns.slice(0, -1);
-    const contextualTask = contextualizeUserMessage(nextInput, requestContext.contextState);
-    activeRequestRef.current = requestId;
-    setTaskInput("");
-    setAttachments([]);
-    onChatTurnsChange([...chatTurns, userTurn]);
-    const profilePatches = profilePatchesFromMessage(nextInput);
-    if (profilePatches.length && isTauriRuntime()) {
-      invokeWorkspaceCommand("update_project_profile_from_conversation", {
-        input: { patches: profilePatches },
-      })
-        .then((nextSnapshot) => onProfileUpdated?.(nextSnapshot))
-        .catch(() => {});
-    }
-    const messageKind = classifyConversationMessage(nextInput, submittedAttachments.length > 0);
-    setChatLoadingLabel(loadingLabelForMessageKind(messageKind));
-    setChatLoadingEvents(loadingEventsForMessageKind(messageKind));
-    setChatLoading(true);
-
-    let chatResult;
-    try {
-      if (messageKind === "task") {
-        chatResult = {
-          intent: "task",
-          reply: "可以，我先生成计划。",
-          shouldCreatePlan: true,
-        };
-      } else if (["model-status", "connection-status"].includes(messageKind)) {
-        chatResult = {
-          intent: messageKind,
-          reply: localStatusReply({
-            kind: messageKind,
-            provider,
-            providerHealth,
-            snapshot,
-            tasks,
-          }),
-          shouldCreatePlan: false,
-        };
-      } else if (!isTauriRuntime()) {
-        chatResult = previewChatResult(nextInput, submittedAttachments.length > 0, snapshot, tasks, requestContext.contextState);
-      } else {
-        chatResult = await invokeWorkspaceCommand("chat_with_model", {
-          input: {
-            attachments: submittedAttachments.map((attachment) => ({
-              dataUrl: attachment.dataUrl,
-              mimeType: attachment.mimeType,
-              name: attachment.name,
-            })),
-            contextState: requestContext.contextState,
-            message: nextInput,
-            recentTurns,
-          },
-        });
-      }
-    } catch (err) {
-      onModelHealthChange?.(provider?.model, "unavailable", err instanceof Error ? err.message : String(err));
-      chatResult = {
-        intent: "chat",
-        providerError: err instanceof Error ? err.message : String(err),
-        providerModel: provider?.model || "",
-        providerStatus: "unavailable",
-        reply: "我现在先按本地上下文回答。模型连接暂时不可用，我会把这件事标在状态里，不影响你继续问项目问题。",
-        shouldCreatePlan: false,
-      };
-    } finally {
-      if (activeRequestRef.current === requestId) {
-        setChatLoading(false);
-      }
-    }
-
-    if (activeRequestRef.current !== requestId) {
-      submittedAttachments.forEach((attachment) => URL.revokeObjectURL(attachment.url));
-      return;
-    }
-
-    const shouldCreatePlan = Boolean(chatResult?.shouldCreatePlan) || isActionRequestMessage(nextInput, submittedAttachments.length > 0);
-    if (chatResult?.providerStatus === "available") {
-      onModelHealthChange?.(chatResult.providerModel || provider?.model, "available", `${chatResult.providerModel || provider?.model} work`);
-    } else if (chatResult?.providerStatus === "unavailable") {
-      onModelHealthChange?.(chatResult.providerModel || provider?.model, "unavailable", chatResult.providerError || "模型不可用");
-    }
-
-    if (!shouldCreatePlan) {
-      onChatTurnsChange([
-        ...chatTurns,
-        userTurn,
-        {
-          id: `${Date.now()}-assistant`,
-          actions: chatResult?.intent === "task" ? actionPromptsForMessage(nextInput, chatResult?.intent) : [],
-          diagnostic: conversationDiagnosticForResult(chatResult, providerHealth),
-          events: agentEventsForMessageKind(messageKind, chatResult),
-          intent: chatResult?.intent || "chat",
-          references: Array.isArray(chatResult?.references) ? chatResult.references : [],
-          statusLabel: loadingLabelForMessageKind(messageKind),
-          role: "assistant",
-          text: safeDisplayText(chatResult?.reply, "我在。你可以继续说想做什么。"),
-        },
-      ]);
-      submittedAttachments.forEach((attachment) => URL.revokeObjectURL(attachment.url));
-      return;
-    }
-
-    setPendingTurn({
-      attachments: submittedAttachments,
-      showUser: false,
-      text: nextInput || "请根据截图帮我分析并修改。",
-    });
-    ensureExecutionTabs();
-    let planFallbackTimer = window.setTimeout(() => {
-      if (activeRequestRef.current !== requestId) return;
-      activeRequestRef.current = null;
-      setChatLoading(false);
-      setPendingTurn(null);
-      onChatTurnsChange([
-        ...chatTurns,
-        userTurn,
-        {
-          id: `${Date.now()}-assistant-plan-timeout`,
-          diagnostic: {
-            label: "计划生成等待超时",
-            message: "我已停止等待这次计划生成，避免对话一直悬空。",
-          },
-          role: "assistant",
-          text: "这次没有顺利生成计划。我先把状态收住，你可以继续补充或重试。",
-          workflow: [
-            { label: "理解请求", status: "done" },
-            { label: "生成计划", status: "failed" },
-            { label: "等待重试", status: "current" },
-          ],
-          events: planningAgentEvents("failed", "计划生成等待超时。"),
-        },
-      ]);
-      submittedAttachments.forEach((attachment) => URL.revokeObjectURL(attachment.url));
-    }, 15000);
-    withTimeout(onGeneratePlan({
-      attachments: submittedAttachments.map((attachment) => ({
-        dataUrl: attachment.dataUrl,
-        mimeType: attachment.mimeType,
-        name: attachment.name,
-      })),
-      conversationId: activeConversationId,
-      displayTask: requestContext.contextState.currentTopic || nextInput,
-      requestId,
-      task: contextualTask || "请根据截图帮我分析并修改。",
-    }), 15000, "计划生成等待超时").then((ok) => {
-      if (activeRequestRef.current !== requestId) return;
-      window.clearTimeout(planFallbackTimer);
-      if (ok) {
-        activeRequestRef.current = null;
-        onChatTurnsChange([
-          ...chatTurns,
-          userTurn,
-          {
-            id: `${Date.now()}-assistant-plan`,
-            actions: [{ id: "confirm-active-task", label: "开始执行" }],
-            role: "assistant",
-            text: "我整理好了一个执行计划，先不改文件。你点「开始执行」后，我再进入改动和验证。",
-            events: completedPlanAgentEvents(),
-          },
-        ]);
-        setPendingTurn(null);
-        submittedAttachments.forEach((attachment) => URL.revokeObjectURL(attachment.url));
-      } else {
-        activeRequestRef.current = null;
-        onChatTurnsChange([
-          ...chatTurns,
-          userTurn,
-          {
-            id: `${Date.now()}-assistant-plan-failed`,
-            diagnostic: {
-              label: "计划没有生成成功",
-              message: "我没有继续卡在处理中。可以稍后重试，或先把需求拆小一点再发。",
-            },
-            role: "assistant",
-            text: "这次计划生成没有完成，我先停在这里。",
-            events: planningAgentEvents("failed", "计划生成返回失败。"),
-            workflow: [
-              { label: "理解请求", status: "done" },
-              { label: "生成计划", status: "failed" },
-              { label: "等待重试", status: "current" },
-            ],
-          },
-        ]);
-        setPendingTurn(null);
-        submittedAttachments.forEach((attachment) => URL.revokeObjectURL(attachment.url));
-      }
-    }).catch((err) => {
-      if (activeRequestRef.current !== requestId) return;
-      window.clearTimeout(planFallbackTimer);
-      activeRequestRef.current = null;
-      onChatTurnsChange([
-        ...chatTurns,
-        userTurn,
-        {
-          id: `${Date.now()}-assistant-plan-timeout`,
-          diagnostic: {
-            label: "计划生成中断",
-            message: "我已停止等待这次计划生成，避免对话一直悬空。",
-            detail: err instanceof Error ? err.message : String(err),
-          },
-          role: "assistant",
-          text: "这次没有顺利生成计划。我先把状态收住，你可以继续补充或重试。",
-          events: planningAgentEvents("failed", err instanceof Error ? err.message : String(err)),
-          workflow: [
-            { label: "理解请求", status: "done" },
-            { label: "生成计划", status: "failed" },
-            { label: "等待重试", status: "current" },
-          ],
-        },
-      ]);
-      setPendingTurn(null);
-      submittedAttachments.forEach((attachment) => URL.revokeObjectURL(attachment.url));
-    });
-  };
-
-  const stopCurrentResponse = () => {
-    activeRequestRef.current = null;
-    setChatLoading(false);
-    setPendingTurn(null);
-    onStopPlan?.();
-  };
+  const { handleAssistantUiAction, handlePaste, useStarterPrompt } = useAgentWorkspaceInputActions({ addImageFiles, chatTurns, composerRef, handleConversationTurnAction, setTaskInput });
 
   return (
-    <Tabs className="center" value={activeWorkspaceTab} onValueChange={setActiveWorkspaceTab}>
-      <TabsList className="tabs" aria-label="工作区视图">
-        {workspaceTabs.filter((tab) => isExecutionWorkspaceTab(tab, actionMode)).map((tab) => {
-          const tabTitle = tab.kind === "execution" && (activeTask || readonlyPlan)
-            ? `任务：${compactGoalTitle(activeTask?.title || readonlyPlan?.task || readonlyPlan?.summary || "详情")}`
-            : tab.title;
-          return (
-          <TabsTrigger className={`tab workspaceTab ${tab.kind === "file" ? "fileTab" : ""}${tab.closable ? " closable" : ""}`} key={tab.id} value={tab.id}>
-            <span>{tabTitle}</span>
-            {tab.closable ? (
-              <button
-                aria-label={`关闭 ${tabTitle}`}
-                className="workspaceTabClose"
-                type="button"
-                onClick={(event) => closeWorkspaceTab(event, tab.id)}
-              >
-                <X strokeWidth={2} aria-hidden="true" />
-              </button>
-            ) : null}
-          </TabsTrigger>
-        );})}
-      </TabsList>
+    <Tabs className="center" value={activeWorkspaceTab} onValueChange={changeWorkspaceTab}>
+      <WorkspaceTabStrip onCloseTab={closeWorkspaceTab} tabs={workspaceTabs} />
 
-      <TabsContent className="workspaceTabContent agentCanvas" value="plan">
-        {isConversationEmpty ? (
-          <div className="conversationStart">
-            <h2>有什么新点子？</h2>
-            <div className="conversationStarters" aria-label="建议任务">
-              {chatStarterPrompts.map((prompt) => (
-                <button key={prompt} type="button" onClick={() => useStarterPrompt(prompt)}>
-                  {prompt}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <Conversation>
-            {chatTurns.map((turn) => (
-              <ConversationMessage key={turn.id} role={turn.role}>
-                <div>{safeDisplayText(turn.text)}</div>
-                {turn.diagnostic ? (
-                  <div className="conversationDiagnostic">
-                    <span>{turn.diagnostic.label}</span>
-                    <p>{turn.diagnostic.message}</p>
-                    {turn.diagnostic.detail ? (
-                      <details>
-                        <summary>Details</summary>
-                        <code>{turn.diagnostic.detail}</code>
-                      </details>
-                    ) : null}
-                  </div>
-                ) : null}
-                {shouldShowAgentTimeline(turn) ? (
-                  <details className="conversationTimelineGroup">
-                    <summary>
-                      <span className="conversationTimelineGroupIcon" aria-hidden="true" />
-                      <strong>{timelineSummary(agentEventsForTurn(turn))}</strong>
-                      <em>{agentEventsForTurn(turn).length}步</em>
-                    </summary>
-                    <div className="conversationTimeline" aria-label="Agent 事件时间线">
-                      {agentEventsForTurn(turn).map((event) => (
-                        <div className={`conversationTimelineEvent ${event.status || "pending"}`} key={event.id || `${event.type}-${event.title}`}>
-                          <div className="conversationTimelineEventHeader">
-                            <span className="conversationTimelineDot" aria-hidden="true" />
-                            <strong>{event.title}</strong>
-                            <em>{event.time}</em>
-                          </div>
-                          {event.detail ? <p>{event.detail}</p> : null}
-                        </div>
-                      ))}
-                    </div>
-                  </details>
-                ) : null}
-                {turn.references?.length ? (
-                  <div className="conversationReferences" aria-label="回答依据">
-                    {turn.references.map((reference) => (
-                      <button
-                        key={`${reference.kind}-${reference.target}`}
-                        type="button"
-                        onClick={() => onRunChatAction?.({ ...reference, id: "open-reference" })}
-                      >
-                        <FileText aria-hidden="true" />
-                        <span>{reference.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-                {turn.actions?.length ? (
-                  <div className="conversationActions">
-                    {turn.actions.map((action) => (
-                      <button
-                        key={action.id}
-                        type="button"
-                        onClick={() => onRunChatAction?.(action)}
-                      >
-                        {action.label}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-                {turn.attachments?.length ? (
-                  <div className="conversationAttachmentGrid">
-                    {turn.attachments.map((attachment) => (
-                      <figure className="conversationAttachment" key={attachment.id}>
-                        <img src={attachment.url} alt={attachment.name} />
-                        <figcaption>{attachment.name}</figcaption>
-                      </figure>
-                    ))}
-                  </div>
-                ) : null}
-              </ConversationMessage>
-            ))}
+      <AgentWorkspaceConversationCanvas
+        assistantUi={useAssistantUiPoc ? <React.Suspense fallback={<AgentProcessingStatus label="载入对话 POC" running />}><AssistantUiConversationPoc isRunning={chatLoading || Boolean(pendingTurn)} onAction={handleAssistantUiAction} turns={chatTurns} /></React.Suspense> : null}
+        chatLoading={chatLoading}
+        chatLoadingEvents={chatLoadingEvents}
+        chatLoadingLabel={chatLoadingLabel}
+        chatStartedAt={chatStartedAt}
+        conversationState={conversationRuntime.state}
+        error={error}
+        isEmpty={isConversationEmpty}
+        loading={loading}
+        onTurnAction={(action, turn) => handleConversationTurnAction(action, turn, { projectExecution: true })}
+        onUseStarterPrompt={useStarterPrompt}
+        pendingTurn={pendingTurn}
+        phase={snapshot.phase}
+        starterPrompts={chatStarterPrompts}
+        tasks={tasks}
+        turns={chatTurns}
+      />
 
-            {loading || error ? (
-              <ConversationMessage
-                meta={loading ? "连接中" : error ? "需要检查" : snapshot.phase}
-                role="assistant"
-                title="OmniDesk"
-              >
-                {loading
-                  ? "正在连接本地工作区。"
-                  : error
-                    ? `本地能力暂时不可用：${error}`
-                    : null}
-              </ConversationMessage>
-            ) : null}
-
-            {(activeTask || readonlyPlan) && !hasConversationPlanPrompt ? (
-              <ConversationMessage
-                meta={activeTask ? activeTask.status : "计划已生成"}
-                role="assistant"
-            title="OmniDesk"
-          >
-                {activeTask
-                  ? "我整理好了下一步，详情放在「执行」里。你确认后我再继续动手。"
-                  : "我整理好了下一步，详情放在「执行」里。"}
-                {taskAgentEvents(activeTask, readonlyPlan).length ? (
-                  <details className="conversationTimelineGroup">
-                    <summary>
-                      <span className="conversationTimelineGroupIcon" aria-hidden="true" />
-                      <strong>{timelineSummary(taskAgentEvents(activeTask, readonlyPlan))}</strong>
-                      <em>{taskAgentEvents(activeTask, readonlyPlan).length}步</em>
-                    </summary>
-                    <div className="conversationTimeline" aria-label="当前任务事件时间线">
-                      {taskAgentEvents(activeTask, readonlyPlan).map((event) => (
-                        <div className={`conversationTimelineEvent ${event.status || "pending"}`} key={event.id || `${event.type}-${event.title}`}>
-                          <div className="conversationTimelineEventHeader">
-                            <span className="conversationTimelineDot" aria-hidden="true" />
-                            <strong>{event.title}</strong>
-                            <em>{event.time}</em>
-                          </div>
-                          {event.detail ? <p>{event.detail}</p> : null}
-                        </div>
-                      ))}
-                    </div>
-                  </details>
-                ) : null}
-                {planError ? <Notice className="planError" variant="danger">{planError}</Notice> : null}
-                {activeTask?.status === taskStatuses.planned ? (
-                  <div className="conversationActions">
-                    <button type="button" onClick={() => onConfirmTask?.(activeTask.id)}>
-                      开始执行
-                    </button>
-                  </div>
-                ) : null}
-              </ConversationMessage>
-            ) : null}
-
-          {pendingTurn || chatLoading ? (
-            <>
-              {pendingTurn && pendingTurn.showUser !== false ? (
-                <ConversationMessage role="user">
-                  <div>{safeDisplayText(pendingTurn.text)}</div>
-                  {pendingTurn.attachments?.length ? (
-                    <div className="conversationAttachmentGrid">
-                      {pendingTurn.attachments.map((attachment) => (
-                        <figure className="conversationAttachment" key={attachment.id}>
-                          <img src={attachment.url} alt={attachment.name} />
-                          <figcaption>{attachment.name}</figcaption>
-                        </figure>
-                      ))}
-                    </div>
-                  ) : null}
-                </ConversationMessage>
-              ) : null}
-              <ConversationMessage className="conversationMessage-thinking" role="assistant" title="OmniDesk">
-                <div className="thinkingStage">
-                  <span className="thinkingStageDot" aria-hidden="true" />
-                  <span>{pendingTurn ? "整理计划" : chatLoadingLabel}</span>
-                </div>
-                {!pendingTurn && chatLoadingEvents.length ? (
-                  <div className="thinkingSteps" aria-label="处理中步骤">
-                    {chatLoadingEvents.map((step) => (
-                      <span className={`thinkingStep ${step.status}`} key={step.label}>{step.label}</span>
-                    ))}
-                  </div>
-                ) : null}
-              </ConversationMessage>
-            </>
-          ) : null}
-
-          </Conversation>
-        )}
-      </TabsContent>
-
-      {workspaceTabs.filter((tab) => tab.id !== "plan" && isExecutionWorkspaceTab(tab, actionMode)).map((tab) => {
-        if (tab.kind === "file") {
-          return (
-            <TabsContent className="workspaceTabContent fileCanvas" key={tab.id} value={tab.id}>
-              <EngineeringFileTab
+      <AgentWorkspaceAuxiliaryTabs
+        activeWorkspaceTab={activeWorkspaceTab}
+        renderFileTab={(tab) => <TabsContent className="workspaceTabContent fileCanvas" key={tab.id} value={tab.id}><EngineeringFileTab
+                activeTaskId={activeTask?.id}
                 selectedEngineeringFile={tab.file}
                 snapshot={snapshot}
                 tasks={tasks}
@@ -2773,98 +1948,38 @@ function AgentWorkspace({
                 onMergeHandoff={onMergeHandoff}
                 onRunGuardedCheck={onRunGuardedCheck}
                 onSelectTask={onSelectTask}
+                onMarkTaskWaiting={onMarkTaskWaiting}
+                onEnsureModelAvailable={onEnsureModelAvailable}
+                onCreateTask={onCreateTask}
+                onCreateGoal={onCreateGoal}
+                onDeleteTask={onDeleteTask}
+                onArchiveGoal={onArchiveGoal}
+                onMergeGoal={onMergeGoal}
+                onRestoreGoal={onRestoreGoal}
+                onOpenTaskConversation={onOpenTaskConversation}
                 onNavigateWorkbench={navigateWorkbench}
                 onCreateRepairTask={onCreateRepairTask}
                 onCreateGovernanceTask={onCreateGovernanceTask}
                 onCreateDesignGovernanceTask={onCreateDesignGovernanceTask}
-              />
-            </TabsContent>
-          );
-        }
-        if (tab.kind === "terminal") {
-          return (
-            <TabsContent className="workspaceTabContent terminalWorkspace" key={tab.id} value={tab.id}>
-              <TerminalDock
-                active={activeWorkspaceTab === tab.id}
-                logs={terminalLogs}
-                runningId={terminalRunningId}
-                onRunCheck={onRunTerminalCheck}
-                onWriteTerminalData={onWriteTerminalData}
-                onResizeTerminalSession={onResizeTerminalSession}
-                onSelectTerminalSession={onSelectTerminalSession}
-                onNewTerminalSession={onNewTerminalSession}
-                onCloseTerminalSession={onCloseTerminalSession}
-                onOpenNativeTerminal={onOpenNativeTerminal}
-                onRestartTerminalSession={onRestartTerminalSession}
-                text={terminalText}
-                chunks={terminalChunks}
-                session={terminalSession}
-                sessions={terminalSessions}
-                activeSessionId={activeTerminalSessionId}
-                error={terminalError}
-              />
-            </TabsContent>
-          );
-        }
-        if (tab.kind === "execution") {
-          return (
-            <TabsContent className="workspaceTabContent agentCanvas executionWorkspace" key={tab.id} value={tab.id}>
-              {activeTask ? (
-                <ActiveTask
-                  task={activeTask}
-                  runnerLoadingId={runnerLoadingId}
-                  runnerError={runnerError}
-                  patchLoading={patchLoading}
-                  patchError={patchError}
-                  applyLoading={applyLoading}
-                  applyError={applyError}
-                  handoffLoading={handoffLoading}
-                  handoffError={handoffError}
-                  onGeneratePatchDraft={onGeneratePatchDraft}
-                  onApplyPatchDraft={onApplyPatchDraft}
-                  onMergeHandoff={onMergeHandoff}
-                  onRunGuardedCheck={onRunGuardedCheck}
-                  onSelectConversation={onSelectConversation}
-                  onBackToProgress={openCurrentProgress}
-                />
-              ) : readonlyPlan ? (
-                <ReadonlyPlan plan={readonlyPlan} />
-              ) : (
-                <Notice variant="muted">生成计划后，执行详情会显示在这里。</Notice>
-              )}
-            </TabsContent>
-          );
-        }
-        if (tab.kind === "diff") {
-          return (
-            <TabsContent className="workspaceTabContent agentCanvas emptyWorkspacePanel" key={tab.id} value={tab.id}>
-              <Notice variant="muted">生成改动后，会在这里预览。</Notice>
-            </TabsContent>
-          );
-        }
-        if (tab.kind === "checks") {
-          return (
-            <TabsContent className="workspaceTabContent agentCanvas emptyWorkspacePanel" key={tab.id} value={tab.id}>
-              <Notice variant="muted">运行检查会在确认计划后显示可执行项。</Notice>
-            </TabsContent>
-          );
-        }
-        if (tab.kind === "trace") {
-          return (
-            <TabsContent className="workspaceTabContent agentCanvas emptyWorkspacePanel" key={tab.id} value={tab.id}>
-              <div className="terminal conversationTerminal">
-                {snapshot.trace.map((line) => (
-                  <div key={line}>{line}</div>
-                ))}
-              </div>
-            </TabsContent>
-          );
-        }
-        return null;
-      })}
+                onPersistTask={onPersistTask}
+                onUpdateGoal={onUpdateGoal}
+                decomposingGoal={decomposingGoal}
+                onConfirmDecomposition={onConfirmDecomposition}
+                onGenerateDecomposition={onGenerateDecomposition}
+                onRequestProjectAccess={onRequestProjectAccess}
+                onPrepareTerminalCommand={prepareTerminalCommand}
+                onRefreshWorkspace={onRefreshWorkspace}
+                onReadEngineeringFile={onReadEngineeringFile}
+                onGetHermesExecutorStatus={onGetHermesExecutorStatus}
+              /></TabsContent>}
+        tabs={workspaceTabs}
+        terminal={{ activeSessionId: activeTerminalSessionId, chunks: terminalChunks, draftRequest: terminalDraftRequest, error: terminalError, logs: terminalLogs, onCloseTerminalSession, onNewTerminalSession, onOpenNativeTerminal, onRestartTerminalSession, onResizeTerminalSession, onRunCheck: onRunTerminalCheck, onSelectTerminalSession, onWriteTerminalData, runningId: terminalRunningId, session: terminalSession, sessions: terminalSessions, text: terminalText }}
+        trace={snapshot.trace}
+      />
 
       {activeWorkspaceTab === "plan" ? (
         <ChatDock
+          attachmentError={attachmentError}
           attachments={attachments}
           chatLoading={chatLoading}
           composerRef={composerRef}
@@ -2887,438 +2002,23 @@ function AgentWorkspace({
           onSelectComposerModel={onSelectComposerModel}
           onTestComposerModel={onTestComposerModel}
           goalRefinementMode={goalRefinementMode}
+          taskContext={activeConversationTaskId ? activeTask : null}
+          taskContextHeader={activeConversationTaskId && activeTask ? (
+            <TaskConversationContext
+              goalName={taskGoalName(activeTask, snapshot)}
+              onNextTask={nextConversationTask ? () => openTaskConversationWorkspace(nextConversationTask.id) : undefined}
+              onPreviousTask={previousConversationTask ? () => openTaskConversationWorkspace(previousConversationTask.id) : undefined}
+              position={activeTaskPosition}
+              statusLabel={taskStatusLabel(activeTask.status)}
+              task={activeTask}
+            />
+          ) : null}
+          processing={Boolean(pendingTurn)}
           planLoading={planLoading}
           taskInput={taskInput}
         />
       ) : null}
     </Tabs>
-  );
-}
-
-function ChatDock({
-  attachments,
-  chatLoading,
-  composerRef,
-  onFilesSelected,
-  onInputChange,
-  onPaste,
-  onRemoveAttachment,
-  onStop,
-  onSubmit,
-  onVoiceInput,
-  currentModel,
-  modelAvailability,
-  modelLabel,
-  modelLoading,
-  modelOptions,
-  modelProfile,
-  modelSource,
-  modelTesting,
-  onLoadComposerModels,
-  onSelectComposerModel,
-  onTestComposerModel,
-  goalRefinementMode,
-  planLoading,
-  taskInput,
-}) {
-  const placeholder = goalRefinementMode
-    ? "说说哪里还不满意，比如交互、视觉、文案、流程或结果..."
-    : "问项目情况、描述想法，或说要改什么...";
-  return (
-    <section className="chatDock" aria-label="对话输入">
-      <ChatComposer
-        attachments={attachments}
-        inputRef={composerRef}
-        disabled={false}
-        onFilesSelected={onFilesSelected}
-        onChange={onInputChange}
-        onPaste={onPaste}
-        onRemoveAttachment={onRemoveAttachment}
-        onStop={onStop}
-        onSubmit={onSubmit}
-        onVoiceInput={onVoiceInput}
-        currentModel={currentModel}
-        modelAvailability={modelAvailability}
-        modelLabel={modelLabel}
-        modelLoading={modelLoading}
-        modelOptions={modelOptions}
-        modelProfile={modelProfile}
-        modelSource={modelSource}
-        modelTesting={modelTesting}
-        onModelMenuOpen={onLoadComposerModels}
-        onModelSelect={onSelectComposerModel}
-        onModelTest={onTestComposerModel}
-        placeholder={placeholder}
-        sending={planLoading || chatLoading}
-        value={taskInput}
-      />
-    </section>
-  );
-}
-
-function TerminalDock({
-  active = true,
-  activeSessionId = "main",
-  logs,
-  runningId,
-  onRunCheck,
-  onWriteTerminalData,
-  onResizeTerminalSession,
-  onSelectTerminalSession,
-  onNewTerminalSession,
-  onCloseTerminalSession,
-  onOpenNativeTerminal,
-  onRestartTerminalSession,
-  text,
-  chunks,
-  session,
-  sessions = [],
-  error,
-}) {
-  const [terminalDraft, setTerminalDraft] = useState("");
-  const [terminalDraftSending, setTerminalDraftSending] = useState(false);
-  const terminalHostRef = React.useRef(null);
-  const xtermRef = React.useRef(null);
-  const fitAddonRef = React.useRef(null);
-  const writeDataRef = React.useRef(onWriteTerminalData);
-  const resizeSessionRef = React.useRef(onResizeTerminalSession);
-  const writtenChunkCountRef = React.useRef(0);
-  const renderedSessionKeyRef = React.useRef("");
-  const lastSizeRef = React.useRef({ cols: 0, rows: 0 });
-  const isDesktopRuntime = isTauriRuntime();
-  const isTerminalReady = Boolean(session);
-  const terminalEmptyState = !isDesktopRuntime ? "preview" : error ? "failed" : "starting";
-  const visibleSessions = sessions.length ? sessions : session ? [session] : [];
-  const sessionKey = session
-    ? `${session.sessionId || session.session_id || session.id || activeSessionId}:${session.generation || ""}`
-    : "";
-
-  useEffect(() => {
-    writeDataRef.current = onWriteTerminalData;
-  }, [onWriteTerminalData]);
-
-  useEffect(() => {
-    resizeSessionRef.current = onResizeTerminalSession;
-  }, [onResizeTerminalSession]);
-
-  const syncTerminalSize = React.useCallback((force = false) => {
-    if (!xtermRef.current || !fitAddonRef.current) return;
-    try {
-      fitAddonRef.current.fit();
-      const cols = xtermRef.current.cols;
-      const rows = xtermRef.current.rows;
-      if (!cols || !rows) return;
-      if (!force && cols === lastSizeRef.current.cols && rows === lastSizeRef.current.rows) return;
-      lastSizeRef.current = { cols, rows };
-      resizeSessionRef.current?.(cols, rows);
-    } catch {
-      // Ignore fit races while the panel is settling.
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!terminalHostRef.current || xtermRef.current) return undefined;
-
-    const terminal = new Terminal({
-      allowProposedApi: false,
-      convertEol: true,
-      cursorBlink: true,
-      cursorStyle: "block",
-      fontFamily: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace",
-      fontSize: 11,
-      letterSpacing: 0,
-      lineHeight: 1.35,
-      scrollOnUserInput: true,
-      scrollback: 5000,
-      theme: terminalThemeForCurrentMode(),
-    });
-    const fitAddon = new FitAddon();
-    terminal.loadAddon(fitAddon);
-    terminal.open(terminalHostRef.current);
-    terminal.focus();
-    terminal.attachCustomKeyEventHandler((event) => {
-      if (
-        event.type !== "keydown"
-        || event.isComposing
-        || event.key !== "Tab"
-        || event.metaKey
-        || event.ctrlKey
-        || event.altKey
-      ) {
-        return true;
-      }
-      event.preventDefault();
-      event.stopPropagation();
-      terminal.scrollToBottom();
-      writeDataRef.current(event.shiftKey ? "\u001b[Z" : "\t");
-      return false;
-    });
-    const dataDisposable = terminal.onData((data) => {
-      terminal.scrollToBottom();
-      writeDataRef.current(data);
-    });
-    xtermRef.current = terminal;
-    fitAddonRef.current = fitAddon;
-    requestAnimationFrame(() => {
-      syncTerminalSize(true);
-      requestAnimationFrame(() => syncTerminalSize(true));
-    });
-
-    const themeObserver = new MutationObserver(() => {
-      terminal.options.theme = terminalThemeForCurrentMode();
-    });
-    themeObserver.observe(document.documentElement, { attributeFilter: ["class"], attributes: true });
-    window.addEventListener("resize", syncTerminalSize);
-    return () => {
-      themeObserver.disconnect();
-      window.removeEventListener("resize", syncTerminalSize);
-      dataDisposable.dispose();
-      terminal.dispose();
-      xtermRef.current = null;
-      fitAddonRef.current = null;
-      writtenChunkCountRef.current = 0;
-      renderedSessionKeyRef.current = "";
-      lastSizeRef.current = { cols: 0, rows: 0 };
-    };
-  }, [syncTerminalSize]);
-
-  useEffect(() => {
-    if (!xtermRef.current) return;
-    const replayChunks = Array.isArray(chunks) ? chunks : [];
-    if (renderedSessionKeyRef.current !== sessionKey) {
-      xtermRef.current.reset();
-      replayChunks.forEach((chunk) => xtermRef.current.write(chunk.data || ""));
-      writtenChunkCountRef.current = replayChunks.length;
-      renderedSessionKeyRef.current = sessionKey;
-      requestAnimationFrame(() => {
-        syncTerminalSize(true);
-        requestAnimationFrame(() => {
-          syncTerminalSize(true);
-          xtermRef.current?.scrollToBottom();
-          xtermRef.current?.focus();
-        });
-      });
-      return;
-    }
-    const nextChunks = replayChunks.slice(writtenChunkCountRef.current);
-    nextChunks.forEach((chunk) => {
-      xtermRef.current.write(chunk.data || "", () => xtermRef.current?.scrollToBottom());
-    });
-    writtenChunkCountRef.current = replayChunks.length;
-  }, [chunks, sessionKey, syncTerminalSize]);
-
-  useEffect(() => {
-    if (!active || !xtermRef.current) return;
-    requestAnimationFrame(() => {
-      syncTerminalSize(true);
-      requestAnimationFrame(() => syncTerminalSize(true));
-      xtermRef.current?.focus();
-    });
-  }, [active, syncTerminalSize]);
-
-  const clearTerminal = () => {
-    xtermRef.current?.clear();
-    writtenChunkCountRef.current = Array.isArray(chunks) ? chunks.length : 0;
-    requestAnimationFrame(() => xtermRef.current?.focus());
-  };
-
-  const submitTerminalDraft = async () => {
-    if (!terminalDraft || terminalDraftSending) return;
-    setTerminalDraftSending(true);
-    try {
-      const sent = await onWriteTerminalData(
-        formatTerminalInputForPaste(terminalDraft, { submit: true }),
-        { trackInput: false }
-      );
-      if (sent !== false) setTerminalDraft("");
-    } finally {
-      setTerminalDraftSending(false);
-    }
-  };
-
-  if (!isTerminalReady) {
-    const emptyStateLabel = terminalEmptyState === "preview"
-      ? "preview"
-      : terminalEmptyState === "failed"
-        ? "启动失败"
-        : "正在启动";
-    const emptyStateTitle = terminalEmptyState === "preview"
-      ? "浏览器预览不启动本地终端"
-      : terminalEmptyState === "failed"
-        ? "终端启动失败"
-        : "正在启动本地终端";
-    const emptyStateDescription = terminalEmptyState === "preview"
-      ? (text || "请在桌面 App 窗口里使用完整终端。这里不会执行命令，也不会写入工程文件。")
-      : terminalEmptyState === "failed"
-        ? error
-        : "正在连接当前项目的本地终端。";
-
-    return (
-      <section className="terminalDock" aria-label="终端">
-        <div className="terminalDockHeader">
-          <div className="terminalDockPrimary">
-            <Tooltip content={emptyStateTitle}>
-              <div className="terminalSessionTabs" role="tablist" aria-label="终端会话">
-                <button className="terminalSessionTab active" type="button" role="tab" aria-selected="true">
-                  {terminalEmptyState === "starting"
-                    ? <Loader2 className="terminalLoadingIcon" aria-hidden="true" />
-                    : <TerminalSquare aria-hidden="true" />}
-                  <span>{emptyStateLabel}</span>
-                </button>
-              </div>
-            </Tooltip>
-          </div>
-          {isDesktopRuntime ? (
-            <div className="terminalDockActions">
-              <Tooltip content="在原生终端打开">
-                <Button className="terminalIconButton" size="icon" type="button" variant="ghost" onClick={onOpenNativeTerminal} aria-label="在原生终端打开">
-                  <ExternalLink strokeWidth={2} aria-hidden="true" />
-                </Button>
-              </Tooltip>
-            </div>
-          ) : null}
-        </div>
-        <div className="terminalPreviewEmpty">
-          {terminalEmptyState === "starting"
-            ? <Loader2 className="terminalLoadingIcon" aria-hidden="true" />
-            : <TerminalSquare aria-hidden="true" />}
-          <strong>{emptyStateTitle}</strong>
-          <p>{emptyStateDescription}</p>
-          {terminalEmptyState === "failed" ? (
-            <Button size="sm" type="button" variant="default" onClick={onRestartTerminalSession}>
-              <RotateCcw aria-hidden="true" />
-              重试
-            </Button>
-          ) : null}
-        </div>
-      </section>
-    );
-  }
-
-  return (
-    <section className="terminalDock" aria-label="终端">
-      <div className="terminalDockHeader">
-        <div className="terminalDockPrimary">
-          <Tooltip content={session?.cwd || "终端"}>
-            <div className="terminalSessionTabs" role="tablist" aria-label="终端会话">
-              {visibleSessions.map((item, index) => {
-                const sessionId = item.sessionId || item.session_id || item.id || `term-${index + 1}`;
-                const activeItem = sessionId === activeSessionId;
-                const canClose = sessionId !== "main";
-                return (
-                  <div
-                    className={`terminalSessionTab${activeItem ? " active" : ""}`}
-                    key={sessionId}
-                    role="tab"
-                    aria-selected={activeItem}
-                    tabIndex={0}
-                    onClick={() => onSelectTerminalSession?.(sessionId)}
-                    onKeyDown={(event) => {
-                      if (event.key !== "Enter" && event.key !== " ") return;
-                      event.preventDefault();
-                      onSelectTerminalSession?.(sessionId);
-                    }}
-                    title={item.cwd || session?.cwd || sessionId}
-                  >
-                    <TerminalSquare aria-hidden="true" />
-                    <span>{sessionId === "main" ? "main" : sessionId.replace(/^terminal-/, "term-")}</span>
-                    {canClose ? (
-                      <span
-                        aria-label={`关闭 ${sessionId}`}
-                        className="terminalSessionClose"
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          onCloseTerminalSession?.(sessionId);
-                        }}
-                        role="button"
-                        tabIndex={0}
-                        title="关闭会话"
-                        onKeyDown={(event) => {
-                          if (event.key !== "Enter" && event.key !== " ") return;
-                          event.preventDefault();
-                          event.stopPropagation();
-                          onCloseTerminalSession?.(sessionId);
-                        }}
-                      >
-                        <X aria-hidden="true" />
-                      </span>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
-          </Tooltip>
-        </div>
-        <div className="terminalDockActions">
-          <Tooltip content="在原生终端打开">
-            <Button className="terminalIconButton" size="icon" type="button" variant="ghost" onClick={onOpenNativeTerminal} aria-label="在原生终端打开">
-              <ExternalLink strokeWidth={2} aria-hidden="true" />
-            </Button>
-          </Tooltip>
-          <Tooltip content="新建会话">
-            <Button className="terminalIconButton" size="icon" type="button" variant="ghost" onClick={onNewTerminalSession} aria-label="新建终端会话">
-              <Plus strokeWidth={2} aria-hidden="true" />
-            </Button>
-          </Tooltip>
-          <Tooltip content="清空屏幕">
-            <Button className="terminalIconButton" size="icon" type="button" variant="ghost" onClick={clearTerminal} aria-label="清空终端屏幕">
-              <Eraser strokeWidth={2} aria-hidden="true" />
-            </Button>
-          </Tooltip>
-          <Tooltip content="停止当前命令">
-            <Button className="terminalIconButton" size="icon" type="button" variant="ghost" onClick={() => onWriteTerminalData("\u0003")} aria-label="停止当前命令">
-              <Square strokeWidth={2} aria-hidden="true" />
-            </Button>
-          </Tooltip>
-          <Tooltip content="重启终端">
-            <Button className="terminalIconButton" size="icon" type="button" variant="ghost" onClick={onRestartTerminalSession} aria-label="重启终端">
-              <RotateCcw strokeWidth={2} aria-hidden="true" />
-            </Button>
-          </Tooltip>
-        </div>
-      </div>
-      <div
-        className="terminal terminalDockOutput terminalDockXterm"
-        onMouseDown={() => requestAnimationFrame(() => {
-          xtermRef.current?.scrollToBottom();
-          xtermRef.current?.focus();
-        })}
-        ref={terminalHostRef}
-      />
-      <div className="terminalComposer" role="region" aria-label="终端输入">
-        <textarea
-          aria-label="终端输入内容"
-          className="terminalComposerInput"
-          disabled={terminalDraftSending}
-          onChange={(event) => setTerminalDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
-            event.preventDefault();
-            submitTerminalDraft();
-          }}
-          placeholder="输入终端内容..."
-          rows={1}
-          value={terminalDraft}
-        />
-        <Tooltip content="发送到终端">
-          <Button
-            aria-label="发送到终端"
-            className="terminalComposerSend"
-            disabled={!terminalDraft || terminalDraftSending}
-            onClick={submitTerminalDraft}
-            size="icon"
-            type="button"
-            variant="primary"
-          >
-            {terminalDraftSending
-              ? <Loader2 className="terminalLoadingIcon" aria-hidden="true" />
-              : <ArrowRight aria-hidden="true" />}
-          </Button>
-        </Tooltip>
-      </div>
-      {error ? <Notice className="terminalNotice" variant="danger">{error}</Notice> : null}
-    </section>
   );
 }
 
@@ -3408,7 +2108,7 @@ function governanceStatusSummaryText(summary, fallbackCount = 0) {
   ].filter(Boolean).join(" / ") || `${fallbackCount} 个文件`;
 }
 
-function GovernanceFilesHealthSection({ onCreateGovernanceTask, report }) {
+function GovernanceFilesHealthSection({ onCreateGovernanceTask, onReadEngineeringFile, report }) {
   const [openDomainId, setOpenDomainId] = useState("");
   const [governanceFile, setGovernanceFile] = useState(null);
   const [activeStatusFilter, setActiveStatusFilter] = useState("");
@@ -3467,9 +2167,7 @@ function GovernanceFilesHealthSection({ onCreateGovernanceTask, report }) {
     }
     setGovernanceFile({ loading: true, path });
     try {
-      const preview = await invokeWorkspaceCommand("read_engineering_file", {
-        input: { path },
-      });
+      const preview = await onReadEngineeringFile(path);
       setGovernanceFile({ path, preview });
     } catch (err) {
       setGovernanceFile({
@@ -3577,30 +2275,7 @@ function GovernanceFilesHealthSection({ onCreateGovernanceTask, report }) {
           );
         })}
       </div>
-      {governanceFile ? (
-        <div className="workspaceGovernancePreview">
-          <div className="engineeringFileHeader">
-            <div>
-              <strong>{governanceFile.path}</strong>
-              <p>工程文件只读预览</p>
-            </div>
-            {governanceFile.preview ? <Badge>{governanceFile.preview.language}</Badge> : null}
-          </div>
-          {governanceFile.loading ? (
-            <Notice variant="info">正在读取文件内容...</Notice>
-          ) : governanceFile.error ? (
-            <Notice variant="danger">{governanceFile.error}</Notice>
-          ) : governanceFile.preview ? (
-            <>
-              <div className="engineeringFileMeta">
-                <span>{formatBytes(governanceFile.preview.size)}</span>
-                {governanceFile.preview.truncated ? <span>已截断</span> : <span>完整预览</span>}
-              </div>
-              <pre className="engineeringFileCode">{governanceFile.preview.content || "文件为空。"}</pre>
-            </>
-          ) : null}
-        </div>
-      ) : null}
+      <ReadonlyFilePreview file={governanceFile} />
     </section>
   );
 }
@@ -3624,7 +2299,7 @@ const designImplementationTopics = {
   },
 };
 
-function DesignImplementationHealthSection({ onCreateDesignGovernanceTask, report, topic }) {
+function DesignImplementationHealthSection({ onCreateDesignGovernanceTask, onReadEngineeringFile, report, topic }) {
   const [activeStatusFilter, setActiveStatusFilter] = useState("");
   const [previewFile, setPreviewFile] = useState(null);
   const designDomain = (Array.isArray(report?.governanceDomains) ? report.governanceDomains : [])
@@ -3655,9 +2330,7 @@ function DesignImplementationHealthSection({ onCreateDesignGovernanceTask, repor
     }
     setPreviewFile({ loading: true, path });
     try {
-      const preview = await invokeWorkspaceCommand("read_engineering_file", {
-        input: { path },
-      });
+      const preview = await onReadEngineeringFile(path);
       setPreviewFile({ path, preview });
     } catch (err) {
       setPreviewFile({ error: err instanceof Error ? err.message : String(err), path });
@@ -3740,333 +2413,539 @@ function DesignImplementationHealthSection({ onCreateDesignGovernanceTask, repor
           <Notice variant="info">当前入口还没有匹配到设计实现资产。</Notice>
         )}
       </div>
-      {previewFile ? (
-        <div className="workspaceGovernancePreview">
-          <div className="engineeringFileHeader">
-            <div>
-              <strong>{previewFile.path}</strong>
-              <p>工程文件只读预览</p>
-            </div>
-            {previewFile.preview ? <Badge>{previewFile.preview.language}</Badge> : null}
-          </div>
-          {previewFile.loading ? (
-            <Notice variant="info">正在读取文件内容...</Notice>
-          ) : previewFile.error ? (
-            <Notice variant="danger">{previewFile.error}</Notice>
-          ) : previewFile.preview ? (
-            <>
-              <div className="engineeringFileMeta">
-                <span>{formatBytes(previewFile.preview.size)}</span>
-                {previewFile.preview.truncated ? <span>已截断</span> : <span>完整预览</span>}
-              </div>
-              <pre className="engineeringFileCode">{previewFile.preview.content || "文件为空。"}</pre>
-            </>
-          ) : null}
-        </div>
-      ) : null}
+      <ReadonlyFilePreview file={previewFile} />
     </section>
   );
 }
 
-function CurrentProgressPanel({ report, snapshot, tasks = [], onSelectTask }) {
-  const [activeFocus, setActiveFocus] = useState("");
-  const [progressFilePreview, setProgressFilePreview] = useState(null);
-  const activeGoal = activeGoalFromSnapshot(snapshot);
-  const goals = Array.isArray(snapshot?.goals?.goals) ? snapshot.goals.goals : [];
-  const backlogItems = Array.isArray(snapshot?.taskBacklog?.items) ? snapshot.taskBacklog.items : [];
-  const summary = report?.summary?.currentProgress || {};
-  const currentProgressDomain = (Array.isArray(report?.governanceDomains) ? report.governanceDomains : [])
-    .find((domain) => domain.id === "current-progress" || domain.title === "当前进度");
-  const allTasks = tasks.filter((task) => !isNoiseTask(task));
-  const openTasks = allTasks.filter((task) => ![taskStatuses.done, taskStatuses.failed].includes(task.status));
-  const doneTasks = allTasks.filter((task) => task.status === taskStatuses.done);
-  const failedTasks = allTasks.filter((task) => task.status === taskStatuses.failed);
-  const backlogDone = backlogItems.filter((item) => item.status === "done");
-  const backlogOpen = backlogItems.filter((item) => item.status !== "done");
-  const taskTotal = allTasks.length || backlogItems.length;
-  const taskDone = doneTasks.length || backlogDone.length;
-  const progressValue = taskTotal ? Math.round((taskDone / taskTotal) * 100) : 0;
-  const phaseText = phaseLabel(snapshot?.phase || report?.project?.lifecycle);
-  const goalStatus = activeGoal ? goalStatusLabelText(activeGoal.status) : phaseText;
-  const recentDone = [
-    ...doneTasks.slice(0, 3).map((task) => ({
-      id: task.id,
-      title: task.title,
-      meta: task.runSummary?.path || task.updatedAt || task.createdAt || "已完成",
-      task,
-    })),
-    ...backlogDone.slice(0, Math.max(0, 3 - doneTasks.length)).map((item) => ({
-      id: item.id,
-      title: item.title,
-      meta: item.completedAt || item.updatedAt || "已完成",
-    })),
-  ].slice(0, 4);
-  const nextItems = [
-    ...openTasks.slice(0, 4).map((task) => ({
-      id: task.id,
-      title: task.title,
-      meta: taskStatusLabel(task.status),
-      task,
-    })),
-    ...backlogOpen.slice(0, Math.max(0, 4 - openTasks.length)).map((item) => ({
-      id: item.id,
-      title: item.title,
-      meta: item.status || "planned",
-    })),
-  ].slice(0, 4);
-  const fileStatuses = Array.isArray(currentProgressDomain?.fileStatuses) ? currentProgressDomain.fileStatuses : [];
-  const progressFiles = fileStatuses.length
-    ? fileStatuses
-    : (currentProgressDomain?.files || []).map((path) => ({ path, status: "found" }));
-  const riskFiles = fileStatuses.filter((file) => ["missing", "changed", "stale"].includes(file.status || "found"));
-  const riskCount = failedTasks.length + riskFiles.length;
-  const visibleProgressFiles = activeFocus === "risk" ? riskFiles : progressFiles;
-  const primaryNext = nextItems[0];
-  const previewProgressFile = async (path) => {
-    if (!path || path.includes("*") || path.endsWith("/")) {
-      setProgressFilePreview({ error: "这是目录或匹配规则，暂不直接预览。请选择具体文件。", path });
-      return;
-    }
-    setProgressFilePreview({ loading: true, path });
-    try {
-      const preview = await invokeWorkspaceCommand("read_engineering_file", {
-        input: { path },
-      });
-      setProgressFilePreview({ path, preview });
-    } catch (err) {
-      setProgressFilePreview({ error: err instanceof Error ? err.message : String(err), path });
-    }
-  };
-
-  return (
-    <section className="currentProgressBoard">
-      <header className="currentProgressHero">
-        <div>
-          <span>阶段</span>
-          <strong>{phaseText}</strong>
-          <p>{summary.body || "当前进度会从目标、任务、交接和工作区事实中自动汇总。"}</p>
-        </div>
-        <div className="currentProgressScore" aria-label={`当前进度 ${progressValue}%`}>
-          <strong>{progressValue}%</strong>
-          <span>任务完成度</span>
-        </div>
-      </header>
-
-      <div className="currentProgressStage">
-        <div className="currentProgressStageTrack" aria-hidden="true">
-          <span style={{ width: `${progressValue}%` }} />
-        </div>
-        <div className="currentProgressStageMeta">
-          <span>{activeGoal?.shortTitle || activeGoal?.title || "暂无目标"}</span>
-          <strong>{goalStatus}</strong>
-        </div>
-      </div>
-
-      <div className="currentProgressStats">
-        <div>
-          <span>执行任务</span>
-          <strong>{openTasks.length}</strong>
-          <p>待确认 / 进行中</p>
-        </div>
-        <div>
-          <span>已完成</span>
-          <strong>{taskDone}</strong>
-          <p>任务或 backlog</p>
-        </div>
-        <button
-          className={activeFocus === "risk" ? "active" : ""}
-          type="button"
-          onClick={() => setActiveFocus(activeFocus === "risk" ? "" : "risk")}
-        >
-          <span>需关注</span>
-          <strong>{riskCount}</strong>
-          <p>失败或治理变更</p>
-        </button>
-      </div>
-
-      <div className="currentProgressSurface">
-        <section className="currentProgressPrimary">
-          <header>
-            <div>
-              <span>下一步</span>
-              <strong>{primaryNext?.title || "暂无待处理任务"}</strong>
-              <p>{primaryNext ? primaryNext.meta : "当前没有待处理任务。"}</p>
-            </div>
-            {primaryNext?.task ? (
-              <Button size="sm" variant="primary" type="button" onClick={() => onSelectTask?.(primaryNext.task.id)}>
-                打开任务
-              </Button>
-            ) : null}
-          </header>
-          <div className="currentProgressList">
-            {nextItems.slice(1).length ? nextItems.slice(1).map((item) => (
-              <button
-                disabled={!item.task}
-                key={item.id}
-                type="button"
-                onClick={() => item.task && onSelectTask?.(item.task.id)}
-              >
-                <span>{item.title}</span>
-                <small>{item.meta}</small>
-              </button>
-            )) : <Notice variant="success">没有更多待处理任务。</Notice>}
-          </div>
-        </section>
-
-        <aside className="currentProgressAside">
-          <section>
-            <strong>最近完成</strong>
-            <div className="currentProgressTimeline">
-              {recentDone.length ? recentDone.map((item) => (
-              <button
-                disabled={!item.task}
-                key={item.id}
-                type="button"
-                onClick={() => item.task && onSelectTask?.(item.task.id)}
-              >
-                <span>{item.title}</span>
-                <small>{item.meta}</small>
-              </button>
-            )) : <Notice variant="info">完成任务后会出现在这里。</Notice>}
-            </div>
-          </section>
-          <section>
-            <strong>{activeFocus === "risk" ? "需关注项" : "进度依据"}</strong>
-            <div className="currentProgressFiles">
-              {visibleProgressFiles.map((file) => {
-                const path = file.path || file;
-                return (
-                  <button
-                    className={`status-${file.status || "found"}${progressFilePreview?.path === path ? " active" : ""}`}
-                    key={path}
-                    type="button"
-                    onClick={() => previewProgressFile(path)}
-                  >
-                    {path}
-                    <small>{governanceFileHealthLabel(file.status)}</small>
-                  </button>
-                );
-              })}
-              {activeFocus === "risk" && failedTasks.map((task) => (
-                <button
-                  className="status-failed"
-                  key={task.id}
-                  type="button"
-                  onClick={() => onSelectTask?.(task.id)}
-                >
-                  {task.title}
-                  <small>失败任务</small>
-                </button>
-              ))}
-              {activeFocus === "risk" && !riskFiles.length && !failedTasks.length ? <Notice variant="success">当前没有需关注项。</Notice> : null}
-            </div>
-          </section>
-        </aside>
-      </div>
-      {progressFilePreview ? (
-        <div className="workspaceGovernancePreview">
-          <div className="engineeringFileHeader">
-            <div>
-              <strong>{progressFilePreview.path}</strong>
-              <p>进度依据只读预览</p>
-            </div>
-            {progressFilePreview.preview ? <Badge>{progressFilePreview.preview.language}</Badge> : null}
-          </div>
-          {progressFilePreview.loading ? (
-            <Notice variant="info">正在读取文件内容...</Notice>
-          ) : progressFilePreview.error ? (
-            <Notice variant="danger">{progressFilePreview.error}</Notice>
-          ) : progressFilePreview.preview ? (
-            <>
-              <div className="engineeringFileMeta">
-                <span>{formatBytes(progressFilePreview.preview.size)}</span>
-                {progressFilePreview.preview.truncated ? <span>已截断</span> : <span>完整预览</span>}
-              </div>
-              <pre className="engineeringFileCode">{progressFilePreview.preview.content || "文件为空。"}</pre>
-            </>
-          ) : null}
-        </div>
-      ) : null}
-    </section>
-  );
-}
-
-function RunbookPanel({ report }) {
-  const runbookSummary = report?.summary?.runbook || {};
-  const runbookDomain = (Array.isArray(report?.governanceDomains) ? report.governanceDomains : [])
-    .find((domain) => domain.id === "runbook" || domain.title === "启动方式");
-  const fileStatuses = Array.isArray(runbookDomain?.fileStatuses) ? runbookDomain.fileStatuses : [];
-  const commandGroups = [
+function CurrentProgressSlot({ model, onNavigate, onOpenSource }) {
+  const updatedAt = model.evidence.updatedAt
+    ? new Date(model.evidence.updatedAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })
+    : null;
+  const validationMeta = model.validation.meta && model.validation.meta !== "--"
+    ? `更新于 ${new Date(model.validation.meta).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}`
+    : model.validation.meta;
+  const acceptanceValue = model.acceptance.kind === "missing-required"
+    ? <Badge variant="warning">{model.acceptance.label}</Badge>
+    : <strong>{model.acceptance.label}</strong>;
+  const acceptanceContent = <div className="currentProgressOverviewItem">{acceptanceValue}<span>{model.acceptance.meta}</span></div>;
+  const validationValue = model.validation.kind === "empty"
+    ? <strong>{model.validation.label}</strong>
+    : <Badge>{model.validation.label}</Badge>;
+  const nextActionItems = [
     {
-      command: "npm --prefix desktop run web:dev -- --host 127.0.0.1 --port 1420",
-      label: "开发预览",
-      note: "启动浏览器里的工作台预览，当前地址就是 http://127.0.0.1:1420/。",
-      status: "本地服务",
-    },
-    {
-      command: "npm --prefix desktop run web:build",
-      label: "Web 构建",
-      note: "验证前端页面能否构建通过，适合改 UI 后自检。",
-      status: "可验证",
-    },
-    {
-      command: "cargo check --manifest-path desktop/src-tauri/Cargo.toml",
-      label: "桌面壳检查",
-      note: "验证 Tauri/Rust 桌面端命令和类型是否正常。",
-      status: "可验证",
-    },
-    {
-      command: "bash scripts/check-runtime.sh .",
-      label: "治理检查",
-      note: "检查 Project OS 运行规则、文档 frontmatter 和基础治理约束。",
-      status: "可验证",
+      id: `next-${model.nextAction.id}`,
+      content: (
+        <div className="currentProgressOverviewItem">
+          <strong>{model.nextAction.title}</strong>
+          <span>{model.nextAction.meta}</span>
+        </div>
+      ),
+      onClick: () => onNavigate?.(model.nextAction.routeId),
     },
   ];
-  const foundFiles = fileStatuses.filter((file) => (file.status || "found") === "found").length;
-  const missingFiles = fileStatuses.filter((file) => file.status === "missing").length;
-
   return (
-    <section className="runbookSurface">
-      <header className="runbookHero">
-        <div>
-          <span>启动方式</span>
-          <strong>{runbookSummary.title || "本地启动方式"}</strong>
-          <p>{runbookSummary.body || "这里集中展示当前项目的启动、构建和检查命令。"}</p>
-        </div>
-        <Badge>{missingFiles ? `${missingFiles} 项待补` : "可启动"}</Badge>
-      </header>
-      <div className="agentTopicPanel">
-        <div className="agentTopicCard">
-          <span>命令类型</span>
-          <strong>{commandGroups.length}</strong>
-        </div>
-        <div className="agentTopicCard">
-          <span>运行说明</span>
-          <strong>{foundFiles}/{fileStatuses.length || 3}</strong>
-        </div>
-        <div className="agentTopicCard">
-          <span>当前入口</span>
-          <strong>浏览器预览 / 桌面端 / 治理检查</strong>
-        </div>
-      </div>
-      <div className="runbookCommandGrid">
-        {commandGroups.map((item) => (
-          <article className="runbookCommand" key={item.label}>
-            <header>
-              <div>
-                <span>{item.label}</span>
-                <strong>{item.status}</strong>
+    <section className="workspaceFacts projectOverviewSurface currentProgressBoard">
+      <OverviewPageHeader
+        title="项目进展"
+        description={model.summary}
+        meta={<span>{updatedAt ? `更新于 ${updatedAt}` : "随项目事实自动更新"}</span>}
+        sources={<div className="overviewSourceButtons">{model.evidence.files.slice(0, 5).map((source) => <button key={source} type="button" onClick={() => onOpenSource?.(source)}><FileText aria-hidden="true" size={12} /><span>{source}</span></button>)}</div>}
+      />
+      <OverviewSection
+        title="项目位置"
+        subtitle="项目目标与当前阶段目标"
+        items={[
+          {
+            id: "project-goal",
+            label: "项目目标",
+            content: model.projectGoal,
+          },
+          {
+            id: "milestone",
+            label: "当前里程碑",
+            content: model.milestone,
+          },
+          {
+            id: "goal",
+            label: "当前阶段目标",
+            content: (
+              <div className="currentProgressOverviewItem">
+                <strong>{model.goal.title}</strong>
+                <Badge>{model.goal.status}</Badge>
               </div>
-              <Badge>{item.label === "开发预览" ? "启动" : "检查"}</Badge>
-            </header>
-            <code>{item.command}</code>
-            <p>{item.note}</p>
-          </article>
-        ))}
-      </div>
-      <Notice variant="info">这里先只展示受控启动和检查入口。长期运行的 dev server 后续应接入进程管理，再开放一键启动/停止。</Notice>
+            ),
+            onClick: () => onNavigate?.(model.goal.routeId),
+          },
+        ]}
+      />
+      <OverviewSection
+        title="目标阶段"
+        subtitle={model.stage.label}
+        items={[
+          {
+            id: "stage",
+            content: (
+              <div className="projectProgressStages" aria-label={`当前项目目标阶段：${model.stage.label}`}>
+                {model.stage.steps.map((step) => (
+                  <div className="projectProgressStage" data-state={step.state} key={step.id}>
+                    <span aria-hidden="true" />
+                    <strong>{step.label}</strong>
+                  </div>
+                ))}
+              </div>
+            ),
+          },
+        ]}
+      />
+      <OverviewSection
+        title="验收与风险"
+        subtitle="项目级判断依据"
+        items={[
+          {
+            id: "acceptance",
+            label: "验收标准",
+            content: acceptanceContent,
+            onClick: model.acceptance.kind === "ready" ? () => onNavigate?.(model.acceptance.routeId) : undefined,
+          },
+          {
+            id: "validation",
+            label: "最近验收",
+            content: <div className="currentProgressOverviewItem">{validationValue}<span>{validationMeta}</span></div>,
+            onClick: () => onNavigate?.(model.validation.routeId),
+          },
+          {
+            id: "risks",
+            label: "项目风险",
+            content: <div className="currentProgressOverviewItem"><strong>{model.risks.count} 项</strong><span>{model.risks.meta}</span></div>,
+            onClick: () => onNavigate?.(model.risks.routeId),
+          },
+        ]}
+      />
+      <OverviewSection
+        title="下一步"
+        subtitle="项目级唯一建议"
+        items={nextActionItems}
+      />
     </section>
   );
+}
+
+function CurrentProgressPanel({ onNavigate, onOpenSource, report, snapshot, tasks = [] }) {
+  const store = buildProjectFactStore({ report, snapshot, tasks });
+  const descriptors = compileCurrentProgressSlots({ capabilityManifest: snapshot?.projectCapabilities, components: { CurrentProgressSlot }, contract: projectProgressContract, store });
+  return descriptors.map((descriptor) => <descriptor.component key={descriptor.id} model={descriptor.props} onNavigate={onNavigate} onOpenSource={onOpenSource} />);
+}
+
+function currentGoalNextAction(goal) {
+  if (!goal) return { detail: "先建立一个可验收的当前目标。", routeId: "current-goal", title: "建立当前目标" };
+  if (goal.status === "draft") return { detail: "确认范围后，才能进入任务拆解。", routeId: "current-goal", title: "确认当前目标" };
+  if (goal.status === "planned") return { detail: "先生成并确认任务拆解草案，再进入任务执行。", routeId: "current-goal", title: "生成任务拆解" };
+  if (goal.status === "pending-confirm") return { detail: "验收已结束，确认完成前请先核对验收标准。", routeId: "acceptance-criteria", title: "核对验收标准" };
+  if (goal.status === "failed") return { detail: "先处理验收失败项，再重新判断目标状态。", routeId: "validation-report", title: "处理验收失败项" };
+  if (goal.status === "done") return { detail: "当前目标已完成，后续记录归入目标历史。", routeId: "goal-history", title: "查看目标历史" };
+  return { detail: "在任务中推进关联任务，完成后进入验收标准判断。", routeId: "task-list", title: "继续推进关联任务" };
+}
+
+function CurrentGoalPanel({ decomposingGoal, onConfirmDecomposition, onGenerateDecomposition, onNavigate, onOpenSource, snapshot }) {
+  const [decompositionOpen, setDecompositionOpen] = useState(false);
+  const [draftItems, setDraftItems] = useState([]);
+  const [draftError, setDraftError] = useState("");
+  const [generatingDraft, setGeneratingDraft] = useState(false);
+  const goal = activeGoalFromSnapshot(snapshot || {});
+  const updatedAt = goal?.updatedAt || goal?.confirmedAt || goal?.createdAt;
+  const updatedLabel = updatedAt
+    ? `更新于 ${new Date(updatedAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}`
+    : "尚未记录更新时间";
+  const status = goal ? goalStatusLabelText(goal.status) : "待建立";
+  const nextAction = currentGoalNextAction(goal);
+  const sources = [".project-os/goals.json", "PROJECT.md", "HANDOFF.md"];
+  return (
+    <section className="overviewSurface currentGoalSurface">
+      <OverviewPageHeader
+        title="当前阶段目标"
+        description="集中查看当前项目目标下的阶段目标、范围边界与唯一下一步。"
+        meta={<span>{updatedLabel}</span>}
+        sources={<div className="overviewSourceButtons">{sources.map((source) => <button key={source} type="button" onClick={() => onOpenSource?.(source)}><FileText aria-hidden="true" size={12} /><span>{source}</span></button>)}</div>}
+        status={<Badge>{status}</Badge>}
+      />
+      <OverviewSection
+        title="目标定义"
+        subtitle="本阶段要达成什么"
+        actions={<Button size="sm" type="button" variant="ghost" onClick={() => onNavigate?.("acceptance-criteria")}>查看验收标准</Button>}
+        items={[{ id: "goal-title", label: "目标", content: goal?.title || "尚未建立当前目标" }]}
+      />
+      <OverviewSection
+        title="范围边界"
+        subtitle="本目标覆盖什么"
+        items={[{ id: "goal-scope", content: goal?.summary || "尚未填写目标范围说明。" }]}
+      />
+      <OverviewSection
+        title="下一步"
+        subtitle="由当前目标状态决定"
+        items={[{
+          id: "goal-next-action",
+          content: <div className="currentProgressOverviewItem"><strong>{nextAction.title}</strong><span>{nextAction.detail}</span>{goal?.status === "planned" ? <Button size="sm" type="button" variant="ghost" onClick={() => setDecompositionOpen(true)}>查看拆解草案<ArrowRight aria-hidden="true" size={14} /></Button> : null}</div>,
+          onClick: goal?.status === "planned" ? undefined : () => onNavigate?.(nextAction.routeId),
+        }]}
+      />
+      <Dialog open={decompositionOpen} onOpenChange={setDecompositionOpen}>
+        <DialogContent title="任务拆解" description="只有模型成功生成草案后，才能确认并写入任务。">
+          {draftItems.length ? <div className="goalHistoryList">{draftItems.map((item) => <article key={item.id}><strong>{item.title}</strong><p>{item.detail}</p></article>)}</div> : <Notice variant="info">尚未生成草案。模型不可用或调用失败时不会创建任务。</Notice>}
+          {draftError ? <Notice variant="danger">{draftError}</Notice> : null}
+          <div className="goalConfirmActions">
+            <DialogClose asChild><Button size="sm" type="button" variant="default">取消</Button></DialogClose>
+            {!draftItems.length ? <Button size="sm" type="button" variant="primary" disabled={generatingDraft} onClick={async () => {
+              setGeneratingDraft(true); setDraftError("");
+              try { setDraftItems(await onGenerateDecomposition?.(goal) || []); } catch (error) { setDraftError(error instanceof Error ? error.message : String(error)); } finally { setGeneratingDraft(false); }
+            }}>{generatingDraft ? "生成中" : "生成模型草案"}</Button> : <Button size="sm" type="button" variant="primary" disabled={decomposingGoal} onClick={async () => {
+              const completed = await onConfirmDecomposition?.(goal, draftItems);
+              if (completed) setDecompositionOpen(false);
+            }}>{decomposingGoal ? "确认中" : "确认拆解"}</Button>
+            }
+          </div>
+        </DialogContent>
+      </Dialog>
+    </section>
+  );
+}
+
+function goalValidationStatusLabel(status) {
+  return {
+    passed: "已通过",
+    failed: "未通过",
+    running: "验收中",
+    missing: "尚未验收",
+  }[status] || "尚未验收";
+}
+
+function AcceptanceCriteriaPanel({ onNavigate, onOpenSource, snapshot }) {
+  const validation = snapshot?.goalValidation || {};
+  const report = snapshot?.goalValidationReport || {};
+  const criteria = Array.isArray(validation.criteria) ? validation.criteria : [];
+  const activeGoal = activeGoalFromSnapshot(snapshot || {});
+  const goal = validation.goal || activeGoal;
+  const criteriaMatchCurrentGoal = Boolean(activeGoal?.id && validation.goal?.id === activeGoal.id);
+  const criteriaNeedRelinking = Boolean(criteria.length && activeGoal?.id && !criteriaMatchCurrentGoal);
+  const updatedAt = validation.updatedAt || report.generatedAt;
+  const updatedLabel = updatedAt
+    ? `更新于 ${new Date(updatedAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}`
+    : "尚未记录验收时间";
+  const reportStatus = goalValidationStatusLabel(report.status || "missing");
+  const sources = [".project-os/goal-validation.json", "docs/TESTING.md"];
+  return (
+    <section className="overviewSurface acceptanceCriteriaSurface">
+      <OverviewPageHeader
+        title="验收标准"
+        description="集中定义当前目标完成时必须满足的判断条件。"
+        meta={<span>{updatedLabel}</span>}
+        sources={<div className="overviewSourceButtons">{sources.map((source) => <button key={source} type="button" onClick={() => onOpenSource?.(source)}><FileText aria-hidden="true" size={12} /><span>{source}</span></button>)}</div>}
+        status={<Badge variant={criteriaNeedRelinking ? "warning" : criteria.length ? "success" : "neutral"}>{criteriaNeedRelinking ? "需处理" : criteria.length ? "已登记" : "待确认"}</Badge>}
+      />
+      <OverviewSection
+        title="关联目标"
+        subtitle="这些条件判断哪个目标是否完成"
+        actions={<Button size="sm" type="button" variant="ghost" onClick={() => onNavigate?.("current-goal")}>查看当前目标</Button>}
+        items={[{ id: "validation-goal", label: "目标", content: goal?.title || "尚未关联目标" }]}
+      />
+      <OverviewSection
+        title="完成判断"
+        subtitle={criteria.length ? `${criteria.length} 项必须满足的条件` : "尚未登记完成判断"}
+        items={[{
+          id: "criteria",
+          content: criteria.length ? <div className="acceptanceCriteriaList">{criteriaNeedRelinking ? <Notice variant="warning">现有标准关联的是“{goal?.title || "其他目标"}”，当前目标“{activeGoal?.title || "未命名目标"}”仍缺少验收标准。</Notice> : null}{criteria.map((criterion) => <article key={criterion.id || criterion.title}><div><strong>{criterion.title || "未命名条件"}</strong>{criterion.required ? <Badge>必需</Badge> : null}</div><p>{criterion.body || "未填写判断说明。"}</p></article>)}</div> : <Notice variant="info">尚未为当前目标登记验收标准。</Notice>,
+        }]}
+      />
+      <OverviewSection
+        title="当前结论"
+        subtitle="执行证据和检查详情归验收报告"
+        actions={<Button size="sm" type="button" variant="ghost" onClick={() => onNavigate?.("validation-report")}>查看验收报告</Button>}
+        items={[{ id: "report-status", label: "验收状态", content: <Badge>{reportStatus}</Badge> }]}
+      />
+    </section>
+  );
+}
+
+function GoalHistoryPanel({ onOpenSource, snapshot }) {
+  const goals = Array.isArray(snapshot?.goals?.goals) ? snapshot.goals.goals : [];
+  const completedGoals = goals.filter((goal) => goal.status === "done");
+  const signoffHistory = Array.isArray(snapshot?.goalSignoffHistory?.entries) ? snapshot.goalSignoffHistory.entries : [];
+  const updatedAt = snapshot?.goalSignoffHistory?.updatedAt || snapshot?.goals?.updatedAt;
+  const updatedLabel = updatedAt
+    ? `更新于 ${new Date(updatedAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}`
+    : "尚未记录完成时间";
+  const sources = [".project-os/goals.json", ".project-os/goal-signoff-history.json"];
+  return (
+    <section className="overviewSurface goalHistorySurface">
+      <OverviewPageHeader
+        title="目标历史"
+        description="保留已经完成目标及其完成确认记录，便于回看和追溯。"
+        meta={<span>{updatedLabel}</span>}
+        sources={<div className="overviewSourceButtons">{sources.map((source) => <button key={source} type="button" onClick={() => onOpenSource?.(source)}><FileText aria-hidden="true" size={12} /><span>{source}</span></button>)}</div>}
+        status={<Badge status={completedGoals.length ? "done" : "waiting"}>{completedGoals.length ? "已完成" : "尚未记录"}</Badge>}
+      />
+      <OverviewSection
+        title="已完成目标"
+        subtitle={completedGoals.length ? `${completedGoals.length} 个已完成目标` : "尚无已完成目标"}
+        items={[{
+          id: "completed-goals",
+          content: completedGoals.length ? <div className="goalHistoryList">{completedGoals.map((goal) => <article key={goal.id}><div><strong>{goal.title || "未命名目标"}</strong><Badge>已完成</Badge></div><p>{goal.summary || "未记录目标说明。"}</p></article>)}</div> : <Notice variant="info">完成后的目标会在这里保留历史记录。</Notice>,
+        }]}
+      />
+      <OverviewSection
+        title="完成确认"
+        subtitle="确认结果来自验收完成记录"
+        items={[{
+          id: "signoff-history",
+          content: signoffHistory.length ? <div className="goalHistoryList">{signoffHistory.map((entry, index) => <article key={`${entry.goalId || entry.goalTitle}-${entry.signedOffAt || index}`}><div><strong>{entry.goalTitle || "未命名目标"}</strong><Badge>{goalValidationStatusLabel(entry.reportStatus)}</Badge></div><p>{entry.signedOffAt ? `确认于 ${new Date(entry.signedOffAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}` : "未记录确认时间"}</p></article>)}</div> : <Notice variant="info">完成确认后会在这里沉淀可追溯记录。</Notice>,
+        }]}
+      />
+    </section>
+  );
+}
+
+function RuleSourceButtons({ onOpenSource, sources }) {
+  return (
+    <div className="overviewSourceButtons">
+      {sources.map((source) => <button key={source} type="button" onClick={() => onOpenSource?.(source)}><FileText aria-hidden="true" size={12} /><span>{source}</span></button>)}
+    </div>
+  );
+}
+
+function ValidationReportPanel({ onOpenSource, snapshot }) {
+  const report = snapshot?.goalValidationReport || {};
+  const checks = Array.isArray(report.checks) ? report.checks : [];
+  const passed = checks.filter((check) => check?.success).length;
+  const status = goalValidationStatusLabel(report.status || "missing");
+  const sources = [".project-os/goal-validation-report.json", ".project-os/reports/ai-project-report.json"];
+  return (
+    <section className="overviewSurface validationReportSurface">
+      <OverviewPageHeader
+        title="验收报告"
+        description="给出当前目标最近一次验收的结论、检查结果和后续处理方向。"
+        meta={<span>{report.generatedAt ? `更新于 ${new Date(report.generatedAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}` : "尚未生成验收报告"}</span>}
+        sources={<RuleSourceButtons onOpenSource={onOpenSource} sources={sources} />}
+        status={<Badge>{status}</Badge>}
+      />
+      <OverviewSection
+        title="当前结论"
+        subtitle="只呈现当前目标的验收判断"
+        items={[{ id: "validation-conclusion", content: report.summary || (checks.length ? `最近验收 ${status}。` : "尚未运行当前目标的验收。") }]}
+      />
+      <OverviewSection
+        title="检查结果"
+        subtitle={checks.length ? `${passed}/${checks.length} 项通过` : "尚无检查结果"}
+        items={[{ id: "validation-check-results", content: checks.length ? <OverviewTagList items={checks.map((check) => `${check.success ? "通过" : "失败"} · ${check.label || check.id || "未命名检查"}`)} /> : <Notice variant="info">运行验收后，这里会显示每项检查的结论。</Notice> }]}
+      />
+      <OverviewSection
+        title="后续处理"
+        subtitle="失败与运行细节由对应页面承接"
+        items={[{ id: "validation-follow-up", content: report.status === "failed" ? "存在未通过检查。请在任务执行中处理失败项，再重新验收。" : "完整报告产物归工程资产，单次运行过程归运行记录。" }]}
+      />
+    </section>
+  );
+}
+
+function RunRecordsPanel({ onOpenSource, snapshot }) {
+  const runCount = Number(snapshot?.runCount || 0);
+  const report = snapshot?.goalValidationReport || {};
+  const sources = [".project-os/runs/desktop-summary.md", ".project-os/goal-validation-report.json"];
+  return (
+    <section className="overviewSurface runRecordsSurface">
+      <OverviewPageHeader
+        title="运行记录"
+        description="保留检查、扫描和受控执行的历史证据，供后续追溯。"
+        meta={<span>{report.generatedAt ? `最近验收于 ${new Date(report.generatedAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}` : "尚未记录最近运行"}</span>}
+        sources={<RuleSourceButtons onOpenSource={onOpenSource} sources={sources} />}
+        status={<Badge>{runCount ? "已登记" : "待确认"}</Badge>}
+      />
+      <OverviewSection
+        title="执行历史"
+        subtitle="已沉淀的本地运行次数"
+        items={[{ id: "run-history", content: runCount ? `当前项目已记录 ${runCount} 次运行。` : "尚未发现可展示的本地运行记录。" }]}
+      />
+      <OverviewSection
+        title="可追溯证据"
+        subtitle="每次运行关联结果和上下文"
+        items={[{ id: "run-evidence", content: "运行记录保留目标、检查命令、输出摘要和最终状态；验收结论仍以验收报告为准。" }]}
+      />
+      <OverviewSection
+        title="保留边界"
+        subtitle="历史产物按本地策略自动清理"
+        items={[{ id: "run-retention", content: "运行历史属于本地治理产物；清理策略由 Project OS 配置维护，交接只沉淀仍与当前项目决策相关的结果。" }]}
+      />
+    </section>
+  );
+}
+
+function RiskBoundaryPanel({ onOpenSource, report, snapshot }) {
+  const boundary = report?.summary?.riskBoundary || report?.project?.riskBoundary || {};
+  const summaryRisks = Array.isArray(report?.findings?.risks) ? report.findings.risks : [];
+  const profileRisks = Array.isArray(snapshot?.projectProfile?.fields?.["memory.risks"]?.value)
+    ? snapshot.projectProfile.fields["memory.risks"].value.map((body) => ({ body, severity: "medium", title: "项目约束" }))
+    : [];
+  const risks = (summaryRisks.length ? summaryRisks : profileRisks).slice(0, 3);
+  const sources = [...new Set([...(boundary.sources || []), ...risks.flatMap((risk) => risk.sources || [])])].slice(0, 5);
+  const status = risks.length ? "需关注" : "暂无项目风险";
+
+  return (
+    <section className="overviewSurface riskBoundarySurface">
+      <OverviewPageHeader
+        description={boundary.body || "集中查看会影响项目推进的已知风险，以及当前阶段明确不覆盖的范围。"}
+        meta={<span>{boundary.status === "confirmed" ? "已确认" : "基于项目事实"}</span>}
+        sources={sources.length ? <div className="overviewSourceButtons">{sources.map((source) => <button key={source} type="button" onClick={() => onOpenSource?.(source)}><FileText aria-hidden="true" size={12} /><span>{source}</span></button>)}</div> : null}
+        status={<Badge status={risks.length ? "waiting" : "done"}>{status}</Badge>}
+        title="风险边界"
+      />
+      <OverviewSection
+        subtitle={risks.length ? `${risks.length} 项需要持续关注` : "当前未发现需要处理的项目级风险"}
+        title="已知风险"
+        items={[{
+          id: "known-risks",
+          content: risks.length ? (
+            <div className="riskBoundaryList">
+              {risks.map((risk) => <article key={`${risk.title}-${risk.body}`}>
+                <div><strong>{risk.title || "未命名风险"}</strong><Badge status={risk.severity === "high" ? "failed" : risk.severity === "low" ? "planned" : "waiting"}>{risk.severity === "high" ? "高" : risk.severity === "low" ? "低" : "中"}</Badge></div>
+                <p>{risk.body}</p>
+              </article>)}
+            </div>
+          ) : <Notice variant="success">当前项目没有记录需要处理的风险。</Notice>,
+        }]}
+      />
+      <OverviewSection
+        subtitle="不在这里执行或重复展示，由对应页面承接"
+        title="当前边界"
+        items={[
+          { id: "execution-boundary", label: "任务与验证", content: "失败任务、运行日志和修复动作进入执行结果。" },
+          { id: "asset-boundary", label: "文件健康", content: "缺失、变更和过期文件进入治理文件。" },
+          { id: "security-boundary", label: "安全与权限", content: "确认动作、密钥和命令限制进入安全边界。" },
+        ]}
+      />
+    </section>
+  );
+}
+
+function LocalProjectStatePanel({ onOpenSource, report, snapshot }) {
+  const summary = report?.summary?.localState || {};
+  const domain = (report?.governanceDomains || []).find((item) => item.id === "local-state") || {};
+  const statuses = Array.isArray(domain.fileStatuses) ? domain.fileStatuses : [];
+  const statusFor = (path) => statuses.find((item) => item.path === path)?.status || "unknown";
+  const sources = [...new Set((summary.sources || domain.files || []).filter((path) => path && !path.endsWith("/")))].slice(0, 5);
+  const selectedProject = (snapshot?.projects || []).find((project) => project.isCurrent);
+  const stateChanged = statusFor(".project-os/state.json") === "changed";
+  return (
+    <section className="localStateSurface">
+      <OverviewPageHeader
+        description={summary.body || "确认 OmniDesk 是否已认识、登记并可以继续治理当前项目。"}
+        meta={<span>接入信息随项目登记和治理文件变化更新</span>}
+        sources={sources.length ? <div className="overviewSourceButtons">{sources.map((source) => <button key={source} type="button" onClick={() => onOpenSource?.(source)}><FileText aria-hidden="true" size={12} /><span>{source}</span></button>)}</div> : null}
+        status={<Badge status="done">已接入</Badge>}
+        title="项目接入"
+      />
+      <OverviewSection title="接入状态" subtitle="当前工作区是否已登记并可继续使用" items={[
+        { id: "project", label: "当前项目", content: selectedProject?.name || snapshot?.projectName || "尚未选择" },
+        { id: "registry", label: "工作区登记", content: <Badge>{statusFor(".project-os/desktop-registry.json") === "found" ? "已登记" : "待确认"}</Badge> },
+      ]} />
+      <OverviewSection title="治理准备" subtitle="继续使用 OmniDesk 所需的基础信息" items={[
+        { id: "state", label: "状态文件", content: stateChanged ? "检测到本地变化，已纳入当前状态" : <Badge>可用</Badge> },
+        { id: "profile", label: "项目档案", content: <Badge>{snapshot?.projectProfile ? "已识别" : "待识别"}</Badge> },
+      ]} />
+    </section>
+  );
+}
+
+function RunbookCommandList({ commands, copiedCommandId, copyErrorId, onCopy, onSendToTerminal }) {
+  if (!commands.length) return <Notice variant="info">尚未识别到命令，请先在 package scripts 或运行文档登记。</Notice>;
+  return (
+    <div className="runbookCommandList">
+      {commands.map((item) => {
+        const copied = copiedCommandId === item.id;
+        const failed = copyErrorId === item.id;
+        return (
+          <div className="runbookCommandRow" key={item.id || item.label}>
+            <div className="runbookCommandIdentity">
+              <strong>{item.label}</strong>
+              <span>{item.source}</span>
+            </div>
+            <code>{item.command}</code>
+            <div className="runbookCommandAction">
+              <div className="runbookCommandButtons">
+                <Tooltip content="发送到终端">
+                  <Button aria-label={`发送${item.label}命令到终端`} onClick={() => onSendToTerminal?.(item.command)} size="icon" type="button" variant="ghost">
+                    <TerminalSquare aria-hidden="true" />
+                  </Button>
+                </Tooltip>
+                <Tooltip content={failed ? "复制失败" : copied ? "已复制" : "复制命令"}>
+                  <Button aria-label={`复制${item.label}命令`} onClick={() => onCopy(item)} size="icon" type="button" variant="ghost">
+                    {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
+                  </Button>
+                </Tooltip>
+              </div>
+              {copied || failed ? <span className={failed ? "error" : "success"} role="status">{failed ? "复制失败" : "已复制"}</span> : null}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function RunbookSlot({ model, onSendToTerminal }) {
+  const [copiedCommandId, setCopiedCommandId] = useState("");
+  const [copyErrorId, setCopyErrorId] = useState("");
+  const copyCommand = async (item) => {
+    setCopyErrorId("");
+    try {
+      await copyTextToSystemClipboard(item.command);
+      setCopiedCommandId(item.id);
+    } catch {
+      setCopiedCommandId("");
+      setCopyErrorId(item.id);
+    }
+  };
+  return (
+    <section className="workspaceFacts projectOverviewSurface runbookSurface">
+      <OverviewPageHeader
+        title="启动方式"
+        description={model.description}
+        sources={<div className="overviewSourceButtons">{model.sources.slice(0, 5).map((source) => <button key={source} type="button" onClick={() => onOpenSource?.(source)}><FileText aria-hidden="true" size={12} /><span>{source}</span></button>)}</div>}
+        status={<Badge>{model.status}</Badge>}
+      />
+      <OverviewSection
+        title="运行环境"
+        subtitle="工作目录与依赖"
+        items={[
+          {
+            id: "directory",
+            label: "工作目录",
+            className: "overviewSectionItem-mono",
+            content: model.context.workingDirectory,
+          },
+          {
+            id: "requirements",
+            label: "环境要求",
+            content: model.context.requirements.length
+              ? <OverviewTagList items={model.context.requirements} />
+              : <span className="runbookEmptyValue">尚未识别</span>,
+          },
+        ]}
+      />
+      <OverviewSection
+        title="启动入口"
+        subtitle={`${model.readiness.startCount} 个已确认入口`}
+        items={[{
+          id: "start-commands",
+          content: <RunbookCommandList commands={model.startCommands} copiedCommandId={copiedCommandId} copyErrorId={copyErrorId} onCopy={copyCommand} onSendToTerminal={onSendToTerminal} />,
+        }]}
+      />
+    </section>
+  );
+}
+
+function RunbookPanel({ onOpenSource, onSendToTerminal, report, snapshot }) {
+  const store = buildProjectFactStore({ report, snapshot });
+  const descriptors = compileRunbookSlots({ capabilityManifest: snapshot?.projectCapabilities, components: { RunbookSlot }, contract: projectRunbookContract, store });
+  return descriptors.map((descriptor) => <descriptor.component key={descriptor.id} model={descriptor.props} onOpenSource={onOpenSource} onSendToTerminal={onSendToTerminal} />);
 }
 
 function ReportArtifactsPanel({ snapshot }) {
@@ -4157,1291 +3036,407 @@ function ReportArtifactsPanel({ snapshot }) {
   );
 }
 
-function WorkspaceFactsPreview({ globalOverview = false, onCreateGovernanceTask, onNavigate, provider, report, snapshot, tasks = [] }) {
+function WorkspaceFactsPreview({ globalOverview = false, onCreateGovernanceTask, onNavigate, onRequestProjectAccess, provider, report, snapshot, tasks = [] }) {
+  const refreshProjectKey = report?.project?.path || snapshot?.currentProjectPath || snapshot?.currentProjectId || snapshot?.projectName || "current-project";
+  const refreshSignature = [refreshProjectKey, ...(snapshot?.factFreshness?.changedSources || [])].filter(Boolean).join("|");
+  const initialRefreshFailure = readFactRefreshFailure(refreshProjectKey);
+  const hasPersistedRefreshFailure = initialRefreshFailure?.signature === refreshSignature;
   const [currentReport, setCurrentReport] = useState(report);
   const [refreshing, setRefreshing] = useState(false);
-  const [runningAction, setRunningAction] = useState("");
-  const [feedback, setFeedback] = useState("");
+  const [refreshState, setRefreshState] = useState(hasPersistedRefreshFailure ? "error" : "idle");
+  const [refreshError, setRefreshError] = useState(hasPersistedRefreshFailure ? initialRefreshFailure.message : "");
+  const [factFreshnessStatus, setFactFreshnessStatus] = useState(snapshot?.factFreshness?.status || "unknown");
+  const [lastRefreshedAt, setLastRefreshedAt] = useState(report?.generatedAt || "");
   const [autoRefreshKey, setAutoRefreshKey] = useState("");
+  const overviewActionHandlersRef = useRef({});
+  const overviewRuntimeRef = useRef(null);
+  const overviewRuntimeStateRef = useRef(null);
+  if (!overviewRuntimeRef.current) {
+    overviewRuntimeRef.current = createProjectOverviewSlotRuntime({
+      actions: {
+        "refresh-project-facts": (...args) => overviewActionHandlersRef.current["refresh-project-facts"]?.(...args),
+        "open-architecture": (...args) => overviewActionHandlersRef.current["open-architecture"]?.(...args),
+        "open-source": (...args) => overviewActionHandlersRef.current["open-source"]?.(...args),
+      },
+      components: { ProjectOverviewHeader, ProjectOverviewSectionSlot },
+    });
+  }
   useEffect(() => {
     setCurrentReport(report);
-  }, [report]);
+    setFactFreshnessStatus(snapshot?.factFreshness?.status || "unknown");
+    if (report?.generatedAt) {
+      setLastRefreshedAt((current) => !current || new Date(report.generatedAt) > new Date(current) ? report.generatedAt : current);
+    }
+  }, [report, snapshot?.factFreshness?.status]);
+  useEffect(() => {
+    const persistedFailure = readFactRefreshFailure(refreshProjectKey);
+    if (persistedFailure?.signature === refreshSignature) {
+      setAutoRefreshKey(refreshSignature);
+      setRefreshError(persistedFailure.message || "项目事实更新失败");
+      setRefreshState("error");
+      return;
+    }
+    setAutoRefreshKey("");
+    setRefreshError("");
+    setRefreshState("idle");
+  }, [refreshProjectKey, refreshSignature]);
   useEffect(() => {
     if (globalOverview) return;
-    const nextKey = [report?.project?.path, report?.generatedAt].filter(Boolean).join("|");
+    if (snapshot?.factFreshness?.status !== "stale") return;
+    const nextKey = refreshSignature;
     if (!nextKey || nextKey === autoRefreshKey) return;
+    const persistedFailure = readFactRefreshFailure(refreshProjectKey);
+    if (persistedFailure?.signature === nextKey) {
+      setAutoRefreshKey(nextKey);
+      setRefreshError(persistedFailure.message || "项目事实更新失败");
+      setRefreshState("error");
+      return;
+    }
     setAutoRefreshKey(nextKey);
-    refreshFacts("auto");
-  }, [globalOverview, report?.project?.path, report?.generatedAt, autoRefreshKey]);
+    refreshFacts();
+  }, [globalOverview, refreshProjectKey, refreshSignature, snapshot?.factFreshness?.status, autoRefreshKey]);
   if (globalOverview) {
     const projects = Array.isArray(snapshot?.projects) ? snapshot.projects : [];
-    const readyProjects = projects.filter((project) => project.health === "ready" || !project.health).length;
-    const attentionProjects = projects.length - readyProjects;
     const currentProject = projects.find((project) => project.isCurrent);
-    const indexedTaskCount = projects.reduce((sum, project) => sum + Number(project.taskCount || 0), 0);
     const indexedActiveTasks = projects.reduce((sum, project) => sum + Number(project.activeTaskCount || 0), 0);
     const indexedFailedTasks = projects.reduce((sum, project) => sum + Number(project.failedTaskCount || 0), 0);
-    const hasProjectTaskIndex = projects.some((project) => Number.isFinite(project.taskCount));
-    const currentActiveTasks = tasks.filter((task) => ![taskStatuses.done, taskStatuses.failed].includes(task.status)).length;
+    const currentTasks = tasks.filter((task) => !isNoiseTask(task));
+    const currentRunningTasks = currentTasks.filter((task) => task.status === taskStatuses.running);
+    const currentWaitingTasks = currentTasks.filter((task) => [taskStatuses.waitingApproval, taskStatuses.planned].includes(task.status));
+    const currentFailedTasks = currentTasks.filter((task) => task.status === taskStatuses.failed);
+    const attentionItems = [
+      ...projects.filter((project) => Number(project.failedTaskCount) > 0).map((project) => ({
+        action: "处理失败任务",
+        body: `${project.failedTaskCount} 个任务失败，需要检查结果并决定是否生成修复任务。`,
+        project,
+        tone: "danger",
+        title: `${project.name} 有执行失败`,
+      })),
+      ...projects.filter((project) => project.health === "missing").map((project) => ({
+        action: "重新定位",
+        body: "项目路径已经失效，需要重新定位后才能继续读取和执行。",
+        project,
+        tone: "danger",
+        title: `${project.name} 无法访问`,
+      })),
+      ...projects.filter((project) => project.health === "partial").map((project) => ({
+        action: "查看项目",
+        body: "项目缺少关键治理文件，可以先查看扫描结果再决定是否补齐。",
+        project,
+        tone: "warning",
+        title: `${project.name} 需要补充信息`,
+      })),
+      ...currentWaitingTasks.slice(0, 2).map((task) => ({
+        action: "继续任务",
+        body: task.plan?.summary || task.description || "任务已准备好，等待确认后继续。",
+        project: currentProject,
+        target: "execution",
+        tone: "info",
+        title: task.title || "任务等待确认",
+      })),
+    ].slice(0, 4);
+    const recentActivities = projects
+      .filter((project) => project.latestActivityTitle)
+      .sort((a, b) => String(b.latestActivityAt || "").localeCompare(String(a.latestActivityAt || "")))
+      .slice(0, 5);
+    const switchAndNavigate = (project, target) => {
+      if (!project) return;
+      if (!project.isCurrent) {
+        onNavigate?.({ type: "project", id: project.id, nextTarget: target });
+        return;
+      }
+      if (target) onNavigate?.(target);
+    };
     return (
       <div className="workspaceFacts workbenchDashboard portfolioDashboard">
-        <section className="workbenchHero">
-          <h3>工作台总览</h3>
-          <p>{projects.length} 个项目 · 当前：{currentProject?.name || snapshot?.projectName || "未选择"}</p>
+        <section className="portfolioCommandBar">
+          <div>
+            <span className="portfolioEyebrow">今日工作</span>
+            <strong>{attentionItems.length ? `${attentionItems.length} 件事需要处理` : "当前没有阻塞事项"}</strong>
+            <p>{projects.length} 个项目已接入，当前在 {currentProject?.name || snapshot?.projectName || "未选择项目"}。</p>
+          </div>
+          <div className="portfolioCommandActions">
+            <Button type="button" variant="primary" onClick={() => onNavigate?.("conversation")}><MessageSquare size={15} />发起任务</Button>
+            <Button type="button" variant="secondary" onClick={onRequestProjectAccess}><Plus size={15} />添加项目</Button>
+          </div>
         </section>
-        <section className="portfolioStats" aria-label="跨项目状态">
-          <div><span>项目总数</span><strong>{projects.length}</strong></div>
-          <div><span>可用</span><strong>{readyProjects}</strong></div>
-          <div><span>需关注</span><strong>{attentionProjects}</strong></div>
-          <div><span>{hasProjectTaskIndex ? "跨项目活跃任务" : "当前项目任务"}</span><strong>{hasProjectTaskIndex ? indexedActiveTasks : currentActiveTasks}</strong></div>
+
+        <section className="portfolioAttention" aria-labelledby="portfolio-attention-title">
+          <header className="portfolioSectionHeader">
+            <div><strong id="portfolio-attention-title">需要你处理</strong><span>按影响程度排序</span></div>
+            <em>{attentionItems.length || "无"}</em>
+          </header>
+          {attentionItems.length ? (
+            <div className="portfolioAttentionList">
+              {attentionItems.map((item) => (
+                <article className={`portfolioAttentionItem tone-${item.tone}`} key={`${item.project?.id}-${item.title}`}>
+                  <span className="portfolioAttentionMarker" aria-hidden="true" />
+                  <div><strong>{item.title}</strong><p>{item.body}</p></div>
+                  <Button type="button" variant="ghost" onClick={() => switchAndNavigate(item.project, item.target)}>{item.action}<ArrowRight size={14} /></Button>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="portfolioClearState"><Check size={16} /><span>所有项目当前可继续推进，没有等待处理的失败或确认项。</span></div>
+          )}
         </section>
+
         <section className="portfolioProjects">
-          <header><strong>项目</strong><p>跨项目状态来自本地工作台 registry。</p></header>
+          <header className="portfolioSectionHeader">
+            <div><strong>项目</strong><span>状态、当前动作与最近进展</span></div>
+            <em>{projects.length}</em>
+          </header>
           <div className="portfolioProjectList">
             {projects.map((project) => {
               const needsAttention = ["missing", "partial"].includes(project.health);
+              const failedCount = Number(project.failedTaskCount || 0);
+              const activeCount = Number(project.activeTaskCount || 0);
+              const statusText = failedCount
+                ? `${failedCount} 个失败`
+                : project.health === "missing"
+                  ? "路径失效"
+                  : project.health === "partial"
+                    ? "信息不完整"
+                    : activeCount
+                      ? `${activeCount} 项进行中`
+                      : "可继续推进";
               return (
-                <div className={`portfolioProjectRow${project.isCurrent ? " active" : ""}`} key={project.id}>
+                <button className={`portfolioProjectRow${project.isCurrent ? " active" : ""}`} key={project.id} type="button" onClick={() => switchAndNavigate(project)}>
                   <span className={`projectStatusDot${needsAttention ? ` projectStatusDot-${project.health === "missing" ? "danger" : "warning"}` : " projectStatusDot-empty"}`} aria-hidden="true" />
                   <div>
-                    <strong>{project.name}</strong>
-                    <span>{project.latestActivityTitle || project.path}</span>
+                    <span className="portfolioProjectTitle"><strong>{project.name}</strong>{project.isCurrent ? <em>当前</em> : null}</span>
+                    <span>{project.latestActivityTitle || project.phase || "已接入工作台"}</span>
                   </div>
-                  <em>{project.isCurrent ? "当前" : Number(project.failedTaskCount) ? `${project.failedTaskCount} 失败` : Number(project.activeTaskCount) ? `${project.activeTaskCount} 活跃` : project.phase || "已接入"}</em>
-                </div>
+                  <span className={failedCount || needsAttention ? "portfolioProjectState attention" : "portfolioProjectState"}>{statusText}</span>
+                  <ArrowRight size={15} aria-hidden="true" />
+                </button>
               );
             })}
           </div>
         </section>
-        <Notice variant={indexedFailedTasks ? "warning" : "info"}>
-          {hasProjectTaskIndex
-            ? `已索引 ${indexedTaskCount} 个跨项目任务${indexedFailedTasks ? `，其中 ${indexedFailedTasks} 个失败` : ""}。`
-            : "浏览器预览仅能读取当前项目任务；桌面端会从各项目目录建立只读摘要。"}
-        </Notice>
+
+        <section className="portfolioLowerGrid">
+          <div className="portfolioAgentQueue">
+            <header className="portfolioSectionHeader"><div><strong>AI 工作</strong><span>跨项目执行队列</span></div></header>
+            <div className="portfolioQueueMetrics">
+              <button type="button" onClick={() => onNavigate?.("execution")}><strong>{indexedActiveTasks || currentRunningTasks.length}</strong><span>进行中</span></button>
+              <button type="button" onClick={() => onNavigate?.("execution")}><strong>{currentWaitingTasks.length}</strong><span>等待确认</span></button>
+              <button type="button" onClick={() => onNavigate?.("execution-results")}><strong>{indexedFailedTasks || currentFailedTasks.length}</strong><span>执行失败</span></button>
+            </div>
+            <Button type="button" variant="secondary" onClick={() => onNavigate?.("conversation")}><MessageSquare size={15} />告诉 AI 下一步做什么</Button>
+          </div>
+
+          <div className="portfolioRecent">
+            <header className="portfolioSectionHeader"><div><strong>最近活动</strong><span>只保留关键变化</span></div></header>
+            {recentActivities.length ? (
+              <div className="portfolioRecentList">
+                {recentActivities.map((project) => (
+                  <button type="button" key={project.id} onClick={() => switchAndNavigate(project)}>
+                    <span className="workbenchActivityDot tone-success" aria-hidden="true" />
+                    <div><strong>{project.latestActivityTitle}</strong><p>{project.name}</p></div>
+                    <time>{project.latestActivityAt ? new Date(project.latestActivityAt).toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" }) : "最近"}</time>
+                  </button>
+                ))}
+              </div>
+            ) : <p className="portfolioEmptyText">完成任务或运行检查后，关键结果会出现在这里。</p>}
+          </div>
+        </section>
       </div>
     );
   }
-  const quickEntries = [
-    ["currentProgress", "当前进度", "进展、最近完成和下一步"],
-    ["runbook", "启动方式", "运行、构建和验证命令"],
-    ["riskBoundary", "风险边界", "约束、风险和不可触碰区"],
-    ["localState", "本地状态", "Git、工作区和本地变化"],
-  ].map(([key, fallbackTitle, description]) => ({
-    key,
-    title: currentReport?.summary?.[key]?.title || fallbackTitle,
-    description,
-    status: currentReport?.summary?.[key]?.status,
-    confidence: currentReport?.summary?.[key]?.confidence,
-    sources: currentReport?.summary?.[key]?.sources || [],
-  }));
-  const evidence = Array.isArray(currentReport?.evidence) ? currentReport.evidence : [];
-  const missing = Array.isArray(currentReport?.findings?.missing) ? currentReport.findings.missing : [];
-  const risks = Array.isArray(currentReport?.findings?.risks) ? currentReport.findings.risks : [];
-  const governanceDomains = Array.isArray(currentReport?.governanceDomains) ? currentReport.governanceDomains : [];
-  const recommendations = Array.isArray(currentReport?.recommendations) ? currentReport.recommendations : [];
-  const healthScore = currentReport?.healthScore || {};
-  const healthDimensions = Array.isArray(healthScore.dimensions) ? healthScore.dimensions : [];
-  const governanceLevel = currentReport?.governanceLevel || {};
-  const governanceLevels = Array.isArray(governanceLevel.levels) ? governanceLevel.levels : [];
-  const activeGoal = activeGoalFromSnapshot(snapshot || {});
-  const goals = Array.isArray(snapshot?.goals?.goals) ? snapshot.goals.goals : [];
-  const visibleTasks = tasks.filter((task) => !isNoiseTask(task));
-  const runningTasks = visibleTasks.filter((task) => task.status === taskStatuses.running);
-  const plannedTasks = visibleTasks.filter((task) => task.status === taskStatuses.planned || task.status === taskStatuses.waitingApproval);
-  const failedTasks = visibleTasks.filter((task) => task.status === taskStatuses.failed);
-  const doneTasks = visibleTasks.filter((task) => task.status === taskStatuses.done);
-  const openTasks = [...runningTasks, ...plannedTasks];
-  const draftGoals = goals.filter((goal) => goal.status === "draft" || goal.status === "planned" || goal.status === "pending-confirm");
-  const validationChecks = Array.isArray(snapshot?.goalValidationReport?.checks) ? snapshot.goalValidationReport.checks : [];
-  const failedChecks = validationChecks.filter((check) => check && check.success === false);
-  const taskProgressTotal = visibleTasks.length || goals.length || 0;
-  const taskProgressDone = visibleTasks.length ? doneTasks.length : goals.filter((goal) => goal.status === "done").length;
-  const progressText = taskProgressTotal ? `${taskProgressDone}/${taskProgressTotal} (${Math.round((taskProgressDone / taskProgressTotal) * 100)}%)` : statusLabel(currentReport?.status);
-  const projectIssuesCount = risks.length + missing.length + failedTasks.length + failedChecks.length + draftGoals.length;
-  const localStatusText = failedTasks.length || failedChecks.length
-    ? "需处理"
-    : runningTasks.length
-      ? "执行中"
-      : statusLabel(currentReport?.status) || "正常运行";
-  const governanceActions = [
-    { id: "scan", label: "一键扫描" },
-    { id: "recommend", label: "生成优化建议" },
-    { id: "report", label: "批量修复草案" },
-    { id: "prune", label: "清理过期产物" },
-    { id: "sync", label: "同步治理状态" },
-  ];
-  const sourceNames = [...new Set(evidence.filter((item) => item.status === "found").map((item) => item.source))].slice(0, 6);
-  const detectedStack = (currentReport?.project?.detectedStack || []).join(" / ");
-  const metaParts = [
-    currentReport?.project?.kind,
-    currentReport?.project?.lifecycle,
-    detectedStack,
-  ].filter(Boolean);
-  const projectPhase = currentReport?.project?.lifecycle || currentReport?.project?.phase || "stabilizing";
-  const warningItems = [
-    ...failedTasks.map((task) => ({
-      action: "打开任务",
-      body: failureSummaryForTask(task) || task.plan?.summary || "任务执行失败，需要查看运行记录并生成修复任务。",
-      target: "execution",
-      tone: "danger",
-      title: task.title || "任务失败",
-      type: "高危预警",
-    })),
-    ...failedChecks.map((check) => ({
-      action: "查看报告",
-      body: check.output || check.command || "最近一次验收检查未通过。",
-      target: "validation-report",
-      tone: "danger",
-      title: check.label || check.id || "验收失败",
-      type: "高危预警",
-    })),
-    ...risks.map((item) => ({
-      action: "查看详情",
-      body: item.body || item.description || "需要确认风险边界。",
-      target: "project-risks",
-      tone: item.severity === "high" ? "danger" : "warning",
-      title: item.title || "风险预警",
-      type: item.severity === "high" ? "高危预警" : "状态警告",
-    })),
-    ...missing.map((item) => ({
-      action: "补齐信息",
-      body: item.body || item.description || "存在缺失项，需要补齐。",
-      target: "governance-files",
-      tone: "warning",
-      title: item.title || "治理缺口",
-      type: "状态警告",
-    })),
-    ...draftGoals.map((goal) => ({
-      action: "前往确认",
-      body: goal.summary || "目标处于待确认状态，需要进入目标治理确认范围和验收口径。",
-      target: "current-goal",
-      tone: "info",
-      title: goal.shortTitle || goal.title || "待确认目标",
-      type: "操作提示",
-    })),
-    ...recommendations.slice(0, 2).map((item) => ({
-      action: "查看建议",
-      body: item.problem || item.action || "已有治理优化建议。",
-      target: item.files?.[0] ? { type: "file", path: item.files[0] } : "current-goal",
-      tone: item.severity === "high" ? "danger" : "info",
-      title: item.title || "操作提示",
-      type: item.severity === "high" ? "高危预警" : "操作提示",
-    })),
-  ].slice(0, 3);
-  const fallbackWarnings = [
-    {
-      action: "前往确认",
-      body: "系统检测到目标或任务仍有待确认项，需要人工确认后进入执行闭环。",
-      target: "current-goal",
-      tone: "info",
-      title: "待确认目标",
-      type: "操作提示",
-    },
-  ];
-  const visibleWarnings = warningItems.length ? warningItems.slice(0, 3) : fallbackWarnings;
-  const warningCounts = (warningItems.length ? warningItems : visibleWarnings).reduce((acc, item) => {
-    acc[item.tone] = (acc[item.tone] || 0) + 1;
-    return acc;
-  }, {});
-  const primaryFocus = failedTasks[0]
-    ? {
-      next: failureSummaryForTask(failedTasks[0]) || "任务失败，需要查看运行记录并修复。",
-      target: "execution",
-      title: failedTasks[0].title || "处理失败任务",
-    }
-    : failedChecks[0]
-      ? {
-        next: failedChecks[0].command || "最近一次验收未通过，需要查看报告。",
-        target: "validation-report",
-        title: failedChecks[0].label || "处理失败验收",
-      }
-      : runningTasks[0]
-        ? {
-          next: runningTasks[0].plan?.summary || "任务正在执行，优先观察结果和终端输出。",
-          target: "execution",
-          title: runningTasks[0].title || "跟进运行中任务",
-        }
-        : draftGoals[0]
-          ? {
-            next: draftGoals[0].summary || "目标待确认，需要确认范围和验收标准。",
-            target: "current-goal",
-            title: draftGoals[0].shortTitle || draftGoals[0].title || "确认当前目标",
-          }
-          : recommendations[0]
-            ? {
-              next: recommendations[0].action || recommendations[0].problem,
-              target: recommendations[0].files?.[0] ? { type: "file", path: recommendations[0].files[0] } : "governance-files",
-              title: recommendations[0].title || "处理治理建议",
-            }
-            : {
-              next: currentReport?.summary?.currentProgress?.body || activeGoal?.summary || "下一步：确认当前焦点，必要时运行一轮基础检查。",
-              target: "project-progress",
-              title: currentReport?.summary?.currentProgress?.title || activeGoal?.shortTitle || activeGoal?.title || "推进当前项目治理闭环",
-            };
-  const focusTitle = primaryFocus.title;
-  const focusNext = primaryFocus.next;
-  const recentActivities = [
-    ...visibleTasks.slice(0, 3).map((task) => ({
-      body: task.plan?.summary || task.description || task.projectName || "来自当前任务队列。",
-      target: task.status === taskStatuses.done || task.status === taskStatuses.failed ? "execution-results" : "execution",
-      title: task.title || "任务更新",
-      when: task.updatedAt || task.createdAt || taskStatusLabel(task.status),
-      tone: task.status === taskStatuses.failed ? "danger" : task.status === taskStatuses.done ? "success" : "neutral",
-    })),
-    ...recommendations.slice(0, 3).map((item) => ({
-      body: item.problem || item.action || "已生成治理建议。",
-      target: item.files?.[0] ? { type: "file", path: item.files[0] } : "governance-files",
-      title: item.title || "生成治理建议",
-      when: item.impact || "刚刚",
-      tone: "success",
-    })),
-    ...evidence.filter((item) => item.status === "found").slice(0, 3).map((item) => ({
-      body: item.reason || item.path || "已纳入工作台事实。",
-      target: item.path ? { type: "file", path: item.path } : "governance-files",
-      title: `识别 ${item.source || item.path || "工程文件"}`,
-      when: "本次扫描",
-      tone: "neutral",
-    })),
-  ].slice(0, 4);
-  const quickCounts = {
-    conversation: "",
-    execution: openTasks.length || visibleTasks.length || "",
-    terminal: runningTasks.length || "",
-    "project-identity": projectIssuesCount || "",
-    "engineering-files": evidence.filter((item) => item.status === "found").length || "",
-    "validation-report": failedChecks.length || snapshot?.goalValidationReport?.status || "",
-  };
-  const quickLinks = [
-    ["当前对话", "对话", MessageSquare, "conversation"],
-    ["当前任务", "任务", Check, "execution"],
-    ["终端", "命令", TerminalSquare, "terminal"],
-    ["项目流程", "治理", ClipboardList, "project-identity"],
-    ["工程资产", "文件", Package, "engineering-files"],
-    ["验证报告", "验收", FileText, "validation-report"],
-  ];
-  const dashboardStats = [
-    ["当前项目", currentReport?.project?.name || "OmniDesk", "project-identity"],
-    ["项目阶段", projectPhase, "project-progress"],
-    ["目标进度", progressText, "project-progress"],
-    ["治理健康", Number.isFinite(healthScore.score) ? `${healthScore.score}/100` : statusLabel(currentReport?.status), "governance-files"],
-    ["本地状态", localStatusText, "local-project-state"],
-  ];
-  const projectProfileMissing = Array.isArray(snapshot?.projectProfile?.missingFields)
-    ? snapshot.projectProfile.missingFields.length
-    : 0;
-  const governanceFilesCount = governanceDomains.reduce((sum, domain) => sum + (Array.isArray(domain.files) ? domain.files.length : 0), 0);
-  const reportAssetsReady = Boolean(snapshot?.goalValidationReport?.status) || recommendations.length > 0 || Number.isFinite(healthScore.score);
-  const agentReady = Boolean(provider?.enabled && provider?.model);
-  const taskExecutionReady = visibleTasks.length > 0 || Boolean(snapshot?.runCount);
-  const onboardingCards = [
-    {
-      action: projectProfileMissing ? "补齐事实" : "查看事实",
-      body: projectProfileMissing
-        ? `还有 ${projectProfileMissing} 项项目事实待补齐，Agent 理解项目时会优先提示确认。`
-        : "项目身份、阶段、栈和治理事实已可用于 Agent 上下文。",
-      metric: projectProfileMissing ? `${projectProfileMissing} 缺失` : "已识别",
-      status: projectProfileMissing ? "待补齐" : "可用",
-      target: "project-facts",
-      title: "项目事实",
-      tone: projectProfileMissing ? "warning" : "success",
-    },
-    {
-      action: "查看资产",
-      body: governanceFilesCount
-        ? `已识别 ${governanceFilesCount} 个治理域文件引用，可按工程文件、治理文件、报告、Schema 和脚本下钻。`
-        : "还需要扫描关键工程文件、治理文件、报告产物和脚本模板。",
-      metric: governanceFilesCount ? `${governanceFilesCount} 文件` : "待扫描",
-      status: governanceFilesCount ? "已发现" : "待扫描",
-      target: "engineering-files",
-      title: "工程资产",
-      tone: governanceFilesCount ? "success" : "warning",
-    },
-    {
-      action: agentReady ? "查看配置" : "配置模型",
-      body: agentReady
-        ? `当前模型 ${provider.model} 已接入，工具白名单、Skill、适配器和安全边界可继续检查。`
-        : "模型连接未完全可用，其他项目接入后需要先配置 Provider 和默认模型。",
-      metric: agentReady ? "已接入" : "待配置",
-      status: agentReady ? "可用" : "待配置",
-      target: "model-connections",
-      title: "Agent 配置",
-      tone: agentReady ? "success" : "warning",
-    },
-    {
-      action: taskExecutionReady ? "查看队列" : "创建任务",
-      body: taskExecutionReady
-        ? `当前有 ${visibleTasks.length} 个任务记录、${runningTasks.length} 个运行中任务，可进入受控执行链路。`
-        : "还没有任务队列，接入项目后需要从对话或目标生成第一批任务。",
-      metric: taskExecutionReady ? `${visibleTasks.length} 任务` : "待创建",
-      status: failedTasks.length ? "需处理" : taskExecutionReady ? "可执行" : "待创建",
-      target: taskExecutionReady ? "task-queue" : "conversation",
-      title: "任务执行",
-      tone: failedTasks.length ? "danger" : taskExecutionReady ? "success" : "warning",
-    },
-  ];
-  const onboardingBlockers = onboardingCards.filter((card) => card.tone !== "success").length;
-  const onboardingReady = onboardingCards.length - onboardingBlockers;
-  const refreshFacts = async (source = "manual") => {
+  const refreshFacts = async () => {
       setRefreshing(true);
-      setFeedback(source === "auto" ? "正在自动更新工作区事实..." : "正在手动刷新当前项目事实...");
+      setRefreshError("");
+      setRefreshState("loading");
       try {
         const nextReport = await refreshWorkspaceFactsPreview();
-        if (nextReport) setCurrentReport(nextReport);
-        setFeedback(source === "auto"
-          ? "已自动更新：结果只刷新在工作区，没有写入工程文件。"
-          : "已完成手动刷新：结果只刷新在工作区，没有写入工程文件。");
+        const refreshedAt = nextReport?.generatedAt || new Date().toISOString();
+        if (nextReport) setCurrentReport({ ...nextReport, generatedAt: refreshedAt });
+        clearFactRefreshFailure(refreshProjectKey);
+        setFactFreshnessStatus("fresh");
+        setLastRefreshedAt(refreshedAt);
+        setRefreshState("success");
+        window.setTimeout(() => setRefreshState("idle"), 1800);
       } catch (err) {
-        setFeedback(`${source === "auto" ? "自动更新" : "手动刷新"}失败：${err?.message || err}`);
+        const message = err instanceof Error ? err.message : "项目事实更新失败";
+        writeFactRefreshFailure(refreshProjectKey, { message, signature: refreshSignature });
+        setRefreshError(message);
+        setRefreshState("error");
       } finally {
         setRefreshing(false);
       }
   };
-  const handleWorkspaceAction = async (nextMode) => {
-    if (nextMode === "refresh") {
-      await refreshFacts("manual");
-      return;
-    }
-    const action = governanceActions.find((item) => item.id === nextMode);
-    if (!action) return;
-    setRunningAction(action.id);
-    setFeedback(`正在执行：${action.label}...`);
-    try {
-      const result = await invokeWorkspaceCommand("run_project_os_action", {
-        input: { actionId: action.id },
-      });
-      const nextReport = await refreshWorkspaceFactsPreview();
-      if (nextReport) setCurrentReport(nextReport);
-      window.dispatchEvent(new CustomEvent("project-os:snapshot-refresh-requested", {
-        detail: { source: action.id },
-      }));
-      setFeedback(result?.success
-        ? `已完成：${action.label}。结果已写入 .project-os，并刷新当前视图。`
-        : `${action.label} 未通过：${result?.output || "请查看终端输出。"}`);
-    } catch (err) {
-      setFeedback(`${action.label} 失败：${err?.message || err}`);
-    } finally {
-      setRunningAction("");
-    }
+  const factStore = buildProjectFactStore({
+    report: currentReport,
+    snapshot: {
+      ...snapshot,
+      factFreshness: {
+        ...snapshot?.factFreshness,
+        status: factFreshnessStatus,
+        updatedAt: lastRefreshedAt || snapshot?.factFreshness?.updatedAt,
+      },
+    },
+  });
+  overviewActionHandlersRef.current = {
+    "refresh-project-facts": () => refreshFacts(),
+    "open-architecture": () => onNavigate?.("system-architecture"),
+    "open-source": (path) => onNavigate?.({ type: "file", path }),
   };
+  const previousRuntimeState = overviewRuntimeStateRef.current;
+  const projectChanged = previousRuntimeState?.store.projectId !== factStore.projectId;
+  const capabilitySignature = capabilityManifestSignature(snapshot?.projectCapabilities);
+  const capabilitiesChanged = previousRuntimeState?.capabilitySignature !== capabilitySignature;
+  const changedFactIds = projectChanged ? factStore.facts.map((fact) => fact.id) : diffProjectFactStores(previousRuntimeState?.store, factStore);
+  const runtimeResult = !previousRuntimeState || projectChanged || capabilitiesChanged
+    ? { descriptors: overviewRuntimeRef.current.compile({ capabilityManifest: snapshot?.projectCapabilities, contract: projectOverviewContract, store: factStore, surface: "project-overview" }) }
+    : overviewRuntimeRef.current.reconcile({
+      capabilityManifest: snapshot?.projectCapabilities,
+      changedFactIds,
+      contract: projectOverviewContract,
+      previousDescriptors: previousRuntimeState.descriptors,
+      sourcePaths: snapshot?.factFreshness?.changedSources || [],
+      store: factStore,
+      surface: "project-overview",
+    });
+  const slotDescriptors = runtimeResult.descriptors;
+  overviewRuntimeStateRef.current = { capabilitySignature, descriptors: slotDescriptors, store: factStore };
   return (
-    <div className="workspaceFacts workbenchDashboard">
-      <section className="workbenchHero">
-        <h3>今日工作台</h3>
-        {metaParts.length ? <p>{metaParts.join(" · ")}</p> : null}
-      </section>
-
-      <section className="workbenchStatGrid" aria-label="工作台状态总览">
-        {dashboardStats.map(([label, value, target]) => (
-          <button className="workbenchStatCard" key={label} type="button" onClick={() => onNavigate?.(target)}>
-            <span>{label}</span>
-            <strong>{value}</strong>
-          </button>
-        ))}
-      </section>
-
-      <section className="workbenchOnboarding">
-        <header>
-          <div>
-            <strong>项目接入状态</strong>
-            <p>{onboardingReady}/{onboardingCards.length} 条链路可用，{onboardingBlockers ? `${onboardingBlockers} 项需要处理` : "可以进入日常工作"}</p>
-          </div>
-          <button type="button" onClick={() => onNavigate?.("governance-files")}>查看接入详情</button>
-        </header>
-        <div className="workbenchOnboardingGrid">
-          {onboardingCards.map((card) => (
-            <button className={`workbenchOnboardingCard tone-${card.tone}`} key={card.title} type="button" onClick={() => onNavigate?.(card.target)}>
-              <span>{card.status}</span>
-              <strong>{card.title}</strong>
-              <p>{card.body}</p>
-              <small>{card.metric} · {card.action}</small>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <section className="workbenchFocusSection">
-        <h4>当前焦点</h4>
-        <div className="workbenchFocus">
-          <div>
-            <span className="workbenchFocusLabel"><Activity size={14} />进行中任务</span>
-            <strong>{focusTitle}</strong>
-            <p>{focusNext}</p>
-          </div>
-          <Button variant="primary" type="button" disabled={refreshing || Boolean(runningAction)} onClick={() => onNavigate?.(primaryFocus.target)}>
-            <Play size={14} fill="currentColor" />
-            {runningAction === "scan" ? "执行中" : "继续执行"}
-          </Button>
-        </div>
-      </section>
-      {feedback ? <Notice variant="success">{feedback}</Notice> : null}
-
-      <section className="workbenchWarnings">
-        <header>
-          <div>
-            <strong>系统预警</strong>
-            <span className="workbenchWarningPills">
-              <em className="danger">{warningCounts.danger || 0} 高危</em>
-              <em className="warning">{warningCounts.warning || 0} 警告</em>
-              <em className="info">{warningCounts.info || 0} 提示</em>
-            </span>
-          </div>
-          <p>共发现 {visibleWarnings.length} 项需处理事项</p>
-        </header>
-        <div className="workbenchWarningGrid">
-          {visibleWarnings.map((item) => (
-            <article className={`workbenchWarningCard tone-${item.tone}`} key={`${item.type}-${item.title}`}>
-              <span className="workbenchWarningType">
-                {item.tone === "danger" ? <ShieldAlert size={14} /> : item.tone === "warning" ? <AlertTriangle size={14} /> : <Target size={14} />}
-                {item.type}
-              </span>
-              <strong>{item.title}</strong>
-              <p>{item.body}</p>
-              <div>
-                <button type="button" onClick={() => onNavigate?.(item.target)}>{item.action}<ArrowRight size={12} /></button>
-                <button type="button" onClick={() => onNavigate?.(item.target)}>查看详情</button>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="workbenchLowerGrid">
-        <div>
-          <strong>快捷入口</strong>
-          <div className="workbenchShortcutGrid">
-            {quickLinks.map(([title, label, Icon, target]) => (
-              <button type="button" key={title} onClick={() => onNavigate?.(target)}>
-                <Icon size={18} />
-                <strong>{title}</strong>
-                <span>{quickCounts[target] ? `${label} · ${quickCounts[target]}` : label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-        <div>
-          <strong>最近活动</strong>
-          <div className="workbenchActivityList">
-            {(recentActivities.length ? recentActivities : [{ title: "工作台已接入", body: "项目事实已进入工作台总览。", when: "刚刚", tone: "success" }]).map((item) => (
-              <button className="workbenchActivityItem" key={`${item.title}-${item.when}`} type="button" onClick={() => onNavigate?.(item.target || "governance-files")}>
-                <span className={`workbenchActivityDot tone-${item.tone}`} />
-                <div>
-                  <strong>{item.title}</strong>
-                  <p>{item.body}</p>
-                  <small>{item.when}</small>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <details className="workbenchAdvanced">
-        <summary>治理详情与自动化动作</summary>
-        <div className="workspaceFactsActions" aria-label="工作区事实操作">
-          {governanceActions.map((action) => (
-            <Button
-              key={action.id}
-              size="sm"
-              variant={action.id === "scan" ? "primary" : "subtle"}
-              type="button"
-              disabled={refreshing || Boolean(runningAction)}
-              onClick={() => handleWorkspaceAction(action.id)}
-            >
-              {runningAction === action.id ? "执行中" : action.label}
-            </Button>
-          ))}
-          <Button size="sm" variant="subtle" type="button" disabled={refreshing || Boolean(runningAction)} onClick={() => handleWorkspaceAction("refresh")}>{refreshing ? "更新中" : "手动刷新"}</Button>
-        </div>
-        <GovernanceFilesHealthSection onCreateGovernanceTask={onCreateGovernanceTask} report={currentReport} />
-      </details>
+    <div className="workspaceFacts projectOverviewSurface">
+      <ProjectOverviewSlotRenderer descriptors={slotDescriptors} refreshError={refreshError} refreshState={refreshState} refreshing={refreshing} />
     </div>
   );
 }
 
 function AgentTopicPanel({
+  agentRuns = [],
+  onApproveAgentRun,
+  onResumeAgentRun,
+  activeTaskId,
   provider,
   topic,
   tasks = [],
   snapshot,
   composerModelAvailability = {},
   runnerLoadingId,
-  patchLoading,
-  applyLoading,
   handoffLoading,
   onGeneratePatchDraft,
   onApplyPatchDraft,
   onMergeHandoff,
   onRunGuardedCheck,
   onSelectTask,
+  onMarkTaskWaiting,
+  onEnsureModelAvailable,
+  onCreateTask,
+  onCreateGoal,
+  onDeleteTask,
+  onArchiveGoal,
+  onMergeGoal,
+  onRestoreGoal,
+  onPersistTask,
+  onUpdateGoal,
   onCreateRepairTask,
   onCreateGovernanceTask,
   onOpenCapabilityFile,
+  onOpenTaskConversation,
+  onRefreshWorkspace,
+  compact = false,
 }) {
   const id = topic?.id || "";
-  const visibleTasks = tasks.filter((task) => !isNoiseTask(task));
-  const activeTasks = visibleTasks.filter((task) => ![taskStatuses.done, taskStatuses.failed].includes(task.status));
-  const patchTasks = visibleTasks.filter((task) => task.patchDraft);
-  const doneTasks = visibleTasks.filter((task) => task.status === taskStatuses.done);
-  const failedTasks = visibleTasks.filter((task) => task.status === taskStatuses.failed);
-  const currentTask = activeTasks[0] || visibleTasks[0];
-  const recentResultTasks = [...doneTasks, ...failedTasks].slice(0, 5);
-  const providerName = activeProviderProfileName(provider) || "未命名连接";
-  const modelStatus = composerModelAvailability?.[provider?.model]?.status || (provider?.model ? "未测试" : "未选择");
-  const modelEnabled = provider?.enabled ? "已启用" : "未启用";
-  const currentPlan = currentTask?.plan || {};
-  const currentChecks = checksForPlan(currentPlan);
-  const previewItems = (items = [], limit = 3) => items.filter(Boolean).slice(0, limit);
-  const formatDraftFiles = (draft) => {
-    const files = draft?.files || [];
-    if (!files.length) return "未标注文件";
-    return files.slice(0, 3).join(" / ") + (files.length > 3 ? ` 等 ${files.length} 个` : "");
-  };
-  const applyStatusLabel = (task) => {
-    if (task.applyResult?.success) return "已应用";
-    if (task.applyResult) return "应用失败";
-    return "待应用";
-  };
-  const verifyStatusLabel = (task) => {
-    if (task.verificationSummary) return task.verificationSummary;
-    if (task.status === taskStatuses.done) return "已完成";
-    if (task.status === taskStatuses.failed) return "有失败项";
-    return "待验证";
-  };
-  const runChecksForTask = async (task) => {
-    if (!task) return false;
-    const checks = checksForPlan(task.plan);
-    if (!checks.length) return false;
-    for (const check of checks) {
-      const ok = await onRunGuardedCheck?.(task.id, check.id);
-      if (!ok) return false;
-    }
-    return true;
-  };
-  const failedRunsForTask = (task) => (task?.runs || []).filter((run) => run && run.success === false);
-  const failureSummaryForTask = (task) => {
-    const failedRuns = failedRunsForTask(task);
-    if (task?.applyResult && !task.applyResult.success) return task.applyResult.message || "应用改动失败";
-    if (failedRuns.length) return failedRuns[0].output || `${failedRuns[0].label || failedRuns[0].id || "检查"} 失败`;
-    return task?.verificationSummary || "任务失败，等待定位原因";
-  };
-  const rerunFailedChecks = async (task) => {
-    const failedRuns = failedRunsForTask(task);
-    const checkIds = failedRuns.map((run) => run.id).filter(Boolean);
-    const fallbackIds = checksForPlan(task?.plan).map((check) => check.id);
-    const ids = [...new Set(checkIds.length ? checkIds : fallbackIds)];
-    if (!task || !ids.length) return false;
-    for (const checkId of ids) {
-      const ok = await onRunGuardedCheck?.(task.id, checkId);
-      if (!ok) return false;
-    }
-    return true;
-  };
-  const actionsForTask = (task, scope = "task") => {
-    if (!task) return [];
-    const checks = checksForPlan(task.plan);
-    return [
-      {
-        key: `${scope}-open`,
-        label: "打开任务",
-        onClick: () => onSelectTask?.(task.id),
-      },
-      {
-        disabled: patchLoading,
-        key: `${scope}-generate-patch`,
-        label: patchLoading ? "生成中" : task.patchDraft ? "重新生成草案" : "生成 Patch 草案",
-        onClick: () => onGeneratePatchDraft?.(task.id),
-      },
-      {
-        disabled: applyLoading || !task.patchDraft,
-        key: `${scope}-apply`,
-        label: applyLoading ? "应用中" : "应用并自动验证",
-        onClick: () => onApplyPatchDraft?.(task.id),
-        variant: "primary",
-      },
-      {
-        disabled: Boolean(runnerLoadingId) || !checks.length,
-        key: `${scope}-verify`,
-        label: runnerLoadingId ? "验证中" : "运行检查",
-        onClick: () => runChecksForTask(task),
-      },
-      {
-        disabled: handoffLoading || !task.runSummary || Boolean(task.handoffMerge),
-        key: `${scope}-handoff`,
-        label: handoffLoading ? "更新中" : task.handoffMerge ? "已更新交接" : "更新交接",
-        onClick: () => onMergeHandoff?.(task.id),
-      },
-    ];
-  };
-  const emptyTaskActions = [
-    { disabled: true, key: "empty-open", label: "打开任务" },
-    { disabled: true, key: "empty-generate-patch", label: "生成 Patch 草案" },
-    { disabled: true, key: "empty-apply", label: "应用并自动验证", variant: "primary" },
-    { disabled: true, key: "empty-verify", label: "运行检查" },
-    { disabled: true, key: "empty-handoff", label: "更新交接" },
-  ];
-  const assetDomains = Array.isArray(snapshot?.workspaceFacts?.governanceDomains) ? snapshot.workspaceFacts.governanceDomains : [];
-  const assetDomainById = (domainId, title) => assetDomains.find((domain) => domain.id === domainId || domain.title === title);
-  const assetDomainFileCount = (domain) => Array.isArray(domain?.files) ? domain.files.length : 0;
-  const assetDomainRiskCount = (domain) => (Array.isArray(domain?.fileStatuses) ? domain.fileStatuses : [])
-    .filter((file) => ["missing", "changed", "stale"].includes(file.status || "")).length;
-  const engineeringDomain = assetDomainById("engineering-files", "工程文件");
-  const governanceDomain = assetDomainById("governance-files", "治理文件");
-  const reportDomain = assetDomainById("report-artifacts", "报告产物");
-  const schemaDomain = assetDomainById("schema-assets", "Schema");
-  const scriptDomain = assetDomainById("script-templates", "脚本模板");
-  const profileMissingCount = Array.isArray(snapshot?.projectProfile?.missingFields) ? snapshot.projectProfile.missingFields.length : 0;
-  const profileKnownCount = Math.max(0, 5 - profileMissingCount);
-  const memoryItems = Array.isArray(snapshot?.memory) ? snapshot.memory : [];
-  const conversationCount = Array.isArray(snapshot?.conversations) ? snapshot.conversations.length : 0;
-  const activeGoal = activeGoalFromSnapshot(snapshot || {});
-  const goals = Array.isArray(snapshot?.goals?.goals) ? snapshot.goals.goals : [];
-  const doneGoals = goals.filter((goal) => goal.status === "done");
-  const openGoals = goals.filter((goal) => goal.status !== "done");
-  const validationChecks = Array.isArray(snapshot?.goalValidationReport?.checks) ? snapshot.goalValidationReport.checks : [];
-  const passedChecks = validationChecks.filter((check) => check?.success).length;
-  const projectPhase = phaseLabel(snapshot?.phase || snapshot?.workspaceFacts?.project?.lifecycle);
-  const topicRelatedCount = Array.isArray(topic?.relatedFiles) ? topic.relatedFiles.length : 0;
-  const cardsByTopic = {
-    "project-identity": [
-      ["项目阶段", projectPhase],
-      ["事实完整度", `${profileKnownCount}/5`],
-      ["来源文件", `${topicRelatedCount || 2}`],
-    ],
-    "project-progress": [
-      ["当前目标", activeGoal?.shortTitle || activeGoal?.title || "未选择"],
-      ["任务数量", `${visibleTasks.length}`],
-      ["运行中", `${activeTasks.length}`],
-    ],
-    "project-runbook": [
-      ["启动入口", "desktop/package.json"],
-      ["检查命令", `${validationChecks.length || 3}`],
-      ["状态", "可验证"],
-    ],
-    "project-risks": [
-      ["风险来源", "HANDOFF / LESSONS"],
-      ["失败任务", `${failedTasks.length}`],
-      ["需关注", `${assetDomainRiskCount(governanceDomain)}`],
-    ],
-    "local-project-state": [
-      ["接入状态", snapshot?.workspaceFacts?.status || "connected"],
-      ["运行记录", `${snapshot?.runCount || 0}`],
-      ["本地项目", snapshot?.currentProjectId ? "已选中" : "待选择"],
-    ],
-    "current-goal": [
-      ["当前目标", activeGoal?.shortTitle || activeGoal?.title || "未选择"],
-      ["目标状态", activeGoal ? goalStatusLabelText(activeGoal.status) : "空"],
-      ["目标总数", `${goals.length}`],
-    ],
-    "acceptance-criteria": [
-      ["验收状态", snapshot?.goalValidationReport?.status || "missing"],
-      ["检查项", validationChecks.length ? `${passedChecks}/${validationChecks.length}` : "待补齐"],
-      ["来源", ".project-os/goal-validation.json"],
-    ],
-    "goal-history": [
-      ["已完成", `${doneGoals.length}`],
-      ["进行中", `${openGoals.length}`],
-      ["历史来源", ".project-os/goals.json"],
-    ],
-    "collaboration-boundary": [
-      ["规则来源", "AGENTS.md"],
-      ["路由来源", "docs/ROUTING.md"],
-      ["状态", "已接入"],
-    ],
-    "execution-permissions": [
-      ["自动边界", "受控命令"],
-      ["确认边界", "写入/发布/高风险"],
-      ["状态", "规则已接入"],
-    ],
-    "documentation-rules": [
-      ["文档边界", "DOCUMENTATION"],
-      ["命名规则", "NAMING"],
-      ["状态", "已接入"],
-    ],
-    "system-architecture": [
-      ["架构来源", "docs/ARCHITECTURE.md"],
-      ["实现入口", "desktop/src"],
-      ["状态", "待细化"],
-    ],
-    "data-contracts": [
-      ["契约来源", "schemas / docs/data"],
-      ["Schema 状态", assetDomainFileCount(schemaDomain) ? "已发现" : "待补齐"],
-      ["用途", "状态和报告结构"],
-    ],
-    "ui-standards": [
-      ["规范来源", "DESIGN_STANDARDS"],
-      ["Token 来源", "desktop/src/styles.css"],
-      ["状态", "已接入"],
-    ],
-    "code-structure": [
-      ["结构来源", "CODE_STRUCTURE"],
-      ["前端入口", "desktop/src/main.jsx"],
-      ["后端入口", "desktop/src-tauri/src/main.rs"],
-    ],
-    "validation-checks": [
-      ["检查项", `${validationChecks.length || 3}`],
-      ["通过项", validationChecks.length ? `${passedChecks}` : "待运行"],
-      ["状态", snapshot?.goalValidationReport?.status || "待生成"],
-    ],
-    "validation-report": [
-      ["报告状态", snapshot?.goalValidationReport?.status || "missing"],
-      ["检查结果", validationChecks.length ? `${passedChecks}/${validationChecks.length}` : "待运行"],
-      ["用途", "验收和修复入口"],
-    ],
-    "run-records": [
-      ["运行记录", `${snapshot?.runCount || 0}`],
-      ["任务结果", `${doneTasks.length + failedTasks.length}`],
-      ["来源", ".project-os/runs/*"],
-    ],
-    "handoff-records": [
-      ["交接来源", "HANDOFF.md"],
-      ["任务结果", `${doneTasks.length + failedTasks.length}`],
-      ["状态", "可继续"],
-    ],
-    "decision-records": [
-      ["决策来源", "DECISIONS / CHANGELOG"],
-      ["状态", "待沉淀"],
-      ["用途", "重要取舍记录"],
-    ],
-    "lessons-learned": [
-      ["经验来源", "LESSONS.md"],
-      ["记忆条目", `${memoryItems.length}`],
-      ["用途", "踩坑约束"],
-    ],
-    "active-task": [
-      ["当前任务", currentTask?.title || "暂无进行中的任务"],
-      ["任务状态", currentTask ? taskStatusLabel(currentTask.status) : "空"],
-      ["下一步", currentTask?.status === taskStatuses.planned ? "点击右侧任务或对话里的开始执行" : "生成计划后会进入执行链路"],
-    ],
-    "task-queue": [
-      ["任务总数", `${visibleTasks.length}`],
-      ["活跃任务", `${activeTasks.length}`],
-      ["失败任务", `${failedTasks.length}`],
-    ],
-    "patch-drafts": [
-      ["草案数量", `${patchTasks.length}`],
-      ["最近草案", patchTasks[0]?.title || "暂无 Patch 草案"],
-      ["下一步", patchTasks.length ? "打开任务查看 diff、确认 apply、自动验证" : "先从当前任务生成改动"],
-    ],
-    "execution-terminal": [
-      ["运行记录", `${snapshot?.runCount || 0}`],
-      ["可用入口", "终端 tab / 受控检查 / 白名单命令"],
-      ["边界", "不直接执行任意高风险命令"],
-    ],
-    "execution-results": [
-      ["已完成任务", `${doneTasks.length}`],
-      ["失败任务", `${failedTasks.length}`],
-      ["最近结果", doneTasks[0]?.title || failedTasks[0]?.title || "暂无执行结果"],
-    ],
-    "model-connections": [
-      ["当前连接", providerName],
-      ["启用状态", modelEnabled],
-      ["当前模型", provider?.model || "未选择"],
-      ["模型状态", modelStatus],
-    ],
-    "tool-allowlist": [
-      ["受控检查", "runtime / docs / recommend / web-build / cargo-check"],
-      ["治理动作", "scan / recommend / report / prune / sync"],
-      ["执行方式", "Tauri command 白名单"],
-    ],
-    "skill-capabilities": [
-      ["已接入 Skill", "project-setup / design-system / frontend"],
-      ["本地目录", ".agents/skills / .claude/skills"],
-      ["触发方式", "按项目请求和领域意图路由"],
-    ],
-    "adapters": [
-      ["适配目标", "Claude / Codex / Cursor / Gemini / DeepSeek"],
-      ["当前形态", "adapters/* 文档适配"],
-      ["接入状态", "可读，待产品化检测"],
-    ],
-    "security-boundary": [
-      ["写入边界", "工程文件写入必须经确认"],
-      ["命令边界", "页面不传任意 shell"],
-      ["密钥边界", "API Key 只保存在本地环境"],
-    ],
-    "engineering-files": [
-      ["关键文件", `${assetDomainFileCount(engineeringDomain) || "待扫描"}`],
-      ["风险文件", `${assetDomainRiskCount(engineeringDomain)}`],
-      ["用途", "源码入口、配置和工程目录"],
-    ],
-    "governance-files": [
-      ["治理文件", `${assetDomainFileCount(governanceDomain) || "待扫描"}`],
-      ["需关注", `${assetDomainRiskCount(governanceDomain)}`],
-      ["用途", "规则、状态、交接和运行说明"],
-    ],
-    "report-artifacts": [
-      ["报告状态", snapshot?.goalValidationReport?.status || "待生成"],
-      ["推荐数量", `${Array.isArray(snapshot?.workspaceFacts?.recommendations) ? snapshot.workspaceFacts.recommendations.length : 0}`],
-      ["用途", "评分、建议和验收证据"],
-    ],
-    "schema-assets": [
-      ["Schema 文件", `${assetDomainFileCount(schemaDomain) || "待扫描"}`],
-      ["需关注", `${assetDomainRiskCount(schemaDomain)}`],
-      ["用途", "约束 Agent 输入输出契约"],
-    ],
-    "script-templates": [
-      ["脚本模板", `${assetDomainFileCount(scriptDomain) || "待扫描"}`],
-      ["需关注", `${assetDomainRiskCount(scriptDomain)}`],
-      ["用途", "检查、同步、模板和适配资源"],
-    ],
-    "project-facts": [
-      ["事实完整度", `${profileKnownCount}/5`],
-      ["事实来源", "profile / state / workspace-facts"],
-      ["缺失项", profileMissingCount ? `${profileMissingCount}` : "无"],
-    ],
-    "user-preferences": [
-      ["偏好状态", snapshot?.projectProfile?.userPreferences ? "已记录" : "待确认"],
-      ["作用范围", "项目偏好 / 全局偏好"],
-      ["来源", "对话提取 / 用户确认"],
-    ],
-    "long-term-memory": [
-      ["记忆条目", `${memoryItems.length}`],
-      ["沉淀方式", "事实 / 决策 / 经验"],
-      ["状态", memoryItems.length ? "已接入" : "待沉淀"],
-    ],
-    "conversation-summary": [
-      ["会话数量", `${conversationCount || "本地缓存"}`],
-      ["沉淀方向", "任务 / 事实 / 偏好"],
-      ["状态", "待产品化"],
-    ],
-  };
-  const agentConfigSpecs = {
-    "model-connections": {
-      title: "模型连接",
-      status: provider?.enabled && provider?.model ? "已接入" : "待配置",
-      tone: provider?.enabled && provider?.model ? "success" : "warning",
-      value: "让接入项目知道当前 Agent 用哪个模型、Key 存在哪里、模型是否可用。",
-      next: provider?.enabled ? "测试当前模型可用性，并补充项目级默认模型策略。" : "配置 Provider、API Base、Key 环境变量和默认模型。",
-      files: [".project-os/desktop-provider.json", ".project-os/model-catalog.json", ".project-os/model-health.json"],
-    },
-    "tool-allowlist": {
-      title: "工具白名单",
-      status: "待产品化",
-      tone: "warning",
-      value: "让新项目明确哪些检查、治理动作和终端命令可以被 Agent 调用。",
-      next: "把 Tauri command、检查脚本、治理动作汇总成项目级允许列表。",
-      files: ["desktop/src-tauri/src/main.rs", "scripts/check-runtime.sh", "scripts/check-ai-project.sh"],
-    },
-    "skill-capabilities": {
-      title: "Skill 能力",
-      status: "已发现",
-      tone: "success",
-      value: "让接入项目按意图启用项目初始化、设计规范、前端实现等能力。",
-      next: "显示每个 Skill 的职责、触发条件、来源目录和启用状态。",
-      files: [".agents/skills/project-setup/SKILL.md", ".agents/skills/design-system/SKILL.md", ".agents/skills/frontend/SKILL.md", ".claude/skills/REGISTRY.md"],
-    },
-    "adapters": {
-      title: "适配器",
-      status: "有基础",
-      tone: "info",
-      value: "让同一个项目规则可以被 Codex、Claude、Cursor、Gemini 等工具复用。",
-      next: "检测 adapters 目录、根入口文件和工具专属规则是否同步。",
-      files: ["adapters/CODEX.md", "adapters/CLAUDE.md", "adapters/CURSOR.md", "adapters/GEMINI.md"],
-    },
-    "security-boundary": {
-      title: "安全边界",
-      status: "规则已接入",
-      tone: "success",
-      value: "让接入项目明确哪些动作必须确认、哪些文件不能动、哪些信息不能外传。",
-      next: "把 AGENTS.md 的禁止行为、确认动作和密钥规则整理成可视化边界。",
-      files: ["AGENTS.md", "docs/ROUTING.md", "docs/DOCUMENTATION.md", "docs/LESSONS.md"],
-    },
-  };
-  const agentConfigSpec = agentConfigSpecs[id];
-  const assetCapabilitySpecs = {
-    "engineering-files": {
-      title: "工程文件",
-      status: assetDomainFileCount(engineeringDomain) ? "已发现" : "待扫描",
-      tone: assetDomainFileCount(engineeringDomain) ? "success" : "warning",
-      value: "让 Agent 快速定位源码入口、配置文件和工程目录，减少从零扫目录的成本。",
-      next: "优先标注入口文件、运行配置、核心模块和高频修改区域。",
-      files: engineeringDomain?.files || ["desktop/*", "cli/*", "package.json"],
-    },
-    "governance-files": {
-      title: "治理文件",
-      status: assetDomainRiskCount(governanceDomain) ? "需关注" : "已接入",
-      tone: assetDomainRiskCount(governanceDomain) ? "warning" : "success",
-      value: "让 Agent 知道项目规则、当前状态、交接记录和文档边界。",
-      next: "把缺失、过期或变更中的治理文件标成待确认事项。",
-      files: governanceDomain?.files || ["PROJECT.md", "HANDOFF.md", "AGENTS.md", "docs/*"],
-    },
-    "report-artifacts": {
-      title: "报告产物",
-      status: snapshot?.goalValidationReport?.status || "待生成",
-      tone: snapshot?.goalValidationReport?.status === "failed" ? "danger" : snapshot?.goalValidationReport?.status ? "success" : "warning",
-      value: "让接入项目有评分、建议、验收和运行证据，用户能知道报告下一步能干嘛。",
-      next: "把评分、建议和失败验收直接连接到修复任务。",
-      files: reportDomain?.files || [".project-os/reports/*", ".project-os/recommendations/*", ".project-os/goal-validation-report.json"],
-    },
-    "schema-assets": {
-      title: "Schema",
-      status: assetDomainFileCount(schemaDomain) ? "已发现" : "待补齐",
-      tone: assetDomainFileCount(schemaDomain) ? "success" : "warning",
-      value: "让 Agent 按结构化契约读取状态、生成报告和校验配置。",
-      next: "展示每个 schema/manifest 约束的数据对象和使用场景。",
-      files: schemaDomain?.files || ["schemas/*", "docs/data/*"],
-    },
-    "script-templates": {
-      title: "脚本模板",
-      status: assetDomainFileCount(scriptDomain) ? "已发现" : "待整理",
-      tone: assetDomainFileCount(scriptDomain) ? "success" : "warning",
-      value: "让接入项目知道哪些检查、同步和模板命令可以被安全复用。",
-      next: "区分可直接运行、需要确认、只作为模板参考的脚本。",
-      files: scriptDomain?.files || ["scripts/*", "templates/*", "adapters/*"],
-    },
-  };
-  const assetCapabilitySpec = assetCapabilitySpecs[id];
-  const executionCapabilitySpecs = {
-    "active-task": {
-      files: [".project-os/runs/desktop-tasks/*", ".project-os/goals.json"],
-      next: currentTask ? "围绕当前任务生成 Patch 草案、应用并自动验证。" : "从对话或目标创建当前任务。",
-      status: currentTask ? taskStatusLabel(currentTask.status) : "待创建",
-      title: "当前任务",
-      tone: currentTask?.status === taskStatuses.failed ? "danger" : currentTask ? "success" : "warning",
-      value: "让接入项目把对话意图变成可追踪、可验证、可交接的执行任务。",
-    },
-    "task-queue": {
-      files: [".project-os/runs/desktop-tasks/*", ".project-os/task-backlog.json"],
-      next: failedTasks.length ? "优先处理失败任务，再推进运行中和待确认任务。" : "按状态推进队列，必要时从对话继续补充任务。",
-      status: failedTasks.length ? "有失败项" : activeTasks.length ? "推进中" : visibleTasks.length ? "已归档" : "待创建",
-      title: "任务队列",
-      tone: failedTasks.length ? "danger" : visibleTasks.length ? "success" : "warning",
-      value: "让接入项目知道所有任务的状态、来源和下一步动作，而不是散落在对话里。",
-    },
-    "patch-drafts": {
-      files: [".project-os/runs/desktop-tasks/*"],
-      next: patchTasks.length ? "查看涉及文件和验证项，确认后应用并自动验证。" : "先从当前任务生成 Patch 草案。",
-      status: patchTasks.length ? "有草案" : "待生成",
-      title: "Patch 草案",
-      tone: patchTasks.length ? "success" : "warning",
-      value: "让接入项目在真正改文件前先看到改动范围、风险和验证计划。",
-    },
-    "execution-terminal": {
-      files: ["scripts/check-runtime.sh", "scripts/check-ai-project.sh", "desktop/package.json"],
-      next: "把常用检查和构建命令标为受控命令，和普通终端输入区分开。",
-      status: "可用",
-      title: "执行终端",
-      tone: "success",
-      value: "让用户知道哪些命令是安全入口，哪些只是普通终端操作。",
-    },
-    "execution-results": {
-      files: [".project-os/runs/*", ".project-os/runs/desktop-summary.md", "HANDOFF.md"],
-      next: failedTasks.length ? "重跑失败检查或生成修复任务。" : "把成功结果沉淀到 run summary 和交接记录。",
-      status: failedTasks.length ? "需处理" : recentResultTasks.length ? "有结果" : "待生成",
-      title: "执行结果",
-      tone: failedTasks.length ? "danger" : recentResultTasks.length ? "success" : "warning",
-      value: "让接入项目保留执行证据，并能从失败结果直接进入修复闭环。",
-    },
-  };
-  const executionCapabilitySpec = executionCapabilitySpecs[id];
-  const memoryCapabilitySpecs = {
-    "project-facts": {
-      files: [".project-os/project-profile.json", ".project-os/workspace-facts.json", ".project-os/state.json", "PROJECT.md"],
-      next: profileMissingCount ? "补齐缺失事实，并标记哪些来自用户确认、哪些来自文件推断。" : "把事实来源、可信度和更新时机展示出来。",
-      status: profileMissingCount ? "待补齐" : "已识别",
-      title: "项目事实",
-      tone: profileMissingCount ? "warning" : "success",
-      value: "让接入项目不再从零理解，Agent 可以直接知道项目定位、阶段、技术栈和治理域。",
-    },
-    "user-preferences": {
-      files: [".project-os/project-profile.json", "OmniDesk global: user-profile.json"],
-      next: "提供偏好确认入口，并区分项目级偏好和全局偏好。",
-      status: snapshot?.projectProfile?.userPreferences ? "已记录" : "待确认",
-      title: "用户偏好",
-      tone: snapshot?.projectProfile?.userPreferences ? "success" : "warning",
-      value: "让 Agent 记住用户对协作方式、视觉偏好、风险边界和表达方式的要求。",
-    },
-    "long-term-memory": {
-      files: [".project-os/memory/*", "docs/LESSONS.md", "docs/DECISIONS.md", "HANDOFF.md"],
-      next: "把重要对话、决策和踩坑经验沉淀为可复用长期记忆。",
-      status: memoryItems.length ? "已接入" : "待沉淀",
-      title: "长期记忆",
-      tone: memoryItems.length ? "success" : "warning",
-      value: "让接入项目保留长期上下文，避免重复解释历史决策和约束。",
-    },
-    "conversation-summary": {
-      files: [".project-os/conversations/*", ".project-os/runs/desktop-tasks/*"],
-      next: "把会话摘要和任务、项目事实、偏好更新关联起来。",
-      status: "待产品化",
-      title: "会话摘要",
-      tone: "warning",
-      value: "让对话不只是聊天记录，而能沉淀成任务、事实、偏好和交接线索。",
-    },
-  };
-  const memoryCapabilitySpec = memoryCapabilitySpecs[id];
-  const flowStageByTopic = {
-    "project-identity": ["认识项目", "项目身份、用途和阶段。"],
-    "project-progress": ["认识项目", "当前进度和下一步。"],
-    "project-runbook": ["认识项目", "启动、构建和检查命令。"],
-    "project-risks": ["认识项目", "已知风险和边界。"],
-    "local-project-state": ["认识项目", "本地接入和文件状态。"],
-    "current-goal": ["定义目标", "当前目标、范围和优先级。"],
-    "acceptance-criteria": ["定义目标", "完成判断和检查条件。"],
-    "goal-history": ["定义目标", "目标历史和完成记录。"],
-    "collaboration-boundary": ["工作规则", "AI 和用户如何分工。"],
-    "execution-permissions": ["工作规则", "自动执行和确认边界。"],
-    "documentation-rules": ["工作规则", "信息归属和命名规则。"],
-    "system-architecture": ["设计实现", "模块、依赖和架构关系。"],
-    "data-contracts": ["设计实现", "对象、状态和结构化契约。"],
-    "ui-standards": ["设计实现", "组件、视觉规范和设计 token。"],
-    "code-structure": ["设计实现", "目录、模块职责和实现入口。"],
-    "validation-checks": ["验证交付", "当前项目可运行检查。"],
-    "validation-report": ["验证交付", "目标验收和检查结果。"],
-    "run-records": ["验证交付", "检查、扫描和执行历史。"],
-    "handoff-records": ["复盘沉淀", "继续工作上下文。"],
-    "decision-records": ["复盘沉淀", "重要取舍记录。"],
-    "lessons-learned": ["复盘沉淀", "踩坑、修正和新增约束。"],
-  };
-  const flowStage = flowStageByTopic[id];
-  const flowCapabilitySpec = flowStage ? {
-    files: topic?.relatedFiles || [],
-    next: topic?.nextAction || "补齐状态源、操作入口和闭环验证。",
-    status: topic?.maturity || "只读",
-    title: topic?.title || flowStage[0],
-    tone: ["闭环", "状态化", "可验证"].includes(topic?.maturity) ? "success" : "info",
-    value: `属于「${flowStage[0]}」阶段，用来让接入项目明确${flowStage[1]}`,
-  } : null;
-  const cards = cardsByTopic[id];
+  const {
+    archivingGoal, archivingTask, createGoalOpen, createTaskError, createTaskOpen,
+    deletingTask, editingGoal, editingGoalSummary, editingGoalTitle, editingTask,
+    editingTaskGoalId, editingTaskSummary, editingTaskTitle, goalHistoryOpen,
+    mergeTargetGoalId, mergingGoal, mutationError, newGoalTitle, newTaskGoalId,
+    newTaskSummary, newTaskTitle, setArchivingGoal, setArchivingTask, setCreateGoalOpen,
+    setCreateTaskError, setCreateTaskOpen, setDeletingTask, setEditingGoal,
+    setEditingGoalSummary, setEditingGoalTitle, setEditingTask, setEditingTaskGoalId,
+    setEditingTaskSummary, setEditingTaskTitle, setGoalHistoryOpen, setMergeTargetGoalId,
+    setMergingGoal, setMutationError, setNewGoalTitle, setNewTaskGoalId, setNewTaskSummary,
+    setNewTaskTitle, setTaskActionDialog, setTaskFilter, setTaskModelPreflight, setTaskSort,
+    taskActionDialog, taskFilter, taskModelPreflight, taskSort,
+    activeTasks, currentTask, doneTasks, failedTasks, mergeGoalOptions, recentResultTasks,
+    taskGoalOptions, taskGroups, visibleTasks,
+  } = boardState;
+  const { activeCapabilitySpec, activeGoal, archivedGoals, archivedTasks, capabilityKind, cards, currentChecks, currentPlan, doneGoals, modelAvailable } = buildAgentTopicViewModel({
+    activeGoalFromSnapshot, activeTasks, checksForPlan, composerModelAvailability, currentTask, doneTasks, failedTasks,
+    goalStatusLabel: goalStatusLabelText, phaseLabel, provider, recentResultTasks, snapshot, taskNextAction, tasks, topic, visibleTasks,
+  });
   if (!cards) return null;
-  const activeCapabilitySpec = agentConfigSpec || assetCapabilitySpec || executionCapabilitySpec || memoryCapabilitySpec || flowCapabilitySpec;
-  const canPreviewCapabilityFile = (file) => {
-    if (!file || typeof file !== "string") return false;
-    if (file.includes("*") || file.endsWith("/")) return false;
-    if (file.includes(":")) return false;
-    if (file.startsWith("/") || file.startsWith(".env") || file.includes("/.env")) return false;
-    if (file.includes(".project-os/desktop-provider")) return false;
-    if (file.split("/").includes("..")) return false;
-    const extension = file.split(".").pop();
-    if (!["md", "mdx", "txt", "json", "jsonc", "yaml", "yml", "toml", "js", "jsx", "ts", "tsx", "css", "scss", "html", "rs", "sh", "py", "sql"].includes(extension)) return false;
-    return !["desktop/*", "cli/*", "docs/*", "schemas/*", "docs/data/*", "scripts/*", "templates/*", "adapters/*"].includes(file);
-  };
+  const {
+    archiveGoal, archiveTask, executeTaskDetailAction, failedRunsForTask, failureSummaryForTask,
+    mergeGoal, onArchiveGoalGroup, onMergeGoalGroup, onRepair, openCreateTaskForGoal,
+    openGoalEditor, openTaskEditor, openTaskPrimaryAction, openTaskFromCard,
+    permanentlyDeleteTask, restoreGoal, restoreTask, rerunFailedChecks, runChecksForTask,
+    saveGoalEdit, saveTaskEdit, selectTaskInWorkspace, startTaskFromDialog,
+    submitNewGoal, submitNewTask,
+  } = useAgentTopicTaskActions({
+    activeGoal,
+    boardState,
+    helpers: { checksForPlan, goalTitleForTask, isTaskNoise: isNoiseTask, taskGoalOptions },
+    modelAvailable,
+    onApplyPatchDraft,
+    onArchiveGoal,
+    onCreateGoal,
+    onCreateRepairTask,
+    onCreateTask,
+    onDeleteTask,
+    onEnsureModelAvailable,
+    onGeneratePatchDraft,
+    onMarkTaskWaiting,
+    onMergeGoal,
+    onMergeHandoff,
+    onOpenTaskConversation,
+    onPersistTask,
+    onRefreshWorkspace,
+    onRestoreGoal,
+    onRunGuardedCheck,
+    onSelectTask,
+    onUpdateGoal,
+  });
 
-  return (
-    <div className="agentTopicStack" aria-label={`${topic.title}状态`}>
-      <div className="agentTopicPanel">
-        {cards.map(([label, value]) => (
-          <div className="agentTopicCard" key={label}>
-            <span>{label}</span>
-            <strong>{value}</strong>
-          </div>
-        ))}
-      </div>
-
-      {activeCapabilitySpec ? (
-        <div className="agentConfigCapability">
-          <div className="agentConfigCapabilityHeader">
-            <div>
-              <span>{agentConfigSpec ? "接入能力" : assetCapabilitySpec ? "资产能力" : executionCapabilitySpec ? "执行能力" : memoryCapabilitySpec ? "记忆能力" : "流程能力"}</span>
-              <strong>{activeCapabilitySpec.title}</strong>
-              <p>{activeCapabilitySpec.value}</p>
-            </div>
-            <Badge status={activeCapabilitySpec.tone}>{activeCapabilitySpec.status}</Badge>
-          </div>
-          <div className="agentConfigCapabilityGrid">
-            <section>
-              <span>对新项目的作用</span>
-              <p>{activeCapabilitySpec.value}</p>
-            </section>
-            <section>
-              <span>下一步动作</span>
-              <p>{activeCapabilitySpec.next}</p>
-            </section>
-          </div>
-          <div className="agentConfigFiles">
-            <span>来源文件</span>
-            <div>
-              {activeCapabilitySpec.files.slice(0, 8).map((file) => canPreviewCapabilityFile(file) ? (
-                <button key={file} type="button" onClick={() => onOpenCapabilityFile?.(file)}>
-                  {file}
-                </button>
-              ) : (
-                <code key={file}>{file}</code>
-              ))}
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {id === "task-queue" ? (
-        <div className="agentTaskQueueList">
-          {visibleTasks.length ? visibleTasks.slice(0, 8).map((task) => (
-            <article className={`agentTaskQueueItem status-${task.status || "unknown"}`} key={task.id}>
-              <div className="agentTaskQueueMain">
-                <span>{taskStatusLabel(task.status)}</span>
-                <strong>{task.title || "未命名任务"}</strong>
-                <p>{task.plan?.summary || task.description || task.projectName || "暂无任务摘要。"}</p>
-              </div>
-              <div className="agentTaskQueueMeta">
-                <span>{task.patchDraft ? "已有草案" : "未生成草案"}</span>
-                <span>{verifyStatusLabel(task)}</span>
-                <span>{task.updatedAt || task.createdAt || "无更新时间"}</span>
-              </div>
-              <TaskCommandBar
-                actions={actionsForTask(task, `queue-${task.id}`)}
-                meta={task.status === taskStatuses.failed ? failureSummaryForTask(task) : "按任务状态进入受控执行链路。"}
-              />
-            </article>
-          )) : (
-            <Notice variant="info">暂无任务。可以从对话或目标开始创建第一批任务。</Notice>
-          )}
-        </div>
-      ) : null}
-
-      {id === "execution-terminal" ? (
-        <div className="agentControlledCommands">
-          {[
-            ["Runtime 检查", "bash scripts/check-runtime.sh .", "验证 Project OS 运行规则和核心文档。"],
-            ["AI 项目报告", "bash scripts/check-ai-project.sh . --write-report", "生成工程治理报告和建议。"],
-            ["Web 构建", "npm --prefix desktop run web:build", "验证桌面前端是否可构建。"],
-          ].map(([label, command, description]) => (
-            <div className="agentControlledCommand" key={command}>
-              <div>
-                <strong>{label}</strong>
-                <p>{description}</p>
-              </div>
-              <code>{command}</code>
-            </div>
-          ))}
-        </div>
-      ) : null}
-
-      {id === "active-task" ? (
-        <div className="agentTopicDetail">
-          <div className="agentTopicDetailHeader">
-            <div>
-              <strong>{currentTask?.title || "暂无当前任务"}</strong>
-              <span>{currentTask?.goalTitle ? `目标：${currentTask.goalTitle}` : "生成计划后会绑定目标、对话和执行状态。"}</span>
-            </div>
-            <Badge status={currentTask?.status}>{currentTask ? taskStatusLabel(currentTask.status) : "空"}</Badge>
-          </div>
-          <div className="agentExecutionGrid">
-            <div>
-              <span>计划步骤</span>
-              <ul>
-                {previewItems(currentPlan.steps).map((step) => <li key={step}>{step}</li>)}
-                {!previewItems(currentPlan.steps).length ? <li>暂无步骤</li> : null}
-              </ul>
-            </div>
-            <div>
-              <span>候选改动</span>
-              <ul>
-                {previewItems(currentPlan.candidateChanges).map((item) => <li key={item}>{item}</li>)}
-                {!previewItems(currentPlan.candidateChanges).length ? <li>暂无候选改动</li> : null}
-              </ul>
-            </div>
-            <div>
-              <span>验证检查</span>
-              <ul>
-                {currentChecks.slice(0, 3).map((check) => <li key={check.id}>{check.label}</li>)}
-                {!currentChecks.length ? <li>暂无可运行检查</li> : null}
-              </ul>
-            </div>
-          </div>
-          <div className="agentTopicStatusLine">
-            <span>{currentTask?.patchDraft ? `已有 Patch 草案：${formatDraftFiles(currentTask.patchDraft)}` : "尚未生成 Patch 草案"}</span>
-            <span>{currentTask ? applyStatusLabel(currentTask) : "待应用"}</span>
-            <span>{currentTask ? verifyStatusLabel(currentTask) : "待验证"}</span>
-          </div>
-          <TaskCommandBar
-            actions={currentTask ? actionsForTask(currentTask, "active") : emptyTaskActions}
-            meta={currentTask
-              ? "操作会复用受控任务链路，写入前仍走既有确认和白名单边界。"
-              : "先通过对话或右侧待办创建任务，操作链路才会启用。"}
-          />
-        </div>
-      ) : null}
-
-      {id === "patch-drafts" ? (
-        <div className="agentTopicList">
-          {patchTasks.length ? patchTasks.map((task) => (
-            <div className="agentPatchItem" key={task.id}>
-              <div className="agentPatchItemHeader">
-                <div>
-                  <strong>{task.title}</strong>
-                  <span>{formatDraftFiles(task.patchDraft)}</span>
-                </div>
-                <Badge status={task.status}>{taskStatusLabel(task.status)}</Badge>
-              </div>
-              <div className="agentTopicStatusLine">
-                <span>{applyStatusLabel(task)}</span>
-                <span>{verifyStatusLabel(task)}</span>
-                <span>{task.runSummary?.path ? `Run summary：${task.runSummary.path}` : "待写入 run summary"}</span>
-                <span>{task.handoffMerge?.path ? "已更新交接" : "待更新交接"}</span>
-              </div>
-              <TaskCommandBar
-                actions={actionsForTask(task, `patch-${task.id}`)}
-                meta={task.patchDraft?.files?.length ? `${task.patchDraft.files.length} 个文件` : "草案未标注文件。"}
-              />
-              {task.patchDraft?.summary ? <p>{task.patchDraft.summary}</p> : null}
-            </div>
-          )) : (
-            <Notice variant="info">还没有 Patch 草案。先在当前任务里生成改动，草案会集中出现在这里。</Notice>
-          )}
-        </div>
-      ) : null}
-
-      {id === "execution-results" ? (
-        <div className="agentTopicList">
-          {recentResultTasks.length ? recentResultTasks.map((task) => (
-            <div className="agentPatchItem" key={task.id}>
-              <div className="agentPatchItemHeader">
-                <div>
-                  <strong>{task.title}</strong>
-                  <span>{task.runSummary?.path || task.createdAt || "暂无 run summary"}</span>
-                </div>
-                <Badge status={task.status}>{taskStatusLabel(task.status)}</Badge>
-              </div>
-              <div className="agentTopicStatusLine">
-                <span>{task.verificationSummary || "未记录验证摘要"}</span>
-                <span>{task.handoffMerge ? "交接已更新" : "交接未更新"}</span>
-              </div>
-              {task.status === taskStatuses.failed ? (
-                <div className="agentFailureBox">
-                  <strong>失败摘要</strong>
-                  <p>{failureSummaryForTask(task)}</p>
-                  <div className="agentTopicStatusLine">
-                    {failedRunsForTask(task).length ? failedRunsForTask(task).slice(0, 3).map((run) => (
-                      <span key={`${task.id}-${run.id}-${run.finishedAt || run.command}`}>{run.label || run.id || run.command || "失败检查"}</span>
-                    )) : <span>暂无失败检查明细</span>}
-                  </div>
-                </div>
-              ) : null}
-              <TaskCommandBar
-                actions={[
-                  {
-                    key: `result-open-${task.id}`,
-                    label: "打开任务",
-                    onClick: () => onSelectTask?.(task.id),
-                  },
-                  {
-                    disabled: task.status !== taskStatuses.failed || Boolean(runnerLoadingId),
-                    key: `result-rerun-${task.id}`,
-                    label: runnerLoadingId ? "重跑中" : "重跑失败检查",
-                    onClick: () => rerunFailedChecks(task),
-                  },
-                  {
-                    disabled: task.status !== taskStatuses.failed,
-                    key: `result-repair-${task.id}`,
-                    label: "生成修复任务",
-                    variant: "primary",
-                    onClick: () => onCreateRepairTask?.(task.id),
-                  },
-                ]}
-                meta={task.status === taskStatuses.failed ? "失败任务可生成修复任务，进入同一套受控 Patch 和验证链路。" : "已完成任务保留结果追溯。"}
-              />
-            </div>
-          )) : (
-            <Notice variant="info">暂无已完成或失败的执行结果。</Notice>
-          )}
-        </div>
-      ) : null}
-    </div>
-  );
+  return <AgentTopicPanelContent
+    activeCapabilitySpec={activeCapabilitySpec}
+    canPreviewAgentTopicFile={canPreviewAgentTopicFile}
+    capabilityKind={capabilityKind}
+    cards={cards}
+    compact={compact}
+    currentTaskDetailProps={{ currentChecks, currentPlan, currentTask, goalTitleForTask, onApplyPatchDraft, onGeneratePatchDraft, onMergeHandoff, onOpenTask: selectTaskInWorkspace, onRunChecks: runChecksForTask, taskStatusLabel }}
+    executionResultsProps={{ agentRuns, failedRunsForTask, failureSummaryForTask, onApproveAgentRun, onCreateRepairTask, onOpenTask: selectTaskInWorkspace, onResumeAgentRun, onRerunFailedChecks: rerunFailedChecks, recentResultTasks, runnerLoadingId, taskStatuses, taskStatusLabel }}
+    id={id}
+    onOpenCapabilityFile={onOpenCapabilityFile}
+    taskBoardProps={{
+      archiveGoal, archiveTask, archivedGoals, archivedTasks, archivingGoal, archivingTask, createGoalOpen,
+      createTaskError, createTaskOpen, deletingTask, doneGoals, editingGoal, editingGoalSummary, editingGoalTitle,
+      editingTask, editingTaskGoalId, editingTaskSummary, editingTaskTitle, failureSummaryForTask, goalHistoryOpen,
+      goalTitleForTask, mergeGoal, mergeGoalOptions, mergeTargetGoalId, mergingGoal, modelAvailable, mutationError,
+      newGoalTitle, newTaskGoalId, newTaskSummary, newTaskTitle,
+      onArchiveGoal: (group) => { setMutationError(""); setArchivingGoal(taskGoalOptions.find((goal) => goal.id === group.id) || null); },
+      onArchiveTask: setArchivingTask, onCreateTask: openCreateTaskForGoal, onDeleteTask: setDeletingTask,
+      onEditGoal: openGoalEditor, onEditTask: openTaskEditor,
+      onMergeGoal: (group) => { const goal = mergeGoalOptions.find((item) => item.id === group.id) || null; setMutationError(""); setMergingGoal(goal); setMergeTargetGoalId(mergeGoalOptions.find((item) => item.id !== group.id)?.id || ""); },
+      onPrimaryAction: openTaskPrimaryAction, onOpenTask: selectTaskInWorkspace,
+      onConfirmStart: startTaskFromDialog, onExecuteDetail: executeTaskDetailAction,
+      onApplyPatchDraft, onGeneratePatchDraft,
+      onMergeHandoff, onRepair: (task) => { setTaskActionDialog(null); onCreateRepairTask?.(task.id); },
+      onRerunFailed: rerunFailedChecks, onRestoreGoal: restoreGoal, onRestoreTask: restoreTask,
+      onRunChecks: runChecksForTask, onSubmitGoal: submitNewGoal, onSubmitTask: submitNewTask,
+      openTaskFromCard, permanentlyDeleteTask, primaryActionLabel: (task) => taskCardPrimaryAction(task.status).label, runnerLoadingId,
+      saveGoalEdit, saveTaskEdit, setArchivingGoal, setArchivingTask, setCreateGoalOpen, setCreateTaskOpen,
+      setDeletingTask, setEditingGoal, setEditingGoalSummary, setEditingGoalTitle, setEditingTask, setEditingTaskGoalId,
+      setEditingTaskSummary, setEditingTaskTitle, setGoalHistoryOpen, setMergeTargetGoalId, setNewGoalTitle,
+      setNewTaskGoalId, setNewTaskSummary, setNewTaskTitle, setTaskActionDialog, setTaskFilter, setTaskSort,
+      taskActionDialog, taskFilter, taskFilterLabel, taskGoalOptions, taskGroups, taskModelPreflight, taskSort,
+      taskSortLabel, taskStatusLabel, taskUpdatedLabel, currentTask,
+    }}
+    topic={topic}
+  />;
 }
 
 function EngineeringFileTab({
   selectedEngineeringFile,
   snapshot,
   tasks = [],
+  activeTaskId,
   provider,
   composerModelAvailability = {},
   runnerLoadingId,
@@ -5453,12 +3448,40 @@ function EngineeringFileTab({
   onMergeHandoff,
   onRunGuardedCheck,
   onSelectTask,
+  onMarkTaskWaiting,
+  onEnsureModelAvailable,
+  onCreateTask,
+  onCreateGoal,
+  onDeleteTask,
+  onArchiveGoal,
+  onMergeGoal,
+  onRestoreGoal,
   onNavigateWorkbench,
   onCreateRepairTask,
   onCreateGovernanceTask,
   onCreateDesignGovernanceTask,
+  onPersistTask,
+  onUpdateGoal,
+  decomposingGoal,
+  onConfirmDecomposition,
+  onGenerateDecomposition,
+  onRequestProjectAccess,
+  onPrepareTerminalCommand,
+  onOpenTaskConversation,
+  onRefreshWorkspace,
+  onReadEngineeringFile,
+  onGetHermesExecutorStatus,
 }) {
-  const selectedTopic = selectedEngineeringFile.topic || (selectedEngineeringFile.virtual ? selectedEngineeringFile : null);
+  const {
+    isAcceptanceCriteriaTopic, isAgentConfigSurfaceTopic, isAssetSurfaceTopic, isCodeStructureTopic,
+    isCollaborationBoundaryTopic, isComponentLibraryTopic, isCurrentGoalTopic, isCurrentProgressTopic,
+    isDataContractsTopic, isDecisionRecordsTopic, isDesignImplementationTopic, isDocumentationRulesTopic,
+    isExecutionPermissionsTopic, isGoalHistoryTopic, isGovernanceFilesTopic, isHandoffRecordsTopic,
+    isLessonsLearnedTopic, isLocalProjectStateTopic, isMemorySurfaceTopic, isOverviewTopic,
+    isReportTopic, isRiskBoundaryTopic, isRunbookTopic, isRunRecordsTopic, isSystemArchitectureTopic,
+    isTaskExecutionTopic, isTokenLibraryTopic, isValidationChecksTopic, isValidationReportTopic,
+    selectedTopic, surface, topicRouteId, usesDedicatedSurface,
+  } = resolveEngineeringTopicSurface({ dedicatedSurfaceByTopic, selectedEngineeringFile, workspaceRouteById });
   const selectedTopicGroupLabel = selectedEngineeringFile.group === "workbench-overview"
     ? "工作台"
     : selectedEngineeringFile.group;
@@ -5477,9 +3500,7 @@ function EngineeringFileTab({
     }
     setRelatedFilePreview({ loading: true, path });
     try {
-      const preview = await invokeWorkspaceCommand("read_engineering_file", {
-        input: { path },
-      });
+      const preview = await onReadEngineeringFile(path);
       setRelatedFilePreview({ path, preview });
     } catch (err) {
       setRelatedFilePreview({
@@ -5490,385 +3511,143 @@ function EngineeringFileTab({
   };
 
   if (selectedTopic) {
-    const isOverviewTopic = ["workbench-overview", "project-identity"].includes(selectedTopic.id) || selectedTopic.title === "项目概览";
-    const isCurrentProgressTopic = selectedTopic.id === "project-progress" || selectedTopic.title === "当前进度";
-    const isRunbookTopic = selectedTopic.id === "project-runbook" || selectedTopic.title === "启动方式";
-    const isGovernanceFilesTopic = selectedTopic.id === "governance-files" || selectedTopic.title === "治理文件";
-    const isReportTopic = ["validation-report", "report-artifacts"].includes(selectedTopic.id);
-    const isDesignImplementationTopic = Object.keys(designImplementationTopics).includes(selectedTopic.id);
-    const isAssetCapabilityTopic = ["engineering-files", "governance-files", "report-artifacts", "schema-assets", "script-templates"].includes(selectedTopic.id);
-    const isFlowCapabilityTopic = [
-      "project-identity", "project-progress", "project-runbook", "project-risks", "local-project-state",
-      "current-goal", "acceptance-criteria", "goal-history",
-      "collaboration-boundary", "execution-permissions", "documentation-rules",
-      "system-architecture", "data-contracts", "ui-standards", "code-structure",
-      "validation-checks", "validation-report", "run-records",
-      "handoff-records", "decision-records", "lessons-learned",
-    ].includes(selectedTopic.id);
     const workspaceFacts = isOverviewTopic ? snapshot?.workspaceFacts || null : null;
+    const openSourceFile = (path) => onNavigateWorkbench?.({ type: "file", path });
     const currentProgressPanel = isCurrentProgressTopic && snapshot?.workspaceFacts
-      ? <CurrentProgressPanel onSelectTask={onSelectTask} report={snapshot.workspaceFacts} snapshot={snapshot} tasks={tasks} />
+      ? <CurrentProgressPanel onNavigate={onNavigateWorkbench} onOpenSource={openSourceFile} report={snapshot.workspaceFacts} snapshot={snapshot} tasks={tasks} />
       : null;
+    const currentGoalPanel = isCurrentGoalTopic
+      ? <CurrentGoalPanel decomposingGoal={decomposingGoal} onConfirmDecomposition={onConfirmDecomposition} onGenerateDecomposition={onGenerateDecomposition} onNavigate={onNavigateWorkbench} onOpenSource={openSourceFile} snapshot={snapshot} />
+      : null;
+    const acceptanceCriteriaPanel = isAcceptanceCriteriaTopic
+      ? <AcceptanceCriteriaPanel onNavigate={onNavigateWorkbench} onOpenSource={openSourceFile} snapshot={snapshot} />
+      : null;
+    const goalHistoryPanel = isGoalHistoryTopic
+      ? <GoalHistoryPanel onOpenSource={openSourceFile} snapshot={snapshot} />
+      : null;
+    const collaborationBoundaryPanel = isCollaborationBoundaryTopic
+      ? <GovernanceSurfacePanel onOpenSource={openSourceFile} renderSourceButtons={(callback, sources) => <RuleSourceButtons onOpenSource={callback} sources={sources} />} type="collaboration-boundary" />
+      : null;
+    const executionPermissionsPanel = isExecutionPermissionsTopic
+      ? <GovernanceSurfacePanel onOpenSource={openSourceFile} renderSourceButtons={(callback, sources) => <RuleSourceButtons onOpenSource={callback} sources={sources} />} type="execution-permissions" />
+      : null;
+    const documentationRulesPanel = isDocumentationRulesTopic
+      ? <GovernanceSurfacePanel onOpenSource={openSourceFile} renderSourceButtons={(callback, sources) => <RuleSourceButtons onOpenSource={callback} sources={sources} />} type="documentation-rules" />
+      : null;
+    const systemArchitecturePanel = isSystemArchitectureTopic
+      ? <GovernanceSurfacePanel onOpenSource={openSourceFile} renderSourceButtons={(callback, sources) => <RuleSourceButtons onOpenSource={callback} sources={sources} />} type="system-architecture" />
+      : null;
+    const dataContractsPanel = isDataContractsTopic
+      ? <GovernanceSurfacePanel onOpenSource={openSourceFile} renderSourceButtons={(callback, sources) => <RuleSourceButtons onOpenSource={callback} sources={sources} />} type="data-contracts" />
+      : null;
+    const codeStructurePanel = isCodeStructureTopic
+      ? <GovernanceSurfacePanel onOpenSource={openSourceFile} renderSourceButtons={(callback, sources) => <RuleSourceButtons onOpenSource={callback} sources={sources} />} type="code-structure" />
+      : null;
+    const validationChecksPanel = isValidationChecksTopic
+      ? <GovernanceSurfacePanel onOpenSource={openSourceFile} renderSourceButtons={(callback, sources) => <RuleSourceButtons onOpenSource={callback} sources={sources} />} type="validation-checks" />
+      : null;
+    const validationReportPanel = isValidationReportTopic
+      ? <ValidationReportPanel onOpenSource={openSourceFile} snapshot={snapshot} />
+      : null;
+    const runRecordsPanel = isRunRecordsTopic
+      ? <RunRecordsPanel onOpenSource={openSourceFile} snapshot={snapshot} />
+      : null;
+    const handoffRecordsPanel = isHandoffRecordsTopic ? <GovernanceSurfacePanel onOpenSource={openSourceFile} renderSourceButtons={(callback, sources) => <RuleSourceButtons onOpenSource={callback} sources={sources} />} type="handoff-records" /> : null;
+    const decisionRecordsPanel = isDecisionRecordsTopic ? <GovernanceSurfacePanel onOpenSource={openSourceFile} renderSourceButtons={(callback, sources) => <RuleSourceButtons onOpenSource={callback} sources={sources} />} type="decision-records" /> : null;
+    const lessonsLearnedPanel = isLessonsLearnedTopic ? <GovernanceSurfacePanel onOpenSource={openSourceFile} renderSourceButtons={(callback, sources) => <RuleSourceButtons onOpenSource={callback} sources={sources} />} type="lessons-learned" /> : null;
+    const memorySurfacePanel = isMemorySurfaceTopic ? <MemorySurfacePanel onOpenSource={openSourceFile} renderSourceButtons={(callback, sources) => <RuleSourceButtons onOpenSource={callback} sources={sources} />} type={topicRouteId} /> : null;
+    const assetSurfacePanel = isAssetSurfaceTopic ? <AssetSurfacePanel onOpenSource={openSourceFile} renderSourceButtons={(callback, sources) => <RuleSourceButtons onOpenSource={callback} sources={sources} />} type={topicRouteId} /> : null;
+    const agentConfigSurfacePanel = isAgentConfigSurfaceTopic ? <AgentConfigSurfacePanel onGetHermesExecutorStatus={onGetHermesExecutorStatus} onOpenSource={openSourceFile} renderSourceButtons={(callback, sources) => <RuleSourceButtons onOpenSource={callback} sources={sources} />} type={topicRouteId} /> : null;
     const runbookPanel = isRunbookTopic && snapshot?.workspaceFacts
-      ? <RunbookPanel report={snapshot.workspaceFacts} />
+      ? <RunbookPanel onOpenSource={openSourceFile} onSendToTerminal={onPrepareTerminalCommand} report={snapshot.workspaceFacts} snapshot={snapshot} />
+      : null;
+    const riskBoundaryPanel = isRiskBoundaryTopic && snapshot?.workspaceFacts
+      ? <RiskBoundaryPanel onOpenSource={openSourceFile} report={snapshot.workspaceFacts} snapshot={snapshot} />
+      : null;
+    const localProjectStatePanel = isLocalProjectStateTopic && snapshot?.workspaceFacts
+      ? <LocalProjectStatePanel onOpenSource={openSourceFile} report={snapshot.workspaceFacts} snapshot={snapshot} />
       : null;
     const reportPanel = isReportTopic
       ? <ReportArtifactsPanel snapshot={snapshot} />
       : null;
     const governanceFilesPanel = isGovernanceFilesTopic && snapshot?.workspaceFacts
-      ? <GovernanceFilesHealthSection onCreateGovernanceTask={onCreateGovernanceTask} report={snapshot.workspaceFacts} />
+      ? <GovernanceFilesHealthSection onCreateGovernanceTask={onCreateGovernanceTask} onReadEngineeringFile={onReadEngineeringFile} report={snapshot.workspaceFacts} />
       : null;
     const designImplementationPanel = isDesignImplementationTopic && snapshot?.workspaceFacts
-      ? <DesignImplementationHealthSection onCreateDesignGovernanceTask={onCreateDesignGovernanceTask} report={snapshot.workspaceFacts} topic={selectedTopic} />
+      ? <DesignImplementationHealthSection onCreateDesignGovernanceTask={onCreateDesignGovernanceTask} onReadEngineeringFile={onReadEngineeringFile} report={snapshot.workspaceFacts} topic={selectedTopic} />
+      : null;
+    const componentLibraryPanel = isComponentLibraryTopic
+      ? <ComponentGovernancePanel onNavigate={onNavigateWorkbench} />
+      : null;
+    const tokenLibraryPanel = isTokenLibraryTopic
+      ? <TokenGovernancePanel onNavigate={onNavigateWorkbench} />
       : null;
     const agentTopic = (
       <AgentTopicPanel
+        agentRuns={agentRuns}
+        onApproveAgentRun={onApproveAgentRun}
+        onResumeAgentRun={onResumeAgentRun}
+        activeTaskId={activeTaskId}
         composerModelAvailability={composerModelAvailability}
         provider={provider}
         snapshot={snapshot}
         tasks={tasks}
         topic={selectedTopic}
         runnerLoadingId={runnerLoadingId}
-        patchLoading={patchLoading}
-        applyLoading={applyLoading}
         handoffLoading={handoffLoading}
         onGeneratePatchDraft={onGeneratePatchDraft}
         onApplyPatchDraft={onApplyPatchDraft}
         onMergeHandoff={onMergeHandoff}
         onRunGuardedCheck={onRunGuardedCheck}
         onSelectTask={onSelectTask}
+        onMarkTaskWaiting={onMarkTaskWaiting}
+        onEnsureModelAvailable={onEnsureModelAvailable}
+        onCreateTask={onCreateTask}
+        onCreateGoal={onCreateGoal}
+        onDeleteTask={onDeleteTask}
+        onArchiveGoal={onArchiveGoal}
+        onMergeGoal={onMergeGoal}
+        onRestoreGoal={onRestoreGoal}
         onCreateRepairTask={onCreateRepairTask}
+        onPersistTask={onPersistTask}
+        onUpdateGoal={onUpdateGoal}
         onOpenCapabilityFile={previewRelatedFile}
+        onOpenTaskConversation={onOpenTaskConversation}
+        onRefreshWorkspace={onRefreshWorkspace}
+        compact={isTaskExecutionTopic}
       />
     );
-    const capabilityPanel = (isAssetCapabilityTopic || isFlowCapabilityTopic) ? agentTopic : null;
-    const topicBody = isOverviewTopic
-      ? <WorkspaceFactsPreview globalOverview={selectedTopic.id === "workbench-overview"} onCreateGovernanceTask={onCreateGovernanceTask} onNavigate={onNavigateWorkbench} provider={provider} report={workspaceFacts} snapshot={snapshot} tasks={tasks} />
-      : capabilityPanel
-        ? (
-          <>
-            {capabilityPanel}
-            {currentProgressPanel || runbookPanel || reportPanel || governanceFilesPanel || designImplementationPanel}
-          </>
-        )
-        : currentProgressPanel || runbookPanel || reportPanel || governanceFilesPanel || designImplementationPanel || agentTopic || (
-          <Notice variant="info">这是项目治理地图。用户只看事项，OmniDesk 在背后维护对应文件、状态来源和更新时机。</Notice>
-        );
-    return (
-      <Panel className="engineeringFilePreview filePreviewPanel" variant="soft">
-        <div className={`engineeringFileHeader${isCurrentProgressTopic ? " progressTopicHeader" : ""}`}>
-          <div>
-            <strong>{selectedTopic.title}</strong>
-            <p>{selectedTopic.description}</p>
-          </div>
-          {isCurrentProgressTopic ? (
-            <span className="topicBreadcrumb">项目流程 / {selectedTopicGroupLabel}</span>
-          ) : (
-            <Badge>{selectedTopicGroupLabel}</Badge>
-          )}
-        </div>
-        <div className="topicPreview">
-          {topicBody}
-          {(selectedTopic.governanceRole || selectedTopic.maturity || selectedTopic.nextAction || selectedTopic.statusSource || selectedTopic.updatesWhen) ? (
-            <div className="topicGovernanceMeta">
-              {selectedTopic.governanceRole ? (
-                <div>
-                  <span>治理角色</span>
-                  <p>{selectedTopic.governanceRole}</p>
-                </div>
-              ) : null}
-              {selectedTopic.maturity ? (
-                <div>
-                  <span>闭环程度</span>
-                  <p>{selectedTopic.maturity}</p>
-                </div>
-              ) : null}
-              {selectedTopic.statusSource ? (
-                <div>
-                  <span>状态来源</span>
-                  <code>{selectedTopic.statusSource}</code>
-                </div>
-              ) : null}
-              {selectedTopic.updatesWhen ? (
-                <div>
-                  <span>更新时机</span>
-                  <p>{selectedTopic.updatesWhen}</p>
-                </div>
-              ) : null}
-              {selectedTopic.nextAction ? (
-                <div>
-                  <span>下一步动作</span>
-                  <p>{selectedTopic.nextAction}</p>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-          <div className="topicFileList">
-            <strong>关联工程文件</strong>
-            <div>
-              {(selectedTopic.relatedFiles || []).map((file) => (
-                <button
-                  className={`topicFileButton${relatedFilePreview?.path === file ? " active" : ""}`}
-                  key={file}
-                  type="button"
-                  onClick={() => previewRelatedFile(file)}
-                >
-                  {file}
-                </button>
-              ))}
-            </div>
-          </div>
-          {relatedFilePreview ? (
-            <div className="workspaceGovernancePreview">
-              <div className="engineeringFileHeader">
-                <div>
-                  <strong>{relatedFilePreview.path}</strong>
-                  <p>关联工程文件只读预览</p>
-                </div>
-                {relatedFilePreview.preview ? <Badge>{relatedFilePreview.preview.language}</Badge> : null}
-              </div>
-              {relatedFilePreview.loading ? (
-                <Notice variant="info">正在读取文件内容...</Notice>
-              ) : relatedFilePreview.error ? (
-                <Notice variant="danger">{relatedFilePreview.error}</Notice>
-              ) : relatedFilePreview.preview ? (
-                <>
-                  <div className="engineeringFileMeta">
-                    <span>{formatBytes(relatedFilePreview.preview.size)}</span>
-                    {relatedFilePreview.preview.truncated ? <span>已截断</span> : <span>完整预览</span>}
-                  </div>
-                  <pre className="engineeringFileCode">{relatedFilePreview.preview.content || "文件为空。"}</pre>
-                </>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-      </Panel>
+    const taskTitle = { "task-list": "目标与任务", "execution-terminal": "执行终端", "execution-results": "执行结果" }[topicRouteId];
+    const taskDescription = { "task-list": "按目标查看任务进展与审核状态。", "execution-terminal": "在受控终端中运行命令并查看输出。", "execution-results": "查看完成或失败任务的验证结果与后续处理。" }[topicRouteId];
+    const taskExecutionPanel = isTaskExecutionTopic ? <section className="overviewSurface taskExecutionSurface"><OverviewPageHeader title={taskTitle} description={taskDescription} meta={<span>任务状态变化时自动更新</span>} sources={<RuleSourceButtons onOpenSource={openSourceFile} sources={selectedTopic.relatedFiles || [".project-os/runs/desktop-tasks/*"]} />} />{agentTopic}</section> : null;
+    const capabilityPanel = surface === "agent-topic" ? agentTopic : null;
+    const topicBody = (
+      <EngineeringTopicSurfaceComposer
+        capabilityPanel={capabilityPanel}
+        capabilitySupplementPanels={[currentProgressPanel, runbookPanel, reportPanel, governanceFilesPanel, designImplementationPanel, componentLibraryPanel, tokenLibraryPanel]}
+        dedicatedPanels={[agentConfigSurfacePanel, assetSurfacePanel, memorySurfacePanel, taskExecutionPanel, currentGoalPanel, acceptanceCriteriaPanel, goalHistoryPanel, collaborationBoundaryPanel, executionPermissionsPanel, documentationRulesPanel, systemArchitecturePanel, dataContractsPanel, codeStructurePanel, validationChecksPanel, validationReportPanel, runRecordsPanel, handoffRecordsPanel, decisionRecordsPanel, lessonsLearnedPanel, currentProgressPanel, runbookPanel, riskBoundaryPanel, localProjectStatePanel, reportPanel, governanceFilesPanel, designImplementationPanel, componentLibraryPanel, tokenLibraryPanel]}
+        fallback={<Notice variant="info">这是项目治理地图。用户只看事项，OmniDesk 在背后维护对应文件、状态来源和更新时机。</Notice>}
+        isOverviewTopic={isOverviewTopic}
+        overviewPanel={<WorkspaceFactsPreview globalOverview={selectedTopic.id === "workbench-overview"} onCreateGovernanceTask={onCreateGovernanceTask} onNavigate={onNavigateWorkbench} onRequestProjectAccess={onRequestProjectAccess} provider={provider} report={workspaceFacts} snapshot={snapshot} tasks={tasks} />}
+        topicPanel={agentTopic}
+      />
     );
+    return <EngineeringTopicFrame
+      isCurrentProgressTopic={isCurrentProgressTopic}
+      onPreviewRelatedFile={previewRelatedFile}
+      relatedFilePreview={relatedFilePreview}
+      selectedTopic={selectedTopic}
+      selectedTopicGroupLabel={selectedTopicGroupLabel}
+      usesDedicatedSurface={usesDedicatedSurface}
+    >
+      {topicBody}
+    </EngineeringTopicFrame>;
   }
 
   return (
     <Panel className="engineeringFilePreview filePreviewPanel" variant="soft">
-      <div className="engineeringFileHeader">
-        <div>
-          <strong>{selectedEngineeringFile.path}</strong>
-          <p>{selectedEngineeringFile.description}</p>
-        </div>
-        {selectedEngineeringFile.preview ? (
-          <Badge>{selectedEngineeringFile.preview.language}</Badge>
-        ) : null}
-      </div>
-      {selectedEngineeringFile.loading ? (
-        <Notice variant="info">正在读取文件内容...</Notice>
-      ) : selectedEngineeringFile.error ? (
-        <Notice variant="danger">{selectedEngineeringFile.error}</Notice>
-      ) : selectedEngineeringFile.preview ? (
-        <>
-          <div className="engineeringFileMeta">
-            <span>{formatBytes(selectedEngineeringFile.preview.size)}</span>
-            {selectedEngineeringFile.preview.truncated ? <span>已截断预览</span> : <span>完整预览</span>}
-          </div>
-          <pre className="engineeringFileCode">{selectedEngineeringFile.preview.content || "文件为空。"}</pre>
-        </>
-      ) : null}
+      <ReadonlyFilePreview description={selectedEngineeringFile.description} file={selectedEngineeringFile} />
     </Panel>
-  );
-}
-
-function ActiveTask({
-  task,
-  runnerLoadingId,
-  runnerError,
-  patchLoading,
-  patchError,
-  applyLoading,
-  applyError,
-  handoffLoading,
-  handoffError,
-  onGeneratePatchDraft,
-  onApplyPatchDraft,
-  onMergeHandoff,
-  onRunGuardedCheck,
-  onSelectConversation,
-  onBackToProgress,
-}) {
-  const runnableChecks = checksForPlan(task.plan);
-  const draftActions = [
-    {
-      disabled: patchLoading,
-      key: "generate-patch",
-      label: patchLoading ? "生成中" : task.patchDraft ? "重新生成改动" : "生成改动",
-      onClick: () => onGeneratePatchDraft(task.id),
-      variant: task.patchDraft ? "default" : "primary",
-    },
-    {
-      disabled: applyLoading || !task.patchDraft,
-      key: "apply-patch",
-      label: applyLoading ? "应用中" : "应用改动",
-      onClick: () => onApplyPatchDraft(task.id),
-      variant: task.patchDraft ? "primary" : "default",
-    },
-    {
-      disabled: handoffLoading || !task.runSummary || Boolean(task.handoffMerge),
-      key: "merge-handoff",
-      label: handoffLoading ? "合并中" : task.handoffMerge ? "已更新交接" : "更新交接",
-      onClick: () => onMergeHandoff(task.id),
-    },
-  ];
-  const checkActions = runnableChecks.slice(0, 2).map((check) => ({
-    disabled: Boolean(runnerLoadingId),
-    key: check.id,
-    label: runnerLoadingId === check.id ? "运行中" : check.label,
-    onClick: () => onRunGuardedCheck(task.id, check.id),
-  }));
-
-  return (
-    <Panel as="article" className="activeTask" variant="soft">
-      <div className="activeTaskBreadcrumb">
-        <button type="button" onClick={onBackToProgress}>返回当前进度</button>
-        <span>任务详情</span>
-      </div>
-      <div className="activeTaskHeader">
-        <div>
-          <strong>{task.title}</strong>
-          <span>{task.projectName} · {task.createdAt}</span>
-          {task.goalTitle || task.conversationId ? (
-            <span className="activeTaskSource">
-              {task.goalTitle ? `来自目标：${task.goalTitle}` : null}
-              {task.goalTitle && task.conversationId ? " · " : null}
-              {task.conversationId ? "来自对话" : null}
-            </span>
-          ) : null}
-        </div>
-        <Badge status={task.status}>{taskStatusLabel(task.status)}</Badge>
-      </div>
-      {task.conversationId ? (
-        <div className="activeTaskInlineActions">
-          <button type="button" onClick={() => onSelectConversation?.(task.conversationId)}>
-            回到对话
-          </button>
-        </div>
-      ) : null}
-      <div className="activeTaskPrimaryActions">
-        <TaskCommandBar
-          actions={[...draftActions, ...checkActions]}
-          meta={task.patchDraft?.files?.length
-            ? `已生成 ${task.patchDraft.files.length} 个文件的改动草稿。`
-            : "先生成改动，再应用和验证。"}
-        />
-      </div>
-      {patchError ? <Notice className="planError" variant="danger">{patchError}</Notice> : null}
-      {applyError ? <Notice className="planError" variant="danger">{applyError}</Notice> : null}
-      {handoffError ? <Notice className="planError" variant="danger">{handoffError}</Notice> : null}
-      {runnerError ? <Notice className="planError" variant="danger">{runnerError}</Notice> : null}
-      {task.applyResult ? <Notice className="providerSuccess" variant="success">{task.applyResult.message}</Notice> : null}
-      {task.verificationSummary ? (
-        <Notice className={task.status === taskStatuses.failed ? "providerError" : "providerSuccess"} variant={task.status === taskStatuses.failed ? "danger" : "success"}>
-          {task.verificationSummary}
-        </Notice>
-      ) : null}
-      <ReadonlyPlan plan={task.plan} />
-      <details className="executionTools">
-        <summary>高级详情</summary>
-        <Panel className="diffPanel" variant="info">
-          <div className="runnerHeader">
-            <strong>改动草稿</strong>
-            <span>先预览，不直接写入</span>
-          </div>
-          <TaskCommandBar
-            actions={draftActions}
-            meta={task.patchDraft?.files?.length ? `${task.patchDraft.files.length} 个文件` : "还没有生成改动。"}
-          />
-          {task.runSummary ? <Notice className="providerHint" variant="info">{task.runSummary.message}：{task.runSummary.path}</Notice> : null}
-          {task.handoffMerge ? <Notice className="providerSuccess" variant="success">{task.handoffMerge.message}：{task.handoffMerge.path}</Notice> : null}
-          {task.patchDraft ? <PatchDraft draft={task.patchDraft} /> : null}
-        </Panel>
-        <Panel className="runnerPanel" variant="code">
-          <div className="runnerHeader">
-            <strong>检查</strong>
-            <span>只运行已允许的命令</span>
-          </div>
-          <TaskCommandBar
-            actions={runnableChecks.map((check) => ({
-              disabled: Boolean(runnerLoadingId),
-              key: check.id,
-              label: runnerLoadingId === check.id ? "运行中" : check.label,
-              onClick: () => onRunGuardedCheck(task.id, check.id),
-            }))}
-          >
-            {runnableChecks.length ? (
-              null
-            ) : (
-              <span>当前没有可运行的检查。</span>
-            )}
-          </TaskCommandBar>
-          {runnerError ? <Notice className="planError" variant="danger">{runnerError}</Notice> : null}
-          {task.runs?.length ? (
-            <div className="runnerResults">
-              {task.runs.map((run) => (
-                <div className={`runnerResult ${run.success ? "success" : "failed"}`} key={`${run.id}-${run.finishedAt}`}>
-                  <div>
-                    <strong>{run.label}</strong>
-                    <span>{run.command}</span>
-                  </div>
-                <em>{run.success ? "通过" : `失败 ${run.code ?? ""}`}</em>
-                  <pre>{run.output || "No output."}</pre>
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </Panel>
-      </details>
-    </Panel>
-  );
-}
-
-function PatchDraft({ draft }) {
-  return (
-    <Panel className="patchDraft" variant="default" padding="none">
-      <div className="patchSummary">
-        <strong>{draft.summary}</strong>
-        <span>{draft.guardrails?.join(" · ")}</span>
-      </div>
-      <pre>{draft.diff || "No diff generated."}</pre>
-    </Panel>
-  );
-}
-
-function ReadonlyPlan({ plan }) {
-  return (
-    <Panel as="article" className="readonlyPlan" variant="soft">
-      <div className="planHeader">
-        <div>
-          <strong>下一步计划</strong>
-          <span>{plan.projectName}</span>
-        </div>
-        <Badge>待确认</Badge>
-      </div>
-      <p>{plan.summary}</p>
-      <div className="planColumns">
-        <PlanList title="怎么做" items={plan.steps} />
-        <PlanList title="会看什么" items={plan.filesToRead} />
-        <PlanList title="可能改哪里" items={plan.candidateChanges} />
-        <PlanList title="怎么确认" items={plan.checks} mono />
-        <PlanList title="边界" items={plan.guardrails} />
-      </div>
-    </Panel>
-  );
-}
-
-function PlanList({ title, items, mono }) {
-  const safeItems = Array.isArray(items) ? items : [];
-
-  return (
-    <div className="planList">
-      <strong>{title}</strong>
-      <ul className={mono ? "monoList" : undefined}>
-        {safeItems.map((item) => (
-          <li key={item}>{item}</li>
-        ))}
-      </ul>
-    </div>
   );
 }
 
@@ -5882,7 +3661,9 @@ function RightRail({
   conversations,
   activeConversationId,
   onSelectConversation,
+  onArchiveConversation,
   onDeleteConversation,
+  onRestoreConversation,
   onSelectTask,
   onSendGoalToChat,
   onSendGoalToTerminal,
@@ -5901,21 +3682,23 @@ function RightRail({
   terminalRunningId,
 }) {
   const [taskFilter, setTaskFilter] = useState("todo");
+  const [historyManagementOpen, setHistoryManagementOpen] = useState(false);
   const [confirmGoalOpen, setConfirmGoalOpen] = useState(false);
   const [newGoalOpen, setNewGoalOpen] = useState(false);
   const [newGoalTitle, setNewGoalTitle] = useState("");
   const [newGoalSummary, setNewGoalSummary] = useState("");
-  const activeGoal = activeGoalFromSnapshot(snapshot);
+  const { goal: activeGoal } = resolveWorkspaceContext({ activeConversationId, activeTaskId, conversations, snapshot, tasks });
   const activeGoalTaskIds = new Set(Array.isArray(activeGoal?.taskIds) ? activeGoal.taskIds : []);
   const belongsToActiveGoal = (item) => {
     if (!activeGoal?.id) return true;
     if (item.goalId) return item.goalId === activeGoal.id;
     return activeGoalTaskIds.size ? activeGoalTaskIds.has(item.id) : true;
   };
-  const visibleTasks = tasks.filter((task) => !isNoiseTask(task) && belongsToActiveGoal(task));
-  const conversationGroups = groupedConversations(conversations);
+  const visibleTasks = collapseDuplicateOpenTasks(tasks.filter((task) => !isNoiseTask(task) && belongsToActiveGoal(task)));
+  const conversationGroups = groupConversations(conversations);
+  const activeConversationCount = conversations.filter((conversation) => !conversation.archivedAt).length;
   const activeTask = visibleTasks.find((task) => task.id === activeTaskId);
-  const snapshotTodos = snapshotQueueTodos(snapshot).filter(belongsToActiveGoal);
+  const snapshotTodos = collapseDuplicateOpenTasks(snapshotQueueTodos(snapshot).filter(belongsToActiveGoal));
   const todoMeta = visibleTasks.length || snapshotTodos.length;
   const goalTodos = visibleTasks.length
     ? visibleTasks.map((task) => ({
@@ -5926,6 +3709,7 @@ function RightRail({
         id: task.id,
         status: taskDisplayStatus(task, { activeTaskId, planLoading, terminalRunningId }),
         subtasks: taskSubtasks(task),
+        task,
         title: task.title,
       }))
     : snapshotTodos.map((task) => ({
@@ -6169,7 +3953,7 @@ function RightRail({
                   {useDialoguePhaseGroups ? <span>当前阶段</span> : <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button className="goalTaskFilter" type="button">
-                        <span>任务拆解 · {visibleTaskFilterLabel}</span>
+                        <span>任务拆解 · {compactGoalTitle(goalTitle)} · {visibleTaskFilterLabel}</span>
                         <ChevronDown strokeWidth={2} aria-hidden="true" />
                       </button>
                     </DropdownMenuTrigger>
@@ -6191,9 +3975,18 @@ function RightRail({
                         index={index}
                         key={todo.id}
                         status={todo.status}
+                        taskStatuses={taskStatuses}
                         subtasks={todo.subtasks}
                         title={todo.title}
                         onSelect={() => onSelectTask(todo.id)}
+                        detail={todo.id === activeTaskId ? (
+                          <TaskRailDetail
+                            task={todo.task || todo}
+                            onMarkTaskWaiting={onMarkTaskWaiting}
+                            onSendTaskToChat={onSendTaskToChat}
+                            onSendTaskToTerminal={onSendTaskToTerminal}
+                          />
+                        ) : null}
                       />
                     ))}
                   </ol>
@@ -6207,8 +4000,17 @@ function RightRail({
                             index={currentPhaseTodos.length + index}
                             key={todo.id}
                             status={todo.status}
+                            taskStatuses={taskStatuses}
                             title={todo.title}
                             onSelect={() => onSelectTask(todo.id)}
+                            detail={todo.id === activeTaskId ? (
+                              <TaskRailDetail
+                                task={todo.task || todo}
+                                onMarkTaskWaiting={onMarkTaskWaiting}
+                                onSendTaskToChat={onSendTaskToChat}
+                                onSendTaskToTerminal={onSendTaskToTerminal}
+                              />
+                            ) : null}
                           />
                         ))}
                       </ol>
@@ -6223,9 +4025,29 @@ function RightRail({
           </div>
         </RailDisclosure>
 
-        <RailDisclosure className="railHistory" title="对话" meta={conversations.length}>
+        <RailDisclosure
+          className="railHistory"
+          title="对话"
+          meta={
+            <span className="railSectionActions">
+              <em>{activeConversationCount}</em>
+              <Tooltip content="历史管理">
+              <Button
+                aria-label="对话历史管理"
+                className="sectionIconAction"
+                size="icon"
+                type="button"
+                variant="ghost"
+                onClick={() => setHistoryManagementOpen(true)}
+              >
+                <MoreVertical strokeWidth={1.8} aria-hidden="true" />
+              </Button>
+              </Tooltip>
+            </span>
+          }
+        >
           <div className="queue">
-            {conversations.length ? (
+            {conversationGroups.length ? (
               conversationGroups.map((group) => (
                 <div className="conversationHistoryGroup" key={group.label}>
                   {conversationGroups.length > 1 ? (
@@ -6236,17 +4058,41 @@ function RightRail({
                       active={conversation.id === activeConversationId}
                       conversation={conversation}
                       key={conversation.id}
+                      onArchiveConversation={onArchiveConversation}
                       onDeleteConversation={onDeleteConversation}
+                      onRestoreConversation={onRestoreConversation}
                       onSelectConversation={onSelectConversation}
                     />
                   ))}
                 </div>
               ))
             ) : (
-              <Notice variant="muted">普通聊天会保存在这里；确认执行后才会进入任务。</Notice>
+              <Notice variant="muted">没有匹配的对话。</Notice>
             )}
           </div>
         </RailDisclosure>
+
+        <Dialog open={historyManagementOpen} onOpenChange={setHistoryManagementOpen}>
+          <DialogContent title="历史管理" description="这里只显示已归档对话；归档可恢复，永久删除的对话不会保留记录。">
+            <div className="conversationHistoryManagement">
+              {conversations.filter((conversation) => conversation.archivedAt).map((conversation) => (
+                <ConversationHistoryItem
+                  active={false}
+                  conversation={conversation}
+                  key={conversation.id}
+                  onArchiveConversation={onArchiveConversation}
+                  onDeleteConversation={onDeleteConversation}
+                  onRestoreConversation={onRestoreConversation}
+                  onSelectConversation={onSelectConversation}
+                />
+              ))}
+              {!conversations.some((conversation) => conversation.archivedAt) ? <Notice variant="info">暂无已归档对话。</Notice> : null}
+            </div>
+            <div className="taskCreateActions">
+              <DialogClose asChild><Button type="button" variant="subtle">关闭</Button></DialogClose>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <RailDisclosure className="contextSection" title="项目档案" meta={`${recordedProfileCount}/${profileItems.length}`}>
           <div className="contextPack">
@@ -6266,2533 +4112,451 @@ function RightRail({
   );
 }
 
-function RailDisclosure({ children, className = "", defaultOpen = false, meta, title }) {
-  const metaIsAction = React.isValidElement(meta);
-
-  return (
-    <SectionGroup
-      actions={metaIsAction ? meta : undefined}
-      bodyClassName="railDisclosureBody"
-      className={`railSection railDisclosure ${className}`}
-      defaultOpen={defaultOpen}
-      meta={metaIsAction ? undefined : meta}
-      title={title}
-    >
-      {children}
-    </SectionGroup>
-  );
-}
-
-function GoalStatusIcon({ displayStatus, status }) {
-  const currentStatus = displayStatus || status;
-  const done = currentStatus === taskStatuses.done;
-  const running = currentStatus === taskStatuses.running || currentStatus === taskStatuses.waitingApproval;
-  const failed = currentStatus === taskStatuses.failed;
-  const label = failed ? "失败" : running ? "进行中" : done ? "已完成" : "待开始";
-  return (
-    <span className="goalTodoStatus" aria-label={label}>
-      {done ? <Check strokeWidth={2.25} aria-hidden="true" /> : running ? <Loader2 strokeWidth={2} aria-hidden="true" /> : null}
-    </span>
-  );
-}
-
-function GoalTaskItem({ active, displayStatus, index, onSelect, status, title }) {
-  const currentStatus = displayStatus || status;
-  const done = currentStatus === taskStatuses.done;
-  const running = currentStatus === taskStatuses.running || currentStatus === taskStatuses.waitingApproval;
-  const failed = currentStatus === taskStatuses.failed;
-  const mainContent = (
-    <>
-      <span className="goalTodoIndex">{index + 1}</span>
-      <span className="goalTodoText">
-        <span className="goalTodoTitle">{title}</span>
-      </span>
-      <GoalStatusIcon displayStatus={displayStatus} status={status} />
-    </>
-  );
-
-  return (
-    <li className={`goalTodoItem${active ? " active" : ""}${done ? " done" : ""}${running ? " running" : ""}${failed ? " failed" : ""}`}>
-      <div className="goalTodoRow">
-        {onSelect ? (
-          <button className="goalTodoButton" type="button" onClick={onSelect}>
-            {mainContent}
-          </button>
-        ) : (
-          <div className="goalTodoButton">{mainContent}</div>
-        )}
-      </div>
-    </li>
-  );
-}
-
-function TaskQueueItem({ task, active, onSelectTask, onMarkTaskWaiting }) {
-  const approveDisabled = task.status !== taskStatuses.planned;
-
-  return (
-    <Panel as="article" className={`queueCard taskQueueItem${active ? " active" : ""}`} padding="none">
-      <button
-        aria-label={`打开对话：${task.title}`}
-        className="taskQueueButton"
-        type="button"
-        onClick={() => onSelectTask(task.id)}
-      >
-        <div className="queueHead">
-          <strong>{task.title}</strong>
-          <Badge status={task.status}>{task.status}</Badge>
-        </div>
-        <p>{task.projectName} · {task.createdAt}</p>
-      </button>
-      <div className="taskActions">
-        <Button size="sm" variant="primary" type="button" onClick={() => onMarkTaskWaiting(task.id)} disabled={approveDisabled}>
-          开始执行
-        </Button>
-      </div>
-    </Panel>
-  );
-}
-
-function ProviderPanel({ provider, modelCatalog, source, onSaveProvider, onSaveProviderSecret, onDeleteProviderProfile, providerError }) {
-  const [form, setForm] = useState(provider);
-  const [apiKey, setApiKey] = useState("");
-  const [customModel, setCustomModel] = useState(false);
-  const [selectedProviderId, setSelectedProviderId] = useState("");
-  const [detectedModels, setDetectedModels] = useState([]);
-  const [probeLoading, setProbeLoading] = useState(false);
-  const [probeError, setProbeError] = useState("");
-  const [modelTestLoading, setModelTestLoading] = useState(false);
-  const [modelTestMessage, setModelTestMessage] = useState("");
-  const [modelTestStatus, setModelTestStatus] = useState("untested");
-  const catalogProviders =
-    Array.isArray(modelCatalog?.providers) && modelCatalog.providers.length
-      ? modelCatalog.providers
-      : fallbackModelCatalog.providers;
-  const profiles = Array.isArray(provider.profiles) ? provider.profiles : [];
-  const activePreset =
-    catalogProviders.find((preset) => preset.apiBase === form.apiBase && preset.apiKeyEnv === form.apiKeyEnv) ||
-    catalogProviders.find((preset) => preset.id === selectedProviderId) ||
-    catalogProviders.find((preset) => preset.id === form.profileId) ||
-    catalogProviders.find((preset) => preset.id === "gateway") ||
-    catalogProviders[0];
-  const modelOptions = Array.from(new Set([
-    form.model,
-    ...(detectedModels.length ? detectedModels : (activePreset?.models || [])),
-  ].filter(Boolean)));
-  const isPreview = source !== "tauri";
-  const connectionTestLabel = modelTestStatus === "available"
-    ? modelTestMessage
-    : modelTestStatus === "unavailable"
-      ? "当前连接不可用"
-      : "当前连接尚未测试";
-  const savedProfile = profiles.find((profile) => profile.id === form.profileId);
-  const isCreatingProfile = Boolean(form.profileId) && !savedProfile;
-  const currentHasApiKey = isCreatingProfile ? Boolean(apiKey.trim()) : Boolean(savedProfile?.hasApiKey ?? provider.hasApiKey);
-  const currentConnectionName = form.profileName || activeProviderProfileName(provider);
-  const usesCatalogPreset = Boolean(
-    activePreset &&
-    form.apiBase === activePreset.apiBase &&
-    form.apiKeyEnv === activePreset.apiKeyEnv
-  );
-  const advancedFieldsReadOnly = usesCatalogPreset && !isCreatingProfile;
-
-  useEffect(() => {
-    setForm({
-      ...provider,
-      profileId: provider.activeProfileId || provider.profileId || "",
-      profileName:
-        provider.profiles?.find((profile) => profile.id === provider.activeProfileId)?.name ||
-        provider.profileName ||
-        "",
-      profileNote:
-        provider.profiles?.find((profile) => profile.id === provider.activeProfileId)?.note ||
-        provider.profileNote ||
-        "",
-      profileWebsite:
-        provider.profiles?.find((profile) => profile.id === provider.activeProfileId)?.website ||
-        provider.profileWebsite ||
-        "",
-    });
-    setSelectedProviderId(
-      catalogProviders.find((preset) => preset.apiBase === provider.apiBase && preset.apiKeyEnv === provider.apiKeyEnv)?.id ||
-      provider.profileId ||
-      provider.activeProfileId ||
-      "gateway"
-    );
-    setDetectedModels([]);
-    setProbeError("");
-    setModelTestMessage("");
-    setCustomModel(false);
-  }, [provider, modelCatalog]);
-
-  const updateField = (field, value) => {
-    setForm((current) => ({ ...current, [field]: value }));
-  };
-
-  const createProfile = () => {
-    const id = `profile-${Date.now()}`;
-    const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
-    const preset = activePreset || catalogProviders.find((item) => item.id === "gateway") || catalogProviders[0];
-    setApiKey("");
-    setCustomModel(true);
-    setDetectedModels([]);
-    setProbeError("");
-    setModelTestMessage("");
-    setSelectedProviderId(preset?.id || "gateway");
-    setForm((current) => ({
-      ...current,
-      provider: preset?.provider || "openai-compatible",
-      model: "",
-      apiBase: "",
-      apiKeyEnv: `OMNIDESK_API_KEY_${suffix}`,
-      enabled: true,
-      profileId: id,
-      profileName: "",
-      profileNote: "",
-      profileWebsite: "",
-    }));
-  };
-
-  const applyPreset = (preset) => {
-    setSelectedProviderId(preset.id);
-    setForm((current) => ({
-      ...current,
-      provider: preset.provider || "openai-compatible",
-      model: preset.models.includes(current.model) ? current.model : preset.models[0],
-      apiBase: preset.apiBase,
-      apiKeyEnv: preset.apiKeyEnv,
-      enabled: true,
-      profileId: current.profileId || provider.activeProfileId || preset.id,
-      profileName: current.profileName || preset.label,
-      profileNote: preset.note || "",
-      profileWebsite: preset.website || "",
-    }));
-  };
-
-  const selectProfile = (event) => {
-    const profile = profiles.find((item) => item.id === event.target.value);
-    if (!profile) return;
-    editProfile(profile);
-  };
-
-  const editProfile = (profile) => {
-    setSelectedProviderId(
-      catalogProviders.find((preset) => preset.apiBase === profile.apiBase && preset.apiKeyEnv === profile.apiKeyEnv)?.id ||
-      "gateway"
-    );
-    setCustomModel(false);
-    setForm((current) => ({
-      ...current,
-      profileId: profile.id,
-      profileName: profile.name,
-      profileNote: profile.note || "",
-      profileWebsite: profile.website || "",
-      provider: profile.provider,
-      model: profile.model,
-      apiBase: profile.apiBase,
-      apiKeyEnv: profile.apiKeyEnv,
-      enabled: true,
-    }));
-  };
-
-  const deleteProfile = async (profile) => {
-    if (!profile) return;
-    const confirmed = window.confirm(`删除连接「${profile.name || "未命名连接"}」？\n如果这个 Key 没有被其他连接共用，也会从 .env.local 移除。`);
-    if (!confirmed) return;
-    const ok = await onDeleteProviderProfile?.(profile.id);
-    if (ok) {
-      setApiKey("");
-      setCustomModel(false);
-      setDetectedModels([]);
-      setProbeError("");
-      setModelTestMessage("");
-    }
-  };
-
-  const selectPreset = (event) => {
-    const preset = catalogProviders.find((item) => item.id === event.target.value);
-    if (preset) {
-      setCustomModel(false);
-      applyPreset(preset);
-    }
-  };
-
-  const selectModel = (event) => {
-    if (event.target.value === "__custom") {
-      setCustomModel(true);
-      updateField("model", "");
-      return;
-    }
-    setCustomModel(false);
-    updateField("model", event.target.value);
-  };
-
-  const probeModels = async () => {
-    if (isPreview) {
-      setProbeError("");
-      setModelTestMessage("");
-      return false;
-    }
-    setProbeError("");
-    setModelTestMessage("");
-    setProbeLoading(true);
-    try {
-      const previousModel = form.model;
-      const result = await invokeWorkspaceCommand("probe_provider_models", {
-        input: {
-          apiBase: form.apiBase,
-          apiKeyEnv: form.apiKeyEnv,
-          apiKey,
-        },
-      });
-      const models = Array.isArray(result.models) ? result.models : [];
-      setDetectedModels(models);
-      if (models.length && previousModel && !models.includes(previousModel)) {
-        setCustomModel(false);
-        updateField("model", models[0]);
-      } else if (models.length) {
-        if (!previousModel) {
-          setCustomModel(false);
-          updateField("model", models[0]);
-        }
-      }
-      return true;
-    } catch (err) {
-      setProbeError(err instanceof Error ? err.message : String(err));
-      return false;
-    } finally {
-      setProbeLoading(false);
-    }
-  };
-
-  const testCurrentModel = async () => {
-    if (isPreview) {
-      setModelTestStatus("untested");
-      return false;
-    }
-    setProbeError("");
-    setModelTestStatus("testing");
-    setModelTestLoading(true);
-    try {
-      const result = await invokeWorkspaceCommand("test_provider_model", {
-        input: {
-          apiBase: form.apiBase,
-          apiKeyEnv: form.apiKeyEnv,
-          model: form.model,
-          apiKey,
-        },
-      });
-      setModelTestStatus("available");
-      setModelTestMessage(`当前连接可用 · ${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`);
-      return true;
-    } catch (err) {
-      setModelTestStatus("unavailable");
-      setModelTestMessage("当前连接不可用");
-      setProbeError(err instanceof Error ? err.message : String(err));
-      return false;
-    } finally {
-      setModelTestLoading(false);
-    }
-  };
-
-  const submitProvider = async (event) => {
-    event.preventDefault();
-    if (isPreview) {
-      setProbeError("");
-      return;
-    }
-
-    if (apiKey.trim()) {
-      await probeModels();
-    }
-
-    const ok = await onSaveProvider(form);
-    if (ok && apiKey.trim()) {
-      const saved = await onSaveProviderSecret(form.apiKeyEnv, apiKey);
-      if (saved) {
-        setApiKey("");
-      }
-    }
-  };
-
-  return (
-	    <Panel as="form" className={`providerPanel${isCreatingProfile ? " providerPanel-creating" : ""}`} onSubmit={submitProvider}>
-      <section className={`providerConnectionSummary ${modelTestStatus}`} aria-label="当前连接状态">
-        <div>
-          <strong>{currentConnectionName || "当前连接"}</strong>
-          <span>{form.model || "未选模型"} · {form.enabled ? "已启用" : "未启用"} · {currentHasApiKey ? "Key 已保存" : "未保存 Key"}</span>
-        </div>
-        <div className="providerConnectionSummaryAction">
-          <span>{connectionTestLabel}</span>
-          <Button className="textAction" size="sm" variant="ghost" type="button" onClick={testCurrentModel} disabled={modelTestLoading || isPreview}>
-            {modelTestLoading ? "测试中" : "测试当前"}
-          </Button>
-        </div>
-      </section>
-      {isPreview ? (
-        <InfoCallout>当前是浏览器预览；保存 Key、刷新模型和写入配置需要在桌面 App 窗口中操作，删除已保存连接可在预览中验证。</InfoCallout>
-      ) : null}
-      <div className="providerSavedConnections" aria-label="已保存连接">
-        <div className="providerSectionTitle">
-          <span>已保存连接</span>
-        </div>
-        {profiles.length ? (
-          <div className="providerConnectionList">
-            {profiles.map((profile) => {
-              const active = profile.id === form.profileId;
-              return (
-                <div className={`providerConnectionItem${active ? " active" : ""}`} key={profile.id}>
-                  <button className="providerConnectionMain" type="button" onClick={() => editProfile(profile)}>
-                    <strong>{providerConnectionLabel(profile)}</strong>
-                  </button>
-                  <button
-                    className="tileRemoveButton providerConnectionRemove"
-                    type="button"
-                    onClick={() => deleteProfile(profile)}
-                    aria-label={`删除连接 ${providerConnectionLabel(profile)}`}
-                  >
-                    <X strokeWidth={2.2} aria-hidden="true" />
-                  </button>
-                </div>
-              );
-            })}
-            <button className="providerConnectionItem providerConnectionAdd" type="button" onClick={createProfile} aria-label="新建连接">
-              <Plus strokeWidth={2.25} aria-hidden="true" />
-            </button>
-          </div>
-        ) : (
-          <button className="providerConnectionItem providerConnectionAdd providerConnectionAdd-empty" type="button" onClick={createProfile}>
-            <Plus strokeWidth={2.25} aria-hidden="true" />
-            <span>新建连接</span>
-          </button>
-        )}
-        {providerError ? <Notice className="providerError providerConnectionError" variant="danger">{providerError}</Notice> : null}
-      </div>
-      <div className="providerSectionTitle">基础设置</div>
-      <Field label="连接名称" hint="只用于识别，不影响实际调用。">
-        {({ id }) => <Input
-          id={id}
-          value={form.profileName || ""}
-          onChange={(event) => updateField("profileName", event.target.value)}
-          placeholder="例如：公司网关、我的 OpenAI"
-        />}
-      </Field>
-      <Field label={<RequiredLabel>服务商</RequiredLabel>}>
-        {({ id }) => <Select id={id} value={selectedProviderId || activePreset?.id || "gateway"} onChange={selectPreset}>
-          {catalogProviders.map((preset) => (
-            <option value={preset.id} key={preset.id}>{preset.label}</option>
-          ))}
-        </Select>}
-      </Field>
-      <Field label={<RequiredLabel>API 地址</RequiredLabel>}>
-        {({ id }) => <Input id={id} value={form.apiBase} onChange={(event) => updateField("apiBase", event.target.value)} placeholder="https://api.example.com/v1" />}
-      </Field>
-      <Field label={<RequiredLabel>API Key</RequiredLabel>} hint={currentHasApiKey && !isCreatingProfile ? "已保存，可留空；填写新 Key 会覆盖当前连接。" : "新连接需要填写 API Key。"}>
-        {({ id }) => <Input
-          id={id}
-          type="password"
-          value={apiKey}
-          onChange={(event) => setApiKey(event.target.value)}
-          placeholder={currentHasApiKey && !isCreatingProfile ? "已保存；留空则不修改" : "粘贴你的 API Key"}
-        />}
-      </Field>
-      <div className="providerSectionTitle">模型</div>
-      <Field label={<RequiredLabel>模型</RequiredLabel>}>
-        {({ id }) => <Select id={id} value={!customModel && modelOptions.includes(form.model) ? form.model : "__custom"} onChange={selectModel}>
-          {modelOptions.map((model) => (
-            <option value={model} key={model}>{model}</option>
-          ))}
-          <option value="__custom">自定义</option>
-        </Select>}
-      </Field>
-      {customModel || !modelOptions.includes(form.model) ? (
-        <Field label={<RequiredLabel>自定义模型</RequiredLabel>}>
-          {({ id }) => <Input
-            id={id}
-            value={form.model}
-            onChange={(event) => updateField("model", event.target.value)}
-            placeholder="例如：gpt-4o-mini"
-          />}
-        </Field>
-      ) : null}
-      <details className="advancedProvider">
-        <summary>
-          <span>高级设置</span>
-          {usesCatalogPreset ? <small>来自服务商预设</small> : <small>自定义连接</small>}
-        </summary>
-        <Field label="备注">
-          {({ id }) => <Input
-            id={id}
-            value={form.profileNote || ""}
-            onChange={(event) => updateField("profileNote", event.target.value)}
-            placeholder="例如：团队共用"
-            readOnly={advancedFieldsReadOnly}
-          />}
-        </Field>
-        <Field className="providerReadOnly" label="接入方式">
-          {({ id }) => <Input id={id} value={form.provider} onChange={(event) => updateField("provider", event.target.value)} readOnly={advancedFieldsReadOnly} />}
-        </Field>
-        <Field label="Key 保存变量名">
-          {({ id }) => <Input id={id} value={form.apiKeyEnv} onChange={(event) => updateField("apiKeyEnv", event.target.value)} readOnly={advancedFieldsReadOnly} />}
-        </Field>
-        <Field label="官网链接">
-          {({ id }) => <Input
-            id={id}
-            value={form.profileWebsite || ""}
-            onChange={(event) => updateField("profileWebsite", event.target.value)}
-            placeholder="https://..."
-            readOnly={advancedFieldsReadOnly}
-          />}
-        </Field>
-      </details>
-      <div className="toggleRow">
-        <Switch
-          aria-label="启用当前连接"
-          checked={form.enabled}
-          onCheckedChange={(checked) => updateField("enabled", checked)}
-        />
-        <span>
-          启用当前连接
-          <small>关闭后不调用模型，改用本地规则回答。</small>
-        </span>
-      </div>
-      <Button variant="primary" type="submit" disabled={isPreview}>保存并启用</Button>
-      {probeError ? <Notice className="providerError" variant="danger">{probeError}</Notice> : null}
-    </Panel>
-  );
-}
-
-function RequiredLabel({ children }) {
-  return (
-    <span className="requiredLabel">
-      {children}
-      <span aria-hidden="true" className="requiredMark">*</span>
-    </span>
-  );
-}
-
-function StatusBar({ snapshot, source }) {
-  return (
-    <footer className="bottombar">
-      <span>{source === "tauri" ? "本地模式" : "浏览器预览"}</span>
-      <span className="safe">本地安全</span>
-      <span>{snapshot.projectName}</span>
-    </footer>
-  );
-}
-
-function ProjectProfileItem({ body, missing, title }) {
-  return (
-    <div className={`contextItem${missing ? " missing" : ""}`}>
-      <div>
-        <strong>{title}</strong>
-        <p>{body || "待补充到项目文档"}</p>
-      </div>
-    </div>
-  );
-}
-
-function formatBytes(bytes) {
-  if (!Number.isFinite(bytes)) return "未知大小";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
-
-const sidebarSizing = {
-  leftDefault: 248,
-  leftMin: 220,
-  leftMax: 420,
-  rightDefault: 248,
-  rightMin: 220,
-  rightMax: 420,
-};
-
-function clampSidebarWidth(value, min, max) {
-  return Math.min(max, Math.max(min, value));
+function currentRuntimeSource() {
+  return isTauriRuntime() ? "tauri" : "preview";
 }
 
 function App() {
-  const [snapshot, setSnapshot] = useState(fallbackSnapshot);
-  const [readonlyPlan, setReadonlyPlan] = useState(fallbackPlan);
-  const [tasks, setTasks] = useState([]);
-  const [activeTaskId, setActiveTaskId] = useState("");
-  const [chatTurns, setChatTurns] = useState([]);
-  const [conversations, setConversations] = useState([]);
-  const [activeConversationId, setActiveConversationId] = useState(() => `conv-${Date.now()}`);
-  const [provider, setProvider] = useState(fallbackProvider);
-  const [modelCatalog, setModelCatalog] = useState(fallbackModelCatalog);
-  const [composerModels, setComposerModels] = useState([]);
-  const [composerModelsKey, setComposerModelsKey] = useState("");
-  const [composerModelsSource, setComposerModelsSource] = useState("");
-  const [composerModelsLoading, setComposerModelsLoading] = useState(false);
-  const [composerModelTests, setComposerModelTests] = useState({});
-  const [composerModelTesting, setComposerModelTesting] = useState(false);
-  const [source, setSource] = useState("preview");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const {
+    applySnapshot,
+    error,
+    loading,
+    refreshSnapshot: refreshSnapshotFromSource,
+    setError,
+    setLoading,
+    snapshot,
+    source,
+  } = useWorkspaceSession({
+    fallbackSnapshot,
+    loadSnapshot: loadWorkspaceSnapshot,
+    runtimeSource: currentRuntimeSource,
+  });
+  const {
+    activeTaskId,
+    activeTask,
+    readonlyPlan,
+    setActiveTaskId,
+    setReadonlyPlan,
+    setTasks,
+    tasks,
+  } = useTaskSession({ fallbackPlan });
+  const {
+    activeConversationId,
+    activeConversationTaskId,
+    chatTurns,
+    conversationSummary,
+    conversations,
+    setActiveConversationId,
+    setActiveConversationTaskId,
+    setChatTurns,
+    setConversationSummary,
+    setConversations,
+  } = useConversationSession();
+  const { composerModelTesting, composerModelTests, composerModels, composerModelsKey, composerModelsLoading, composerModelsSource, modelCatalog, provider, providerError, setComposerModelTesting, setComposerModelTests, setComposerModels, setComposerModelsKey, setComposerModelsLoading, setComposerModelsSource, setModelCatalog, setProvider, setProviderError } = useProviderSession({ fallbackModelCatalog, fallbackProvider });
   const [projectActionError, setProjectActionError] = useState("");
-  const [planLoading, setPlanLoading] = useState(false);
-  const [planError, setPlanError] = useState("");
-  const [runnerLoadingId, setRunnerLoadingId] = useState("");
-  const [runnerError, setRunnerError] = useState("");
-  const [terminalRunningId, setTerminalRunningId] = useState("");
-  const [terminalLogs, setTerminalLogs] = useState([]);
-  const [activeTerminalSessionId, setActiveTerminalSessionId] = useState("main");
-  const [terminalSessions, setTerminalSessions] = useState([]);
-  const [terminalTextBySession, setTerminalTextBySession] = useState({});
-  const [terminalChunksBySession, setTerminalChunksBySession] = useState({});
-  const [terminalError, setTerminalError] = useState("");
-  const [patchLoading, setPatchLoading] = useState(false);
-  const [patchError, setPatchError] = useState("");
-  const [applyLoading, setApplyLoading] = useState(false);
-  const [applyError, setApplyError] = useState("");
-  const [handoffLoading, setHandoffLoading] = useState(false);
-  const [handoffError, setHandoffError] = useState("");
+  const [agentRuns, setAgentRuns] = useState([]);
+  const { applyError, applyLoading, handoffError, handoffLoading, patchError, patchLoading, planError, planLoading, runnerError, runnerLoadingId, setApplyError, setApplyLoading, setHandoffError, setHandoffLoading, setPatchError, setPatchLoading, setPlanError, setPlanLoading, setRunnerError, setRunnerLoadingId } = useExecutionSession();
+  const { activeTerminalSessionId, appendContextToTerminal, appendTerminalLog, closeTerminalSession, newTerminalSession, openNativeTerminal, resetTerminalSessionState, resizeTerminalSession, restartTerminalSession, setActiveTerminalSessionId, setTerminalRunningId, terminalChunks, terminalError, terminalLogs, terminalRunningId, terminalSession, terminalSessions, terminalText, writeTerminalData } = useTerminalSession({
+    isTauri: isTauriRuntime(),
+    terminalClient,
+  });
   const [validatingGoal, setValidatingGoal] = useState(false);
   const [signingGoal, setSigningGoal] = useState(false);
+  const [decomposingGoal, setDecomposingGoal] = useState(false);
   const [goalRefinementMode, setGoalRefinementMode] = useState(false);
-  const [providerError, setProviderError] = useState("");
-  const [toast, setToast] = useState(null);
-  const [actionFeedback, setActionFeedback] = useState(null);
-  const [projectActivities, setProjectActivities] = useState({});
+  const { actionFeedback, beginActionFeedback, finishActionFeedback, showToast, toast } = useActionFeedback();
   const [conversationResetKey, setConversationResetKey] = useState(0);
   const [selectedEngineeringFile, setSelectedEngineeringFile] = useState(null);
-  const terminalSession = terminalSessions.find((item) => (item.sessionId || item.session_id || item.id) === activeTerminalSessionId) || null;
-  const terminalText = terminalTextBySession[activeTerminalSessionId] || "";
-  const terminalChunks = terminalChunksBySession[activeTerminalSessionId] || [];
-  const lastTerminalPromptRef = React.useRef({});
-  const terminalTextBySessionRef = React.useRef(terminalTextBySession);
-  const terminalSessionsRef = React.useRef(terminalSessions);
-  const terminalClearRequestedRef = React.useRef({});
-  const terminalGenerationBySessionRef = React.useRef({});
-  const terminalInputBufferRef = React.useRef({});
-  const terminalLastOutputRef = React.useRef({});
-  const terminalPassthroughRef = React.useRef({});
-
-  useEffect(() => {
-    terminalTextBySessionRef.current = terminalTextBySession;
-  }, [terminalTextBySession]);
-
-  useEffect(() => {
-    terminalSessionsRef.current = terminalSessions;
-  }, [terminalSessions]);
+  const conversationPersistRef = React.useRef(Promise.resolve());
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
-  const [leftWidth, setLeftWidth] = useState(sidebarSizing.leftDefault);
-  const [rightWidth, setRightWidth] = useState(sidebarSizing.rightDefault);
-  const activePlanRequestRef = React.useRef(null);
-  const workspaceWatcherRefreshRef = React.useRef(0);
-
-  const showToast = (message, variant = "success") => {
-    setToast({ id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, message, variant });
-  };
-
-  const beginActionFeedback = (key, message) => {
-    setActionFeedback({
-      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      key,
-      message,
-      status: "running",
-    });
-  };
-
-  const finishActionFeedback = (key, status, message) => {
-    setActionFeedback((current) => {
-      if (current?.key && current.key !== key) return current;
-      return {
-        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-        key,
-        message,
-        status,
-      };
-    });
-    showToast(message, status === "failed" ? "danger" : "success");
-  };
+  const { beginSidebarResize, leftWidth, rightWidth } = useSidebarLayout();
 
   useEffect(() => {
-    if (!toast) return undefined;
-    const timer = window.setTimeout(() => setToast(null), 2200);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
+    let active = true;
+    executionClient.listAgentRuns().then((runs) => {
+      if (!active) return;
+      const records = Array.isArray(runs) ? runs : [];
+      setAgentRuns(records.filter((run) => !snapshot?.currentProjectId || run.projectId === snapshot.currentProjectId));
+    }).catch(() => { if (active) setAgentRuns([]); });
+    return () => { active = false; };
+  }, [snapshot?.currentProjectId, snapshot?.currentProjectPath, source]);
 
-  useEffect(() => {
-    if (!actionFeedback || actionFeedback.status === "running") return undefined;
-    const timer = window.setTimeout(() => setActionFeedback(null), 3200);
-    return () => window.clearTimeout(timer);
-  }, [actionFeedback]);
-
-  useEffect(() => {
-    const projectId = snapshot.currentProjectId;
-    if (!projectId) return;
-    const relatedTasks = tasks.filter((task) => {
-      if (task.projectId && task.projectId === projectId) return true;
-      if (task.projectPath && task.projectPath === snapshot.currentProjectPath) return true;
-      return task.projectName && task.projectName === snapshot.projectName;
-    });
-    let nextActivity = null;
-    if (planLoading || relatedTasks.some((task) => task.id === terminalRunningId)) {
-      nextActivity = { tone: "running", label: "进行中" };
-    } else if (relatedTasks.some((task) => [taskStatuses.failed, "interrupted", "canceled", "cancelled", "error"].includes(task.status))) {
-      nextActivity = { tone: "danger", label: "任务或会话中断" };
-    }
-    setProjectActivities((current) => {
-      const next = { ...current };
-      if (nextActivity) {
-        next[projectId] = nextActivity;
-      } else {
-        delete next[projectId];
-      }
-      return next;
-    });
-  }, [snapshot.currentProjectId, snapshot.currentProjectPath, snapshot.projectName, tasks, planLoading, terminalRunningId]);
-
-  const markProjectActivitySeen = (projectId) => {
-    if (!projectId) return;
-    setProjectActivities((current) => {
-      const activity = current[projectId];
-      if (!activity?.tone || ["danger", "running"].includes(activity.tone)) return current;
-      const next = { ...current };
-      delete next[projectId];
-      return next;
-    });
-  };
-
-  const beginSidebarResize = (side, event) => {
-    event.preventDefault();
-    const startX = event.clientX;
-    const startWidth = side === "left" ? leftWidth : rightWidth;
-    const min = side === "left" ? sidebarSizing.leftMin : sidebarSizing.rightMin;
-    const max = side === "left" ? sidebarSizing.leftMax : sidebarSizing.rightMax;
-
-    const move = (moveEvent) => {
-      const delta = moveEvent.clientX - startX;
-      const nextWidth = side === "left" ? startWidth + delta : startWidth - delta;
-      const clamped = clampSidebarWidth(nextWidth, min, max);
-      if (side === "left") {
-        setLeftWidth(clamped);
-      } else {
-        setRightWidth(clamped);
-      }
-    };
-
-    const stop = () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", stop);
-      document.body.classList.remove("isResizingSidebar");
-    };
-
-    document.body.classList.add("isResizingSidebar");
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", stop, { once: true });
-  };
-
-  const updateChatTurns = (nextTurns) => {
-    setChatTurns(nextTurns);
-    if (!nextTurns.length) return;
-    const now = new Date().toLocaleTimeString("zh-CN", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-    const record = buildConversationRecord({ id: activeConversationId, turns: nextTurns, updatedAt: now });
-    setConversations((current) => {
-      return mergeConversationRecords(current, record);
-    });
-    persistDesktopConversation(record).catch((err) => {
-      setRunnerError(err instanceof Error ? err.message : String(err));
-    });
-  };
-
-  const resetWorkspaceEphemeralState = (nextSnapshot) => {
-    setActiveConversationId(`conv-${Date.now()}`);
-    setChatTurns([]);
-    setActiveTaskId("");
-    setReadonlyPlan(null);
-    setSelectedEngineeringFile(null);
-    setPlanError("");
-    setRunnerError("");
-    setPatchError("");
-    setApplyError("");
-    setHandoffError("");
-    setTerminalLogs([]);
-    setActiveTerminalSessionId("main");
-    setTerminalSessions([]);
-    setTerminalTextBySession({});
-    setTerminalChunksBySession({});
-    lastTerminalPromptRef.current = {};
-    terminalClearRequestedRef.current = {};
-    terminalGenerationBySessionRef.current = {};
-    terminalInputBufferRef.current = {};
-    terminalPassthroughRef.current = {};
-    setTerminalError("");
-    loadDesktopConversations()
-      .then((records) => setConversations(Array.isArray(records) ? records : []))
-      .catch(() => setConversations([]));
-    loadDesktopTasks()
-      .then((records) => setTasks(Array.isArray(records) ? records : []))
-      .catch(() => setTasks([]));
-  };
-
-  const setAndPersistTask = async (nextTask) => {
-    setTasks((current) => {
-      const exists = current.some((task) => task.id === nextTask.id);
-      return exists
-        ? current.map((task) => (task.id === nextTask.id ? nextTask : task))
-        : [nextTask, ...current];
-    });
-    setActiveTaskId(nextTask.id);
-    if (nextTask.plan) {
-      setReadonlyPlan(nextTask.plan);
-    }
-    if (nextTask.status === taskStatuses.done) {
-      const projectId = nextTask.projectId || snapshot.currentProjectId;
-      if (projectId) {
-        setProjectActivities((current) => ({
-          ...current,
-          [projectId]: {
-            tone: "success",
-            label: "有新完成结果",
-            taskId: nextTask.id,
-          },
-        }));
-      }
-    }
-    if (!isTauriRuntime()) {
-      persistDesktopTask(nextTask).catch((err) => {
-        setRunnerError(err instanceof Error ? err.message : String(err));
-      });
-      return;
-    }
+  const resumeAgentRun = async (run) => {
     try {
-      await persistDesktopTask(nextTask);
-    } catch (err) {
-      setRunnerError(err instanceof Error ? err.message : String(err));
+      const result = await executionClient.resumeHermesAgent(run);
+      const records = await executionClient.listAgentRuns();
+      setAgentRuns((Array.isArray(records) ? records : []).filter((item) => !snapshot?.currentProjectId || item.projectId === snapshot.currentProjectId));
+      return result;
+    } catch (error_) {
+      showToast(error_ instanceof Error ? error_.message : String(error_));
+      return null;
     }
   };
 
-  const applySnapshot = (nextSnapshot) => {
-    setSnapshot({ ...fallbackSnapshot, ...nextSnapshot });
-    setSource(isTauriRuntime() ? "tauri" : "preview");
-    setError("");
-  };
-
-  const refreshSnapshotFromSource = async () => {
-    const nextSnapshot = await loadWorkspaceSnapshot();
-    applySnapshot(nextSnapshot);
-    return nextSnapshot;
-  };
-
-  useEffect(() => {
-    if (!isTauriRuntime()) return undefined;
-    let cancelled = false;
-    let unlisten = null;
-
-    const startWatcher = async () => {
-      try {
-        const { listen } = await import("@tauri-apps/api/event");
-        unlisten = await listen("workspace://files-changed", async (event) => {
-          const now = Date.now();
-          if (now - workspaceWatcherRefreshRef.current < 1200) return;
-          workspaceWatcherRefreshRef.current = now;
-          try {
-            await refreshSnapshotFromSource();
-            if (cancelled) return;
-            const path = event.payload?.path ? `：${event.payload.path}` : "";
-            showToast(`治理骨架已变化，页面已同步${path}`, "success");
-          } catch (err) {
-            if (!cancelled) {
-              showToast(`治理状态自动同步失败：${err instanceof Error ? err.message : String(err)}`, "danger");
-            }
-          }
-        });
-        await invokeWorkspaceCommand("start_workspace_file_watcher");
-      } catch (err) {
-        if (!cancelled) {
-          showToast(`工程文件监听启动失败：${err instanceof Error ? err.message : String(err)}`, "danger");
-        }
-      }
-    };
-
-    startWatcher();
-
-    return () => {
-      cancelled = true;
-      if (unlisten) unlisten();
-    };
-  }, [snapshot.currentProjectPath]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const handleRefreshRequest = async () => {
-      const now = Date.now();
-      if (now - workspaceWatcherRefreshRef.current < 800) return;
-      workspaceWatcherRefreshRef.current = now;
-      try {
-        await refreshSnapshotFromSource();
-      } catch (err) {
-        if (!cancelled) {
-          showToast(`治理状态刷新失败：${err instanceof Error ? err.message : String(err)}`, "danger");
-        }
-      }
-    };
-    window.addEventListener("project-os:snapshot-refresh-requested", handleRefreshRequest);
-    return () => {
-      cancelled = true;
-      window.removeEventListener("project-os:snapshot-refresh-requested", handleRefreshRequest);
-    };
-  }, [snapshot.currentProjectPath]);
-
-  useEffect(() => {
-    if (isTauriRuntime()) return undefined;
-    let cancelled = false;
-    const timer = window.setInterval(async () => {
-      const now = Date.now();
-      if (now - workspaceWatcherRefreshRef.current < 30000) return;
-      workspaceWatcherRefreshRef.current = now;
-      try {
-        await refreshSnapshotFromSource();
-      } catch (err) {
-        if (!cancelled) {
-          showToast(`治理状态轮询失败：${err instanceof Error ? err.message : String(err)}`, "danger");
-        }
-      }
-    }, 30000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [snapshot.currentProjectPath]);
-
-  const validateGoal = async () => {
-    const feedbackKey = "validate-goal";
-    beginActionFeedback(feedbackKey, "正在验证目标...");
-    setValidatingGoal(true);
-    setError("");
+  const approveAgentRun = async (run) => {
     try {
-      const nextSnapshot = await runGoalValidationCheck();
-      applySnapshot(nextSnapshot);
-      finishActionFeedback(feedbackKey, "success", "目标验收已完成。");
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setError(message);
-      finishActionFeedback(feedbackKey, "failed", `目标验收失败：${message}`);
-    } finally {
-      setValidatingGoal(false);
+      const result = await executionClient.approveHermesAgent(run);
+      const records = await executionClient.listAgentRuns();
+      setAgentRuns((Array.isArray(records) ? records : []).filter((item) => !snapshot?.currentProjectId || item.projectId === snapshot.currentProjectId));
+      return result;
+    } catch (error_) {
+      showToast(error_ instanceof Error ? error_.message : String(error_));
+      return null;
     }
   };
 
-  const signOffGoal = async () => {
-    const feedbackKey = "signoff-goal";
-    beginActionFeedback(feedbackKey, "正在确认完成...");
-    setSigningGoal(true);
-    setError("");
-    try {
-      const nextSnapshot = await signOffGoalValidation();
-      applySnapshot(nextSnapshot);
-      setGoalRefinementMode(false);
-      finishActionFeedback(feedbackKey, "success", "目标已确认完成。");
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setError(message);
-      finishActionFeedback(feedbackKey, "failed", `确认完成失败：${message}`);
-    } finally {
-      setSigningGoal(false);
-    }
-  };
-
-  const refineGoal = () => {
-    setGoalRefinementMode(true);
-  };
-
-  const createGoal = async (input) => {
-    setError("");
-    const title = input?.title?.trim() || "新的目标";
-    const summary = input?.summary?.trim() || "新的目标已开始。";
-    try {
-      const nextSnapshot = await createWorkspaceGoal({
-        title,
-        summary,
-      });
-      applySnapshot(nextSnapshot);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  };
-
-  const switchGoal = async (id) => {
-    setError("");
-    try {
-      const nextSnapshot = await switchWorkspaceGoal({ id });
-      applySnapshot(nextSnapshot);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  };
-
-  const confirmGoal = async (id) => {
-    setError("");
-    try {
-      const nextSnapshot = await confirmWorkspaceGoal({ id });
-      applySnapshot(nextSnapshot);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  };
-
-  useEffect(() => {
-    let cancelled = false;
-
-    loadWorkspaceSnapshot()
-      .then((nextSnapshot) => {
-        if (cancelled) return;
-        applySnapshot(nextSnapshot);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setError(err instanceof Error ? err.message : String(err));
-        setSource("preview");
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      loadWorkspaceSnapshot()
-        .then((nextSnapshot) => applySnapshot(nextSnapshot))
-        .catch(() => {});
-    }, 5000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    loadDesktopConversations()
-      .then((records) => {
-        if (!cancelled) setConversations(Array.isArray(records) ? records : []);
-      })
-      .catch(() => {
-        if (!cancelled) setConversations([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [snapshot.currentProjectId, snapshot.currentProjectPath]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    loadDesktopTasks()
-      .then((records) => {
-        if (cancelled || !Array.isArray(records)) return;
-        setTasks(records);
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setRunnerError(err instanceof Error ? err.message : String(err));
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    Promise.all([
-      loadProviderStatus(),
-      loadModelCatalog(),
-      loadModelHealth().catch(() => ({
-        schemaVersion: "project-os.model-health.v0.1",
-        entries: [],
-      })),
-    ])
-      .then(([status, catalog, modelHealth]) => {
-        if (!cancelled) {
-          setProvider({ ...fallbackProvider, ...status });
-          setModelCatalog({ ...fallbackModelCatalog, ...catalog });
-          const entries = Array.isArray(modelHealth?.entries) ? modelHealth.entries : [];
-          setComposerModelTests(Object.fromEntries(
-            entries.map((entry) => [
-              [entry.apiBase || entry.api_base || "", entry.apiKeyEnv || entry.api_key_env || "", entry.model || ""].join("|"),
-              {
-                checkedAt: entry.checkedAt || entry.checked_at || "",
-                message: entry.message || "",
-                status: entry.status || "unknown",
-              },
-            ])
-          ));
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setProviderError(err instanceof Error ? err.message : String(err));
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!isTauriRuntime()) {
-      setTerminalTextBySession({ main: "浏览器预览不能启动本地终端。请在桌面 App 窗口里使用完整终端。" });
-      setTerminalSessions([]);
-      return undefined;
-    }
-
-    let cancelled = false;
-    let unlisten = null;
-
-    const startTerminal = async () => {
-      try {
-        const { listen } = await import("@tauri-apps/api/event");
-        unlisten = await listen("terminal://output", (event) => {
-          const payload = event.payload || {};
-          const sessionId = payload.sessionId || "main";
-          const generation = Number(payload.generation || 0);
-          const currentGeneration = Number(terminalGenerationBySessionRef.current[sessionId] || 0);
-          if (generation && currentGeneration && generation !== currentGeneration) {
-            return;
-          }
-          let data = payload.data || "";
-          const now = Date.now();
-          const lastOutput = terminalLastOutputRef.current[sessionId];
-          if (lastOutput?.data === data && now - lastOutput.at < 80) {
-            return;
-          }
-          terminalLastOutputRef.current = {
-            ...terminalLastOutputRef.current,
-            [sessionId]: { at: now, data },
-          };
-          const passthrough = Boolean(terminalPassthroughRef.current[sessionId]);
-          if (!passthrough) {
-            const sessionHasOutput = Boolean((terminalTextBySessionRef.current[sessionId] || "").trim());
-            if (!sessionHasOutput) {
-              data = data.replace(/^(?:\r?\n)+/, "");
-            }
-          }
-          let cleanedData = cleanTerminalText(data);
-          const screenControlOnly = !cleanedData && hasTerminalScreenControl(data);
-          if (!cleanedData && !screenControlOnly) return;
-          const previousTerminalText = terminalTextBySessionRef.current[sessionId] || "";
-          if (terminalClearRequestedRef.current[sessionId]) {
-            terminalClearRequestedRef.current = {
-              ...terminalClearRequestedRef.current,
-              [sessionId]: false,
-            };
-            data = `\u001bc${data}`;
-          }
-          if (!passthrough) {
-            const collapsedData = collapseDuplicateTerminalPromptLines(cleanedData);
-            if (collapsedData !== cleanedData) {
-              data = collapsedData;
-              cleanedData = collapsedData;
-            }
-          }
-          if (!passthrough) {
-            const lastPrompt = lastTerminalPromptRef.current[sessionId];
-            const incomingPromptLine = terminalPromptLine(cleanedData);
-            const currentPromptLine = terminalPromptLine(previousTerminalText);
-            if (
-              isTerminalPromptEcho(cleanedData) &&
-              (lastPrompt?.text === incomingPromptLine || currentPromptLine === incomingPromptLine)
-            ) {
-              return;
-            }
-            if (isTerminalPromptEcho(cleanedData)) {
-              lastTerminalPromptRef.current = {
-                ...lastTerminalPromptRef.current,
-                [sessionId]: { at: now, text: incomingPromptLine },
-              };
-            }
-          }
-          const nextTerminalText = screenControlOnly
-            ? previousTerminalText
-            : `${previousTerminalText}${cleanedData}`.slice(-50000);
-          terminalTextBySessionRef.current = {
-            ...terminalTextBySessionRef.current,
-            [sessionId]: nextTerminalText,
-          };
-          setTerminalChunksBySession((current) => {
-            const currentChunks = current[sessionId] || [];
-            return {
-              ...current,
-              [sessionId]: [
-                ...currentChunks,
-                {
-                  data,
-                  id: `${Date.now()}-${currentChunks.length}`,
-                },
-              ].slice(-2000),
-            };
-          });
-          setTerminalTextBySession((current) => ({
-            ...current,
-            [sessionId]: nextTerminalText,
-          }));
-        });
-        if (cancelled) {
-          if (unlisten) unlisten();
-          return;
-        }
-        setTerminalChunksBySession((current) => ({ ...current, main: [] }));
-        const session = await invokeWorkspaceCommand("start_terminal_session", {
-          input: { sessionId: "main", cols: 120, rows: 32 },
-        });
-        if (!cancelled) {
-          terminalGenerationBySessionRef.current = {
-            ...terminalGenerationBySessionRef.current,
-            main: Number(session.generation || 0),
-          };
-          setTerminalSessions([session]);
-          setActiveTerminalSessionId("main");
-          setTerminalError("");
-          setTerminalTextBySession((current) => ({ ...current, main: current.main || `Connected to ${session.shell} at ${session.cwd}\n` }));
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setTerminalError(err instanceof Error ? err.message : String(err));
-          setTerminalTextBySession((current) => ({ ...current, main: current.main || "终端启动失败。" }));
-        }
-      }
-    };
-
-    startTerminal();
-
-    return () => {
-      cancelled = true;
-      if (unlisten) {
-        unlisten();
-      }
-      const sessionIds = new Set([
-        "main",
-        ...terminalSessionsRef.current.map((item) => item.sessionId || item.session_id || item.id).filter(Boolean),
-      ]);
-      sessionIds.forEach((sessionId) => {
-        invokeWorkspaceCommand("stop_terminal_session", {
-          input: { sessionId },
-        }).catch(() => {});
-      });
-    };
-  }, []);
-
-  const switchProject = async (id) => {
-    const project = snapshot.projects.find((item) => item.id === id);
-    if (!project || project.isCurrent) return;
-
-    setLoading(true);
-    setProjectActionError("");
-    try {
-      const nextSnapshot = source !== "tauri"
-        ? await switchPreviewProject(id)
-        : await invokeWorkspaceCommand("switch_registry_project", { id });
-      applySnapshot(nextSnapshot);
-      resetWorkspaceEphemeralState({ ...fallbackSnapshot, ...nextSnapshot });
-      showToast(`已切换到 ${nextSnapshot.projectName || project.name}`);
-    } catch (err) {
-      setProjectActionError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const addProject = async (path) => {
-    setProjectActionError("");
-    setLoading(true);
-    try {
-      const nextSnapshot = await invokeWorkspaceCommand("add_registry_project", { path });
-      applySnapshot(nextSnapshot);
-      resetWorkspaceEphemeralState({ ...fallbackSnapshot, ...nextSnapshot });
-      showToast(`已添加 ${nextSnapshot.projectName || "项目"}`);
-      return true;
-    } catch (err) {
-      setProjectActionError(err instanceof Error ? err.message : String(err));
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const pickProject = async () => {
-    setProjectActionError("");
-    try {
-      const selected = await pickProjectDirectory();
-      if (!selected) return;
-      await addProject(Array.isArray(selected) ? selected[0] : selected);
-    } catch (err) {
-      setProjectActionError(err instanceof Error ? err.message : String(err));
-    }
-  };
-
-  const relocateProject = async (id) => {
-    const project = snapshot.projects.find((item) => item.id === id);
-    if (!project) return;
-    setProjectActionError("");
-    try {
-      const selected = await pickProjectDirectory();
-      if (!selected) return;
-      const path = Array.isArray(selected) ? selected[0] : selected;
-      setLoading(true);
-      const nextSnapshot = source !== "tauri"
-        ? await relocatePreviewProject(id, path)
-        : await invokeWorkspaceCommand("relocate_registry_project", {
-          input: { id, path },
-        });
-      applySnapshot(nextSnapshot);
-      resetWorkspaceEphemeralState({ ...fallbackSnapshot, ...nextSnapshot });
-      showToast(`已重新定位 ${project.name}`);
-    } catch (err) {
-      setProjectActionError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const removeProject = async (id) => {
-    const project = snapshot.projects.find((item) => item.id === id);
-    if (!project) return;
-    if (snapshot.projects.length <= 1) {
-      setProjectActionError("至少保留一个工作台项目；可以先添加新项目，再移除这个项目。");
-      return;
-    }
-    setProjectActionError("");
-    setLoading(true);
-    try {
-      const nextSnapshot = await invokeWorkspaceCommand("remove_registry_project", { id });
-      applySnapshot(nextSnapshot);
-      resetWorkspaceEphemeralState({ ...fallbackSnapshot, ...nextSnapshot });
-      showToast(`已移除 ${project.name}`);
-    } catch (err) {
-      setProjectActionError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const openProjectFolder = async (id) => {
-    setProjectActionError("");
-    try {
-      await invokeWorkspaceCommand("open_project_folder", { id });
-    } catch (err) {
-      setProjectActionError(err instanceof Error ? err.message : String(err));
-    }
-  };
-
-  const renameProject = async (id, name) => {
-    setProjectActionError("");
-    setLoading(true);
-    try {
-      const nextSnapshot = await invokeWorkspaceCommand("rename_registry_project", {
-        input: { id, name },
-      });
-      applySnapshot(nextSnapshot);
-      return true;
-    } catch (err) {
-      setProjectActionError(err instanceof Error ? err.message : String(err));
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const selectEngineeringFile = async (file) => {
-    if (!file) {
-      setSelectedEngineeringFile(null);
-      return;
-    }
-    const nextFile = {
-      ...file,
-      error: "",
-      loading: true,
-      preview: null,
-    };
-    setSelectedEngineeringFile(nextFile);
-    setActiveTaskId("");
-    setReadonlyPlan(null);
-    setPlanError("");
-
-    if (file.virtual && Array.isArray(file.relatedFiles)) {
-      setSelectedEngineeringFile({
-        ...nextFile,
-        loading: false,
-        topic: {
-          id: file.id,
-          title: file.title || file.path,
-          description: file.description,
-          governanceRole: file.governanceRole,
-          maturity: file.maturity,
-          nextAction: file.nextAction,
-          relatedFiles: file.relatedFiles,
-          statusSource: file.statusSource,
-          updatesWhen: file.updatesWhen,
-        },
-      });
-      return;
-    }
-
-    if (file.virtual) {
-      setSelectedEngineeringFile({
-        ...nextFile,
-        loading: false,
-        preview: {
-          content: "这个入口属于 OmniDesk 全局记忆，不属于当前项目文件。\n\n建议后续保存到应用级本地配置：\n- user-profile.json：用户画像\n- global-preferences.json：全局偏好\n\n这样它会跨项目生效，不污染当前项目的 .project-os/。",
-          language: "text",
-          name: file.path.replace("OmniDesk global: ", ""),
-          size: 0,
-          truncated: false,
-        },
-      });
-      return;
-    }
-
-    try {
-      const preview = await invokeWorkspaceCommand("read_engineering_file", {
-        input: { path: file.path },
-      });
-      setSelectedEngineeringFile({
-        ...nextFile,
-        loading: false,
-        preview,
-      });
-    } catch (err) {
-      setSelectedEngineeringFile({
-        ...nextFile,
-        error: err instanceof Error ? err.message : String(err),
-        loading: false,
-      });
-    }
-  };
-
-  const createRepairTask = async (failedTaskId) => {
-    const failedTask = tasks.find((task) => task.id === failedTaskId);
-    if (!failedTask) return false;
-    const failedRuns = (failedTask.runs || []).filter((run) => run && run.success === false);
-    const failedLabels = failedRuns.map((run) => run.label || run.id || run.command).filter(Boolean);
-    const failureSummary =
-      failedTask.applyResult?.message ||
-      failedRuns[0]?.output ||
-      failedTask.verificationSummary ||
-      "失败原因待进一步定位。";
-    const sourceTitle = failedTask.title || "失败任务";
-    const repairPlan = {
-      candidateChanges: failedTask.plan?.candidateChanges || [],
-      checks: failedTask.plan?.checks || [],
-      filesToRead: [
-        ...(failedTask.plan?.filesToRead || []),
-        ".project-os/runs/desktop-summary.md",
-        "HANDOFF.md",
-      ].filter(Boolean),
-      guardrails: [
-        "先定位失败原因，再生成 Patch 草案。",
-        "不要绕过原任务的验证检查。",
-        "修复任务仍需用户确认后才应用改动。",
-      ],
-      mode: "repair-task",
-      projectName: failedTask.projectName || snapshot.projectName,
-      steps: [
-        `复盘失败任务：${sourceTitle}`,
-        failedLabels.length ? `定位失败检查：${failedLabels.slice(0, 3).join("、")}` : "定位失败检查或应用错误。",
-        "生成最小修复方案。",
-        "重新运行失败检查并更新执行结果。",
-      ],
-      summary: `修复失败任务：${sourceTitle}`,
-      task: `修复失败任务：${sourceTitle}`,
-      trace: [
-        `REPAIR_SOURCE_TASK: ${failedTask.id}`,
-        `FAILURE_SUMMARY: ${String(failureSummary).slice(0, 240)}`,
-      ],
-    };
-    const repairTask = {
-      ...createTaskFromPlan(repairPlan, `修复失败任务：${sourceTitle}`, snapshot, {
-        conversationId: failedTask.conversationId || activeConversationId,
-      }),
-      repairOfTaskId: failedTask.id,
-      repairSourceTitle: sourceTitle,
-    };
-    await setAndPersistTask(repairTask);
-    showToast("已生成修复任务，等待确认执行。", "success");
-    return true;
-  };
-
-  const createGovernanceTask = async ({ files = [], status = "" } = {}) => {
-    const actionableFiles = files.filter((file) => file?.path);
-    if (!actionableFiles.length) return false;
-    const statusTitle = {
-      changed: "审阅本地变更治理文件",
-      missing: "补齐缺失治理文件",
-      stale: "同步可能过期治理文件",
-    }[status] || "处理治理文件";
-    const statusAction = {
-      changed: "逐个审阅本地变更，确认是否需要同步到项目状态或交接记录。",
-      missing: "确认缺失是否合理，必要时生成补齐方案。",
-      stale: "复查文件内容是否过期，必要时同步到最新项目状态。",
-    }[status] || "确认治理文件状态并给出处理方案。";
-    const fileList = actionableFiles.map((file) => file.path);
-    const domainNames = [...new Set(actionableFiles.map((file) => file.domainTitle).filter(Boolean))];
-    const governancePlan = {
-      candidateChanges: status === "missing"
-        ? fileList.map((file) => `必要时补齐 ${file}`)
-        : fileList.map((file) => `必要时同步 ${file}`),
-      checks: [
-        "bash scripts/check-runtime.sh .",
-        "bash scripts/check-doc-structure.sh .",
-      ],
-      filesToRead: fileList,
-      guardrails: [
-        "先只读确认问题，不自动写文件。",
-        "缺失文件需要判断是否确实属于当前项目。",
-        "有本地变更的治理文件要保留用户已有改动。",
-        "进入 Apply 前必须生成 Patch 草案并由用户确认。",
-      ],
-      mode: "governance-file-task",
-      projectName: snapshot.projectName,
-      steps: [
-        `聚焦治理域：${domainNames.slice(0, 4).join("、") || "治理文件"}`,
-        statusAction,
-        "生成最小处理方案和 Patch 草案。",
-        "运行治理检查并更新执行结果。",
-      ],
-      summary: `${statusTitle}：${fileList.slice(0, 3).join("、")}${fileList.length > 3 ? ` 等 ${fileList.length} 个文件` : ""}`,
-      task: statusTitle,
-      trace: [
-        `GOVERNANCE_FILE_STATUS: ${status || "all"}`,
-        `GOVERNANCE_FILE_COUNT: ${fileList.length}`,
-      ],
-    };
-    const task = createTaskFromPlan(governancePlan, statusTitle, snapshot, {
-      conversationId: activeConversationId,
-    });
-    await setAndPersistTask({
-      ...task,
-      governanceFileStatus: status,
-      governanceFiles: actionableFiles,
-    });
-    showToast(`已生成治理文件任务：${statusTitle}`, "success");
-    return true;
-  };
-
-  const createDesignGovernanceTask = async ({ files = [], topic = {} } = {}) => {
-    const actionableFiles = files.filter((file) => file?.path);
-    if (!actionableFiles.length) return false;
-    const topicConfig = designImplementationTopics[topic?.id] || {};
-    const taskTitle = topicConfig.task || `审阅${topic?.title || "设计实现"}`;
-    const fileList = actionableFiles.map((file) => file.path);
-    const statusSummary = [...new Set(actionableFiles.map((file) => governanceFileHealthLabel(file.status)).filter(Boolean))];
-    const designPlan = {
-      candidateChanges: fileList.map((file) => `必要时同步 ${file}`),
-      checks: [
-        "npm --prefix desktop run web:build",
-        "bash scripts/check-runtime.sh .",
-        "bash scripts/check-doc-structure.sh .",
-      ],
-      filesToRead: fileList,
-      guardrails: [
-        "先判断架构、契约、规范和实现是否一致，不直接重构。",
-        "只生成最小治理任务和 Patch 草案，进入 Apply 前必须由用户确认。",
-        "涉及代码结构时保留现有模块边界，不做无关 UI 优化。",
-      ],
-      mode: "design-implementation-governance",
-      projectName: snapshot.projectName,
-      steps: [
-        `聚焦设计实现入口：${topic?.title || "设计实现"}`,
-        statusSummary.length ? `确认资产状态：${statusSummary.join("、")}` : "确认设计实现资产状态。",
-        "比对架构、数据契约、界面规范和实现结构是否一致。",
-        "生成最小处理方案，并运行构建和治理检查。",
-      ],
-      summary: `${taskTitle}：${fileList.slice(0, 3).join("、")}${fileList.length > 3 ? ` 等 ${fileList.length} 个文件` : ""}`,
-      task: taskTitle,
-      trace: [
-        `DESIGN_GOVERNANCE_TOPIC: ${topic?.id || "design-implementation"}`,
-        `DESIGN_GOVERNANCE_FILE_COUNT: ${fileList.length}`,
-      ],
-    };
-    const task = createTaskFromPlan(designPlan, taskTitle, snapshot, {
-      conversationId: activeConversationId,
-    });
-    await setAndPersistTask({
-      ...task,
-      designGovernanceFiles: actionableFiles,
-      designGovernanceTopic: topic?.id || "design-implementation",
-    });
-    showToast(`已生成设计实现治理任务：${taskTitle}`, "success");
-    return true;
-  };
-
-  const generatePlan = async (request) => {
-    const input = typeof request === "string" ? { task: request, attachments: [] } : request;
-    const requestId = input.requestId || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    const feedbackKey = `generate-plan-${requestId}`;
-    activePlanRequestRef.current = requestId;
-    beginActionFeedback(feedbackKey, "正在生成计划...");
-    setPlanError("");
-    setPlanLoading(true);
-    try {
-      let plan = buildPreviewPlan(input, snapshot);
-      if (isTauriRuntime()) {
-        try {
-          plan = await invokeWorkspaceCommand("generate_readonly_plan", { input });
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          const isOldGeneratePlanArgs =
-            message.includes("generate_readonly_plan") &&
-            message.includes("missing required key") &&
-            message.includes("task");
-          if (!isOldGeneratePlanArgs) {
-            throw err;
-          }
-          const attachmentNote = input.attachments?.length
-            ? `\n\n附带截图：${input.attachments.map((attachment) => attachment.name).join("、")}\n提示：当前桌面端后端还未重启到多模态版本，本次先按文字和附件名称生成计划。`
-            : "";
-          plan = await invokeWorkspaceCommand("generate_readonly_plan", {
-            task: `${input.task}${attachmentNote}`,
-          });
-        }
-      }
-      if (activePlanRequestRef.current !== requestId) return false;
-      const nextTask = createTaskFromPlan(plan, input.displayTask || input.task, snapshot, {
-        conversationId: input.conversationId || activeConversationId,
-      });
-      setReadonlyPlan(plan);
-      await setAndPersistTask(nextTask);
-      finishActionFeedback(feedbackKey, "success", "已生成计划，等待确认执行。");
-      return true;
-    } catch (err) {
-      if (activePlanRequestRef.current !== requestId) return false;
-      const message = err instanceof Error ? err.message : String(err);
-      setPlanError(message);
-      finishActionFeedback(feedbackKey, "failed", `生成计划失败：${message}`);
-      return false;
-    } finally {
-      if (activePlanRequestRef.current === requestId) {
-        activePlanRequestRef.current = null;
-        setPlanLoading(false);
-      }
-    }
-  };
-
-  const stopPlanGeneration = () => {
-    activePlanRequestRef.current = null;
-    setPlanLoading(false);
-  };
-
-  const runChatAction = async (action) => {
-    if (action?.id === "open-reference" && action.target) {
-      if (action.kind === "file") {
-        await selectEngineeringFile({ path: action.target, title: action.label });
-        return true;
-      }
-      if (action.kind === "task") {
-        selectTask(action.target);
-        return true;
-      }
-      if (action.kind === "terminal") {
-        window.dispatchEvent(new Event("project-os:open-terminal"));
-        return true;
-      }
-      const topic = topicPayloadFromOutline(action.target);
-      if (topic) {
-        setSelectedEngineeringFile(topic);
-        return true;
-      }
-      return false;
-    }
-    if (action?.id === "confirm-active-task") {
-      const targetTask = tasks.find((task) => task.id === activeTaskId);
-      if (!targetTask) return false;
-      markTaskWaiting(targetTask.id);
-      return true;
-    }
-    if (action?.id === "open-topic" && action.target) {
-      if (action.target === "task-queue") {
-        window.dispatchEvent(new Event("project-os:open-execution"));
-        const topic = topicPayloadFromOutline(action.target);
-        if (topic) setSelectedEngineeringFile(topic);
-        return true;
-      }
-      const topic = topicPayloadFromOutline(action.target);
-      if (topic) {
-        setSelectedEngineeringFile(topic);
-        return true;
-      }
-      return false;
-    }
-    if (action?.id !== "generate-plan" || !action.task) return false;
-    const ok = await generatePlan({ task: action.task, attachments: [] });
-    if (ok) {
-      setSelectedEngineeringFile(null);
-    }
-    return ok;
-  };
-
-  const activeTask = tasks.find((task) => task.id === activeTaskId) || null;
-
-  const selectTask = (id) => {
-    const queueItem = snapshot.queue?.find((item) => item.id === id);
-    const task = tasks.find((item) => item.id === id) || (queueItem ? {
-      createdAt: "",
-      id: queueItem.id,
-      plan: {
-        candidateChanges: [],
-        checks: [],
-        filesToRead: [],
-        guardrails: ["这是目标拆解里的待办，开始执行前仍需确认具体改动范围。"],
-        mode: "planned-task",
-        projectName: snapshot.projectName,
-        steps: [queueItem.body || "补齐任务执行方案。"],
-        summary: queueItem.body || "",
-        task: queueItem.title,
-        trace: [`GOAL_TASK: ${queueItem.goalId || "current"}`],
-      },
-      projectId: snapshot.currentProjectId || "",
-      projectName: snapshot.projectName,
-      projectPath: snapshot.currentProjectPath || "",
-      status: queueItem.status || taskStatuses.planned,
-      title: queueItem.title,
-    } : null);
-    if (!task) return;
-    markProjectActivitySeen(task.projectId || snapshot.currentProjectId);
-    setActiveTaskId(id);
-    setReadonlyPlan(task.plan);
-    setSelectedEngineeringFile(null);
-    window.dispatchEvent(new CustomEvent("project-os:open-execution", {
-      detail: { taskId: id, source: "current-progress" },
-    }));
-  };
-
-  const selectConversation = (id) => {
-    const conversation = conversations.find((item) => item.id === id);
-    if (!conversation) return;
-    markProjectActivitySeen(snapshot.currentProjectId);
-    setActiveConversationId(id);
-    setChatTurns(Array.isArray(conversation.turns) ? conversation.turns : []);
-    setActiveTaskId("");
-    setReadonlyPlan(null);
-    setSelectedEngineeringFile(null);
-  };
-
-  const deleteConversation = (id) => {
-    const conversation = conversations.find((item) => item.id === id);
-    if (!conversation) return;
-    const ok = window.confirm(`删除「${conversation.title}」？`);
-    if (!ok) return;
-
-    const nextConversations = conversations.filter((item) => item.id !== id);
-    setConversations(nextConversations);
-    removeDesktopConversation(id).catch((err) => {
-      setRunnerError(err instanceof Error ? err.message : String(err));
-    });
-
-    if (activeConversationId !== id) return;
-    const nextConversation = nextConversations[0];
-    if (nextConversation) {
-      setActiveConversationId(nextConversation.id);
-      setChatTurns(Array.isArray(nextConversation.turns) ? nextConversation.turns : []);
-      setActiveTaskId("");
-      setReadonlyPlan(null);
-      setSelectedEngineeringFile(null);
-      return;
-    }
-    startNewConversation();
-  };
-
-  const startNewConversation = () => {
-    setActiveConversationId(`conv-${Date.now()}`);
-    setChatTurns([]);
-    setActiveTaskId("");
-    setReadonlyPlan(null);
-    setSelectedEngineeringFile(null);
-    setPlanError("");
-    setRunnerError("");
-    setPatchError("");
-    setApplyError("");
-    setConversationResetKey((key) => key + 1);
-  };
-
-  const markTaskWaiting = (id) => {
-    const task = tasks.find((item) => item.id === id);
-    if (!task) return;
-    setAndPersistTask({ ...task, status: taskStatuses.running });
-  };
-
-  const runGuardedCheck = async (taskId, checkId) => {
-    const feedbackKey = `check-${taskId}-${checkId}`;
-    const checkLabel = guardedChecks.find((check) => check.id === checkId)?.label || checkId;
-    beginActionFeedback(feedbackKey, `正在运行检查：${checkLabel}`);
-    setRunnerError("");
-    setRunnerLoadingId(checkId);
-    setTasks((current) =>
-      current.map((task) =>
-        task.id === taskId ? { ...task, status: taskStatuses.running } : task
-      )
-    );
-
-    try {
-      const result = await invokeWorkspaceCommand("run_guarded_check", {
-        input: { checkId },
-      });
-      const finishedRun = {
-        ...result,
-        finishedAt: new Date().toISOString(),
-      };
-      appendTerminalLog(result);
-      const task = tasks.find((item) => item.id === taskId);
-      if (task) {
-        await setAndPersistTask({
-          ...task,
-          status: result.success ? taskStatuses.done : taskStatuses.failed,
-          runs: [finishedRun, ...(task.runs || [])],
-        });
-      }
-      finishActionFeedback(
-        feedbackKey,
-        result.success ? "success" : "failed",
-        result.success ? `${checkLabel} 通过。` : `${checkLabel} 失败。`
-      );
-      return true;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      appendTerminalLog({
-        id: checkId,
-        command: guardedChecks.find((check) => check.id === checkId)?.command || checkId,
-        output: message,
-        success: false,
-      });
-      setRunnerError(message);
-      setTasks((current) =>
-        current.map((task) =>
-          task.id === taskId ? { ...task, status: taskStatuses.failed } : task
-        )
-      );
-      finishActionFeedback(feedbackKey, "failed", `${checkLabel} 失败：${message}`);
-      return false;
-    } finally {
-      setRunnerLoadingId("");
-    }
-  };
-
-  const appendTerminalLog = (result) => {
-    const now = new Date().toLocaleTimeString("zh-CN", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-    setTerminalLogs((current) => [
-      {
-        command: result.command || result.id || "unknown command",
-        id: `${Date.now()}-${result.id || "terminal"}`,
-        output: result.output || (result.success ? "Command completed." : "Command failed."),
-        status: result.success ? "success" : "failed",
-        timestamp: now,
-      },
-      ...current,
-    ].slice(0, 8));
-    setTerminalTextBySession((current) => ({
-      ...current,
-      [activeTerminalSessionId]: `${current[activeTerminalSessionId] || ""}\n$ ${result.command || result.id || "command"}\n${cleanTerminalText(result.output || "")}\n`.slice(-50000),
-    }));
-  };
-
-  const writeTerminalData = async (data, { trackInput = true } = {}) => {
-    if (!data) return false;
-    const sessionId = activeTerminalSessionId;
-    let dataToSend = data;
-    if (!trackInput) {
-      dataToSend = data;
-    } else if (data === "\u0003") {
-      terminalInputBufferRef.current = {
-        ...terminalInputBufferRef.current,
-        [sessionId]: "",
-      };
-    } else {
-      const previousInput = terminalInputBufferRef.current[sessionId] || "";
-      const isEditingControl = data.startsWith("\u001b")
-        || data === "\t"
-        || (/[\x00-\x1f]/.test(data) && !/[\r\n\b]/.test(data));
-      if (isEditingControl) {
-        // xterm already encoded navigation, completion, and control keys for the active TUI mode.
-      } else if (/[\r\n]/.test(data)) {
-        const command = previousInput.trim();
-        if (/^codex(?:\s|$)/.test(command)) {
-          dataToSend = "\u0015clear\u000dcodex\u000d";
-          terminalClearRequestedRef.current = {
-            ...terminalClearRequestedRef.current,
-            [sessionId]: true,
-          };
-          terminalPassthroughRef.current = {
-            ...terminalPassthroughRef.current,
-            [sessionId]: true,
-          };
-          setTerminalTextBySession((current) => ({ ...current, [sessionId]: "" }));
-          setTerminalChunksBySession((current) => ({ ...current, [sessionId]: [] }));
-          delete terminalLastOutputRef.current[sessionId];
-        }
-        terminalInputBufferRef.current = {
-          ...terminalInputBufferRef.current,
-          [sessionId]: "",
-        };
-      } else {
-        const nextInput = data === "\u007f" || data === "\b"
-          ? previousInput.slice(0, -1)
-          : `${previousInput}${data}`;
-        let bufferedInput = nextInput.slice(-240);
-        if (bufferedInput.length >= 2 && bufferedInput.length % 2 === 0) {
-          const midpoint = bufferedInput.length / 2;
-          const firstHalf = bufferedInput.slice(0, midpoint);
-          const secondHalf = bufferedInput.slice(midpoint);
-          if (firstHalf === secondHalf) {
-            bufferedInput = firstHalf;
-            dataToSend = "";
-          }
-        }
-        terminalInputBufferRef.current = {
-          ...terminalInputBufferRef.current,
-          [sessionId]: bufferedInput,
-        };
-      }
-    }
-    try {
-      if (!dataToSend) {
-        setTerminalError("");
-        return true;
-      }
-      await invokeWorkspaceCommand("write_terminal_session", {
-        input: { sessionId, data: dataToSend },
-      });
-      setTerminalError("");
-      return true;
-    } catch (err) {
-      setTerminalError(err instanceof Error ? err.message : String(err));
-      return false;
-    }
-  };
-
-  const resolveGoalTodoTask = (todo) => {
-    if (!todo?.id) return null;
-    const task = tasks.find((item) => item.id === todo.id);
-    if (task) return task;
-    const queueItem = snapshot.queue?.find((item) => item.id === todo.id) || todo;
-    return {
-      createdAt: "",
-      id: queueItem.id,
-      plan: {
-        candidateChanges: [],
-        checks: [],
-        filesToRead: [],
-        guardrails: ["这是目标拆解里的待办，开始执行前仍需确认具体改动范围。"],
-        mode: "planned-task",
-        projectName: snapshot.projectName,
-        steps: [queueItem.body || queueItem.description || "补齐任务执行方案。"],
-        summary: queueItem.body || queueItem.description || "",
-        task: queueItem.title,
-        trace: [`GOAL_TASK: ${queueItem.goalId || "current"}`],
-      },
-      projectId: snapshot.currentProjectId || "",
-      projectName: snapshot.projectName,
-      projectPath: snapshot.currentProjectPath || "",
-      status: queueItem.status || taskStatuses.planned,
-      title: queueItem.title,
-    };
-  };
-
-  const goalTasksForContext = (goal) => {
-    const goalTaskIds = new Set(Array.isArray(goal?.taskIds) ? goal.taskIds : []);
-    if (!goal?.id && !goalTaskIds.size) return tasks.filter((task) => !isNoiseTask(task)).slice(0, 8);
-    return tasks
-      .filter((task) => !isNoiseTask(task) && (task.goalId === goal.id || goalTaskIds.has(task.id)))
-      .slice(0, 8);
-  };
-
-  const appendContextTurn = (text, actions = []) => {
-    const now = Date.now();
-    updateChatTurns([
-      ...chatTurns,
-      {
-        id: `${now}-context`,
-        role: "assistant",
-        text,
-        actions,
-      },
-    ]);
-    setSelectedEngineeringFile(null);
-    window.dispatchEvent(new Event("project-os:open-conversation"));
-  };
-
-  const sendGoalToChat = (goal) => {
-    if (!goal) return;
-    const relatedTasks = goalTasksForContext(goal);
-    const taskLines = relatedTasks.length
-      ? relatedTasks.map((task, index) => `${index + 1}. ${task.title}（${taskStatusLabel(task.status)}）`).join("\n")
-      : "暂未绑定具体任务。";
-    appendContextTurn(
-      `已带入目标上下文：${goal.shortTitle || goal.title || "当前目标"}\n\n状态：${goalStatusLabelText(goal.status)}\n说明：${goal.summary || "暂无说明"}\n\n关联任务：\n${taskLines}\n\n你可以直接继续问：下一步先做哪个、要不要拆任务、或者从哪个任务开始执行。`,
-      [{ id: "open-topic", label: "查看当前进度", target: "project-progress" }]
-    );
-    showToast("已发送目标到对话。", "success");
-  };
-
-  const sendTaskToChat = (todo) => {
-    const task = resolveGoalTodoTask(todo);
-    if (!task) return;
-    setActiveTaskId(task.id);
-    setReadonlyPlan(task.plan || null);
-    setSelectedEngineeringFile(null);
-    appendContextTurn(
-      `已带入任务上下文：${task.title}\n\n状态：${taskStatusLabel(task.status)}\n来自目标：${task.goalTitle || todo?.goalTitle || "当前目标"}\n说明：${task.plan?.summary || todo?.description || "暂无说明"}\n\n你可以继续问这个任务怎么做，也可以点下面开始执行。`,
-      task.status === taskStatuses.planned ? [{ id: "confirm-active-task", label: "开始执行" }] : [{ id: "open-topic", label: "查看任务详情", target: "execution" }]
-    );
-    showToast("已发送任务到对话。", "success");
-  };
-
-  const appendContextToTerminal = async (lines) => {
-    window.dispatchEvent(new Event("project-os:open-terminal"));
-    if (isTauriRuntime()) {
-      await writeTerminalData(formatTerminalContextForInput(lines), { trackInput: false });
-    } else {
-      const normalized = formatTerminalContext(lines);
-      setTerminalTextBySession((current) => ({
-        ...current,
-        [activeTerminalSessionId]: `${current[activeTerminalSessionId] || ""}${normalized}`.slice(-50000),
-      }));
-    }
-  };
-
-  const sendGoalToTerminal = async (goal) => {
-    if (!goal) return;
-    const relatedTasks = goalTasksForContext(goal);
-    const taskLines = relatedTasks.length
-      ? relatedTasks.map((task, index) => `  ${index + 1}. ${task.title} [${taskStatusLabel(task.status)}]`)
-      : ["  暂未绑定具体任务"];
-    await appendContextToTerminal([
-      "Goal context",
-      `Goal: ${goal.shortTitle || goal.title || "当前目标"}`,
-      `Status: ${goalStatusLabelText(goal.status)}`,
-      `Summary: ${goal.summary || "暂无说明"}`,
-      "Tasks:",
-      ...taskLines,
-    ]);
-    showToast("已发送目标到终端。", "success");
-  };
-
-  const sendTaskToTerminal = async (todo) => {
-    const task = resolveGoalTodoTask(todo);
-    if (!task) return;
-    setActiveTaskId(task.id);
-    setReadonlyPlan(task.plan || null);
-    await appendContextToTerminal([
-      "Task context",
-      `Task: ${task.title}`,
-      `Status: ${taskStatusLabel(task.status)}`,
-      `Goal: ${task.goalTitle || todo?.goalTitle || "当前目标"}`,
-      `Summary: ${task.plan?.summary || todo?.description || "暂无说明"}`,
-      "Next: 在这里手动输入要运行的检查或命令。",
-    ]);
-    showToast("已发送任务到终端。", "success");
-  };
-
-  const resizeTerminalSession = async (cols, rows) => {
-    if (!isTauriRuntime() || !cols || !rows) return false;
-    try {
-      await invokeWorkspaceCommand("resize_terminal_session", {
-        input: { sessionId: activeTerminalSessionId, cols, rows },
-      });
-      return true;
-    } catch (err) {
-      setTerminalError(err instanceof Error ? err.message : String(err));
-      return false;
-    }
-  };
-
-  const startTerminalSession = async (sessionId, { activate = true, reset = false } = {}) => {
-    if (!isTauriRuntime()) return false;
-    setTerminalError("");
-    try {
-      if (reset) {
-        await invokeWorkspaceCommand("stop_terminal_session", {
-          input: { sessionId },
-        }).catch(() => {});
-        setTerminalTextBySession((current) => ({ ...current, [sessionId]: "" }));
-        setTerminalChunksBySession((current) => ({ ...current, [sessionId]: [] }));
-        lastTerminalPromptRef.current = {
-          ...lastTerminalPromptRef.current,
-          [sessionId]: null,
-        };
-        terminalInputBufferRef.current = {
-          ...terminalInputBufferRef.current,
-          [sessionId]: "",
-        };
-        terminalClearRequestedRef.current = {
-          ...terminalClearRequestedRef.current,
-          [sessionId]: false,
-        };
-        terminalGenerationBySessionRef.current = {
-          ...terminalGenerationBySessionRef.current,
-          [sessionId]: 0,
-        };
-        terminalLastOutputRef.current = {
-          ...terminalLastOutputRef.current,
-          [sessionId]: null,
-        };
-        terminalPassthroughRef.current = {
-          ...terminalPassthroughRef.current,
-          [sessionId]: false,
-        };
-      }
-      const session = await invokeWorkspaceCommand("start_terminal_session", {
-        input: { sessionId, cols: 120, rows: 32 },
-      });
-      terminalGenerationBySessionRef.current = {
-        ...terminalGenerationBySessionRef.current,
-        [sessionId]: Number(session.generation || 0),
-      };
-      setTerminalSessions((current) => {
-        const next = current.filter((item) => (item.sessionId || item.session_id || item.id) !== sessionId);
-        return [...next, session];
-      });
-      setTerminalTextBySession((current) => ({
-        ...current,
-        [sessionId]: current[sessionId] || `Connected to ${session.shell} at ${session.cwd}\n`,
-      }));
-      setTerminalChunksBySession((current) => ({ ...current, [sessionId]: current[sessionId] || [] }));
-      if (activate) setActiveTerminalSessionId(sessionId);
-      return true;
-    } catch (err) {
-      setTerminalError(err instanceof Error ? err.message : String(err));
-      return false;
-    }
-  };
-
-  const newTerminalSession = async () => {
-    const used = new Set(terminalSessions.map((item) => item.sessionId || item.session_id || item.id));
-    let index = terminalSessions.length + 1;
-    let sessionId = `term-${index}`;
-    while (used.has(sessionId)) {
-      index += 1;
-      sessionId = `term-${index}`;
-    }
-    return startTerminalSession(sessionId, { activate: true });
-  };
-
-  const closeTerminalSession = async (sessionId) => {
-    if (!sessionId || sessionId === "main") return false;
-    setTerminalError("");
-    const sessionIds = terminalSessions.map((item) => item.sessionId || item.session_id || item.id).filter(Boolean);
-    const closingIndex = sessionIds.indexOf(sessionId);
-    const fallbackSessionId = sessionIds[closingIndex - 1] || sessionIds[closingIndex + 1] || "main";
-    try {
-      if (isTauriRuntime()) {
-        await invokeWorkspaceCommand("stop_terminal_session", {
-          input: { sessionId },
-        });
-      }
-      setTerminalSessions((current) => current.filter((item) => (item.sessionId || item.session_id || item.id) !== sessionId));
-      setTerminalTextBySession((current) => {
-        const next = { ...current };
-        delete next[sessionId];
-        return next;
-      });
-      setTerminalChunksBySession((current) => {
-        const next = { ...current };
-        delete next[sessionId];
-        return next;
-      });
-      delete lastTerminalPromptRef.current[sessionId];
-      delete terminalClearRequestedRef.current[sessionId];
-      delete terminalGenerationBySessionRef.current[sessionId];
-      delete terminalInputBufferRef.current[sessionId];
-      delete terminalLastOutputRef.current[sessionId];
-      delete terminalPassthroughRef.current[sessionId];
-      if (activeTerminalSessionId === sessionId) {
-        setActiveTerminalSessionId(fallbackSessionId === sessionId ? "main" : fallbackSessionId);
-      }
-      return true;
-    } catch (err) {
-      setTerminalError(err instanceof Error ? err.message : String(err));
-      return false;
-    }
-  };
-
-  const restartTerminalSession = async () => startTerminalSession(activeTerminalSessionId, { activate: true, reset: true });
-
-  const openNativeTerminal = async () => {
-    setTerminalError("");
-    try {
-      await invokeWorkspaceCommand("open_native_terminal", {});
-      return true;
-    } catch (err) {
-      setTerminalError(err instanceof Error ? err.message : String(err));
-      return false;
-    }
-  };
-
-  const runTerminalCheck = async (checkId) => {
-    setRunnerError("");
-    setTerminalRunningId(checkId);
-    try {
-      const result = await invokeWorkspaceCommand("run_guarded_check", {
-        input: { checkId },
-      });
-      appendTerminalLog(result);
-      return true;
-    } catch (err) {
-      appendTerminalLog({
-        id: checkId,
-        command: guardedChecks.find((check) => check.id === checkId)?.command || checkId,
-        output: err instanceof Error ? err.message : String(err),
-        success: false,
-      });
-      return false;
-    } finally {
-      setTerminalRunningId("");
-    }
-  };
-
-  const generatePatchDraft = async (taskId) => {
-    const task = tasks.find((item) => item.id === taskId);
-    if (!task) return false;
-
-    const feedbackKey = `patch-${taskId}`;
-    beginActionFeedback(feedbackKey, "正在生成改动草稿...");
-    setPatchError("");
-    setPatchLoading(true);
-    try {
-      const patchDraft = await invokeWorkspaceCommand("generate_patch_draft", {
-        input: { task },
-      });
-      await setAndPersistTask({
-        ...task,
-        status: taskStatuses.waitingApproval,
-        patchDraft,
-      });
-      finishActionFeedback(feedbackKey, "success", "改动草稿已生成。");
-      return true;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setPatchError(message);
-      finishActionFeedback(feedbackKey, "failed", `生成改动失败：${message}`);
-      return false;
-    } finally {
-      setPatchLoading(false);
-    }
-  };
-
-  const applyPatchDraft = async (taskId) => {
-    const task = tasks.find((item) => item.id === taskId);
-    if (!task) return false;
-
-    const feedbackKey = `apply-${taskId}`;
-    beginActionFeedback(feedbackKey, "正在应用改动并验证...");
-    setApplyError("");
-    setRunnerError("");
-    setApplyLoading(true);
-    try {
-      const applyResult = await invokeWorkspaceCommand("apply_patch_draft", {
-        input: { task },
-      });
-      const appliedTask = {
-        ...task,
-        status: taskStatuses.running,
-        applyResult: {
-          ...applyResult,
-          finishedAt: new Date().toISOString(),
-        },
-      };
-      await setAndPersistTask(appliedTask);
-
-      const checks = checksForPlan(task.plan);
-      if (!checks.length) {
-        const doneTask = { ...appliedTask, status: taskStatuses.done };
-        const runSummary = await invokeWorkspaceCommand("write_run_summary", {
-          input: { task: doneTask },
-        });
-        await setAndPersistTask({ ...doneTask, runSummary });
-        finishActionFeedback(feedbackKey, "success", "改动已应用，已写入运行摘要。");
-        return true;
-      }
-
-      const verificationRuns = [];
-      for (const check of checks) {
-        setRunnerLoadingId(check.id);
-        const result = await invokeWorkspaceCommand("run_guarded_check", {
-          input: { checkId: check.id },
-        });
-        verificationRuns.push({
-          ...result,
-          finishedAt: new Date().toISOString(),
-          auto: true,
-        });
-      }
-
-      const allPassed = verificationRuns.every((run) => run.success);
-      const verifiedTask = {
-        ...appliedTask,
-        status: allPassed ? taskStatuses.done : taskStatuses.failed,
-        runs: [...verificationRuns, ...(task.runs || [])],
-        verificationSummary: allPassed ? "自动验证通过" : "自动验证有失败项",
-      };
-      const runSummary = await invokeWorkspaceCommand("write_run_summary", {
-        input: { task: verifiedTask },
-      });
-      await setAndPersistTask({ ...verifiedTask, runSummary });
-      finishActionFeedback(
-        feedbackKey,
-        allPassed ? "success" : "failed",
-        allPassed ? "改动已应用，自动验证通过。" : "改动已应用，但自动验证有失败项。"
-      );
-      return true;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setApplyError(message);
-      setRunnerError(message);
-      const failedTask = tasks.find((item) => item.id === taskId) || task;
-      await setAndPersistTask({ ...failedTask, status: taskStatuses.failed });
-      finishActionFeedback(feedbackKey, "failed", `应用改动失败：${message}`);
-      return false;
-    } finally {
-      setApplyLoading(false);
-      setRunnerLoadingId("");
-    }
-  };
-
-  const mergeHandoff = async (taskId) => {
-    const task = tasks.find((item) => item.id === taskId);
-    if (!task) return false;
-
-    const feedbackKey = `handoff-${taskId}`;
-    beginActionFeedback(feedbackKey, "正在更新交接...");
-    setHandoffError("");
-    setHandoffLoading(true);
-    try {
-      const handoffMerge = await invokeWorkspaceCommand("merge_run_summary_to_handoff", {
-        input: { task },
-      });
-      await setAndPersistTask({
-        ...task,
-        handoffMerge,
-      });
-      finishActionFeedback(feedbackKey, "success", "交接已更新。");
-      return true;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setHandoffError(message);
-      finishActionFeedback(feedbackKey, "failed", `更新交接失败：${message}`);
-      return false;
-    } finally {
-      setHandoffLoading(false);
-    }
-  };
-
-  const saveProvider = async (form) => {
-    const feedbackKey = "save-provider";
-    beginActionFeedback(feedbackKey, "正在保存连接...");
-    setProviderError("");
-    try {
-      const status = await invokeWorkspaceCommand("save_provider_config", { input: form });
-      setProvider({ ...fallbackProvider, ...status });
-      finishActionFeedback(feedbackKey, "success", "连接配置已保存。");
-      return true;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setProviderError(message);
-      finishActionFeedback(feedbackKey, "failed", `保存连接失败：${message}`);
-      return false;
-    }
-  };
-
-  const loadComposerModels = async () => {
-    const key = providerModelKey(provider);
-    if (composerModelsKey === key && composerModels.length) return;
-
-    const fallbackModels = catalogModelsForProvider(provider, modelCatalog);
-    setComposerModelsLoading(true);
-    setComposerModelsSource(fallbackModels.length > 1 ? "来自本地模型列表" : "当前模型");
-    setComposerModels(fallbackModels);
-
-    if (source !== "tauri" || !provider?.apiBase || !provider?.apiKeyEnv) {
-      setComposerModelsKey(key);
-      setComposerModelsLoading(false);
-      return;
-    }
-
-    try {
-      const result = await invokeWorkspaceCommand("probe_provider_models", {
-        input: {
-          apiBase: provider.apiBase,
-          apiKeyEnv: provider.apiKeyEnv,
-          apiKey: "",
-        },
-      });
-      const models = Array.isArray(result.models) ? result.models.filter(Boolean) : [];
-      setComposerModels(models.length ? models : fallbackModels);
-      setComposerModelsSource(models.length ? "来自当前 API 可见模型" : "来自本地模型列表");
-      setComposerModelsKey(key);
-    } catch {
-      setComposerModels(fallbackModels);
-      setComposerModelsSource(fallbackModels.length > 1 ? "来自本地模型列表" : "当前模型");
-      setComposerModelsKey(key);
-    } finally {
-      setComposerModelsLoading(false);
-    }
-  };
-
-  const selectComposerModel = async (model) => {
-    if (!model || model === provider.model) return;
-    if (source !== "tauri") {
-      setProvider((current) => ({ ...current, model }));
-      return;
-    }
-    await saveProvider({ ...provider, model });
-  };
-
-  const testComposerModel = async (model) => {
-    const targetModel = model || provider?.model;
-    if (source !== "tauri" || !targetModel || !provider?.apiBase || !provider?.apiKeyEnv) return false;
-    const key = modelAvailabilityKey(provider, targetModel);
-    setComposerModelTesting(true);
-    try {
-      const result = await invokeWorkspaceCommand("test_provider_model_with_cache", {
-        input: {
-          apiBase: provider.apiBase,
-          apiKeyEnv: provider.apiKeyEnv,
-          model: targetModel,
-          apiKey: "",
-        },
-      });
-      setComposerModelTests((current) => ({
-        ...current,
-        [key]: {
-          checkedAt: Date.now(),
-          message: result.message || `${targetModel} 可用`,
-          status: "available",
-        },
-      }));
-      return true;
-    } catch (err) {
-      setComposerModelTests((current) => ({
-        ...current,
-        [key]: {
-          checkedAt: Date.now(),
-          message: err instanceof Error ? err.message : String(err),
-          status: "unavailable",
-        },
-      }));
-      return false;
-    } finally {
-      setComposerModelTesting(false);
-    }
-  };
-
-  const updateComposerModelHealth = React.useCallback((model, status, message = "") => {
-    const targetModel = model || provider?.model;
-    if (!targetModel) return;
-    const key = modelAvailabilityKey(provider, targetModel);
-    setComposerModelTests((current) => ({
-      ...current,
-      [key]: {
-        checkedAt: Date.now(),
-        message,
-        status,
-      },
-    }));
-  }, [provider]);
-
-  useEffect(() => {
-    if (source !== "tauri" || !provider?.enabled || !provider?.model || !provider?.apiBase || !provider?.apiKeyEnv) return undefined;
-    const key = modelAvailabilityKey(provider, provider.model);
-    if (!composerModelTests[key]?.status) {
-      testComposerModel(provider.model);
-    }
-    const timer = window.setInterval(() => {
-      testComposerModel(provider.model);
-    }, 60000);
-    return () => window.clearInterval(timer);
-  }, [source, provider?.enabled, provider?.apiBase, provider?.apiKeyEnv, provider?.model]);
-
-  const saveProviderSecret = async (apiKeyEnv, apiKey) => {
-    const feedbackKey = "save-provider-secret";
-    beginActionFeedback(feedbackKey, "正在保存 API Key...");
-    setProviderError("");
-    try {
-      const status = await invokeWorkspaceCommand("save_provider_secret", {
-        input: { apiKeyEnv, apiKey },
-      });
-      setProvider({ ...fallbackProvider, ...status });
-      finishActionFeedback(feedbackKey, "success", "API Key 已保存。");
-      return true;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setProviderError(message);
-      finishActionFeedback(feedbackKey, "failed", `保存 API Key 失败：${message}`);
-      return false;
-    }
-  };
-
-  const deleteProviderProfile = async (profileId) => {
-    const feedbackKey = "delete-provider";
-    beginActionFeedback(feedbackKey, "正在删除连接...");
-    setProviderError("");
-    try {
-      const status = source !== "tauri"
-        ? await deleteProviderProfilePreview(profileId)
-        : await invokeWorkspaceCommand("delete_provider_profile", {
-            input: { profileId },
-          });
-      setProvider({ ...fallbackProvider, ...status });
-      finishActionFeedback(feedbackKey, "success", "连接已删除。");
-      return true;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      const displayMessage =
-        message.includes("delete_provider_profile") && message.includes("not found")
-          ? "当前桌面进程还没加载删除连接命令，请重启桌面 dev 进程后再删。"
-          : message;
-      setProviderError(displayMessage);
-      finishActionFeedback(feedbackKey, "failed", `删除连接失败：${displayMessage}`);
-      return false;
-    }
-  };
-
-  const composerModelOptions = composerModels.length
-    ? composerModels
-    : catalogModelsForProvider(provider, modelCatalog);
-  const composerModelAvailability = Object.fromEntries(
-    composerModelOptions.map((model) => [model, composerModelTests[modelAvailabilityKey(provider, model)]])
-  );
-  const currentProviderHealth = providerModelHealth(provider, composerModelAvailability);
-
-  return (
-    <TooltipProvider>
-    <div className="shell">
+  const { markProjectActivityCompleted, markProjectActivitySeen, projectActivities } = useProjectActivities({ planLoading, snapshot, tasks, terminalRunningId, taskStatuses });
+
+  const resetWorkspaceEphemeralState = useWorkspaceEphemeralReset({
+    listDesktopConversations,
+    listDesktopTasks,
+    recoverConversationRuntime,
+    resetTerminalSessionState,
+    setActiveConversationId,
+    setActiveConversationTaskId,
+    setActiveTaskId,
+    setApplyError,
+    setChatTurns,
+    setConversationSummary,
+    setConversations,
+    setHandoffError,
+    setPatchError,
+    setPlanError,
+    setReadonlyPlan,
+    setRunnerError,
+    setSelectedEngineeringFile,
+    setTasks,
+  });
+
+  const { persistTask: setAndPersistTask } = useTaskPersistence({
+    isTauri: isTauriRuntime(),
+    markProjectActivityCompleted,
+    projectId: snapshot.currentProjectId,
+    saveTask: saveDesktopTask,
+    setActiveTaskId,
+    setReadonlyPlan,
+    setRunnerError,
+    setTasks,
+    showToast,
+  });
+
+  const updateChatTurns = useConversationPersistence({
+    activeConversationId, activeConversationTaskId, activeTask, conversationSummary,
+    setAndPersistTask, setChatTurns, setConversationSummary, setConversations, setRunnerError,
+    snapshot, tasks,
+  });
+
+  const updateProjectCapability = useWorkspaceCapabilityActions({
+    capabilityLabels,
+    refreshSnapshot: refreshSnapshotFromSource,
+    showToast,
+    updateProjectCapability: workspaceCapabilityClient.updateProjectCapability,
+  });
+
+  useWorkspaceSnapshotRefresh({
+    isTauri: isTauriRuntime(),
+    refreshSnapshot: refreshSnapshotFromSource,
+    showToast,
+    workspacePath: snapshot.currentProjectPath,
+    workspaceRegistryClient,
+  });
+
+  const { confirmDecomposition, confirmGoal, createGoal, generateDecomposition, refineGoal, signOffGoal, switchGoal, updateGoal, validateGoal } = useWorkspaceGoalActions({
+    applySnapshot,
+    beginActionFeedback,
+    buildPreviewPlan,
+    createTaskFromPlan,
+    executionClient,
+    finishActionFeedback,
+    goalClient: workspaceGoalClient,
+    isTauri: isTauriRuntime(),
+    loadWorkspaceSnapshot,
+    persistTask: setAndPersistTask,
+    provider,
+    setDecomposingGoal,
+    setError,
+    setGoalRefinementMode,
+    setSigningGoal,
+    setValidatingGoal,
+    showToast,
+    snapshot,
+    taskStatuses,
+    updateWorkspaceGoal,
+  });
+
+  useWorkspaceDataSync({
+    listDesktopConversations,
+    listDesktopTasks,
+    projectId: snapshot.currentProjectId,
+    projectPath: snapshot.currentProjectPath,
+    recoverConversationRuntime,
+    saveDesktopConversation,
+    saveDesktopTask,
+    setConversations,
+    setRunnerError,
+    setTasks,
+    taskStatuses,
+  });
+
+  useProviderDataSync({
+    fallbackModelCatalog,
+    fallbackProvider,
+    getModelCatalog: providerClient.getModelCatalog,
+    getModelHealth: providerClient.getModelHealth,
+    getProviderStatus: providerClient.getProviderStatus,
+    setComposerModelTests,
+    setModelCatalog,
+    setProvider,
+    setProviderError,
+  });
+
+
+  const { addProject, openProjectFolder, pickProject, relocateProject, removeProject, renameProject, switchProject } = createWorkspaceRegistryActions({
+    applySnapshot,
+    fallbackSnapshot,
+    loadWorkspaceSnapshot,
+    pickProjectDirectory,
+    registryClient: workspaceRegistryClient,
+    resetWorkspaceEphemeralState,
+    setLoading,
+    setProjectActionError,
+    showToast,
+    snapshot,
+  });
+  const requestProjectAccess = () => window.dispatchEvent(new Event("project-os:request-project-access"));
+
+  const { selectEngineeringFile } = createWorkspaceFileActions({ fileClient: workspaceFileClient, setActiveTaskId, setPlanError, setReadonlyPlan, setSelectedEngineeringFile });
+
+
+  const { createDesignGovernanceTask, createGovernanceTask } = useGovernanceTaskActions({
+    activeConversationId,
+    createTaskFromPlan,
+    designImplementationTopics,
+    governanceFileHealthLabel,
+    persistTask: setAndPersistTask,
+    showToast,
+    snapshot,
+  });
+
+  const { generatePlan, stopPlanGeneration } = usePlanAction({
+    activeConversationId,
+    beginActionFeedback,
+    buildLocalPlan: (input) => buildPreviewPlan(input, snapshot),
+    cancelRuntimeRequest,
+    createTaskFromPlan: (plan, taskText, options) => createTaskFromPlan(plan, taskText, snapshot, options),
+    finishActionFeedback,
+    generateRemotePlan: executionClient.generateReadonlyPlan,
+    isTauri: isTauriRuntime(),
+    persistTask: setAndPersistTask,
+    setPlanError,
+    setPlanLoading,
+    withTimeout,
+  });
+
+  const runChatAction = createConversationActionController({
+    activeTaskId,
+    applySnapshot,
+    beginActionFeedback,
+    confirmWorkspaceGoal,
+    createWorkspaceGoal,
+    executeGuardedCheck: (...args) => executeGuardedCheck(...args),
+    executePatchApply: (...args) => executePatchApply(...args),
+    executePatchDraft: (...args) => executePatchDraft(...args),
+    executeRegisteredConversationAction,
+    finishActionFeedback,
+    generatePlan,
+    generatePatchDraft: (...args) => generatePatchDraft(...args),
+    createRepairTask: (...args) => createRepairTask(...args),
+    markTaskWaiting: (...args) => markTaskWaiting(...args),
+    onEnsureModelAvailable: () => testComposerModel(provider.model),
+    runGuardedCheck: (...args) => runGuardedCheck(...args),
+    selectEngineeringFile: (...args) => selectEngineeringFile(...args),
+    selectTask: (...args) => selectTask(...args),
+    setError,
+    setSelectedEngineeringFile,
+    stopPlanGeneration,
+    taskStatuses,
+    tasks,
+    topicPayloadFromOutline,
+  });
+
+  const { archiveConversation, deleteConversation, openTaskConversation, restoreConversation, selectConversation, startNewConversation } = useConversationNavigation({
+    activeConversationId,
+    conversations,
+    deleteConversation: deleteDesktopConversation,
+    saveConversation: saveDesktopConversation,
+    markProjectActivitySeen,
+    onResetConversation: () => { setSelectedEngineeringFile(null); setPlanError(""); setRunnerError(""); setPatchError(""); setApplyError(""); },
+    projectId: snapshot.currentProjectId,
+    setActiveConversationId,
+    setActiveConversationTaskId,
+    setActiveTaskId,
+    setChatTurns,
+    setConversationResetKey,
+    setConversationSummary,
+    setReadonlyPlan,
+    setSelectedEngineeringFile,
+    setConversations,
+    setRunnerError,
+    tasks,
+  });
+  const { completeTask, createManualTask, createRepairTask, markTaskWaiting, removeTask, selectTask } = createTaskLifecycleController({
+    activeConversationId,
+    activeConversationTaskId,
+    activeTaskId,
+    conversations,
+    createTaskFromPlan,
+    deleteTask: deleteDesktopTask,
+    markProjectActivitySeen,
+    persistTask: setAndPersistTask,
+    readonlyPlan,
+    refreshSnapshot: refreshSnapshotFromSource,
+    setActiveTaskId,
+    setConversations,
+    setReadonlyPlan,
+    setSelectedEngineeringFile,
+    setTasks,
+    showToast,
+    snapshot,
+    startNewConversation,
+    taskStatuses,
+    tasks,
+  });
+
+  const { executeGuardedCheck, runGuardedCheck } = createExecutionActionController({
+    appendTerminalLog,
+    beginActionFeedback,
+    chatTurns,
+    executeGuardedCheckCommand,
+    executeTaskGuardedCheckWorkflow,
+    finishActionFeedback,
+    guardedCheckCapability,
+    persistTask: setAndPersistTask,
+    projectExecutionEvent,
+    runCheck: executionClient.runGuardedCheck,
+    setRunnerError,
+    setRunnerLoadingId,
+    setTasks,
+    taskStatuses,
+    tasks,
+    updateChatTurns,
+  });
+
+  const { sendGoalToChat, sendGoalToTerminal, sendTaskToChat, sendTaskToTerminal } = useWorkspaceContextActions({
+    appendContextToTerminal,
+    chatTurns,
+    goalStatusLabelText,
+    isNoiseTask,
+    onOpenConversation: () => window.dispatchEvent(new Event("project-os:open-conversation")),
+    setActiveTaskId,
+    setReadonlyPlan,
+    setSelectedEngineeringFile,
+    showToast,
+    snapshot,
+    taskStatusLabel,
+    taskStatuses,
+    tasks,
+    updateChatTurns,
+  });
+
+
+  const { runTerminalCheck } = useTerminalCheckAction({
+    appendTerminalLog,
+    executeGuardedCheckCommand,
+    guardedCheckCapability,
+    runCheck: executionClient.runGuardedCheck,
+    setRunnerError,
+    setTerminalRunningId,
+  });
+
+  const { applyPatchDraft, executePatchApply, executePatchDraft, generatePatchDraft, mergeHandoff } = usePatchActions({
+    beginActionFeedback,
+    chatTurns,
+    checksForPlan,
+    executionClient,
+    finishActionFeedback,
+    persistTask: setAndPersistTask,
+    projectExecutionEvent,
+    setApplyError,
+    setApplyLoading,
+    setHandoffError,
+    setHandoffLoading,
+    setPatchError,
+    setPatchLoading,
+    setRunnerError,
+    setRunnerLoadingId,
+    tasks,
+    updateChatTurns,
+  });
+
+  const { deleteProviderProfile, saveProvider, saveProviderSecret } = createProviderActionController({
+    beginActionFeedback,
+    fallbackProvider,
+    finishActionFeedback,
+    getProviderStatus: providerClient.getProviderStatus,
+    providerClient,
+    setProvider,
+    setProviderError,
+  });
+
+  const { loadComposerModels, selectComposerModel, testComposerModel, updateComposerModelHealth } = useComposerModelActions({
+    catalogModelsForProvider,
+    composerModelTests,
+    composerModels,
+    composerModelsKey,
+    modelAvailabilityKey,
+    modelCatalog,
+    provider,
+    providerClient,
+    providerModelKey,
+    saveProvider,
+    setComposerModelTesting,
+    setComposerModelTests,
+    setComposerModels,
+    setComposerModelsKey,
+    setComposerModelsLoading,
+    setComposerModelsSource,
+    setProvider,
+    source,
+  });
+  const { composerModelAvailability, composerModelOptions, currentProviderHealth, currentProviderTestRecord } = useProviderComposerViewModel({
+    catalogModelsForProvider,
+    composerModelTests,
+    composerModels,
+    modelAvailabilityKey,
+    modelCatalog,
+    provider,
+    providerModelHealth,
+  });
+  const recordProviderTest = useProviderTestRecord({ setComposerModelTests });
+
+  return <AppWorkbenchSurface
+    actionFeedback={actionFeedback ? <ActionFeedbackToast feedback={actionFeedback} /> : null}
+    topBar={(
       <TopBar
-        snapshot={snapshot}
-        source={source}
-        error={error}
-        provider={provider}
-        providerHealth={currentProviderHealth}
-        modelCatalog={modelCatalog}
-        onSaveProvider={saveProvider}
-        onSaveProviderSecret={saveProviderSecret}
-        onDeleteProviderProfile={deleteProviderProfile}
-        providerError={providerError}
         onStartConversation={startNewConversation}
+        providerButtonLabel={activeProviderProfileName(provider)}
+        providerHealth={currentProviderHealth}
+        providerPanel={(
+          <ProviderPanel
+            fallbackModelCatalog={fallbackModelCatalog}
+            provider={provider}
+            modelCatalog={modelCatalog}
+            modelTestRecord={currentProviderTestRecord}
+            source={source}
+            onSaveProvider={saveProvider}
+            onSaveProviderSecret={saveProviderSecret}
+            onDeleteProviderProfile={deleteProviderProfile}
+            onModelTestRecorded={recordProviderTest}
+            providerError={providerError}
+          />
+        )}
       />
-      <main
-        className={`workspace${leftCollapsed ? " leftCollapsed" : ""}${rightCollapsed ? " rightCollapsed" : ""}`}
-        style={{
-          "--desktop-layout-sidebar-left": `${leftWidth}px`,
-          "--desktop-layout-sidebar-right": `${rightWidth}px`,
-        }}
-      >
-        <ProjectSidebar
+    )}
+    projectSidebar={(
+      <ProjectSidebar
+          copyTextToSystemClipboard={copyTextToSystemClipboard}
           collapsed={leftCollapsed}
           onResizeStart={(event) => beginSidebarResize("left", event)}
           onToggleCollapsed={() => setLeftCollapsed((value) => !value)}
@@ -8808,17 +4572,26 @@ function App() {
           onRenameProject={renameProject}
           onRemoveProject={removeProject}
           onSelectEngineeringFile={selectEngineeringFile}
+          onUpdateCapability={updateProjectCapability}
           onProjectActionError={setProjectActionError}
           onProjectActivitySeen={markProjectActivitySeen}
           onProjectPathCopied={() => showToast("已复制项目路径。")}
           projectActionError={projectActionError}
           selectedEngineeringFile={selectedEngineeringFile}
         />
+    )}
+    agentWorkspace={(
         <AgentWorkspace
           snapshot={snapshot}
+          activeTaskId={activeTaskId}
+          agentRuns={agentRuns}
+          onApproveAgentRun={approveAgentRun}
+          onResumeAgentRun={resumeAgentRun}
+          activeConversationTaskId={activeConversationTaskId}
           selectedEngineeringFile={selectedEngineeringFile}
           activeConversationId={activeConversationId}
           chatTurns={chatTurns}
+          conversationSummary={conversationSummary}
           terminalLogs={terminalLogs}
           terminalRunningId={terminalRunningId}
           terminalText={terminalText}
@@ -8833,7 +4606,6 @@ function App() {
           activeTask={activeTask}
           tasks={tasks}
           planLoading={planLoading}
-          planError={planError}
           runnerLoadingId={runnerLoadingId}
           runnerError={runnerError}
           patchLoading={patchLoading}
@@ -8845,7 +4617,6 @@ function App() {
           conversationResetKey={conversationResetKey}
           onChatTurnsChange={updateChatTurns}
           onGeneratePlan={generatePlan}
-          onConfirmTask={markTaskWaiting}
           onGeneratePatchDraft={generatePatchDraft}
           onApplyPatchDraft={applyPatchDraft}
           onMergeHandoff={mergeHandoff}
@@ -8860,7 +4631,9 @@ function App() {
           onOpenNativeTerminal={openNativeTerminal}
           onRestartTerminalSession={restartTerminalSession}
           onProfileUpdated={applySnapshot}
+          onProviderProfileUpdate={workspaceFileClient.updateProjectProfileFromConversation}
           onStopPlan={stopPlanGeneration}
+          isTauri={isTauriRuntime()}
           provider={provider}
           composerModelAvailability={composerModelAvailability}
           composerModelOptions={composerModelOptions}
@@ -8871,14 +4644,37 @@ function App() {
           onSelectComposerModel={selectComposerModel}
           onTestComposerModel={testComposerModel}
           onModelHealthChange={updateComposerModelHealth}
+          decomposingGoal={decomposingGoal}
+          onConfirmDecomposition={confirmDecomposition}
+          onGenerateDecomposition={generateDecomposition}
           goalRefinementMode={goalRefinementMode}
           onSelectEngineeringFile={selectEngineeringFile}
           onSelectConversation={selectConversation}
           onSelectTask={selectTask}
+          onOpenTaskConversation={openTaskConversation}
+          onSendTaskToTerminal={sendTaskToTerminal}
+          onMarkTaskWaiting={markTaskWaiting}
+          onEnsureModelAvailable={() => testComposerModel(provider.model)}
+          onCreateTask={createManualTask}
+          onCreateGoal={createGoal}
+          onDeleteTask={removeTask}
+          onArchiveGoal={archiveWorkspaceGoal}
+          onMergeGoal={mergeWorkspaceGoal}
+          onRestoreGoal={restoreWorkspaceGoal}
+          onCompleteTask={completeTask}
           onCreateRepairTask={createRepairTask}
           onCreateGovernanceTask={createGovernanceTask}
           onCreateDesignGovernanceTask={createDesignGovernanceTask}
+          onPersistTask={(task) => setAndPersistTask(task, { durable: true })}
+          onUpdateGoal={updateGoal}
+          onSwitchProject={switchProject}
+          onRequestProjectAccess={requestProjectAccess}
+          onRefreshWorkspace={refreshSnapshotFromSource}
+          onReadEngineeringFile={workspaceFileClient.readEngineeringFile}
+          onGetHermesExecutorStatus={executionClient.getHermesExecutorStatus}
         />
+    )}
+    rightRail={(
         <RightRail
           collapsed={rightCollapsed}
           onResizeStart={(event) => beginSidebarResize("right", event)}
@@ -8889,7 +4685,9 @@ function App() {
           conversations={conversations}
           activeConversationId={activeConversationId}
           onSelectConversation={selectConversation}
+          onArchiveConversation={archiveConversation}
           onDeleteConversation={deleteConversation}
+          onRestoreConversation={restoreConversation}
           onSelectTask={selectTask}
           onSendGoalToChat={sendGoalToChat}
           onSendGoalToTerminal={sendGoalToTerminal}
@@ -8907,13 +4705,14 @@ function App() {
           planLoading={planLoading}
           terminalRunningId={terminalRunningId}
         />
-      </main>
-      {actionFeedback ? <ActionFeedbackToast feedback={actionFeedback} /> : null}
-      {!actionFeedback && toast ? <div className={`appToast appToast-${toast.variant}`}>{toast.message}</div> : null}
-      <StatusBar snapshot={snapshot} source={source} />
-    </div>
-    </TooltipProvider>
-  );
+    )}
+    leftCollapsed={leftCollapsed}
+    leftWidth={leftWidth}
+    rightCollapsed={rightCollapsed}
+    rightWidth={rightWidth}
+    statusBar={<StatusBar snapshot={snapshot} source={source} />}
+    toast={!actionFeedback && toast ? <div className={`appToast appToast-${toast.variant}`}>{toast.message}</div> : null}
+  />;
 }
 
 function ActionFeedbackToast({ feedback }) {
@@ -8927,6 +4726,9 @@ function ActionFeedbackToast({ feedback }) {
     </div>
   );
 }
+
+exposeDesktopPerformanceBaseline();
+recordWorkbenchReady();
 
 createRoot(document.getElementById("root")).render(
   <AppErrorBoundary>

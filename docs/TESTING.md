@@ -196,7 +196,27 @@ bash tests/run-tests.sh
 - 后续如果继续拆出评分执行层或报告渲染层，应继续把对应检查接入这个入口。
 - `tests/check-report-model.mjs` 会校验评分维度总分、报告模块引用的 section，以及上下文评分维度是否都被报告模块覆盖，避免页面分组和评分模型漂移。
 
-### 8. CI 自动化检查
+### 8. Fact / Slot Runtime 验收
+
+目标：确保浏览器 Preview 与 Tauri Desktop 虽然读取方式不同，但生成一致的事实和工作面。
+
+检查项：
+- 旧项目没有 capability manifest 时保持兼容。
+- 父能力或模块未启用时，Slot 在 Selector 执行前被门控。
+- Fact 变化只重算直接依赖的 Slot，其他描述符保持不变。
+- 事件严格按 `source.changed -> fact.invalidated -> fact.updated -> selector.recomputed -> slot.updated` 输出。
+- 项目概览、当前进度和启动方式 Contract 均能从同一个 Fact Store 编译。
+- 浏览器与 Tauri 的等价输入得到相同关键事实和 ViewModel。
+
+推荐命令：
+
+```bash
+npm --prefix desktop test
+npm --prefix desktop run web:build
+cargo check --manifest-path desktop/src-tauri/Cargo.toml
+```
+
+### 9. CI 自动化检查
 
 目标：把本地回归测试接入 GitHub，让 push 和 pull request 后自动复查。
 
@@ -216,10 +236,21 @@ CI 文件：
 - 报告关键标记检查
 - tracked files 是否被测试过程意外改动
 - 上传 markdown / HTML 报告 artifact，若生成了截图也一并上传
+- Desktop PR 同时校验 `desktop/evals/agent-eval-report.json` 完整覆盖 12 个 case，且任务成功率、Patch 可应用率、检查通过率不低于已提交基线。
 
 说明：
 - CI 是自动执行器，不替代 `tests/run-tests.sh`。
 - `tests/run-tests.sh` 是具体检查脚本，CI 只是负责在 GitHub 上自动调用它。
+
+### Agent 真实评测
+
+常规 PR 不读取模型密钥，只运行以下离线门槛：
+
+```bash
+npm --prefix desktop run check:agent-eval
+```
+
+`.github/workflows/agent-eval.yml` 在受保护的 `agent-eval` environment 中按日或手动运行。它需要 `OMNIDESK_AGENT_EVAL_KEY` secret 与 `OMNIDESK_AGENT_EVAL_MODEL` variable，执行 12-case suite、保留真实 trace，并拒绝成功率、Patch 可应用率或检查通过率回退。报告没有真实 trace 时不能替代该门槛。
 
 ---
 

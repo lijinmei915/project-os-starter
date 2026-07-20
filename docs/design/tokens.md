@@ -89,6 +89,13 @@
 | `--desktop-border-accent` | derived | 选中、focus、强调边框 |
 | `--desktop-state-accent-bg` | derived | 弱选中底色 |
 | `--desktop-state-accent-bg-strong` | derived | 强选中底色 |
+| `--desktop-tag-bg` | component | 中性 Tag 默认底色 |
+| `--desktop-tag-bg-hover` | component | Tag hover / focus 加深底色 |
+| `--desktop-tag-bg-pressed` | component | Tag pressed 底色 |
+| `--desktop-tag-border` | component | Tag 默认边框 |
+| `--desktop-tag-border-hover` | component | Tag hover / focus 边框 |
+| `--desktop-tag-text` | component | Tag 默认文字 |
+| `--desktop-tag-text-hover` | component | Tag hover / focus 文字 |
 
 桌面端文字颜色规则：
 
@@ -287,6 +294,7 @@
 | `--desktop-layout-column-gap` | `0px` | 主工作台三栏之间的结构 gap，默认靠边框分隔 |
 | `--desktop-layout-panel-gap` | `10px` | 面板内部模块间距 |
 | `--desktop-layout-panel-padding` | `12px` | 桌面端标准面板内边距 |
+| `--desktop-space-overview-section` | `20px` | 概览型治理页的页头到首分区、以及分区到分区的纵向间距 |
 | `--desktop-toolbar-control-height` | `30px` | 顶部工具栏控件高度 |
 | `--desktop-toolbar-control-padding-x` | `12px` | 顶部文字型控件左右内边距 |
 | `--desktop-toolbar-control-gap` | `7px` | 顶部控件 icon 与文字间距 |

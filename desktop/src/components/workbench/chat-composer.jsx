@@ -64,6 +64,7 @@ function writeFavoriteModels(models) {
 }
 
 export function ChatComposer({
+  attachmentError = "",
   attachments = [],
   className,
   disabled,
@@ -100,6 +101,7 @@ export function ChatComposer({
   const [voiceError, setVoiceError] = React.useState("");
   const [storedFavoriteModels, setStoredFavoriteModels] = React.useState(() => readFavoriteModels());
   const hasValue = Boolean(value?.trim()) || attachments.length > 0;
+  const hasTakeoverInput = sending && hasValue;
   const isDisabled = sending ? false : disabled || !hasValue;
   const voiceDisabled = disabled || !speechSupported || !onVoiceInput;
   const flatModels = flatModelOptions(modelOptions);
@@ -174,7 +176,7 @@ export function ChatComposer({
     }
 
     event.preventDefault();
-    event.currentTarget.form?.requestSubmit();
+    onSubmit?.(event);
   };
 
   const getSpeechRecognition = () => window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -239,6 +241,7 @@ export function ChatComposer({
   return (
     <form className={cn("chatComposer", className)} onSubmit={onSubmit}>
       <div className="chatComposerShell" data-state={hasValue ? "filled" : "empty"}>
+        {attachmentError ? <p className="chatComposerAttachmentError" role="status">{attachmentError}</p> : null}
         {attachments.length ? (
           <div className="chatComposerAttachments">
             {attachments.map((attachment) => (
@@ -437,13 +440,13 @@ export function ChatComposer({
           </button>
         <button
           className={`chatComposerSend${sending ? " sending" : ""}`}
-          type={sending ? "button" : "submit"}
-          aria-label={sending ? "停止生成" : "发送"}
+          type="button"
+          aria-label={hasTakeoverInput ? "提交新要求" : sending ? "停止生成" : "发送"}
           aria-busy={sending}
           disabled={isDisabled}
-          onClick={sending ? onStop : undefined}
+          onClick={hasTakeoverInput ? onSubmit : sending ? onStop : onSubmit}
         >
-            {sending ? <span className="chatComposerStopIcon" aria-hidden="true" /> : <ArrowUp aria-hidden="true" strokeWidth={2.35} />}
+            {sending && !hasTakeoverInput ? <span className="chatComposerStopIcon" aria-hidden="true" /> : <ArrowUp aria-hidden="true" strokeWidth={2.35} />}
         </button>
         </div>
       </div>

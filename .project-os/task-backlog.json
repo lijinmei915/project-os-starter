@@ -1,16 +1,288 @@
 {
   "schemaVersion": "project-os.task-backlog.v0.1",
-  "updatedAt": "2026-07-11T09:21:09.000Z",
+  "updatedAt": "2026-07-19T16:37:52.000Z",
   "items": [
+    {
+      "id": "workspace-asset-boundary-20260720",
+      "title": "定义资产边界并收紧 Git 忽略",
+      "status": "done",
+      "body": "已将 tmp、Project OS 事件、事务和锁标记为本地运行产物；安装脚本会把同一边界写入目标项目。项目事实、目标和任务状态仍保留为可追溯治理数据。",
+      "tone": "accent",
+      "goalId": "workspace-asset-governance-v1-20260720",
+      "goalTitle": "工作区资产分层治理 v1",
+      "updatedAt": "2026-07-20T02:39:16.000Z",
+      "completedAt": "2026-07-20T02:39:16.000Z"
+    },
+    {
+      "id": "workspace-asset-tree-20260720",
+      "title": "收敛默认项目文件树",
+      "status": "done",
+      "body": "桌面 Runtime 和浏览器 Preview 现在共同隐藏 Project OS 运行目录、临时文件、构建输出、依赖缓存和真实环境文件；.env.example 仍可见。",
+      "tone": "neutral",
+      "goalId": "workspace-asset-governance-v1-20260720",
+      "goalTitle": "工作区资产分层治理 v1",
+      "updatedAt": "2026-07-20T02:39:16.000Z",
+      "completedAt": "2026-07-20T02:39:16.000Z"
+    },
+    {
+      "id": "workspace-asset-retention-20260720",
+      "title": "补齐运行产物保留与恢复边界",
+      "status": "done",
+      "body": "保留脚本现在管理 events 与已终态 transactions，默认各保留最近 200 条；prepared 事务永不清理。--dry-run 只输出候选，不删除现有证据。",
+      "tone": "neutral",
+      "goalId": "workspace-asset-governance-v1-20260720",
+      "goalTitle": "工作区资产分层治理 v1",
+      "updatedAt": "2026-07-20T02:39:16.000Z",
+      "completedAt": "2026-07-20T02:39:16.000Z"
+    },
+    {
+      "id": "workspace-handoff-consolidation-20260720",
+      "title": "定义交接历史迁移边界",
+      "status": "done",
+      "body": "已明确 HANDOFF 只保留当前接手摘要；历史迁移必须作为独立、可回退的文档迁移执行，不能与资产边界治理混合删除。",
+      "tone": "neutral",
+      "goalId": "workspace-asset-governance-v1-20260720",
+      "goalTitle": "工作区资产分层治理 v1",
+      "updatedAt": "2026-07-20T03:02:00.000Z",
+      "completedAt": "2026-07-20T03:02:00.000Z"
+    },
+    {
+      "id": "agent-real-desktop-provider-smoke-20260720",
+      "title": "确认真实 Provider 与 Hermes 执行环境",
+      "status": "done",
+      "body": "已使用当前 Llm Gateway / gpt-5.6-luna 在隔离 README fixture 完成真实模型草稿、独立审批、应用与检查。模型输出可直接应用，耗时 9.8 秒；凭据始终只从环境变量读取。",
+      "tone": "accent",
+      "goalId": "agent-real-desktop-release-acceptance-v1-20260720",
+      "goalTitle": "真实桌面任务发布验收 v1",
+      "updatedAt": "2026-07-19T16:42:58.905Z",
+      "completedAt": "2026-07-19T16:42:58.905Z"
+    },
+    {
+      "id": "agent-real-desktop-controlled-patch-20260720",
+      "title": "在隔离工程验证受控 Patch 链路",
+      "status": "done",
+      "body": "已完成 README、React、CSS、Rust 语义与检查失败修复共 5 个真实隔离 fixture。每个用例均由真实模型生成可应用草稿，经 1 次受控审批后应用并通过对应检查；未修改 OmniDesk 主工程。",
+      "tone": "neutral",
+      "goalId": "agent-real-desktop-release-acceptance-v1-20260720",
+      "goalTitle": "真实桌面任务发布验收 v1",
+      "updatedAt": "2026-07-19T16:44:30.105Z",
+      "completedAt": "2026-07-19T16:44:30.105Z"
+    },
+    {
+      "id": "agent-real-desktop-release-evidence-20260720",
+      "title": "归档发布候选证据并判定结果",
+      "status": "running",
+      "body": "5 个真实 trace（原始模型输出、usage、审批、应用和检查）已生成于 /tmp/omnidesk-real-desktop-*-trace。当前仅作为发布候选证据；仍需补原生 Tauri 窗口的端到端交互验收，不能替换正式 12-case 基线。",
+      "tone": "neutral",
+      "goalId": "agent-real-desktop-release-acceptance-v1-20260720",
+      "goalTitle": "真实桌面任务发布验收 v1",
+      "updatedAt": "2026-07-19T16:44:30.105Z"
+    },
+    {
+      "id": "agent-provider-production-20260720",
+      "title": "治理模型可用性与备用连接",
+      "status": "done",
+      "body": "Runtime 已在对话、计划和 Patch 草稿前验证模型；额度、认证、模型和网络失败分别持久化。当前 profile 不可用时会测试已保存且有 Key 的候选连接，选中后持久化切换并同步 Hermes。",
+      "tone": "accent",
+      "goalId": "agent-production-loop-v1-1-20260720",
+      "goalTitle": "Agent 闭环生产化与多 Provider 可用性 v1.1",
+      "updatedAt": "2026-07-20T00:00:00.000Z",
+      "completedAt": "2026-07-20T00:00:00.000Z"
+    },
+    {
+      "id": "agent-desktop-loop-acceptance-20260720",
+      "title": "验收桌面端受控开发闭环",
+      "status": "done",
+      "body": "验证对话发起任务、生成草稿、独立审批、应用、检查、修复草稿和时间线证据；浏览器预览只验证只读边界，真实写入只在桌面 Runtime 验收。",
+      "tone": "neutral",
+      "goalId": "agent-production-loop-v1-1-20260720",
+      "goalTitle": "Agent 闭环生产化与多 Provider 可用性 v1.1",
+      "updatedAt": "2026-07-19T16:37:52.000Z",
+      "completedAt": "2026-07-19T16:37:52.000Z"
+    },
+    {
+      "id": "agent-eval-ci-evidence-20260720",
+      "title": "将真实 Eval trace 接入受保护 CI",
+      "status": "done",
+      "body": "受保护 workflow 现在要求 API Base、模型和 Key；只写 Key 环境变量名到临时 Hermes 配置，并上传 report、results 与每个 case 的 trace/raw output/usage artifact。",
+      "tone": "neutral",
+      "goalId": "agent-production-loop-v1-1-20260720",
+      "goalTitle": "Agent 闭环生产化与多 Provider 可用性 v1.1",
+      "updatedAt": "2026-07-20T00:00:00.000Z",
+      "completedAt": "2026-07-20T00:00:00.000Z"
+    },
+    {
+      "id": "agent-rust-stability-20260720",
+      "title": "提高 Rust 补丁路径稳定性",
+      "status": "done",
+      "body": "Rust case 现在要求保留准确参数名并执行空、空白和正常输入的行为断言；受控真实 Eval 已通过补丁、审批、编译与语义检查。",
+      "tone": "neutral",
+      "goalId": "agent-production-loop-v1-1-20260720",
+      "goalTitle": "Agent 闭环生产化与多 Provider 可用性 v1.1",
+      "updatedAt": "2026-07-20T00:00:00.000Z",
+      "completedAt": "2026-07-20T00:00:00.000Z"
+    },
+    {
+      "id": "agent-eval-protected-suite-20260719",
+      "title": "运行受保护的真实 12-case Agent Eval",
+      "status": "done",
+      "body": "已运行真实 12-case suite 并生成候选报告。结果：任务成功率 33.3%、Patch 可应用率 18.2%、检查通过率 27.3%、恢复成功率 100%；低于当前基线，发布门槛按预期拒绝通过。候选报告：/tmp/omnidesk-agent-eval-report-v1-live.json，原始 trace 位于各隔离 fixture。",
+      "tone": "accent",
+      "goalId": "agent-development-loop-v1-20260719-151357",
+      "goalTitle": "Agent 开发闭环可靠性 v1 验收与成功率提升",
+      "updatedAt": "2026-07-19T15:22:19.000Z",
+      "completedAt": "2026-07-19T15:22:19.000Z"
+    },
+    {
+      "id": "agent-eval-failure-classification-20260719",
+      "title": "按真实 trace 分类 Agent 失败原因",
+      "status": "done",
+      "body": "已完成第一轮 trace 分类：主要失败来自模型缺少精确授权文件上下文，其次是无旧侧 hunk 上下文和格式错误；分类结果用于修正 Eval runner 输入。",
+      "tone": "neutral",
+      "goalId": "agent-development-loop-v1-20260719-151357",
+      "goalTitle": "Agent 开发闭环可靠性 v1 验收与成功率提升",
+      "updatedAt": "2026-07-19T15:25:30.000Z",
+      "completedAt": "2026-07-19T15:25:30.000Z"
+    },
+    {
+      "id": "agent-patch-context-improvement-20260719",
+      "title": "提升 Patch 上下文与生成质量",
+      "status": "done",
+      "body": "已将完整授权文件上下文注入真实 Eval runner，并修正语义 verifier 后重新执行真实 12-case：任务成功率 100%、Patch 可应用率 90.9%、检查通过率 100%、恢复成功率 100%，均高于当前基线。",
+      "tone": "neutral",
+      "goalId": "agent-development-loop-v1-20260719-151357",
+      "goalTitle": "Agent 开发闭环可靠性 v1 验收与成功率提升",
+      "updatedAt": "2026-07-19T15:25:30.000Z",
+      "completedAt": "2026-07-19T15:25:30.000Z"
+    },
+    {
+      "id": "agent-repair-loop-acceptance-20260719",
+      "title": "验收两轮受控修复闭环",
+      "status": "done",
+      "body": "已通过修复草稿状态、失败检查回传和第二轮耗尽回归：每轮仍需独立审批，第二轮失败后状态为 repair failed 且剩余预算为 0。",
+      "tone": "neutral",
+      "goalId": "agent-development-loop-v1-20260719-151357",
+      "goalTitle": "Agent 开发闭环可靠性 v1 验收与成功率提升",
+      "updatedAt": "2026-07-19T15:28:30.000Z",
+      "completedAt": "2026-07-19T15:28:30.000Z"
+    },
+    {
+      "id": "agent-eval-threshold-ratchet-20260719",
+      "title": "逐步提高 Agent Eval 发布门槛",
+      "status": "done",
+      "body": "已用 QY profile 完整运行两轮真实 12-case suite；两轮均达到发布门槛，最终基线为任务成功率 100%、Patch 可应用率 90.9%、检查通过率 100%、恢复成功率 100%，并通过基线不回退检查。正式报告保留每个 case 的真实 trace 引用。默认 TW Gateway 因订阅额度不足未作为基线来源。",
+      "tone": "neutral",
+      "goalId": "agent-development-loop-v1-20260719-151357",
+      "goalTitle": "Agent 开发闭环可靠性 v1 验收与成功率提升",
+      "updatedAt": "2026-07-19T15:52:00.000Z",
+      "completedAt": "2026-07-19T15:52:00.000Z"
+    },
+    {
+      "id": "conversation-runtime-controller",
+      "title": "迁移 Runtime Controller",
+      "status": "done",
+      "body": "将 submitTask 的流程控制迁出 main.jsx。",
+      "tone": "accent",
+      "goalId": "conversation-runtime-v2"
+    },
+    {
+      "id": "conversation-action-registry",
+      "title": "统一 Action Registry",
+      "status": "done",
+      "body": "统一注册生成计划、确认执行、检查、引用、取消和重试。",
+      "tone": "neutral",
+      "goalId": "conversation-runtime-v2"
+    },
+    {
+      "id": "conversation-strict-state-machine",
+      "title": "完善严格状态机",
+      "status": "done",
+      "body": "定义完整状态、事件与非法转换。",
+      "tone": "neutral",
+      "goalId": "conversation-runtime-v2"
+    },
+    {
+      "id": "conversation-single-live-message",
+      "title": "单消息实时更新",
+      "status": "done",
+      "body": "同一请求原位更新处理中与最终结果。",
+      "tone": "neutral",
+      "goalId": "conversation-runtime-v2"
+    },
+    {
+      "id": "conversation-execution-events",
+      "title": "执行进度回流",
+      "status": "done",
+      "body": "任务、检查、Patch 和结果事件回流对话。",
+      "tone": "neutral",
+      "goalId": "conversation-runtime-v2"
+    },
+    {
+      "id": "conversation-cancel-retry-recovery",
+      "title": "取消重试与恢复",
+      "status": "done",
+      "body": "支持取消、重试和重启恢复未完成请求。",
+      "tone": "neutral",
+      "goalId": "conversation-runtime-v2"
+    },
+    {
+      "id": "conversation-schema-migration",
+      "title": "Conversation Schema 与迁移",
+      "status": "done",
+      "body": "校验状态、动作、请求关联并兼容旧对话。",
+      "tone": "neutral",
+      "goalId": "conversation-runtime-v2"
+    },
+    {
+      "id": "conversation-reference-system",
+      "title": "真实引用系统",
+      "status": "done",
+      "body": "按本轮真实来源生成、分类和去重引用。",
+      "tone": "neutral",
+      "goalId": "conversation-runtime-v2"
+    },
+    {
+      "id": "conversation-error-model",
+      "title": "统一错误模型",
+      "status": "done",
+      "body": "统一错误类型、文案、诊断和恢复动作。",
+      "tone": "neutral",
+      "goalId": "conversation-runtime-v2"
+    },
+    {
+      "id": "conversation-ui-states",
+      "title": "统一对话 UI 状态",
+      "status": "done",
+      "body": "统一处理中、确认、执行、完成、失败和取消状态。",
+      "tone": "neutral",
+      "goalId": "conversation-runtime-v2"
+    },
+    {
+      "id": "conversation-cross-runtime-e2e",
+      "title": "跨运行面端到端测试",
+      "status": "done",
+      "body": "覆盖 Preview 与 Tauri 的关键对话流程。",
+      "tone": "neutral",
+      "goalId": "conversation-runtime-v2"
+    },
+    {
+      "id": "conversation-final-cleanup",
+      "title": "遗留清理与最终验收",
+      "status": "done",
+      "body": "删除旧分支并完成全量检查和桌面验收。",
+      "tone": "neutral",
+      "goalId": "conversation-runtime-v2"
+    },
     {
       "id": "codex-dialogue-agent-event-schema",
       "title": "定义 AgentEvent 数据结构",
       "status": "done",
       "body": "把 Codex 式对话能力拆成可记录事件，覆盖 thinking、read-file、search、edit、command、check、result 和 error，先用于前端时间线和现有动作接入。",
       "tone": "accent",
-      "goalId": "打磨对话体验-1783435178902",
-      "updatedAt": "2026-07-10T05:50:00.000Z",
-      "completedAt": "2026-07-10T05:50:00.000Z"
+      "goalId": "goal-2026-07-16T03-37-16Z",
+      "updatedAt": "2026-07-16T13:24:02.102Z",
+      "completedAt": "2026-07-10T05:50:00.000Z",
+      "goalTitle": "打磨对话体验"
     },
     {
       "id": "codex-dialogue-event-timeline",
@@ -18,9 +290,10 @@
       "status": "done",
       "body": "assistant 消息下方显示可折叠时间线，呈现正在理解、读取上下文、生成计划、运行检查和完成/失败等状态。",
       "tone": "accent",
-      "goalId": "打磨对话体验-1783435178902",
-      "updatedAt": "2026-07-10T05:50:00.000Z",
-      "completedAt": "2026-07-10T05:50:00.000Z"
+      "goalId": "goal-2026-07-16T03-37-16Z",
+      "updatedAt": "2026-07-16T13:24:02.102Z",
+      "completedAt": "2026-07-10T05:50:00.000Z",
+      "goalTitle": "打磨对话体验"
     },
     {
       "id": "codex-dialogue-connect-actions",
@@ -28,9 +301,10 @@
       "status": "done",
       "body": "把 generate plan、apply patch、run check、merge handoff 等现有动作转成真实 timeline event，而不是只显示最终结果。",
       "tone": "accent",
-      "goalId": "打磨对话体验-1783435178902",
-      "updatedAt": "2026-07-10T05:50:00.000Z",
-      "completedAt": "2026-07-10T05:50:00.000Z"
+      "goalId": "goal-2026-07-16T03-37-16Z",
+      "updatedAt": "2026-07-16T13:24:02.102Z",
+      "completedAt": "2026-07-10T05:50:00.000Z",
+      "goalTitle": "打磨对话体验"
     },
     {
       "id": "dialogue-context-state",
@@ -38,9 +312,10 @@
       "status": "done",
       "body": "保存当前话题、上一轮结论、待回答问题、用户委托和下一预期动作，让‘那怎么办’‘你自己判断’等追问继承上下文。",
       "tone": "accent",
-      "goalId": "打磨对话体验-1783435178902",
-      "updatedAt": "2026-07-11T09:21:09.000Z",
-      "completedAt": "2026-07-11T09:21:09.000Z"
+      "goalId": "goal-2026-07-16T03-37-16Z",
+      "updatedAt": "2026-07-16T13:24:02.102Z",
+      "completedAt": "2026-07-11T09:21:09.000Z",
+      "goalTitle": "打磨对话体验"
     },
     {
       "id": "dialogue-context-assembler",
@@ -48,9 +323,10 @@
       "status": "done",
       "body": "按当前问题选取项目阶段、目标、任务、Git 变更、检查结果、已知问题和最近对话摘要，避免只把当前一句发给模型。",
       "tone": "accent",
-      "goalId": "打磨对话体验-1783435178902",
-      "updatedAt": "2026-07-11T09:21:09.000Z",
-      "completedAt": "2026-07-11T09:21:09.000Z"
+      "goalId": "goal-2026-07-16T03-37-16Z",
+      "updatedAt": "2026-07-16T13:24:02.102Z",
+      "completedAt": "2026-07-11T09:21:09.000Z",
+      "goalTitle": "打磨对话体验"
     },
     {
       "id": "dialogue-grounded-answer-contract",
@@ -58,9 +334,10 @@
       "status": "done",
       "body": "项目问题固定产出判断、证据、建议动作和是否创建任务；无证据时明确标记为推断，普通回答不展示无意义步骤数。",
       "tone": "accent",
-      "goalId": "打磨对话体验-1783435178902",
-      "updatedAt": "2026-07-11T09:21:09.000Z",
-      "completedAt": "2026-07-11T09:21:09.000Z"
+      "goalId": "goal-2026-07-16T03-37-16Z",
+      "updatedAt": "2026-07-16T13:24:02.102Z",
+      "completedAt": "2026-07-11T09:21:09.000Z",
+      "goalTitle": "打磨对话体验"
     },
     {
       "id": "dialogue-reference-action-loop",
@@ -68,9 +345,10 @@
       "status": "done",
       "body": "回答中的文件、任务、检查和终端证据可点击打开；用户说‘直接修’时沿用上一轮选择进入任务确认。",
       "tone": "accent",
-      "goalId": "打磨对话体验-1783435178902",
-      "updatedAt": "2026-07-11T09:21:09.000Z",
-      "completedAt": "2026-07-11T09:21:09.000Z"
+      "goalId": "goal-2026-07-16T03-37-16Z",
+      "updatedAt": "2026-07-16T13:24:02.102Z",
+      "completedAt": "2026-07-11T09:21:09.000Z",
+      "goalTitle": "打磨对话体验"
     },
     {
       "id": "dialogue-multiturn-evaluation",
@@ -78,9 +356,10 @@
       "status": "done",
       "body": "固定验证‘风险是什么 -> 那怎么办 -> 你判断 -> 直接修’，检查上下文继承、证据真实性、错误追问和任务衔接。",
       "tone": "accent",
-      "goalId": "打磨对话体验-1783435178902",
-      "updatedAt": "2026-07-11T09:21:09.000Z",
-      "completedAt": "2026-07-11T09:21:09.000Z"
+      "goalId": "goal-2026-07-16T03-37-16Z",
+      "updatedAt": "2026-07-16T13:24:02.102Z",
+      "completedAt": "2026-07-11T09:21:09.000Z",
+      "goalTitle": "打磨对话体验"
     },
     {
       "id": "codex-dialogue-message-reference",
@@ -88,9 +367,10 @@
       "status": "done",
       "body": "支持在对话里引用文件、命令、任务和检查结果，为后续点击跳转和上下文追问做准备。",
       "tone": "accent",
-      "goalId": "打磨对话体验-1783435178902",
-      "updatedAt": "2026-07-11T09:21:09.000Z",
-      "completedAt": "2026-07-11T09:21:09.000Z"
+      "goalId": "goal-2026-07-16T03-37-16Z",
+      "updatedAt": "2026-07-16T13:24:02.102Z",
+      "completedAt": "2026-07-11T09:21:09.000Z",
+      "goalTitle": "打磨对话体验"
     },
     {
       "id": "codex-dialogue-clickable-references",
@@ -98,9 +378,10 @@
       "status": "done",
       "body": "点击文件引用打开工程文件预览，点击检查引用打开执行结果或终端记录。",
       "tone": "accent",
-      "goalId": "打磨对话体验-1783435178902",
-      "updatedAt": "2026-07-11T09:21:09.000Z",
-      "completedAt": "2026-07-11T09:21:09.000Z"
+      "goalId": "goal-2026-07-16T03-37-16Z",
+      "updatedAt": "2026-07-16T13:24:02.102Z",
+      "completedAt": "2026-07-11T09:21:09.000Z",
+      "goalTitle": "打磨对话体验"
     },
     {
       "id": "codex-dialogue-turn-summary",
@@ -108,8 +389,9 @@
       "status": "planned",
       "body": "保存本轮读了什么、改了什么、跑了什么、结果如何，让用户问“刚才做了啥”时能基于本轮上下文回答。",
       "tone": "neutral",
-      "goalId": "打磨对话体验-1783435178902",
-      "updatedAt": "2026-07-10T05:45:00.000Z"
+      "goalId": "goal-2026-07-16T03-37-16Z",
+      "updatedAt": "2026-07-16T13:24:02.102Z",
+      "goalTitle": "打磨对话体验"
     },
     {
       "id": "codex-dialogue-task-state-machine",
@@ -117,8 +399,9 @@
       "status": "planned",
       "body": "建立 idle、planning、waiting-confirmation、editing、checking、paused、failed、done 等状态，支持对话和任务执行一致展示。",
       "tone": "neutral",
-      "goalId": "打磨对话体验-1783435178902",
-      "updatedAt": "2026-07-10T05:45:00.000Z"
+      "goalId": "goal-2026-07-16T03-37-16Z",
+      "updatedAt": "2026-07-16T13:24:02.102Z",
+      "goalTitle": "打磨对话体验"
     },
     {
       "id": "codex-dialogue-stop-continue",
@@ -126,8 +409,9 @@
       "status": "planned",
       "body": "用户停止后对话里显示停在哪一步；用户说继续时能从上次任务恢复，而不是重新开始。",
       "tone": "neutral",
-      "goalId": "打磨对话体验-1783435178902",
-      "updatedAt": "2026-07-10T05:45:00.000Z"
+      "goalId": "goal-2026-07-16T03-37-16Z",
+      "updatedAt": "2026-07-16T13:24:02.102Z",
+      "goalTitle": "打磨对话体验"
     },
     {
       "id": "codex-dialogue-midflight-redirect",
@@ -135,8 +419,9 @@
       "status": "planned",
       "body": "执行中用户说先解释、换个方案或别改了时，任务暂停并切回问答或重新生成计划。",
       "tone": "neutral",
-      "goalId": "打磨对话体验-1783435178902",
-      "updatedAt": "2026-07-10T05:45:00.000Z"
+      "goalId": "goal-2026-07-16T03-37-16Z",
+      "updatedAt": "2026-07-16T13:24:02.102Z",
+      "goalTitle": "打磨对话体验"
     },
     {
       "id": "workspace-project-context",

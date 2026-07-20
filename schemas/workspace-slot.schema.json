@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-os.local/schemas/workspace-slot.schema.json",
+  "title": "Workspace Slot",
+  "type": "object",
+  "required": ["id", "surface", "region", "order", "selector", "component", "renderWhen", "dependencies"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)+$" },
+    "surface": { "type": "string", "minLength": 1 },
+    "region": { "type": "string", "enum": ["header", "body", "footer", "actions"] },
+    "order": { "type": "integer", "minimum": 0 },
+    "selector": { "type": "string", "minLength": 1 },
+    "component": { "type": "string", "minLength": 1 },
+    "renderWhen": { "type": "string", "enum": ["always", "has-data", "enabled"] },
+    "dependencies": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+    "actions": { "type": "array", "items": { "type": "string" } },
+    "capability": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "moduleId": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

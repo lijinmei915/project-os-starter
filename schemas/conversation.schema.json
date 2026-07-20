@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-os.local/schemas/conversation.schema.json",
+  "title": "Project OS Conversation",
+  "type": "object",
+  "required": ["schemaVersion", "id", "runtimeState", "summary", "turns"],
+  "properties": {
+    "schemaVersion": { "const": "project-os.conversation.v0.3" },
+    "id": { "type": "string", "minLength": 1 },
+    "runtimeState": { "enum": ["idle", "thinking", "awaiting-confirmation", "executing", "completed", "failed", "cancelled"] },
+    "summary": {
+      "type": "object",
+      "required": ["version", "coveredTurnCount", "currentTopic", "conclusions", "constraints", "decisions", "executionResults", "unresolvedQuestions"],
+      "properties": {
+        "version": { "const": "project-os.turn-summary.v0.1" },
+        "coveredTurnCount": { "type": "integer", "minimum": 0 },
+        "coveredThroughTurnId": { "type": "string" },
+        "currentTopic": { "type": "string" },
+        "conclusions": { "type": "array", "items": { "type": "string" }, "maxItems": 4 },
+        "constraints": { "type": "array", "items": { "type": "string" }, "maxItems": 5 },
+        "decisions": { "type": "array", "maxItems": 5 },
+        "executionResults": { "type": "array", "maxItems": 5 },
+        "unresolvedQuestions": { "type": "array", "items": { "type": "string" }, "maxItems": 3 },
+        "pendingAction": { "type": ["object", "null"] },
+        "userDelegation": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "turns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "role", "text"],
+        "properties": {
+          "conversationEvents": {
+            "type": "array",
+            "items": { "$ref": "conversation-event.schema.json" }
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

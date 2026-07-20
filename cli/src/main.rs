@@ -1,8 +1,14 @@
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitCode, Stdio};
+use std::process::{Command, ExitCode};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+#[path = "../../desktop/src-tauri/src/runtime/governance.rs"]
+mod governance;
+#[allow(dead_code)]
+#[path = "../../desktop/src-tauri/src/runtime/repository.rs"]
+mod repository;
 
 #[derive(Debug, Clone, Copy)]
 enum ProjectCommand {
@@ -158,7 +164,8 @@ fn run() -> Result<u8, String> {
     let _lock = if should_lock(&args) {
         Some(ProjectLock::acquire(
             &target,
-            args.stale_lock_seconds_override.unwrap_or(args.config.stale_lock_seconds),
+            args.stale_lock_seconds_override
+                .unwrap_or(args.config.stale_lock_seconds),
         )?)
     } else {
         None
@@ -177,8 +184,14 @@ fn run() -> Result<u8, String> {
         return Ok(0);
     }
 
-    let status = run_legacy_command(&args, &target)?;
-    emit_result(&args, &target, context_path.as_deref(), status, Some(legacy_output_paths(args.command)));
+    let status = run_governance_action(&args, &target)?;
+    emit_result(
+        &args,
+        &target,
+        context_path.as_deref(),
+        status,
+        Some(legacy_output_paths(args.command)),
+    );
     Ok(status)
 }
 
@@ -225,24 +238,29 @@ fn parse_args() -> Result<CliArgs, String> {
                 let value = raw
                     .get(index + 1)
                     .ok_or_else(|| "--output requires file, json, both, or report".to_string())?;
-                output = Some(OutputMode::parse(value)
-                    .ok_or_else(|| "--output requires file, json, both, or report".to_string())?);
+                output =
+                    Some(OutputMode::parse(value).ok_or_else(|| {
+                        "--output requires file, json, both, or report".to_string()
+                    })?);
                 index += 2;
             }
             "--persist" => {
                 let value = raw
                     .get(index + 1)
                     .ok_or_else(|| "--persist requires auto, none, or full".to_string())?;
-                persist = Some(PersistMode::parse(value)
-                    .ok_or_else(|| "--persist requires auto, none, or full".to_string())?);
+                persist = Some(
+                    PersistMode::parse(value)
+                        .ok_or_else(|| "--persist requires auto, none, or full".to_string())?,
+                );
                 index += 2;
             }
             "--stale-lock-seconds" => {
-                let value = raw
-                    .get(index + 1)
-                    .ok_or_else(|| "--stale-lock-seconds requires a non-negative integer".to_string())?;
-                stale_lock_seconds_override = Some(value.parse::<u64>()
-                    .map_err(|_| "--stale-lock-seconds requires a non-negative integer".to_string())?);
+                let value = raw.get(index + 1).ok_or_else(|| {
+                    "--stale-lock-seconds requires a non-negative integer".to_string()
+                })?;
+                stale_lock_seconds_override = Some(value.parse::<u64>().map_err(|_| {
+                    "--stale-lock-seconds requires a non-negative integer".to_string()
+                })?);
                 index += 2;
             }
             "--" => {
@@ -317,7 +335,10 @@ fn try_run_config_command() -> Result<Option<u8>, String> {
         return Ok(None);
     }
     if raw.get(1).map(|value| value.as_str()) != Some("init") {
-        return Err("unknown config command. Use `project-os config init [--global] [--path path]`.".to_string());
+        return Err(
+            "unknown config command. Use `project-os config init [--global] [--path path]`."
+                .to_string(),
+        );
     }
 
     let mut global = false;
@@ -355,10 +376,13 @@ fn try_run_config_command() -> Result<Option<u8>, String> {
     }
     if config_path.exists() {
         validate_config_file(&config_path)?;
-        println!("Project OS config already exists: {}", config_path.display());
+        println!(
+            "Project OS config already exists: {}",
+            config_path.display()
+        );
         return Ok(Some(0));
     }
-    fs::write(&config_path, default_config_json())
+    repository::write_atomic(&config_path, default_config_json().as_bytes())
         .map_err(|err| format!("cannot write {}: {err}", config_path.display()))?;
     validate_config_file(&config_path)?;
     println!("Project OS config created: {}", config_path.display());
@@ -400,10 +424,14 @@ fn try_run_state_command() -> Result<Option<u8>, String> {
                 index += 2;
             }
             "-h" | "--help" => {
-                println!("Usage:\n  project-os state sync [target] [--set key=value] [--output json]");
+                println!(
+                    "Usage:\n  project-os state sync [target] [--set key=value] [--output json]"
+                );
                 return Ok(Some(0));
             }
-            value if value.starts_with('-') => return Err(format!("unknown state sync option: {value}")),
+            value if value.starts_with('-') => {
+                return Err(format!("unknown state sync option: {value}"))
+            }
             value if !target_set => {
                 target = PathBuf::from(value);
                 target_set = true;
@@ -421,17 +449,25 @@ fn try_run_state_command() -> Result<Option<u8>, String> {
         None
     };
     let state_path = target.join(".project-os").join("state.json");
-    let mut state = read_state_json(&state_path)?;
+    let mut state = read_state_json(&target)?;
     for (key, value) in sets {
         apply_state_set(&mut state, &key, &value)?;
     }
     validate_state_value(&state_path, &state)?;
-    let state_text = format!("{}\n", serde_json::to_string_pretty(&state).map_err(|err| {
-        format!("cannot serialize state {}: {err}", state_path.display())
-    })?);
-    fs::write(&state_path, state_text)
-        .map_err(|err| format!("cannot write {}: {err}", state_path.display()))?;
-    let bundle_path = write_state_bundle(&target, &state)?;
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|err| format!("system clock error: {err}"))?;
+    let bundle_id = format!("{}-{}-state", now.as_secs(), std::process::id());
+    let bundle_relative = format!(".project-os/state-bundles/{bundle_id}.json");
+    let bundle = state_bundle_value(&bundle_id, now.as_secs(), &state)?;
+    repository::Repository::new(&target).transaction(
+        "sync-cli-state",
+        &[
+            repository::JsonMutation::upsert(".project-os/state.json", state),
+            repository::JsonMutation::upsert(&bundle_relative, bundle),
+        ],
+    )?;
+    let bundle_path = target.join(&bundle_relative);
 
     if output == OutputMode::Json {
         println!(
@@ -446,24 +482,30 @@ fn try_run_state_command() -> Result<Option<u8>, String> {
     Ok(Some(0))
 }
 
-fn read_state_json(path: &Path) -> Result<serde_json::Value, String> {
-    let text = fs::read_to_string(path)
-        .map_err(|err| format!("cannot read Project OS state {}: {err}", path.display()))?;
-    let value = serde_json::from_str::<serde_json::Value>(&text)
-        .map_err(|err| format!("invalid Project OS state JSON {}: {err}", path.display()))?;
-    validate_state_value(path, &value)?;
+fn read_state_json(target: &Path) -> Result<serde_json::Value, String> {
+    let path = target.join(".project-os").join("state.json");
+    let value = repository::Repository::new(target)
+        .read_json(".project-os/state.json")
+        .ok_or_else(|| format!("cannot read Project OS state {}", path.display()))?;
+    validate_state_value(&path, &value)?;
     Ok(value)
 }
 
 fn validate_state_value(path: &Path, value: &serde_json::Value) -> Result<(), String> {
-    let object = value
-        .as_object()
-        .ok_or_else(|| format!("invalid Project OS state {}: root must be object", path.display()))?;
+    let object = value.as_object().ok_or_else(|| {
+        format!(
+            "invalid Project OS state {}: root must be object",
+            path.display()
+        )
+    })?;
     let phase = object
         .get("phase")
         .and_then(|value| value.as_str())
         .ok_or_else(|| format!("invalid Project OS state {}: missing phase", path.display()))?;
-    if !matches!(phase, "init" | "stabilizing" | "shipping" | "maintenance" | "archived") {
+    if !matches!(
+        phase,
+        "init" | "stabilizing" | "shipping" | "maintenance" | "archived"
+    ) {
         return Err(format!(
             "invalid Project OS state {}: phase must be init, stabilizing, shipping, maintenance, or archived",
             path.display()
@@ -471,19 +513,25 @@ fn validate_state_value(path: &Path, value: &serde_json::Value) -> Result<(), St
     }
     for key in ["name", "description", "stage"] {
         if object.get(key).is_some_and(|value| !value.is_string()) {
-            return Err(format!("invalid Project OS state {}: {key} must be string", path.display()));
+            return Err(format!(
+                "invalid Project OS state {}: {key} must be string",
+                path.display()
+            ));
         }
     }
     for key in ["done", "doing", "blocked", "next"] {
-        if let Some(items) = object
-            .get("status")
-            .and_then(|status| status.get(key))
-        {
+        if let Some(items) = object.get("status").and_then(|status| status.get(key)) {
             let Some(items) = items.as_array() else {
-                return Err(format!("invalid Project OS state {}: status.{key} must be array", path.display()));
+                return Err(format!(
+                    "invalid Project OS state {}: status.{key} must be array",
+                    path.display()
+                ));
             };
             if items.iter().any(|item| !item.is_string()) {
-                return Err(format!("invalid Project OS state {}: status.{key} must contain strings", path.display()));
+                return Err(format!(
+                    "invalid Project OS state {}: status.{key} must contain strings",
+                    path.display()
+                ));
             }
         }
     }
@@ -496,38 +544,42 @@ fn apply_state_set(state: &mut serde_json::Value, key: &str, value: &str) -> Res
     };
     match key {
         "name" | "description" | "stage" => {
-            object.insert(key.to_string(), serde_json::Value::String(value.to_string()));
+            object.insert(
+                key.to_string(),
+                serde_json::Value::String(value.to_string()),
+            );
         }
         "phase" => {
-            if !matches!(value, "init" | "stabilizing" | "shipping" | "maintenance" | "archived") {
-                return Err("phase must be init, stabilizing, shipping, maintenance, or archived".to_string());
+            if !matches!(
+                value,
+                "init" | "stabilizing" | "shipping" | "maintenance" | "archived"
+            ) {
+                return Err(
+                    "phase must be init, stabilizing, shipping, maintenance, or archived"
+                        .to_string(),
+                );
             }
-            object.insert(key.to_string(), serde_json::Value::String(value.to_string()));
+            object.insert(
+                key.to_string(),
+                serde_json::Value::String(value.to_string()),
+            );
         }
         _ => return Err(format!("unsupported state field for --set: {key}")),
     }
     Ok(())
 }
 
-fn write_state_bundle(target: &Path, state: &serde_json::Value) -> Result<PathBuf, String> {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|err| format!("system clock error: {err}"))?;
-    let bundle_id = format!("{}-{}-state", now.as_secs(), std::process::id());
-    let bundle_dir = target.join(".project-os").join("state-bundles");
-    fs::create_dir_all(&bundle_dir)
-        .map_err(|err| format!("cannot create {}: {err}", bundle_dir.display()))?;
-    let bundle_path = bundle_dir.join(format!("{bundle_id}.json"));
-    let state_json = serde_json::to_string(state).map_err(|err| format!("cannot serialize state: {err}"))?;
-    let content = format!(
-        "{{\n  \"schemaVersion\": \"project-os.state-bundle.v0.1\",\n  \"bundleId\": \"{}\",\n  \"createdAt\": \"{}\",\n  \"state\": {}\n}}\n",
-        json_escape(&bundle_id),
-        iso_like_utc(now.as_secs()),
-        state_json
-    );
-    fs::write(&bundle_path, content)
-        .map_err(|err| format!("cannot write {}: {err}", bundle_path.display()))?;
-    Ok(bundle_path)
+fn state_bundle_value(
+    bundle_id: &str,
+    timestamp_seconds: u64,
+    state: &serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    Ok(serde_json::json!({
+        "schemaVersion": "project-os.state-bundle.v0.1",
+        "bundleId": bundle_id,
+        "createdAt": iso_like_utc(timestamp_seconds),
+        "state": state,
+    }))
 }
 
 fn default_global_config_path() -> Result<PathBuf, String> {
@@ -538,7 +590,9 @@ fn default_global_config_path() -> Result<PathBuf, String> {
                 .map(PathBuf::from)
                 .map(|home| home.join(".project-os").join("config.json"))
         })
-        .ok_or_else(|| "cannot resolve global config path: set HOME or PROJECT_OS_GLOBAL_CONFIG".to_string())
+        .ok_or_else(|| {
+            "cannot resolve global config path: set HOME or PROJECT_OS_GLOBAL_CONFIG".to_string()
+        })
 }
 
 fn default_config_json() -> &'static str {
@@ -563,16 +617,36 @@ fn load_config(target: &Path) -> Result<ProjectOsConfig, String> {
             .ok()
             .and_then(|value| value.parse::<u64>().ok())
             .unwrap_or(900),
-        default_persist_source: if env::var_os("PROJECT_OS_PERSIST").is_some() { "environment".to_string() } else { "default".to_string() },
-        default_output_source: if env::var_os("PROJECT_OS_OUTPUT").is_some() { "environment".to_string() } else { "default".to_string() },
-        lock_writes_source: if env::var_os("PROJECT_OS_LOCK_WRITES").is_some() { "environment".to_string() } else { "default".to_string() },
-        stale_lock_seconds_source: if env::var_os("PROJECT_OS_STALE_LOCK_SECONDS").is_some() { "environment".to_string() } else { "default".to_string() },
+        default_persist_source: if env::var_os("PROJECT_OS_PERSIST").is_some() {
+            "environment".to_string()
+        } else {
+            "default".to_string()
+        },
+        default_output_source: if env::var_os("PROJECT_OS_OUTPUT").is_some() {
+            "environment".to_string()
+        } else {
+            "default".to_string()
+        },
+        lock_writes_source: if env::var_os("PROJECT_OS_LOCK_WRITES").is_some() {
+            "environment".to_string()
+        } else {
+            "default".to_string()
+        },
+        stale_lock_seconds_source: if env::var_os("PROJECT_OS_STALE_LOCK_SECONDS").is_some() {
+            "environment".to_string()
+        } else {
+            "default".to_string()
+        },
     };
 
     if let Some(path) = global_config_path() {
         apply_config_file(&mut config, &path, "global-config")?;
     }
-    apply_config_file(&mut config, &target.join(".project-os").join("config.json"), "project-config")?;
+    apply_config_file(
+        &mut config,
+        &target.join(".project-os").join("config.json"),
+        "project-config",
+    )?;
 
     Ok(config)
 }
@@ -586,7 +660,11 @@ fn global_config_path() -> Option<PathBuf> {
         .map(|home| home.join(".project-os").join("config.json"))
 }
 
-fn apply_config_file(config: &mut ProjectOsConfig, path: &Path, source: &str) -> Result<(), String> {
+fn apply_config_file(
+    config: &mut ProjectOsConfig,
+    path: &Path,
+    source: &str,
+) -> Result<(), String> {
     let Ok(text) = fs::read_to_string(path) else {
         return Ok(());
     };
@@ -611,7 +689,9 @@ fn apply_config_file(config: &mut ProjectOsConfig, path: &Path, source: &str) ->
             config.lock_writes = lock_writes;
             config.lock_writes_source = source.to_string();
         }
-        if let Some(stale_lock_seconds) = cli.get("staleLockSeconds").and_then(|value| value.as_u64()) {
+        if let Some(stale_lock_seconds) =
+            cli.get("staleLockSeconds").and_then(|value| value.as_u64())
+        {
             config.stale_lock_seconds = stale_lock_seconds;
             config.stale_lock_seconds_source = source.to_string();
         }
@@ -628,12 +708,13 @@ fn validate_config_file(path: &Path) -> Result<(), String> {
 }
 
 fn validate_config_value(path: &Path, value: &serde_json::Value) -> Result<(), String> {
-    let object = value
-        .as_object()
-        .ok_or_else(|| format!("invalid Project OS config {}: root must be object", path.display()))?;
-    if object
-        .get("schemaVersion")
-        .and_then(|value| value.as_str())
+    let object = value.as_object().ok_or_else(|| {
+        format!(
+            "invalid Project OS config {}: root must be object",
+            path.display()
+        )
+    })?;
+    if object.get("schemaVersion").and_then(|value| value.as_str())
         != Some("project-os.config.v0.1")
     {
         return Err(format!(
@@ -642,12 +723,18 @@ fn validate_config_value(path: &Path, value: &serde_json::Value) -> Result<(), S
         ));
     }
     if let Some(cli) = object.get("cli") {
-        let cli = cli
-            .as_object()
-            .ok_or_else(|| format!("invalid Project OS config {}: cli must be object", path.display()))?;
+        let cli = cli.as_object().ok_or_else(|| {
+            format!(
+                "invalid Project OS config {}: cli must be object",
+                path.display()
+            )
+        })?;
         if let Some(value) = cli.get("defaultPersist").and_then(|value| value.as_str()) {
             if PersistMode::parse(value).is_none() {
-                return Err(format!("invalid Project OS config {}: cli.defaultPersist must be auto, none, or full", path.display()));
+                return Err(format!(
+                    "invalid Project OS config {}: cli.defaultPersist must be auto, none, or full",
+                    path.display()
+                ));
             }
         }
         if let Some(value) = cli.get("defaultOutput").and_then(|value| value.as_str()) {
@@ -655,11 +742,23 @@ fn validate_config_value(path: &Path, value: &serde_json::Value) -> Result<(), S
                 return Err(format!("invalid Project OS config {}: cli.defaultOutput must be file, json, both, or report", path.display()));
             }
         }
-        if cli.get("lockWrites").is_some_and(|value| !value.is_boolean()) {
-            return Err(format!("invalid Project OS config {}: cli.lockWrites must be boolean", path.display()));
+        if cli
+            .get("lockWrites")
+            .is_some_and(|value| !value.is_boolean())
+        {
+            return Err(format!(
+                "invalid Project OS config {}: cli.lockWrites must be boolean",
+                path.display()
+            ));
         }
-        if cli.get("staleLockSeconds").is_some_and(|value| !value.is_u64()) {
-            return Err(format!("invalid Project OS config {}: cli.staleLockSeconds must be a non-negative integer", path.display()));
+        if cli
+            .get("staleLockSeconds")
+            .is_some_and(|value| !value.is_u64())
+        {
+            return Err(format!(
+                "invalid Project OS config {}: cli.staleLockSeconds must be a non-negative integer",
+                path.display()
+            ));
         }
     }
     Ok(())
@@ -689,7 +788,12 @@ fn build_entry_context(
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(|err| format!("system clock error: {err}"))?;
-    let request_id = format!("{}-{}-{}", now.as_secs(), std::process::id(), command.as_str());
+    let request_id = format!(
+        "{}-{}-{}",
+        now.as_secs(),
+        std::process::id(),
+        command.as_str()
+    );
     let created_at = iso_like_utc(now.as_secs());
     let user = env::var("USER")
         .or_else(|_| env::var("USERNAME"))
@@ -730,10 +834,8 @@ fn build_entry_context(
 
 fn write_entry_context(context: &EntryContext, target: &Path) -> Result<PathBuf, String> {
     let context_dir = target.join(".project-os").join("entry-contexts");
-    fs::create_dir_all(&context_dir)
-        .map_err(|err| format!("cannot create {}: {err}", context_dir.display()))?;
     let context_path = context_dir.join(format!("{}.json", context.request_id));
-    fs::write(&context_path, &context.content)
+    repository::write_atomic(&context_path, context.content.as_bytes())
         .map_err(|err| format!("cannot write {}: {err}", context_path.display()))?;
     Ok(context_path)
 }
@@ -742,7 +844,10 @@ fn should_persist_context(args: &CliArgs) -> bool {
     match args.persist {
         PersistMode::Full => true,
         PersistMode::None => false,
-        PersistMode::Auto => !matches!(args.trigger_source.as_str(), "ci" | "gateway" | "api" | "automation"),
+        PersistMode::Auto => !matches!(
+            args.trigger_source.as_str(),
+            "ci" | "gateway" | "api" | "automation"
+        ),
     }
 }
 
@@ -817,7 +922,9 @@ fn validate_entry_context(context: &EntryContext) -> Result<(), String> {
         return Err("Entry Context validation failed: request.id is empty".to_string());
     }
     if !context.created_at.contains('T') || !context.created_at.ends_with('Z') {
-        return Err("Entry Context validation failed: request.createdAt is not UTC date-time".to_string());
+        return Err(
+            "Entry Context validation failed: request.createdAt is not UTC date-time".to_string(),
+        );
     }
     if context.project_path.is_empty() {
         return Err("Entry Context validation failed: project.path is empty".to_string());
@@ -826,7 +933,10 @@ fn validate_entry_context(context: &EntryContext) -> Result<(), String> {
         context.intent,
         "scan" | "check" | "recommend" | "report" | "plan" | "draft" | "apply" | "validate"
     ) {
-        return Err(format!("Entry Context validation failed: invalid intent {}", context.intent));
+        return Err(format!(
+            "Entry Context validation failed: invalid intent {}",
+            context.intent
+        ));
     }
     if !matches!(
         context.trigger_source.as_str(),
@@ -870,7 +980,10 @@ fn emit_result(
         .map(|path| format!("\"{}\"", json_escape(&path.display().to_string())))
         .unwrap_or_else(|| "null".to_string());
     let embedded = if args.output == OutputMode::Report {
-        format!(",\n  \"embedded\": {}", embedded_outputs(target, &output_paths))
+        format!(
+            ",\n  \"embedded\": {}",
+            embedded_outputs(target, &output_paths)
+        )
     } else {
         String::new()
     };
@@ -931,7 +1044,10 @@ fn legacy_output_paths(command: ProjectCommand) -> Vec<(&'static str, &'static s
     match command {
         ProjectCommand::Scan | ProjectCommand::Run => vec![
             ("reports", ".project-os/reports/"),
-            ("recommendations", ".project-os/recommendations/recommend-next.json"),
+            (
+                "recommendations",
+                ".project-os/recommendations/recommend-next.json",
+            ),
             ("runs", ".project-os/runs/"),
         ],
         ProjectCommand::Report | ProjectCommand::Check => vec![
@@ -946,41 +1062,21 @@ fn legacy_output_paths(command: ProjectCommand) -> Vec<(&'static str, &'static s
     }
 }
 
-fn run_legacy_command(args: &CliArgs, target: &Path) -> Result<u8, String> {
+fn run_governance_action(args: &CliArgs, target: &Path) -> Result<u8, String> {
     let runtime_root = canonical_dir(&args.runtime_root)?;
-    let script = match args.command {
-        ProjectCommand::Scan | ProjectCommand::Run => "scripts/project-runner.sh",
-        ProjectCommand::Check | ProjectCommand::Report => "scripts/check-ai-project.sh",
-        ProjectCommand::Recommend => "scripts/recommend-next.sh",
+    let action_id = match args.command {
+        ProjectCommand::Scan => "scan",
+        ProjectCommand::Run => "run",
+        ProjectCommand::Check => "check",
+        ProjectCommand::Report => "report",
+        ProjectCommand::Recommend => "recommend",
         ProjectCommand::Context => return Ok(0),
     };
-    let script_path = runtime_root.join(script);
-    if !script_path.is_file() {
-        return Err(format!("legacy script not found: {}", script_path.display()));
+    let result = governance::execute(target, &runtime_root, action_id, &args.passthrough)?;
+    if args.output == OutputMode::File && !result.output.is_empty() {
+        println!("{}", result.output);
     }
-
-    let mut command = Command::new("bash");
-    command.arg(&script_path);
-    command.arg(target);
-
-    match args.command {
-        ProjectCommand::Scan | ProjectCommand::Run => {
-            command.arg("--source").arg("local");
-        }
-        ProjectCommand::Report => {
-            command.arg("--write-report");
-        }
-        _ => {}
-    }
-
-    command.args(&args.passthrough);
-    if args.output != OutputMode::File {
-        command.stdout(Stdio::null());
-    }
-    let status = command
-        .status()
-        .map_err(|err| format!("failed to run legacy script {script}: {err}"))?;
-    Ok(status.code().unwrap_or(1) as u8)
+    Ok(result.code.unwrap_or(1) as u8)
 }
 
 fn git_output(target: &Path, args: &[&str]) -> Option<String> {

@@ -1,0 +1,53 @@
+name: Agent Eval
+
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real-agent-eval:
+    name: Protected real Agent Eval
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: agent-eval
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci --prefix desktop
+      - name: Install Hermes CLI
+        run: |
+          python3 -m pip install --user hermes-agent
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Run the 12-case real evaluation
+        env:
+          OMNIDESK_AGENT_EVAL_KEY: ${{ secrets.OMNIDESK_AGENT_EVAL_KEY }}
+          OMNIDESK_AGENT_EVAL_API_BASE: ${{ vars.OMNIDESK_AGENT_EVAL_API_BASE }}
+          OMNIDESK_AGENT_EVAL_MODEL: ${{ vars.OMNIDESK_AGENT_EVAL_MODEL }}
+        run: |
+          test -n "$OMNIDESK_AGENT_EVAL_KEY"
+          test -n "$OMNIDESK_AGENT_EVAL_API_BASE"
+          test -n "$OMNIDESK_AGENT_EVAL_MODEL"
+          mkdir -p .project-os
+          node -e 'const fs=require("fs"); const p={schemaVersion:"project-os.desktop-provider.v0.1",provider:"openai-compatible",model:process.env.OMNIDESK_AGENT_EVAL_MODEL,apiBase:process.env.OMNIDESK_AGENT_EVAL_API_BASE,apiKeyEnv:"OMNIDESK_AGENT_EVAL_KEY",enabled:true,activeProfileId:"agent-eval",profiles:[{id:"agent-eval",name:"Protected Agent Eval",note:"",website:"",provider:"openai-compatible",model:process.env.OMNIDESK_AGENT_EVAL_MODEL,apiBase:process.env.OMNIDESK_AGENT_EVAL_API_BASE,apiKeyEnv:"OMNIDESK_AGENT_EVAL_KEY"}]}; fs.writeFileSync(".project-os/desktop-provider.json", JSON.stringify(p));'
+          mkdir -p "$HOME/.hermes"
+          node -e 'const fs=require("fs"); const base=JSON.stringify(process.env.OMNIDESK_AGENT_EVAL_API_BASE); const model=JSON.stringify(process.env.OMNIDESK_AGENT_EVAL_MODEL); fs.writeFileSync(process.env.HOME+"/.hermes/config.yaml", `model:\n  provider: "omnidesk-gateway"\n  base_url: ${base}\n  api_mode: "chat_completions"\n  default: ${model}\n  key_env: "OMNIDESK_AGENT_EVAL_KEY"\ncustom_providers:\n  - name: "omnidesk-gateway"\n    base_url: ${base}\n    model: ${model}\n    api_mode: "chat_completions"\n    key_env: "OMNIDESK_AGENT_EVAL_KEY"\n`);'
+          OMNIDESK_AGENT_EVAL_API_KEY_ENV=OMNIDESK_AGENT_EVAL_KEY npm --prefix desktop run eval:agent:suite -- --output /tmp/results.json --trace-dir /tmp/agent-eval-traces
+          npm --prefix desktop run eval:agent -- --results /tmp/results.json --output /tmp/report.json
+          npm --prefix desktop run check:agent-eval -- --baseline evals/agent-eval-report.json --candidate /tmp/report.json
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-eval-traces
+          path: |
+            /tmp/report.json
+            /tmp/results.json
+            /tmp/agent-eval-traces
+          if-no-files-found: ignore

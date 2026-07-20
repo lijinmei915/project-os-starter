@@ -2,6 +2,20 @@
   "schemaVersion": "project-os.goal-signoff-history.v0.1",
   "entries": [
     {
+      "goalId": "统一对话-任务与目标的上下文和状态契约-1784370357360",
+      "goalTitle": "统一对话、任务与目标的上下文和状态契约",
+      "signedOffAt": "2026-07-18T10:38:01.672Z",
+      "reportStatus": "passed",
+      "source": "OmniDesk Preview"
+    },
+    {
+      "goalId": "完成对话历史管理闭环验收-1784355087943",
+      "goalTitle": "完成对话历史管理闭环验收",
+      "signedOffAt": "2026-07-18T06:20:57.367Z",
+      "reportStatus": "passed",
+      "source": "OmniDesk Preview"
+    },
+    {
       "goalId": "desktop-v0.1-direction-confirmation",
       "goalTitle": "Project OS Console 内核收口期 / Desktop v0.1 方向确认期",
       "signedOffAt": "2026-07-08T05:23:16.525Z",
@@ -16,5 +30,5 @@
       "source": "OmniDesk Preview"
     }
   ],
-  "updatedAt": "2026-07-08T05:23:16.525Z"
+  "updatedAt": "2026-07-18T10:38:01.672Z"
 }

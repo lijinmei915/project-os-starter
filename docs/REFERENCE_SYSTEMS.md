@@ -1,7 +1,7 @@
 ---
 layer: knowledge
 type: spec
-last_verified: 2026-07-03
+last_verified: 2026-07-18
 depends_on: [docs/PRODUCT_PLAN.md, docs/DESKTOP_APP.md, adapters/HERMES.md]
 teaches: "OmniDesk 和 Hermes、Claude Projects、Cursor 等成熟工具的关系、借鉴边界和接入策略"
 use_when: "评估是否接入成熟治理工程、比较 Hermes 等工具、或决定 OmniDesk 该借鉴什么不借鉴什么时"
@@ -79,6 +79,8 @@ Hermes 不应该成为：
 
 当前适配策略见 `adapters/HERMES.md`。
 
+桌面端已完成两层运行时接入：在 `Agent 配置 / 适配器` 中只读探测 `hermes-acp` 优先、`hermes` 次之的本地可用性；`hermes-acp --check` 只证明 ACP 通道可启动，不证明模型凭据可用。OmniDesk 的当前连接是 Hermes 的非敏感运行配置源：保存或切换当前连接后，自动同步 Hermes `config.yaml` 中的 custom provider、网关地址、API mode 和默认模型，保留 Hermes 其他设置。Patch Draft 生成时，OmniDesk 会优先以 ACP stdio 建立一次性 session，并只把当前 provider 的密钥注入子进程内存环境。对于 Hermes 的 custom provider，还会按网关主域临时注入兼容的 `<VENDOR>_API_KEY`，避免 Hermes 的 host-scoped 凭据保护把有效 Key 误判为缺失；密钥不会写入 Hermes 文件或前端。Hermes 只能返回草案，实际写入仍必须走 OmniDesk 的 Diff review 和 Apply 确认。请求提示禁止工具调用，且所有需要 ACP client 支持的工具或权限请求都会被拒绝。未安装、仅 CLI、ACP 健康检查失败、模型调用失败、无有效 diff 或 ACP 调用失败，都必须如实显示或回退到既有 provider/local 草案，不得伪造已执行或已写入。
+
 ## 借鉴原则
 
 可以借鉴：
@@ -97,6 +99,25 @@ Hermes 不应该成为：
 - 把记忆只留在某个工具会话里
 - 把工具 runtime 当作产品入口
 - 一开始就追求完整 IDE、插件市场或多 Agent 编排
+
+## 对话治理开源参照
+
+OmniDesk 的对话治理优先借鉴“显式状态、可中断、可恢复、人工确认”的工程模式，不直接把第三方 Agent runtime 作为桌面端核心依赖。
+
+| 参照项目 | 主要借鉴点 | 当前边界 |
+|----------|------------|----------|
+| LangGraph | 状态图、checkpoint、interrupt / resume、节点级事件 | 首选架构参照；先映射到现有 `conversation-runtime`，不立即引入整套运行时 |
+| AutoGen | 多角色协作和消息协议 | 仅作未来多 Agent 协作参照，当前单 Agent 治理不需要 |
+| Semantic Kernel | Planner、插件和策略编排 | 参考插件/策略分层，不把 Python/.NET runtime 引入桌面壳 |
+| OpenHands | coding agent 的任务、终端和补丁体验 | 参考执行体验，文件写入仍归 OmniDesk Apply 边界 |
+| Temporal | 长事务、重试、持久化工作流 | 未来服务化或后台任务再评估，桌面本地阶段不引入 |
+
+OmniDesk 当前的等价实现由 `desktop/src/conversation-runtime/`、任务存储、`requestId / taskId` 事件关联和受控执行器组成。任何开源框架接入都必须满足：
+
+- UI、项目事实、任务持久化和治理规则仍由 OmniDesk 拥有。
+- 第三方编排器只能调度注册动作，不能直接写文件或绕过 Apply / Verify 确认。
+- checkpoint 必须能恢复到明确的 `pendingAction`、任务状态和最后一个可见事件。
+- 无模型或编排器不可用时，必须显示不可用并保留本地确定性计划，不得伪造执行成功。
 
 ## 接入策略
 
@@ -128,6 +149,7 @@ OmniDesk UI
 - 受控 runner
 - 项目记忆和推荐
 - Hermes adapter 规则说明
+- Hermes ACP 可用性探测和状态展示
 
 当前阶段暂不做：
 
@@ -136,4 +158,3 @@ OmniDesk UI
 - 远程执行
 - 插件市场
 - 让 Hermes 成为默认必需依赖
-

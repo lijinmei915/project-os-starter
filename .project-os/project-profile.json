@@ -4,7 +4,7 @@
   "updatedAt": "2026-07-08",
   "fields": {
     "identity.summary": {
-      "value": "OmniDesk / Project OS Desktop 是本地 AI 工程工作台，让任何新老项目都能按清晰流程被理解、治理、开发和演进。",
+      "value": "OmniDesk 是本地 AI 工程工作台，让任何新老项目都能按清晰流程被理解、治理、开发和演进。",
       "status": "document_confirmed",
       "source": ".project-os/state.json",
       "updatedAt": "2026-07-05",

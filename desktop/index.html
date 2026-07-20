@@ -7,6 +7,13 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      window.setTimeout(function () {
+        var root = document.getElementById("root");
+        if (!root || root.childNodes.length) return;
+        root.innerHTML = '<main style="box-sizing:border-box;max-width:560px;margin:72px auto;padding:24px;font:14px/1.6 system-ui;color:#18181b"><h1 style="font-size:18px;margin:0 0 8px">OmniDesk 未能启动</h1><p style="margin:0;color:#71717a">当前浏览器没有完成应用脚本加载。请刷新页面，或使用 Chrome / OmniDesk 桌面端打开。</p></main>';
+      }, 4000);
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

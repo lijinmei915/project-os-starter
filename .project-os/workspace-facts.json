@@ -39,8 +39,11 @@
   },
   "project": {
     "name": "OmniDesk",
+    "id": "omnidesk",
     "path": "/Users/heqiao/Desktop/Claude练习/OmniDesk",
     "kind": "local-ai-workbench",
+    "version": "0.1.0",
+    "createdAt": "2026-05-31",
     "detectedStack": [
       "Tauri",
       "React",
@@ -48,8 +51,29 @@
       "Rust",
       "Project OS"
     ],
+    "dependencies": [
+      "React 19",
+      "Tauri 2",
+      "Radix UI",
+      "Vite 7",
+      "Lucide React",
+      "Rust crates"
+    ],
+    "directories": [
+      ".project-os",
+      "desktop",
+      "cli",
+      "docs",
+      "schemas",
+      "scripts",
+      "tests",
+      "templates"
+    ],
+    "coreCapabilities": "终端交互、项目治理、AI 模型调度与受控执行",
+    "owner": "待补充",
+    "milestone": "Project OS Console 内核收口期 / OmniDesk 工作区治理自验证期",
     "lifecycle": "stabilizing",
-    "description": "OmniDesk / Project OS Desktop 是本地 AI 工程工作台，用来让新老项目被理解、治理、开发和持续演进。"
+    "description": "OmniDesk 是本地 AI 工程工作台，用来让新老项目被理解、治理、开发和持续演进。"
   },
   "summary": {
     "overview": {
