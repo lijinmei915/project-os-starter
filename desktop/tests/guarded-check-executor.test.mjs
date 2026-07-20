@@ -4,7 +4,7 @@ import test from "node:test";
 import { executeGuardedCheckCommand, executeTaskGuardedCheckWorkflow } from "../src/lib/guarded-check-executor.js";
 
 const runtimeCheck = {
-  command: "bash scripts/check-runtime.sh .",
+  command: "npm --prefix desktop test",
   id: "runtime",
   label: "基础检查",
 };

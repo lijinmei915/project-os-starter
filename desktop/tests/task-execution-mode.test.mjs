@@ -5,14 +5,14 @@ import { taskExecutionNextAction } from "../src/lib/task-execution-mode.js";
 test("runs checks before drafting a patch for validation-only tasks", () => {
   assert.deepEqual(taskExecutionNextAction({
     id: "task-check",
-    plan: { candidateChanges: ["先不写文件，只形成下一步建议。"], checks: ["bash scripts/check-runtime.sh ."] },
+    plan: { candidateChanges: ["先不写文件，只形成下一步建议。"], checks: ["npm --prefix desktop test"] },
   }), { checkId: "runtime", id: "run-check", label: "运行基础检查", taskId: "task-check" });
 });
 
 test("shows existing validation evidence instead of rerunning an unchanged check", () => {
   assert.deepEqual(taskExecutionNextAction({
     id: "task-check",
-    plan: { candidateChanges: ["先不写文件，只形成下一步建议。"], checks: ["bash scripts/check-runtime.sh ."] },
+    plan: { candidateChanges: ["先不写文件，只形成下一步建议。"], checks: ["npm --prefix desktop test"] },
     verificationSummary: { status: "passed" },
   }), { id: "open-topic", label: "查看检查结果", target: "execution", taskId: "task-check" });
 });

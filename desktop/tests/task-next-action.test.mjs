@@ -23,7 +23,7 @@ test("runs checks instead of offering an inapplicable draft for a validation tas
   const next = taskNextAction({
     id: "task-check",
     patchDraft: { notApplicable: true },
-    plan: { candidateChanges: ["先不写文件，只形成下一步建议。"], checks: ["bash scripts/check-runtime.sh ."] },
+    plan: { candidateChanges: ["先不写文件，只形成下一步建议。"], checks: ["npm --prefix desktop test"] },
     status: "planned",
   });
   assert.equal(next.action, "run-check");

@@ -21,6 +21,8 @@ depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
 
 - 2026-07-21 protected `Agent Eval` workflow 已在汇总指标前校验每个复制到 artifact 的 trace；`failed-check-repair` 必须提供真实初始失败检查，`goal-rebind` 必须提供两份授权文件内的实际改动。新 trace checker 同时覆盖正常和拒绝用例，防止仅有“成功率”而没有可审计原始证据。验证：Desktop Node 443/443、workflow YAML 与 diff check 通过。真实 Provider artifact 仍须等待受保护环境实际运行，不能在本机伪造。
 
+- 2026-07-21 Desktop 任务测试与受控检查示例已不再引用冻结的 `scripts/check-runtime.sh`；运行证据统一展示实际 allowlist 中的 `npm --prefix desktop test`。生产 Runtime、Preview、Desktop 源码与测试对旧治理检查脚本的引用扫描均为空。验证：Desktop Node 443/443、diff check 通过。
+
 - 2026-07-21 旧 CLI crate 与 Desktop `governance` bridge 已从仓库退役；Desktop Runbook、Preview 与工程资产投影也不再发现或展示旧 `scripts/check-runtime.sh`、`templates/` 或 `adapters/`。边界回归现在会阻止这些依赖重新进入 Desktop Runtime。验证：Desktop Node 442/442、`cargo check --manifest-path desktop/src-tauri/Cargo.toml`、`git diff --check` 通过。下一步是按消费者审计拆批清理 installer、scripts、templates、adapters 和 routing skill；`.project-os` 仍是迁移兼容源，不能删除。
 
 - 2026-07-21 Desktop 产品信息架构已断开冻结的 Project OS 资产：工作区不再展示 `cli/`、`templates/`、`adapters/`、`.agents/.claude` 的“自动化与模板 / Skill / 适配器”入口、路由、静态面板或文件索引；Agent 配置仅保留模型连接、受控工具和安全边界，工程资源默认范围也不再包含 `cli/*`。这些条目只参与导航和展示，不参与任务、权限或 Runtime 执行，因此删除不改变受控开发链路。验证：路由与领域边界 92/92、Web build、diff check 通过；首屏入口约 792 KiB / 800 KiB。
