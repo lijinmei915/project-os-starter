@@ -1,7 +1,7 @@
 const commands = [
-  ["Runtime 检查", "bash scripts/check-runtime.sh .", "验证 Project OS 运行规则和核心文档。"],
-  ["AI 项目报告", "bash scripts/check-ai-project.sh . --write-report", "生成工程治理报告和建议。"],
+  ["Desktop 测试", "npm --prefix desktop test", "验证对话、任务、权限和执行契约。"],
   ["Web 构建", "npm --prefix desktop run web:build", "验证桌面前端是否可构建。"],
+  ["Runtime 检查", "cargo check --manifest-path desktop/src-tauri/Cargo.toml", "验证 Tauri Local Agent Runtime 是否可编译。"],
 ];
 
 export function ControlledCommandsPanel() {

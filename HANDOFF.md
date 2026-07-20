@@ -1,7 +1,7 @@
 ---
 layer: knowledge
 type: status
-last_verified: 2026-07-19
+last_verified: 2026-07-20
 teaches: "当前交接上下文、风险点和下一步建议"
 use_when: "新的 AI 会话接手工作、需要了解最近做了什么和接下来该做什么时"
 depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
@@ -14,6 +14,8 @@ depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
 > 不要写什么：长期路线图、完整产品介绍、详细架构说明或历史流水账。
 
 ## 接手摘要
+
+- 2026-07-20 Desktop 已断开旧 Project OS 治理执行链：Tauri Runtime 不再编译 `runtime::governance`，不再暴露 `run_project_os_action`，也不再通过 `bin/project-os` 或治理 Shell 脚本执行扫描、报告、建议和清理。受控检查现仅允许 Desktop Node、Web build 与 Cargo check；Preview 的“刷新事实”只重新读取只读 snapshot。旧 `governance.rs` 暂留给 CLI 兼容调用，CI、`tests/run-tests.sh` 和文档仍有真实旧工具依赖，未提前删除。命名空间迁移曾使共享 Repository 在旧 CLI crate 缺少 `runtime::state_namespace`，现以冻结兼容桥补齐并加入消费 crate 回归约束。验证：Desktop Node 442/442、Runtime Rust 71/71、Patch Normalizer 5/5、CLI Rust 16/16、Web build、首屏 796.88/800 KiB、Desktop 生产引用扫描和全仓库 `tests/run-tests.sh` 通过。
 
 - 2026-07-20 状态命名空间已接入生产 Runtime 与 Preview：启动会先恢复 legacy 事务，幂等复制到 `.omnidesk/data|runtime|cache|evidence`，无冲突时激活 `omnidesk-primary`，有冲突时继续使用 legacy 且不覆盖源或目标。Repository、Workspace、Provider、Task、Conversation、Agent Run、原生工作区投影和 Vite Preview 均经过同一逻辑路径映射；文件树、治理扫描和 Agent 读取工具隐藏两个物理状态目录。本批同时修复 macOS `/var -> /private/var` canonical root 使 Agent Tool 误判所有文件越界的问题。验证：Desktop Node 443/443、Runtime Rust 72/72、Patch Normalizer 5/5、Web build、Runtime docs、diff check 和首屏 797.81 KiB / 800 KiB 软预算通过。
 

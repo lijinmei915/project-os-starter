@@ -480,12 +480,6 @@ struct RunGuardedCheckInput {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct RunProjectOsActionInput {
-    action_id: String,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
 struct StartTerminalSessionInput {
     #[serde(default = "default_terminal_session_id")]
     session_id: String,
@@ -700,17 +694,6 @@ struct HermesExecutorStatus {
     status: String,
     version: String,
     message: String,
-}
-
-#[derive(Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct ProjectOsActionResult {
-    id: String,
-    label: String,
-    command: String,
-    success: bool,
-    code: Option<i32>,
-    output: String,
 }
 
 #[derive(Serialize, Clone)]
@@ -2787,7 +2770,6 @@ fn build_local_readonly_plan(context: PlanContext) -> ReadonlyPlan {
         "docs/DESKTOP_APP.md",
         "docs/ARCHITECTURE.md",
         "docs/PRODUCT_PLAN.md",
-        ".project-os/recommendations/recommend-next.json",
     ] {
         if context.root.join(path).exists() {
             files_to_read.push(path.to_string());
@@ -2796,10 +2778,7 @@ fn build_local_readonly_plan(context: PlanContext) -> ReadonlyPlan {
 
     let lower_task = context.task.to_lowercase();
     let mut candidate_changes = vec!["先不改文件；只形成计划和确认点。".to_string()];
-    let mut checks = vec![
-        "bash scripts/check-runtime.sh .".to_string(),
-        "bash scripts/check-doc-structure.sh .".to_string(),
-    ];
+    let mut checks = vec!["npm --prefix desktop test".to_string()];
 
     if lower_task.contains("ui")
         || lower_task.contains("页面")
@@ -2808,7 +2787,7 @@ fn build_local_readonly_plan(context: PlanContext) -> ReadonlyPlan {
     {
         candidate_changes
             .push("可能涉及 desktop/src/main.jsx 和 desktop/src/styles.css。".to_string());
-        checks.push("cd desktop && npm run web:build".to_string());
+        checks.push("npm --prefix desktop run web:build".to_string());
     }
 
     if lower_task.contains("rust")
@@ -2819,7 +2798,7 @@ fn build_local_readonly_plan(context: PlanContext) -> ReadonlyPlan {
     {
         candidate_changes
             .push("可能涉及 desktop/src-tauri/src/main.rs 和 Tauri capability。".to_string());
-        checks.push("cd desktop/src-tauri && cargo check".to_string());
+        checks.push("cargo check --manifest-path desktop/src-tauri/Cargo.toml".to_string());
     }
 
     if context
@@ -4700,7 +4679,7 @@ Return strict JSON with this exact shape:
 Constraints:
 - Do not propose automatic file writes.
 - Do not propose arbitrary shell commands.
-- Prefer Project OS checks: bash scripts/check-runtime.sh ., bash scripts/check-doc-structure.sh ., cd desktop && npm run web:build, cd desktop/src-tauri && cargo check.
+- Prefer OmniDesk checks: npm --prefix desktop test, npm --prefix desktop run web:build, cargo check --manifest-path desktop/src-tauri/Cargo.toml.
 - Keep the plan concise and actionable.
 - Use Chinese for user-facing plan text.
 
@@ -5365,74 +5344,6 @@ fn get_hermes_executor_status() -> HermesExecutorStatus {
 }
 
 #[tauri::command]
-fn run_project_os_action(input: RunProjectOsActionInput) -> Result<ProjectOsActionResult, String> {
-    let app_root = find_workspace_root()?;
-    let mut registry = load_or_seed_registry(&app_root)?;
-    let current_project = current_registry_project(&mut registry, &app_root)?;
-    let root = PathBuf::from(&current_project.path);
-    if !root.exists() || !root.is_dir() {
-        return Err("当前项目路径不存在或不是目录".to_string());
-    }
-
-    if matches!(
-        input.action_id.as_str(),
-        "scan" | "recommend" | "report" | "prune"
-    ) {
-        let action = crate::runtime::governance::execute(&root, &app_root, &input.action_id, &[])?;
-        let result = ProjectOsActionResult {
-            id: action.id,
-            label: action.label,
-            command: action.command,
-            success: action.success,
-            code: action.code,
-            output: action.output,
-        };
-        let _ = crate::runtime::execution::append_audit(
-            &root,
-            "governance-action",
-            result.success,
-            json!({ "actionId": result.id }),
-            &current_timestamp_string(),
-        );
-        return Ok(result);
-    }
-
-    let spec = project_os_action_spec(&input.action_id, &app_root)
-        .ok_or_else(|| format!("不允许执行这个治理动作：{}", input.action_id))?;
-    for relative in &spec.required_paths {
-        if !app_root.join(relative).exists() && !root.join(relative).exists() {
-            return Err(format!("缺少治理动作所需文件：{}", relative));
-        }
-    }
-
-    let output = Command::new(&spec.program)
-        .args(&spec.args)
-        .current_dir(&root)
-        .output()
-        .map_err(|err| err.to_string())?;
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    let combined = trim_runner_output(&format!("{}{}", stdout, stderr));
-
-    let result = ProjectOsActionResult {
-        id: spec.id.to_string(),
-        label: spec.label.to_string(),
-        command: spec.command,
-        success: output.status.success(),
-        code: output.status.code(),
-        output: combined,
-    };
-    let _ = crate::runtime::execution::append_audit(
-        &root,
-        "governance-action",
-        result.success,
-        json!({ "actionId": result.id }),
-        &current_timestamp_string(),
-    );
-    Ok(result)
-}
-
-#[tauri::command]
 fn save_terminal_image(input: SaveTerminalImageInput) -> Result<String, String> {
     let app_root = find_workspace_root()?;
     let mut registry = load_or_seed_registry(&app_root)?;
@@ -5721,55 +5632,19 @@ struct GuardedCheckSpec {
     required_paths: Vec<&'static str>,
 }
 
-struct ProjectOsActionSpec {
-    id: &'static str,
-    label: &'static str,
-    command: String,
-    program: String,
-    args: Vec<String>,
-    required_paths: Vec<&'static str>,
-}
-
 fn guarded_check_spec(id: &str) -> Option<GuardedCheckSpec> {
     match id {
         "runtime" => Some(GuardedCheckSpec {
             id: "runtime",
-            label: "Runtime",
-            command: "bash scripts/check-runtime.sh .",
-            program: "bash".to_string(),
-            args: vec!["scripts/check-runtime.sh".to_string(), ".".to_string()],
-            required_paths: vec!["scripts/check-runtime.sh"],
-        }),
-        "doc-structure" => Some(GuardedCheckSpec {
-            id: "doc-structure",
-            label: "Docs",
-            command: "bash scripts/check-doc-structure.sh .",
-            program: "bash".to_string(),
+            label: "Desktop Tests",
+            command: "npm --prefix desktop test",
+            program: "npm".to_string(),
             args: vec![
-                "scripts/check-doc-structure.sh".to_string(),
-                ".".to_string(),
+                "--prefix".to_string(),
+                "desktop".to_string(),
+                "test".to_string(),
             ],
-            required_paths: vec!["scripts/check-doc-structure.sh"],
-        }),
-        "recommend" => Some(GuardedCheckSpec {
-            id: "recommend",
-            label: "Recommend",
-            command: "bash scripts/recommend-next.sh .",
-            program: "bash".to_string(),
-            args: vec!["scripts/recommend-next.sh".to_string(), ".".to_string()],
-            required_paths: vec!["scripts/recommend-next.sh"],
-        }),
-        "ai-project" => Some(GuardedCheckSpec {
-            id: "ai-project",
-            label: "AI Project",
-            command: "bash scripts/check-ai-project.sh . --write-report",
-            program: "bash".to_string(),
-            args: vec![
-                "scripts/check-ai-project.sh".to_string(),
-                ".".to_string(),
-                "--write-report".to_string(),
-            ],
-            required_paths: vec!["scripts/check-ai-project.sh"],
+            required_paths: vec!["desktop/package.json"],
         }),
         "web-build" => Some(GuardedCheckSpec {
             id: "web-build",
@@ -5795,90 +5670,6 @@ fn guarded_check_spec(id: &str) -> Option<GuardedCheckSpec> {
                 "desktop/src-tauri/Cargo.toml".to_string(),
             ],
             required_paths: vec!["desktop/src-tauri/Cargo.toml"],
-        }),
-        _ => None,
-    }
-}
-
-fn project_os_action_spec(id: &str, app_root: &Path) -> Option<ProjectOsActionSpec> {
-    let cli_bin = app_root.join("bin").join("project-os");
-    let runtime_root = app_root.to_string_lossy().to_string();
-    let cli_program = cli_bin.to_string_lossy().to_string();
-    let cli_command = |command: &str, extra: &[&str]| {
-        let mut args = vec![
-            command.to_string(),
-            ".".to_string(),
-            "--runtime-root".to_string(),
-            runtime_root.clone(),
-            "--trigger-source".to_string(),
-            "desktop".to_string(),
-        ];
-        args.extend(extra.iter().map(|item| item.to_string()));
-        args
-    };
-
-    match id {
-        "scan" => Some(ProjectOsActionSpec {
-            id: "scan",
-            label: "一键扫描",
-            command: format!(
-                "{} scan . --runtime-root {} --trigger-source desktop --persist full --output json",
-                cli_program, runtime_root
-            ),
-            program: cli_program,
-            args: cli_command("scan", &["--persist", "full", "--output", "json"]),
-            required_paths: vec!["bin/project-os"],
-        }),
-        "recommend" => Some(ProjectOsActionSpec {
-            id: "recommend",
-            label: "生成优化建议",
-            command: format!(
-                "{} recommend . --runtime-root {} --trigger-source desktop --persist full --output json",
-                cli_program, runtime_root
-            ),
-            program: cli_program,
-            args: cli_command("recommend", &["--persist", "full", "--output", "json"]),
-            required_paths: vec!["bin/project-os"],
-        }),
-        "report" => Some(ProjectOsActionSpec {
-            id: "report",
-            label: "批量生成修复草案",
-            command: format!(
-                "{} report . --runtime-root {} --trigger-source desktop --output report --persist full",
-                cli_program, runtime_root
-            ),
-            program: cli_program,
-            args: cli_command("report", &["--output", "report", "--persist", "full"]),
-            required_paths: vec!["bin/project-os"],
-        }),
-        "prune" => Some(ProjectOsActionSpec {
-            id: "prune",
-            label: "清理过期骨架产物",
-            command: "bash scripts/prune-project-os-artifacts.sh .".to_string(),
-            program: "bash".to_string(),
-            args: vec![
-                app_root
-                    .join("scripts")
-                    .join("prune-project-os-artifacts.sh")
-                    .to_string_lossy()
-                    .to_string(),
-                ".".to_string(),
-            ],
-            required_paths: vec!["scripts/prune-project-os-artifacts.sh"],
-        }),
-        "sync" => Some(ProjectOsActionSpec {
-            id: "sync",
-            label: "同步治理状态",
-            command: format!("{} state sync . --output json", cli_program),
-            program: cli_program,
-            args: vec![
-                "state".to_string(),
-                "sync".to_string(),
-                ".".to_string(),
-                "--output".to_string(),
-                "json".to_string(),
-            ],
-            required_paths: vec!["bin/project-os"],
         }),
         _ => None,
     }
@@ -6331,9 +6122,6 @@ fn runbook_commands(root: &Path) -> Value {
     }
     if root.join("desktop/src-tauri/Cargo.toml").exists() {
         commands.push(json!({ "id": "desktop:cargo-check", "label": "桌面壳检查", "command": "cargo check --manifest-path desktop/src-tauri/Cargo.toml", "kind": "check", "source": "desktop/src-tauri/Cargo.toml" }));
-    }
-    if root.join("scripts/check-runtime.sh").exists() {
-        commands.push(json!({ "id": "governance:runtime", "label": "治理检查", "command": "bash scripts/check-runtime.sh .", "kind": "check", "source": "scripts/check-runtime.sh" }));
     }
     json!(commands)
 }
@@ -8693,7 +8481,6 @@ pub fn run() {
             execute_approved_agent_tool,
             run_guarded_check,
             get_hermes_executor_status,
-            run_project_os_action,
             start_terminal_session,
             save_terminal_image,
             write_terminal_session,

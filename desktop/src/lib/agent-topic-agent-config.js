@@ -12,7 +12,7 @@ export function agentConfigCapabilitySpec(topicId, provider) {
       title: "工具白名单", status: "待产品化", tone: "warning",
       value: "让新项目明确哪些检查、治理动作和终端命令可以被 Agent 调用。",
       next: "把 Tauri command、检查脚本、治理动作汇总成项目级允许列表。",
-      files: ["desktop/src-tauri/src/main.rs", "scripts/check-runtime.sh", "scripts/check-ai-project.sh"],
+      files: ["desktop/src/agent-runtime/tool-registry.js", "desktop/src-tauri/src/runtime/app.rs", "desktop/src-tauri/src/runtime/patch.rs"],
     },
     "skill-capabilities": {
       title: "Skill 能力", status: "已发现", tone: "success",

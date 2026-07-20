@@ -4,7 +4,6 @@ pub mod app;
 pub mod conversations;
 pub mod execution;
 pub mod goals;
-pub mod governance;
 pub mod provider;
 pub mod repository;
 pub mod state_namespace;

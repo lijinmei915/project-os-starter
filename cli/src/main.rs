@@ -8,7 +8,16 @@ use std::time::{SystemTime, UNIX_EPOCH};
 mod governance;
 #[allow(dead_code)]
 #[path = "../../desktop/src-tauri/src/runtime/repository.rs"]
-mod repository;
+pub(crate) mod repository;
+#[allow(dead_code)]
+#[path = "../../desktop/src-tauri/src/runtime/state_namespace.rs"]
+pub(crate) mod state_namespace;
+
+// Shared Runtime modules resolve through this shape in the Desktop crate.
+// Keep the frozen CLI bridge source-compatible until the CLI is retired.
+mod runtime {
+    pub(crate) use crate::{repository, state_namespace};
+}
 
 #[derive(Debug, Clone, Copy)]
 enum ProjectCommand {

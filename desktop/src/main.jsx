@@ -318,7 +318,7 @@ function buildPreviewPlan(input, snapshot) {
     ],
     filesToRead: ["PROJECT.md", "HANDOFF.md", "AGENTS.md"],
     candidateChanges: ["先不写文件，只形成下一步建议。"],
-    checks: ["bash scripts/check-runtime.sh ."],
+    checks: ["npm --prefix desktop test"],
     guardrails: ["不自动写文件。", "不自动运行命令。"],
     trace: ["PREVIEW: browser-only local plan."],
   };
@@ -408,10 +408,8 @@ async function loadWorkspaceSnapshot() {
 
 async function refreshWorkspaceFactsPreview() {
   if (!isTauriRuntime()) {
-    const scan = await invokePreviewCommand("run_project_os_action", { input: { actionId: "scan" } });
-    if (!scan?.success) throw new Error(scan?.output || scan?.error || "项目扫描失败。");
-    const response = await fetch("/.project-os/workspace-facts.json", { cache: "no-store" });
-    const report = response.ok ? await response.json() : null;
+    const snapshot = await loadWorkspaceSnapshot();
+    const report = snapshot?.workspaceFacts || null;
     return report ? { ...report, generatedAt: new Date().toISOString() } : report;
   }
 

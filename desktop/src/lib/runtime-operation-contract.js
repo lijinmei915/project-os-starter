@@ -9,7 +9,6 @@ export const runtimeOperations = Object.freeze({
   list_agent_runs: { endpoint: "/__project-os/agent-runs", error: "读取 Agent 运行记录失败。", preview: "allow" },
   execute_agent_read_tool: { endpoint: "/__project-os/execute-agent-read-tool", error: "读取项目上下文失败。", preview: "allow" },
   read_engineering_file: { endpoint: "/__project-os/read-engineering-file", error: "读取文件失败。", preview: "allow" },
-  run_project_os_action: { endpoint: "/__project-os/run-project-os-action", error: "治理动作执行失败。", preview: "deny" },
   run_guarded_check: { endpoint: "/__project-os/run-guarded-check", error: "基础检查执行失败。", preview: "deny" },
   generate_patch_draft: { endpoint: "/__project-os/generate-patch-draft", error: "生成改动草稿失败。", preview: "allow" },
   get_hermes_executor_status: { endpoint: "/__project-os/get-hermes-executor-status", error: "读取 Hermes 执行器状态失败。", preview: "allow" },

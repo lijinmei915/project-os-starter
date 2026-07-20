@@ -1,7 +1,7 @@
 export function runtimeCapabilitySpecs(topicId, { activeTaskCount, currentTask, failedTaskCount, memoryCount, profileMissingCount, recentResultCount, snapshot, taskNextActionLabel, visibleTaskCount }) {
   const execution = {
     "task-list": { files: [".project-os/runs/desktop-tasks/*", ".project-os/task-backlog.json"], next: currentTask ? `当前查看「${currentTask.title}」，下一步：${taskNextActionLabel}。` : "从对话或目标创建第一项任务。", status: failedTaskCount ? "有失败项" : activeTaskCount ? "推进中" : visibleTaskCount ? "已归档" : "待创建", title: "任务", tone: failedTaskCount ? "danger" : visibleTaskCount ? "success" : "warning", value: "让接入项目在一处选择任务、查看详情并推进下一步。" },
-    "execution-terminal": { files: ["scripts/check-runtime.sh", "scripts/check-ai-project.sh", "desktop/package.json"], next: "把常用检查和构建命令标为受控命令，和普通终端输入区分开。", status: "可用", title: "执行终端", tone: "success", value: "让用户知道哪些命令是安全入口，哪些只是普通终端操作。" },
+    "execution-terminal": { files: ["desktop/package.json", "desktop/src-tauri/Cargo.toml", "desktop/src/conversation-runtime/capabilities.js"], next: "把常用检查和构建命令标为受控命令，和普通终端输入区分开。", status: "可用", title: "执行终端", tone: "success", value: "让用户知道哪些命令是安全入口，哪些只是普通终端操作。" },
     "execution-results": { files: [".project-os/runs/*", ".project-os/runs/desktop-summary.md", "HANDOFF.md"], next: failedTaskCount ? "重跑失败检查或生成修复任务。" : "把成功结果沉淀到 run summary 和交接记录。", status: failedTaskCount ? "需处理" : recentResultCount ? "有结果" : "待生成", title: "执行结果", tone: failedTaskCount ? "danger" : recentResultCount ? "success" : "warning", value: "让接入项目保留执行证据，并能从失败结果直接进入修复闭环。" },
   };
   const memory = {

@@ -18,7 +18,7 @@ test("decides a safe check action before the generic task route", () => {
     risk: "read-only",
   });
   assert.equal(conversationActionDecision("当前基础检查有什么问题"), null);
-  assert.equal(guardedCheckCapability("runtime").command, "bash scripts/check-runtime.sh .");
+  assert.equal(guardedCheckCapability("runtime").command, "npm --prefix desktop test");
 });
 
 test("routes explicit modifications to a read-only patch draft", () => {
@@ -394,7 +394,7 @@ test("projects guarded check evidence through the runtime executor", async () =>
     now: () => 200,
   });
   assert.equal(result.requestStatus, "succeeded");
-  assert.equal(result.turn.references[0].target, "scripts/check-runtime.sh");
+  assert.equal(result.turn.references[0].target, "desktop/package.json");
   assert.match(result.turn.text, /未发现 Runtime 文档告警/);
 });
 

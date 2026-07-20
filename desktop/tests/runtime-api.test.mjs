@@ -31,7 +31,7 @@ test("rejects unsupported preview commands instead of falling through", async ()
 for (const command of [
   "save_provider_config", "test_provider_model_with_cache", "probe_provider_models", "delete_provider_profile",
   "save_desktop_conversation", "save_desktop_task", "delete_desktop_task", "delete_desktop_conversation",
-  "save_project_memory", "run_guarded_check", "run_project_os_action", "rename_registry_project",
+  "save_project_memory", "run_guarded_check", "rename_registry_project",
   "update_project_capability", "run_goal_validation", "sign_off_goal_validation", "create_goal",
 ]) {
   test(`keeps ${command} desktop-only in Preview`, async () => {

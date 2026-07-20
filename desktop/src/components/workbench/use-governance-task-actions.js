@@ -9,7 +9,7 @@ export function useGovernanceTaskActions({ activeConversationId, snapshot, desig
     const domainNames = [...new Set(actionableFiles.map((file) => file.domainTitle).filter(Boolean))];
     const plan = {
       candidateChanges: fileList.map((file) => `必要时${status === "missing" ? "补齐" : "同步"} ${file}`),
-      checks: ["bash scripts/check-runtime.sh .", "bash scripts/check-doc-structure.sh ."],
+      checks: ["npm --prefix desktop test"],
       filesToRead: fileList,
       guardrails: ["先只读确认问题，不自动写文件。", "缺失文件需要判断是否确实属于当前项目。", "有本地变更的治理文件要保留用户已有改动。", "进入 Apply 前必须生成 Patch 草案并由用户确认。"],
       mode: "governance-file-task",
@@ -33,7 +33,7 @@ export function useGovernanceTaskActions({ activeConversationId, snapshot, desig
     const statusSummary = [...new Set(actionableFiles.map((file) => governanceFileHealthLabel(file.status)).filter(Boolean))];
     const plan = {
       candidateChanges: fileList.map((file) => `必要时同步 ${file}`),
-      checks: ["npm --prefix desktop run web:build", "bash scripts/check-runtime.sh .", "bash scripts/check-doc-structure.sh ."],
+      checks: ["npm --prefix desktop test", "npm --prefix desktop run web:build", "cargo check --manifest-path desktop/src-tauri/Cargo.toml"],
       filesToRead: fileList,
       guardrails: ["先判断架构、契约、规范和实现是否一致，不直接重构。", "只生成最小治理任务和 Patch 草案，进入 Apply 前必须由用户确认。", "涉及代码结构时保留现有模块边界，不做无关 UI 优化。"],
       mode: "design-implementation-governance",

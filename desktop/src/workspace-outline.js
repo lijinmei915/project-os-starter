@@ -272,7 +272,7 @@ export const projectGovernanceFlow = [
     icon: "check",
     description: "验收、测试和交付结果。",
     items: [
-      { id: "validation-checks", title: "检查项", description: "当前项目可运行的检查。", relatedFiles: ["docs/TESTING.md", "scripts/check-runtime.sh", "scripts/check-ai-project.sh"] },
+      { id: "validation-checks", title: "检查项", description: "当前项目可运行的检查。", relatedFiles: ["docs/TESTING.md", "desktop/package.json", "desktop/src-tauri/Cargo.toml"] },
       { id: "validation-report", title: "验收报告", description: "目标验收和检查结果。", relatedFiles: [".project-os/goal-validation-report.json", ".project-os/reports/ai-project-report.json"] },
       { id: "run-records", title: "运行记录", description: "检查、扫描和执行历史。", relatedFiles: [".project-os/runs/*", ".project-os/runs/desktop-summary.md"] },
     ],
@@ -477,7 +477,7 @@ export const projectGovernanceOutline = [
         icon: "shield",
         description: "允许执行的工具和命令。",
         items: [
-          { id: "tool-allowlist", title: "工具白名单", description: "受控检查、治理动作和终端限制。", relatedFiles: ["desktop/src-tauri/src/main.rs", "scripts/check-runtime.sh"] },
+          { id: "tool-allowlist", title: "工具白名单", description: "受控读取、工程写入、检查和终端限制。", relatedFiles: ["desktop/src/agent-runtime/tool-registry.js", "desktop/src-tauri/src/runtime/app.rs", "desktop/src-tauri/src/runtime/patch.rs"] },
         ],
       },
       {
