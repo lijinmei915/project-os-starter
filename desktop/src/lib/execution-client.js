@@ -36,11 +36,12 @@ export function runHermesAgent(prompt, requestId = "", maxSteps = 20, approvalTo
   return invokeRuntimeCommand("run_hermes_agent", { input: { approvalToken, maxSteps, prompt, requestId } });
 }
 
+// Kept for older callers; the live approval flow now continues by run id so it
+// cannot replace the persisted evidence timeline.
 export function buildApprovedAgentContinuationPrompt(run, toolResult) {
   const original = String(run?.prompt || "").trim();
   if (!original) throw new Error("该 Agent Run 缺少原始任务，不能继续执行。");
-  const observation = JSON.stringify(toolResult ?? null).slice(0, 8000);
-  return `${original}\n\n已批准的上一步工具已经执行，结果如下：${observation}\n不要重复该操作。基于这个结果继续完成任务；若需要新的写入或检查，先请求新的审批。`;
+  return `${original}\n\n已批准的上一步工具已经执行，结果如下：${JSON.stringify(toolResult ?? null).slice(0, 8000)}\n不要重复该操作。基于这个结果继续完成任务；若需要新的写入或检查，先请求新的审批。`;
 }
 
 export function listAgentRuns() {
@@ -51,16 +52,15 @@ export async function resumeHermesAgent(run) {
   if (!run?.id) throw new Error("缺少可恢复的 Agent Run。");
   const resumed = await invokeRuntimeCommand("resume_agent_run", { input: { id: run.id } });
   if (resumed.status === "awaiting-approval") return resumed;
-  return runHermesAgent(resumed.prompt, resumed.requestId, resumed.maxSteps);
+  return invokeRuntimeCommand("continue_agent_run", { input: { id: resumed.id } });
 }
 
 export async function approveHermesAgent(run) {
   if (!run?.id) throw new Error("缺少待审批的 Agent Run。");
   const approved = await invokeRuntimeCommand("approve_agent_run", { input: { id: run.id } });
-  const toolResult = await invokeRuntimeCommand("execute_approved_agent_tool", { input: { id: approved.id, token: approved.approvalToken } });
-  return runHermesAgent(
-    buildApprovedAgentContinuationPrompt(approved, toolResult),
-    approved.requestId,
-    approved.maxSteps,
-  );
+  await invokeRuntimeCommand("execute_approved_agent_tool", { input: { id: approved.id, token: approved.approvalToken } });
+  const updated = (await listAgentRuns()).find((item) => item.id === approved.id);
+  if (!updated) throw new Error("已执行工具的 Agent Run 未找到。");
+  if (updated.status === "failed") return updated;
+  return invokeRuntimeCommand("continue_agent_run", { input: { id: updated.id } });
 }

@@ -6,6 +6,7 @@ export const runtimeOperations = Object.freeze({
   execute_approved_agent_tool: { endpoint: "/__project-os/execute-approved-agent-tool", error: "执行已批准工具失败。", preview: "deny" },
   approve_agent_run: { endpoint: "/__project-os/approve-agent-run", error: "批准 Agent Run 失败。", preview: "deny" },
   resume_agent_run: { endpoint: "/__project-os/resume-agent-run", error: "恢复 Agent Run 失败。", preview: "deny" },
+  continue_agent_run: { endpoint: "/__project-os/continue-agent-run", error: "继续 Agent Run 失败。", preview: "deny" },
   list_agent_runs: { endpoint: "/__project-os/agent-runs", error: "读取 Agent 运行记录失败。", preview: "allow" },
   execute_agent_read_tool: { endpoint: "/__project-os/execute-agent-read-tool", error: "读取项目上下文失败。", preview: "allow" },
   read_engineering_file: { endpoint: "/__project-os/read-engineering-file", error: "读取文件失败。", preview: "allow" },

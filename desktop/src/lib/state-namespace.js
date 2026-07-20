@@ -48,3 +48,9 @@ export function migratedStateRelativePath(relativePath) {
 export function resolvedStateRelativePath(relativePath, namespaceActive) {
   return namespaceActive ? migratedStateRelativePath(relativePath) : normalizedRelativePath(relativePath);
 }
+
+// UI labels should describe the active data layout even while the command
+// boundary accepts a legacy logical key for migration compatibility.
+export function displayStateRelativePath(relativePath) {
+  return migratedStateRelativePath(relativePath);
+}

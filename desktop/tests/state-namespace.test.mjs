@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import {
   migratedStateRelativePath,
+  displayStateRelativePath,
   resolvedStateRelativePath,
 } from "../src/lib/state-namespace.js";
 import {
@@ -20,6 +21,7 @@ test("maps legacy state into the same four partitions as the native runtime", ()
   assert.equal(migratedStateRelativePath(".project-os/events/event.json"), ".omnidesk/runtime/events/event.json");
   assert.equal(migratedStateRelativePath(".project-os/workspace-facts.json"), ".omnidesk/cache/workspace-facts.json");
   assert.equal(migratedStateRelativePath(".project-os/goal-validation-report.json"), ".omnidesk/evidence/goal-validation-report.json");
+  assert.equal(displayStateRelativePath(".project-os/runs/desktop-summary.md"), ".omnidesk/evidence/runs/desktop-summary.md");
 });
 
 test("keeps legacy paths until the namespace manifest is active", () => {

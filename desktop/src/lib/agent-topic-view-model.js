@@ -6,7 +6,7 @@ import { flowCapabilitySpec } from "./agent-topic-flow-capability";
 import { buildAgentTopicCards } from "./agent-topic-cards";
 
 const previewExtensions = new Set(["md", "mdx", "txt", "json", "jsonc", "yaml", "yml", "toml", "js", "jsx", "ts", "tsx", "css", "scss", "html", "rs", "sh", "py", "sql"]);
-const aggregatePaths = new Set(["desktop/*", "cli/*", "docs/*", "schemas/*", "docs/data/*", "scripts/*", "templates/*", "adapters/*"]);
+const aggregatePaths = new Set(["desktop/*", "docs/*", "schemas/*", "docs/data/*", "scripts/*"]);
 
 export function canPreviewAgentTopicFile(file) {
   if (!file || typeof file !== "string" || file.includes("*") || file.endsWith("/") || file.includes(":")) return false;
@@ -29,7 +29,6 @@ export function buildAgentTopicViewModel({
   const governanceDomain = domain("governance-files", "治理文件");
   const reportDomain = domain("report-artifacts", "报告产物");
   const schemaDomain = domain("schema-assets", "Schema");
-  const scriptDomain = domain("script-templates", "脚本模板");
   const profileMissingCount = Array.isArray(snapshot?.projectProfile?.missingFields) ? snapshot.projectProfile.missingFields.length : 0;
   const memoryItems = Array.isArray(snapshot?.memory) ? snapshot.memory : [];
   const goals = Array.isArray(snapshot?.goals?.goals) ? snapshot.goals.goals : [];
@@ -47,7 +46,7 @@ export function buildAgentTopicViewModel({
   const agentConfigSpec = agentConfigCapabilitySpec(id, provider);
   const assetSpec = assetCapabilitySpec(id, {
     assetDomainFileCount: countFiles, assetDomainRiskCount: countRisks,
-    domains: { engineeringDomain, governanceDomain, reportDomain, schemaDomain, scriptDomain }, snapshot,
+    domains: { engineeringDomain, governanceDomain, reportDomain, schemaDomain }, snapshot,
   });
   const cards = buildAgentTopicCards({
     activeGoal, activeTaskCount: activeTasks.length, assetDomainFileCount: countFiles, assetDomainRiskCount: countRisks,
@@ -59,7 +58,7 @@ export function buildAgentTopicViewModel({
     providerName, snapshot, taskNextActionLabel: nextActionLabel, topic, topicId: id, validationChecks,
     visibleTaskCount: visibleTasks.length, domains: { doneGoals: goals.filter((goal) => goal.status === "done").length,
       engineering: engineeringDomain, governance: governanceDomain, latestResult: doneTasks[0]?.title || failedTasks[0]?.title || "",
-      openGoals: goals.filter((goal) => goal.status !== "done").length, schema: schemaDomain, script: scriptDomain },
+      openGoals: goals.filter((goal) => goal.status !== "done").length, schema: schemaDomain },
   });
   const activeCapabilitySpec = agentConfigSpec || assetSpec || execution || memory || flowCapabilitySpec(id, topic);
   return {

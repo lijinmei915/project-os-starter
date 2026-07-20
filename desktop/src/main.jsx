@@ -101,6 +101,7 @@ import { taskContinuationPrompt } from "./lib/task-conversation-prompt";
 import { taskCardPrimaryAction } from "./lib/task-card-action";
 import { discoverableProjectCapabilities, projectRuntimeStatus } from "./lib/project-sidebar-view-model";
 import { buildAgentTopicViewModel, canPreviewAgentTopicFile } from "./lib/agent-topic-view-model";
+import { displayStateRelativePath } from "./lib/state-namespace";
 import { applyPendingConversationPatch } from "./lib/conversation-patch-apply";
 import { createProviderActionController } from "./lib/provider-action-controller";
 import { createConversationActionController } from "./lib/conversation-action-controller";
@@ -682,8 +683,8 @@ const dedicatedSurfaceByTopic = Object.freeze({
   "lessons-learned": "lessons-learned",
   "task-list": "task-execution", "execution-terminal": "task-execution", "execution-results": "task-execution",
   "project-facts": "memory-surface", "user-preferences": "memory-surface", "long-term-memory": "memory-surface", "conversation-summary": "memory-surface",
-  "engineering-files": "asset-surface", "governance-files": "asset-surface", "report-artifacts": "asset-surface", "schema-assets": "asset-surface", "script-templates": "asset-surface",
-  "model-connections": "agent-config-surface", "tool-allowlist": "agent-config-surface", "skill-capabilities": "agent-config-surface", "adapters": "agent-config-surface", "security-boundary": "agent-config-surface",
+  "engineering-files": "asset-surface", "governance-files": "asset-surface", "report-artifacts": "asset-surface", "schema-assets": "asset-surface",
+  "model-connections": "agent-config-surface", "tool-allowlist": "agent-config-surface", "security-boundary": "agent-config-surface",
   "project-progress": "current-progress",
   "project-risks": "risk-boundary",
   "project-runbook": "runbook",
@@ -2709,7 +2710,7 @@ function GoalHistoryPanel({ onOpenSource, snapshot }) {
 function RuleSourceButtons({ onOpenSource, sources }) {
   return (
     <div className="overviewSourceButtons">
-      {sources.map((source) => <button key={source} type="button" onClick={() => onOpenSource?.(source)}><FileText aria-hidden="true" size={12} /><span>{source}</span></button>)}
+      {sources.map((source) => <button key={source} type="button" onClick={() => onOpenSource?.(source)}><FileText aria-hidden="true" size={12} /><span>{displayStateRelativePath(source)}</span></button>)}
     </div>
   );
 }

@@ -15,6 +15,12 @@ depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
 
 ## 接手摘要
 
+- 2026-07-21 Desktop 产品信息架构已断开冻结的 Project OS 资产：工作区不再展示 `cli/`、`templates/`、`adapters/`、`.agents/.claude` 的“自动化与模板 / Skill / 适配器”入口、路由、静态面板或文件索引；Agent 配置仅保留模型连接、受控工具和安全边界，工程资源默认范围也不再包含 `cli/*`。这些条目只参与导航和展示，不参与任务、权限或 Runtime 执行，因此删除不改变受控开发链路。验证：路由与领域边界 92/92、Web build、diff check 通过；首屏入口约 792 KiB / 800 KiB。
+
+- 2026-07-21 离线 Agent Eval 的 JS 状态契约已与 Rust Agent Run checkpoint 对齐：`checkpoint` 现在包含阶段、最后确认、下一动作、工具/参数/结果、允许文件、完成检查与修复预算。恢复 Eval 改为从已批准的 `applying` 状态重启，验证恢复后保留原审批和文件范围并重新计数 attempt；同时修复 `interrupted -> awaiting-approval` 未增加 attempt 的状态机缺陷。验证：Agent Runtime / Eval recovery 定向 10/10 通过。此路径仍是离线契约证据；真实 Provider 网络中断与多文件修复仍需受保护 Eval trace。
+
+- 2026-07-21 Agent Run 已从“整轮重试”推进到工具边界阶段恢复：checkpoint 现在保存当前工具、参数、允许文件、工具结果、已完成检查和剩余修复预算。审批工具执行前先持久化 `applying` / `verifying`，进程中断后恢复为原审批而不是自动重放写入或检查；工具完成后由 `continue_agent_run` 复用同一 Run、原始证据和模型上下文继续，不会重建同 request-id 的记录。检查失败最多进入两轮修复草稿，预算耗尽后明确失败。验证：Desktop Node 442/442、Rust `cargo check`、Agent Run Rust 5/5、diff check 通过。仍未覆盖：真实 Provider 流中的中断不能续传，需从 checkpoint 重新请求；原生重启/网络中断/大型多文件场景仍待发布级验收。
+
 - 2026-07-21 受保护 Agent Eval 已切换到 active `.omnidesk`：workflow 写入 `.omnidesk/namespace.json` 和 `.omnidesk/data/desktop-provider.json`，每个 run 的 results、report 与 trace 固化到 `.omnidesk/evidence/agent-eval/<run-id>` 并作为 artifact 上传；Hermes runner 根据 manifest 选择 active Provider，未激活迁移的旧工作区仍可读取 legacy Provider。验证：Agent Eval workflow YAML、离线 deterministic suite 与 state namespace 测试通过；真实模型调用仍只在受保护 environment 执行。
 
 - 2026-07-21 本地总回归已完成单内核收敛：`tests/run-tests.sh` 从 466 行 Project OS 分发/安装/报告/图谱测试收缩为 OmniDesk 离线发布门槛，覆盖 tracked state、仓库文档契约、Desktop Node、Web build、首屏预算、离线 Eval 基线和 Runtime Rust。它不再调用 CLI、installer、模板、AI 工程报告或图谱生成，也不再写入临时 `.project-os` 运行产物。验证：完整入口通过，Desktop Node 442/442、Runtime Rust 71/71、Patch Normalizer 5/5、首屏 796.88/800 KiB、Eval 基线均通过。

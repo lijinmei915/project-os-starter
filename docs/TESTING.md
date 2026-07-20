@@ -148,6 +148,7 @@ bash tests/run-tests.sh
 - Desktop Node 契约回归
 - Web build 与 800 KiB 首屏预算
 - 离线 12-case Eval 基线结构与不回退检查
+- Agent Run checkpoint 与审批恢复的离线契约证据
 - Tauri Runtime Rust 与 Patch Normalizer 回归
 
 说明：该入口不执行旧 CLI、installer、模板分发、AI 工程报告、图谱或截图报告测试。原生窗口与真实 Provider 路径分别由 `test:native` 和受保护 Agent Eval 工作流覆盖。
@@ -181,7 +182,7 @@ macOS 原生窗口 smoke 不使用官方 `tauri-driver`。它通过仅测试构�
 npm --prefix desktop run test:native
 ```
 
-该命令验证原生窗口的 DOM/React 输入与发送状态。它不把浏览器 Preview 当成桌面证据，不执行终端、检查、Patch 或模型请求。更高风险的写入与审批流程仍应在独立 fixture 中逐项补充。
+该命令验证原生窗口的 DOM/React 输入与发送状态，并从 active `.omnidesk/cache`（未迁移 fixture 才回退 `.project-os`）读取原生终端 trace。它不把浏览器 Preview 当成桌面证据，不执行终端、检查、Patch 或模型请求。更高风险的写入与审批流程仍应在独立 fixture 中逐项补充。
 
 ### 9. CI 自动化检查
 

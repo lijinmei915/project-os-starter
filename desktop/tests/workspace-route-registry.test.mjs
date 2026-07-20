@@ -113,19 +113,19 @@ test("memory pages own distinct facts, preferences, long-term memory, and conver
   assert.deepEqual(workspaceRouteById("conversation-summary").owns, ["conversation-topics", "conversation-outcomes", "conversation-pending"]);
 });
 
-test("asset pages own distinct code, governance, report, schema, and template modules", () => {
+test("asset pages own distinct code, governance, report, and schema modules", () => {
   assert.deepEqual(workspaceRouteById("engineering-files").owns, ["asset-code-entry", "asset-code-structure", "asset-code-preview"]);
   assert.deepEqual(workspaceRouteById("governance-files").owns, ["asset-governance-health", "asset-governance-files", "asset-governance-actions"]);
   assert.deepEqual(workspaceRouteById("report-artifacts").owns, ["asset-reports-catalog", "asset-reports-evidence", "asset-reports-retention"]);
   assert.deepEqual(workspaceRouteById("schema-assets").owns, ["asset-schema-catalog", "asset-schema-usage", "asset-schema-validation"]);
-  assert.deepEqual(workspaceRouteById("script-templates").owns, ["asset-template-catalog", "asset-template-safety", "asset-template-sync"]);
+  assert.equal(workspaceRouteById("script-templates"), null);
 });
 
-test("agent configuration pages own distinct model, tool, skill, adapter, and security modules", () => {
+test("agent configuration pages own distinct model, tool, and security modules", () => {
   assert.deepEqual(workspaceRouteById("model-connections").owns, ["model-provider", "model-availability", "model-default"]);
   assert.deepEqual(workspaceRouteById("tool-allowlist").owns, ["tool-allowed", "tool-confirmation", "tool-restrictions"]);
-  assert.deepEqual(workspaceRouteById("skill-capabilities").owns, ["skill-catalog", "skill-trigger", "skill-boundary"]);
-  assert.deepEqual(workspaceRouteById("adapters").owns, ["adapter-catalog", "adapter-rule-source", "adapter-sync"]);
+  assert.equal(workspaceRouteById("skill-capabilities"), null);
+  assert.equal(workspaceRouteById("adapters"), null);
   assert.deepEqual(workspaceRouteById("security-boundary").owns, ["security-data", "security-execution", "security-confirmation"]);
 });
 

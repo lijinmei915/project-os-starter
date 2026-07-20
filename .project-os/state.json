@@ -49,7 +49,7 @@
     "lateResultRejection": true,
     "agentRunPersistence": true,
     "stateNamespaceMigration": true,
-    "stageCheckpointResume": false,
+    "stageCheckpointResume": true,
     "terminalSessionPersistence": false,
     "evalBaseline": {
       "cases": 12,
@@ -72,18 +72,19 @@
       "Desktop Runtime 与旧 Project OS governance 执行链断开",
       "常规 CI 与旧 CLI、installer 和 AI 工程报告链断开",
       "本地总回归与旧 CLI、installer、模板、报告和图谱链断开",
-      "受保护 Agent Eval 使用 active .omnidesk Provider 与 evidence artifact"
+      "受保护 Agent Eval 使用 active .omnidesk Provider 与 evidence artifact",
+      "Agent Run 持久化阶段 checkpoint、审批恢复和同一 Run 证据续接",
+      "Desktop 工作区移除冻结的 CLI、模板、adapter 与 routing Skill 入口"
     ],
     "doing": [
       "OmniDesk 产品与文档 SSOT 单内核收敛",
       "遗留文档与迁移兼容层的旧 Project OS 依赖退役",
-      "长任务 checkpoint 恢复",
+      "长任务中断、重启与多文件恢复验收",
       "Eval trace 稳定证据化"
     ],
     "blocked": [],
     "next": [
       "删除无生产、CI 或本地回归消费者的 governance bridge",
-      "持久化长任务 checkpoint、阶段、上下文摘要和最后确认点",
       "增加网络中断、应用重启和多文件任务恢复验收",
       "清理历史运行产物和兼容层"
     ]

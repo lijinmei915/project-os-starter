@@ -13,6 +13,22 @@ pub struct AgentRunCheckpoint {
     pub context_summary: String,
     pub last_confirmation: Option<Value>,
     pub next_action: String,
+    #[serde(default)]
+    pub tool_name: String,
+    #[serde(default)]
+    pub tool_arguments: Value,
+    #[serde(default)]
+    pub tool_result: Option<Value>,
+    #[serde(default)]
+    pub allowed_files: Vec<String>,
+    #[serde(default)]
+    pub completed_check_ids: Vec<String>,
+    #[serde(default = "default_remaining_repair_budget")]
+    pub remaining_repair_budget: usize,
+}
+
+fn default_remaining_repair_budget() -> usize {
+    2
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -127,6 +143,12 @@ pub fn recover_stale(root: &Path, timestamp: &str) -> Result<(), String> {
                 context_summary: run.summary.clone(),
                 last_confirmation: run.approval.clone(),
                 next_action: if run.approval.is_some() { "resume-approval".to_string() } else { "resume-stage".to_string() },
+                tool_name: run.checkpoint.tool_name.clone(),
+                tool_arguments: run.checkpoint.tool_arguments.clone(),
+                tool_result: run.checkpoint.tool_result.clone(),
+                allowed_files: run.checkpoint.allowed_files.clone(),
+                completed_check_ids: run.checkpoint.completed_check_ids.clone(),
+                remaining_repair_budget: run.checkpoint.remaining_repair_budget,
             };
             run.status = "interrupted".to_string();
             run.revision += 1;
@@ -226,6 +248,12 @@ pub fn new_hermes_run(
             context_summary: "Agent Run 已创建。".to_string(),
             last_confirmation: None,
             next_action: "start".to_string(),
+            tool_name: String::new(),
+            tool_arguments: json!({}),
+            tool_result: None,
+            allowed_files: Vec::new(),
+            completed_check_ids: Vec::new(),
+            remaining_repair_budget: default_remaining_repair_budget(),
         },
         evidence: vec![json!({
             "phase": "result",
@@ -319,6 +347,39 @@ mod tests {
         assert_eq!(resumed.status, "awaiting-approval");
         assert_eq!(resumed.checkpoint.phase, "awaiting-approval");
         assert_eq!(resumed.approval.as_ref().unwrap()["token"], "approval-1");
+    }
+
+    #[test]
+    fn interrupted_apply_requires_the_original_approval_instead_of_reapplying() {
+        let root = std::env::temp_dir().join(format!(
+            "omnidesk-agent-apply-checkpoint-{}",
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        let mut run = new_hermes_run(
+            "run-applying".to_string(), "request-1".to_string(), "project-1".to_string(),
+            "update file".to_string(), 20, String::new(), "now",
+        );
+        run.status = "applying".to_string();
+        run.approval = Some(json!({
+            "token": "approval-apply-1",
+            "name": "apply_patch",
+            "arguments": { "allowedFiles": ["src/lib.rs"] },
+            "status": "approved"
+        }));
+        run.checkpoint.tool_name = "apply_patch".to_string();
+        run.checkpoint.allowed_files = vec!["src/lib.rs".to_string()];
+        run.checkpoint.remaining_repair_budget = 1;
+        persist(&root, &run).unwrap();
+
+        recover_stale(&root, "later").unwrap();
+        let resumed = resume(&root, "run-applying", "resume").unwrap();
+
+        assert_eq!(resumed.status, "awaiting-approval");
+        assert_eq!(resumed.checkpoint.phase, "applying");
+        assert_eq!(resumed.checkpoint.tool_name, "apply_patch");
+        assert_eq!(resumed.checkpoint.allowed_files, vec!["src/lib.rs"]);
+        assert_eq!(resumed.checkpoint.remaining_repair_budget, 1);
+        assert_eq!(resumed.approval.unwrap()["token"], "approval-apply-1");
     }
 
     #[test]

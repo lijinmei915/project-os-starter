@@ -41,13 +41,14 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 已完成：
 
 - 对话 SSE 流式输出、请求级取消、新请求接管和迟到结果拒绝。
-- Agent Run 持久化、审批、Patch 应用、检查、最多两轮修复和中断恢复。
+- Agent Run 持久化、独立审批、Patch 应用、检查、最多两轮修复，以及工具边界的阶段 checkpoint 恢复。
 - Workspace、Conversation、Task、Goal、Provider、Execution 的 Runtime 模块与 Repository 事务边界。
 - 正式 12-case Eval：任务成功率 100%、Patch 可应用率 90.9%、检查通过率 100%、恢复成功率 100%。
 - 当前工作树回归：Desktop Node 442/442、Runtime Rust 71/71、Patch Normalizer 5/5；Web build 与 800 KiB 首屏软预算通过。
 - `.omnidesk/` v1 四分区 schema、非破坏性迁移器和启动激活已接入生产 Runtime：支持幂等复制、冲突拒绝、符号链接跳过和 legacy 回退。
 - Repository、Workspace、Provider、Task、Conversation、Agent Run 与 Preview 均通过同一逻辑路径映射读写；文件树和 Agent 读取工具隐藏两个物理状态目录。
 - Desktop Runtime 已停止编译旧 `governance` bridge，不再暴露 `run_project_os_action`，受控检查只执行 Desktop Node、Web build 与 Cargo 检查；浏览器 Preview 的事实刷新只重新读取只读 snapshot。
+- Desktop 工作区已移除旧 CLI、模板、adapter 与 routing Skill 的可见入口，仅呈现 OmniDesk Runtime 的模型、受控工具、安全边界、工程文件与证据。
 - 常规 CI 已删除旧 CLI 编译、installer 回归、AI 工程报告生成和 `.project-os` 报告上传，只保留 Desktop Runtime 回归与轻量仓库契约检查。
 - 受保护 Agent Eval 使用 active `.omnidesk/data` Provider 配置，并将每次真实结果、报告与 trace 固化到 `.omnidesk/evidence/agent-eval/<run-id>` 后上传。
 
@@ -55,12 +56,12 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 
 - 将产品与文档 SSOT 收敛到 OmniDesk Desktop Runtime。
 - 继续断开遗留文档和迁移兼容层对旧 Project OS 分发工具链的真实依赖。
-- 将长任务恢复从“整轮重试”提升为持久化 checkpoint 后按阶段恢复。
+- 继续补齐长任务的原生中断、重启与多文件恢复验收；模型请求本身不能从中断 token 续传，但已持久化的工具边界不会重放。
 - 将 Eval 原始 trace 从临时目录固化为可携带的发布证据。
 
 当前风险：
 
-- 活跃 Provider 请求不能从中断 token 续传，只能基于 checkpoint 重新执行当前阶段。
+- 活跃 Provider 请求不能从中断 token 续传；重启后只能从最近持久化阶段重新请求模型，不能续接原网络流。
 - 终端会话和屏幕输出仍在内存，Runtime 重启会终止会话。
 - `.project-os/` 仍作为非破坏性迁移源和 tracked 治理兼容文件；在 `AGENTS.md` 和旧工具链改用新 SSOT 前不能删除。
 - 旧 CLI、scripts、templates、adapters 与部分遗留文档、受保护 Eval 和迁移兼容层仍有真实依赖，不能直接整目录删除；Desktop 生产运行时、常规 CI 和本地总回归已不再依赖它们。

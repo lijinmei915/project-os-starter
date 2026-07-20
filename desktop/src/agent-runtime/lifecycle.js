@@ -32,13 +32,23 @@ export function deserializeAgentRun(serialized) {
 export function recoverAgentRun(run, timestamp) {
   assertAgentRun(run);
   if (!recoverableStatuses.has(run.status)) return run;
-  return transitionAgentRun(run, agentRunStatuses.interrupted, timestamp);
+  const checkpoint = {
+    ...run.checkpoint,
+    phase: run.status,
+    contextSummary: run.summary,
+    lastConfirmation: run.approval,
+    nextAction: run.approval ? "resume-approval" : "resume-stage",
+  };
+  return transitionAgentRun({ ...run, checkpoint }, agentRunStatuses.interrupted, timestamp);
 }
 
 export function resumeAgentRun(run, timestamp) {
   assertAgentRun(run);
   if (run.status !== agentRunStatuses.interrupted) throw new Error(`agent run is not resumable from status: ${run.status}`);
-  return transitionAgentRun(run, agentRunStatuses.queued, timestamp);
+  const status = run.checkpoint?.nextAction === "resume-approval" && run.approval
+    ? agentRunStatuses.awaitingApproval
+    : agentRunStatuses.queued;
+  return transitionAgentRun(run, status, timestamp);
 }
 
 export function settleAgentRun(run, { attempt = run?.attempt, status, summary, timestamp } = {}) {

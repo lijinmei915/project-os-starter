@@ -37,10 +37,10 @@ const runTransitions = Object.freeze({
   [agentRunStatuses.awaitingApproval]: [agentRunStatuses.running, agentRunStatuses.applying, agentRunStatuses.failed, agentRunStatuses.cancelled, agentRunStatuses.interrupted],
   [agentRunStatuses.applying]: [agentRunStatuses.verifying, agentRunStatuses.succeeded, agentRunStatuses.failed, agentRunStatuses.cancelled, agentRunStatuses.interrupted],
   [agentRunStatuses.verifying]: [agentRunStatuses.running, agentRunStatuses.succeeded, agentRunStatuses.failed, agentRunStatuses.cancelled, agentRunStatuses.interrupted],
-  [agentRunStatuses.interrupted]: [agentRunStatuses.queued, agentRunStatuses.failed, agentRunStatuses.cancelled],
+  [agentRunStatuses.interrupted]: [agentRunStatuses.queued, agentRunStatuses.awaitingApproval, agentRunStatuses.failed, agentRunStatuses.cancelled],
 });
 
-const agentRunKeys = new Set(["schemaVersion", "id", "requestId", "conversationId", "taskId", "projectId", "executorId", "status", "step", "maxSteps", "attempt", "revision", "createdAt", "updatedAt", "summary", "prompt", "approval", "approvalToken", "repairAttempt", "evidence"]);
+const agentRunKeys = new Set(["schemaVersion", "id", "requestId", "conversationId", "taskId", "projectId", "executorId", "status", "step", "maxSteps", "attempt", "revision", "createdAt", "updatedAt", "summary", "prompt", "approval", "approvalToken", "repairAttempt", "evidence", "checkpoint"]);
 
 function required(value, name) {
   const text = String(value || "").trim();
@@ -52,6 +52,22 @@ function isoTimestamp(value) {
   const timestamp = value || new Date().toISOString();
   if (Number.isNaN(Date.parse(timestamp))) throw new Error("agent runtime timestamp must be ISO date-time");
   return timestamp;
+}
+
+function checkpoint(input = {}, status = agentRunStatuses.queued) {
+  const value = input && typeof input === "object" && !Array.isArray(input) ? input : {};
+  return Object.freeze({
+    phase: String(value.phase || status),
+    contextSummary: String(value.contextSummary || ""),
+    lastConfirmation: value.lastConfirmation && typeof value.lastConfirmation === "object" && !Array.isArray(value.lastConfirmation) ? value.lastConfirmation : null,
+    nextAction: String(value.nextAction || "start"),
+    toolName: String(value.toolName || ""),
+    toolArguments: value.toolArguments && typeof value.toolArguments === "object" && !Array.isArray(value.toolArguments) ? value.toolArguments : {},
+    toolResult: value.toolResult === undefined ? null : value.toolResult,
+    allowedFiles: Array.isArray(value.allowedFiles) ? value.allowedFiles.map(String) : [],
+    completedCheckIds: Array.isArray(value.completedCheckIds) ? value.completedCheckIds.map(String) : [],
+    remainingRepairBudget: Number.isInteger(value.remainingRepairBudget) && value.remainingRepairBudget >= 0 ? value.remainingRepairBudget : 2,
+  });
 }
 
 export function createAgentRun(input = {}) {
@@ -76,6 +92,7 @@ export function createAgentRun(input = {}) {
     approvalToken: String(input.approvalToken || ""),
     repairAttempt: Number.isInteger(input.repairAttempt) && input.repairAttempt >= 0 ? input.repairAttempt : 0,
     evidence: Array.isArray(input.evidence) ? input.evidence : [],
+    checkpoint: checkpoint(input.checkpoint, input.status || agentRunStatuses.queued),
   };
   assertAgentRun(run);
   return Object.freeze(run);
@@ -84,7 +101,8 @@ export function createAgentRun(input = {}) {
 export function transitionAgentRun(run, status, timestamp) {
   if (!runTransitions[run?.status]?.includes(status)) throw new Error(`illegal agent run transition: ${run?.status} -> ${status}`);
   if (run.step >= run.maxSteps && !finalStatuses.has(status) && status !== agentRunStatuses.interrupted) throw new Error("agent run step budget exhausted");
-  const resumed = run.status === agentRunStatuses.interrupted && status === agentRunStatuses.queued;
+  const resumed = run.status === agentRunStatuses.interrupted
+    && (status === agentRunStatuses.queued || status === agentRunStatuses.awaitingApproval);
   return Object.freeze({
     ...run,
     attempt: resumed ? run.attempt + 1 : run.attempt,
@@ -116,6 +134,11 @@ export function assertAgentRun(value) {
   for (const key of ["summary", "prompt", "approvalToken"]) if (key in value && typeof value[key] !== "string") throw new Error("agent run text metadata must be strings");
   if ("approval" in value && value.approval !== null && (!value.approval || typeof value.approval !== "object" || Array.isArray(value.approval))) throw new Error("agent run approval must be an object or null");
   if (!Array.isArray(value.evidence)) throw new Error("agent run evidence must be an array");
+  const currentCheckpoint = value.checkpoint;
+  if (!currentCheckpoint || typeof currentCheckpoint !== "object" || Array.isArray(currentCheckpoint)) throw new Error("agent run checkpoint must be an object");
+  for (const key of ["phase", "contextSummary", "nextAction", "toolName"]) if (typeof currentCheckpoint[key] !== "string") throw new Error("agent run checkpoint text metadata must be strings");
+  for (const key of ["allowedFiles", "completedCheckIds"]) if (!Array.isArray(currentCheckpoint[key]) || currentCheckpoint[key].some((item) => typeof item !== "string")) throw new Error("agent run checkpoint collections must contain strings");
+  if (!Number.isInteger(currentCheckpoint.remainingRepairBudget) || currentCheckpoint.remainingRepairBudget < 0) throw new Error("agent run checkpoint repair budget must be a non-negative integer");
   return value;
 }
 

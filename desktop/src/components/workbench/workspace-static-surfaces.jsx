@@ -14,7 +14,6 @@ const assetSpecs = {
   "governance-files": { title: "治理文件", description: "查看项目规则、状态和交接文件的健康情况。", sources: ["AGENTS.md", "PROJECT.md", "HANDOFF.md"], sections: [["健康结论", "按正常、变更、缺失和过期识别需要关注的治理文件。"], ["治理文件", "规则、当前状态和交接各自有唯一事实来源。"], ["处理动作", "文件缺口可生成治理任务，进入受控执行与验证链路。"]] },
   "report-artifacts": { title: "报告产物", description: "管理扫描、推荐和验收形成的可追溯报告文件。", sources: [".project-os/reports/", ".project-os/goal-validation-report.json"], sections: [["报告目录", "工程治理报告、文本报告和验收报告分别保存为产物。"], ["证据用途", "报告用于追溯评分、建议和验收，不替代当前验收结论页。"], ["保留边界", "报告是生成产物，长期项目状态和交接仍由对应治理文件维护。"]] },
   "schema-assets": { title: "Schema", description: "管理机器可读结构、版本和校验边界。", sources: ["schemas/", "docs/data/"], sections: [["契约目录", "Schema 与版本化数据定义状态、配置、报告和运行记录的结构。"], ["使用范围", "页面、CLI 与检查脚本复用同一结构化契约，不各自猜测字段。"], ["校验边界", "结构变化需经过 Schema 校验；业务解释仍归对应的治理页面。"]] },
-  "script-templates": { title: "脚本模板", description: "查看检查、同步、安装与适配资源的职责和安全边界。", sources: ["scripts/", "templates/", "adapters/"], sections: [["资源目录", "脚本、模板和适配器按职责分层，不混入页面逻辑。"], ["安全执行", "受控检查按白名单运行；有副作用的操作必须经过确认。"], ["同步校验", "可分发内容变更后同步模板并检查一致性。"]] },
 };
 
 const governanceSpecs = {

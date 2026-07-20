@@ -593,6 +593,8 @@ struct RunHermesAgentInput {
     max_steps: usize,
     #[serde(default)]
     approval_token: String,
+    #[serde(default)]
+    run_id: String,
 }
 
 fn default_agent_max_steps() -> usize {
@@ -638,6 +640,12 @@ struct ApproveAgentRunInput {
 struct ExecuteApprovedAgentToolInput {
     id: String,
     token: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ContinueAgentRunInput {
+    id: String,
 }
 
 #[derive(Serialize)]
@@ -3662,7 +3670,38 @@ fn execute_approved_agent_tool(input: ExecuteApprovedAgentToolInput) -> Result<V
         .get("arguments")
         .cloned()
         .unwrap_or_else(|| json!({}));
-    let result = match name {
+    let timestamp = current_timestamp_string();
+    run.status = if name == "apply_patch" { "applying" } else { "verifying" }.to_string();
+    run.revision += 1;
+    run.updated_at = timestamp.clone();
+    run.summary = format!("正在执行已批准工具：{name}");
+    run.checkpoint.phase = run.status.clone();
+    run.checkpoint.context_summary = run.summary.clone();
+    run.checkpoint.last_confirmation = Some(approval.clone());
+    run.checkpoint.next_action = if name == "apply_patch" {
+        "resume-apply-approval".to_string()
+    } else {
+        "resume-check-approval".to_string()
+    };
+    run.checkpoint.tool_name = name.to_string();
+    run.checkpoint.tool_arguments = arguments.clone();
+    run.checkpoint.tool_result = None;
+    run.checkpoint.allowed_files = arguments
+        .get("allowedFiles")
+        .and_then(Value::as_array)
+        .map(|items| items.iter().filter_map(Value::as_str).map(ToString::to_string).collect())
+        .unwrap_or_default();
+    let execution_phase = run.status.clone();
+    crate::runtime::agent_runs::append_evidence(
+        &mut run,
+        &execution_phase,
+        format!("开始执行已批准工具：{name}"),
+        json!({ "arguments": arguments }),
+        &timestamp,
+    );
+    crate::runtime::agent_runs::persist(&app_root, &run)?;
+    let result = (|| -> Result<Value, String> {
+        match name {
         "apply_patch" => {
             if normalize_project_access_mode(
                 &current_registry_project(&mut load_or_seed_registry(&app_root)?, &app_root)?
@@ -3681,10 +3720,10 @@ fn execute_approved_agent_tool(input: ExecuteApprovedAgentToolInput) -> Result<V
                 .map(|items| items.iter().filter_map(Value::as_str).map(ToString::to_string).collect::<Vec<_>>())
                 .unwrap_or_default();
             crate::runtime::patch::validate_unified_diff_authorized(diff, &allowed_files)?;
-            serde_json::to_value(apply_patch_draft(ApplyPatchDraftInput {
+            Ok(serde_json::to_value(apply_patch_draft(ApplyPatchDraftInput {
                 task: json!({ "patchDraft": { "diff": diff, "allowedFiles": allowed_files } }),
             })?)
-            .map_err(|err| err.to_string())?
+            .map_err(|err| err.to_string())?)
         }
         "run_check" => {
             if normalize_project_access_mode(
@@ -3698,27 +3737,104 @@ fn execute_approved_agent_tool(input: ExecuteApprovedAgentToolInput) -> Result<V
                 .get("checkId")
                 .and_then(Value::as_str)
                 .ok_or_else(|| "审批检查缺少 checkId。".to_string())?;
-            serde_json::to_value(run_guarded_check(RunGuardedCheckInput {
+            Ok(serde_json::to_value(run_guarded_check(RunGuardedCheckInput {
                 check_id: check_id.to_string(),
             })?)
-            .map_err(|err| err.to_string())?
+            .map_err(|err| err.to_string())?)
         }
-        _ => return Err(format!("不允许执行审批工具：{name}")),
+            _ => return Err(format!("不允许执行审批工具：{name}")),
+        }
+    })();
+    let result = match result {
+        Ok(result) => result,
+        Err(error) => {
+            run.status = "failed".to_string();
+            run.revision += 1;
+            run.updated_at = current_timestamp_string();
+            run.summary = format!("已批准工具执行失败：{error}");
+            run.checkpoint.phase = "failed".to_string();
+            run.checkpoint.context_summary = run.summary.clone();
+            run.checkpoint.next_action = "none".to_string();
+            run.checkpoint.tool_result = Some(json!({ "error": error.clone() }));
+            let evidence_at = run.updated_at.clone();
+            let failure_summary = run.summary.clone();
+            crate::runtime::agent_runs::append_evidence(
+                &mut run,
+                "tool-failed",
+                failure_summary,
+                json!({ "name": name, "error": error.clone() }),
+                &evidence_at,
+            );
+            crate::runtime::agent_runs::persist(&app_root, &run)?;
+            return Err(error);
+        }
     };
-    run.status =
-        if name == "run_check" && result.get("success").and_then(Value::as_bool) == Some(false) {
-            "failed".to_string()
+    let check_failed = name == "run_check" && result.get("success").and_then(Value::as_bool) == Some(false);
+    if name == "run_check" {
+        if let Some(check_id) = arguments.get("checkId").and_then(Value::as_str) {
+            if !run.checkpoint.completed_check_ids.iter().any(|id| id == check_id) {
+                run.checkpoint.completed_check_ids.push(check_id.to_string());
+            }
+        }
+    }
+    if check_failed && run.checkpoint.remaining_repair_budget == 0 {
+        run.status = "failed".to_string();
+        run.checkpoint.next_action = "none".to_string();
+        run.summary = "检查仍未通过，已达到两轮修复上限。".to_string();
+    } else {
+        if check_failed {
+            run.checkpoint.remaining_repair_budget -= 1;
+            run.repair_attempt += 1;
+            run.checkpoint.next_action = "resume-repair-draft".to_string();
+            run.summary = format!("检查未通过，剩余 {} 轮受控修复。", run.checkpoint.remaining_repair_budget);
         } else {
-            "succeeded".to_string()
-        };
+            run.checkpoint.next_action = "resume-model".to_string();
+            run.summary = format!("已执行审批工具：{name}；等待模型根据结果继续。");
+        }
+        run.status = "queued".to_string();
+    }
     run.step += 1;
     run.revision += 1;
     run.updated_at = current_timestamp_string();
-    run.summary = format!("已执行审批工具：{name}");
+    run.checkpoint.phase = run.status.clone();
+    run.checkpoint.context_summary = run.summary.clone();
+    run.checkpoint.tool_result = Some(result.clone());
     run.approval = None;
     run.approval_token.clear();
+    let evidence_at = run.updated_at.clone();
+    let completed_summary = run.summary.clone();
+    crate::runtime::agent_runs::append_evidence(
+        &mut run,
+        if check_failed { "check" } else { "tool-result" },
+        completed_summary,
+        json!({ "name": name, "result": result }),
+        &evidence_at,
+    );
     crate::runtime::agent_runs::persist(&app_root, &run)?;
     Ok(result)
+}
+
+#[tauri::command]
+async fn continue_agent_run(
+    input: ContinueAgentRunInput,
+    runtime_requests: State<'_, RuntimeRequestState>,
+) -> Result<HermesAgentLoopResult, String> {
+    let app_root = find_workspace_root()?;
+    let run = crate::runtime::agent_runs::load(&app_root, &input.id)?;
+    if run.status != "queued" || !matches!(run.checkpoint.next_action.as_str(), "resume-model" | "resume-repair-draft" | "resume-stage") {
+        return Err(format!("当前恢复点为 {}，不能继续模型阶段。", run.checkpoint.next_action));
+    }
+    run_hermes_agent(
+        RunHermesAgentInput {
+            request_id: run.request_id.clone(),
+            prompt: run.prompt.clone(),
+            max_steps: run.max_steps,
+            approval_token: String::new(),
+            run_id: run.id.clone(),
+        },
+        runtime_requests,
+    )
+    .await
 }
 
 #[tauri::command]
@@ -3727,7 +3843,6 @@ async fn run_hermes_agent(
     runtime_requests: State<'_, RuntimeRequestState>,
 ) -> Result<HermesAgentLoopResult, String> {
     let app_root = find_workspace_root()?;
-    crate::runtime::agent_runs::recover_stale(&app_root, &current_timestamp_string())?;
     let mut registry = load_or_seed_registry(&app_root)?;
     let current_project = current_registry_project(&mut registry, &app_root)?;
     let root = PathBuf::from(&current_project.path);
@@ -3736,7 +3851,9 @@ async fn run_hermes_agent(
     let api_key = read_secret_from_env_or_dotenv(&root, &provider.api_key_env)
         .ok_or_else(|| format!("环境变量或 .env.local 中未设置 {}", provider.api_key_env))?;
     let request_id = input.request_id.trim().to_string();
-    let run_id = if request_id.is_empty() {
+    let run_id = if !input.run_id.trim().is_empty() {
+        input.run_id.trim().to_string()
+    } else if request_id.is_empty() {
         format!("agent-{}", current_unix_timestamp())
     } else {
         format!("agent-{request_id}")
@@ -3749,31 +3866,50 @@ async fn run_hermes_agent(
         }
     }
     let now = current_timestamp_string();
-    let base_run = crate::runtime::agent_runs::new_hermes_run(
-        run_id.clone(),
-        request_id.clone(),
-        current_project.id.clone(),
-        input.prompt.clone(),
-        input.max_steps,
-        input.approval_token.clone(),
-        &now,
-    );
-    crate::runtime::agent_runs::persist(&app_root, &base_run)?;
+    let base_run = if input.run_id.trim().is_empty() {
+        let run = crate::runtime::agent_runs::new_hermes_run(
+            run_id.clone(),
+            request_id.clone(),
+            current_project.id.clone(),
+            input.prompt.clone(),
+            input.max_steps,
+            input.approval_token.clone(),
+            &now,
+        );
+        crate::runtime::agent_runs::persist(&app_root, &run)?;
+        run
+    } else {
+        let run = crate::runtime::agent_runs::load(&app_root, &run_id)?;
+        if run.project_id != current_project.id {
+            return Err("Agent Run 不属于当前项目，拒绝继续。".to_string());
+        }
+        if run.status != "queued" {
+            return Err(format!("当前状态为 {}，不能继续模型阶段。", run.status));
+        }
+        run
+    };
+    let continuation = base_run.checkpoint.tool_result.as_ref().map(|result| {
+        format!(
+            "\n\nOmniDesk 已执行上一受控工具，结果如下。不要重复这个操作；保留授权文件范围，若仍需写入或检查，先请求新的独立审批。\n{}",
+            serde_json::to_string(result).unwrap_or_else(|_| "null".to_string())
+        )
+    }).unwrap_or_default();
+    let execution_prompt = format!("{}{}", base_run.prompt, continuation);
     let mut running_run = base_run;
     running_run.status = "running".to_string();
-    running_run.revision = 1;
+    running_run.revision += 1;
     running_run.updated_at = current_timestamp_string();
     running_run.summary = "Hermes 正在读取上下文并形成结果。".to_string();
     running_run.checkpoint.phase = "running".to_string();
     running_run.checkpoint.context_summary = running_run.summary.clone();
     running_run.checkpoint.last_confirmation = None;
-    running_run.checkpoint.next_action = "resume-stage".to_string();
+    running_run.checkpoint.next_action = "resume-model".to_string();
     let running_evidence_at = running_run.updated_at.clone();
     crate::runtime::agent_runs::append_evidence(
         &mut running_run,
         "draft",
         "Hermes 开始生成受控草稿。",
-        json!({ "maxSteps": input.max_steps }),
+        json!({ "maxSteps": input.max_steps, "resumed": !input.run_id.trim().is_empty() }),
         &running_evidence_at,
     );
     crate::runtime::agent_runs::persist(&app_root, &running_run)?;
@@ -3789,7 +3925,7 @@ async fn run_hermes_agent(
             &api_key,
             &provider.api_base,
             &provider.api_key_env,
-            &input.prompt,
+            &execution_prompt,
             input.max_steps,
             cancellation.as_ref(),
         )
@@ -8491,6 +8627,7 @@ pub fn run() {
             run_hermes_agent,
             list_agent_runs,
             resume_agent_run,
+            continue_agent_run,
             approve_agent_run,
             execute_approved_agent_tool,
             run_guarded_check,

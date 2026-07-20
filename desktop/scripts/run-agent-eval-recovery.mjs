@@ -21,14 +21,35 @@ const created = createAgentRun({
   updatedAt: "2026-07-19T00:00:00.000Z",
 });
 const running = transitionAgentRun(created, "running", "2026-07-19T00:00:01.000Z");
-fs.writeFileSync(persistedPath, serializeAgentRun(running));
+const applying = Object.freeze({
+  ...transitionAgentRun(running, "awaiting-approval", "2026-07-19T00:00:01.500Z"),
+  approval: { token: "approval-1", name: "apply_patch", status: "approved", arguments: { allowedFiles: ["src/math.js", "src/math.test.js"] } },
+  checkpoint: {
+    ...running.checkpoint,
+    phase: "applying",
+    nextAction: "resume-apply-approval",
+    toolName: "apply_patch",
+    toolArguments: { allowedFiles: ["src/math.js", "src/math.test.js"] },
+    allowedFiles: ["src/math.js", "src/math.test.js"],
+    remainingRepairBudget: 1,
+  },
+  status: "applying",
+});
+fs.writeFileSync(persistedPath, serializeAgentRun(applying));
 const restored = JSON.parse(fs.readFileSync(persistedPath, "utf8"));
 const interrupted = recoverAgentRun(restored, "2026-07-19T00:00:02.000Z");
 const resumed = resumeAgentRun(interrupted, "2026-07-19T00:00:03.000Z");
 const resumedRunning = transitionAgentRun(resumed, "running", "2026-07-19T00:00:04.000Z");
 const settled = settleAgentRun(resumedRunning, { attempt: resumedRunning.attempt, status: "succeeded", summary: "恢复后完成", timestamp: "2026-07-19T00:00:05.000Z" });
-const recovered = interrupted.status === "interrupted" && resumed.status === "queued" && resumed.attempt === running.attempt + 1 && settled.accepted && settled.run.status === "succeeded";
-fs.writeFileSync(tracePath, `${JSON.stringify({ created, running, interrupted, resumed, resumedRunning, settled }, null, 2)}\n`);
+const recovered = interrupted.status === "interrupted"
+  && interrupted.checkpoint.phase === "applying"
+  && resumed.status === "awaiting-approval"
+  && resumed.checkpoint.allowedFiles.join(",") === "src/math.js,src/math.test.js"
+  && resumed.checkpoint.remainingRepairBudget === 1
+  && resumed.attempt === applying.attempt + 1
+  && settled.accepted
+  && settled.run.status === "succeeded";
+fs.writeFileSync(tracePath, `${JSON.stringify({ created, running, applying, interrupted, resumed, resumedRunning, settled }, null, 2)}\n`);
 const result = {
   caseId: "interrupted-run",
   success: recovered,

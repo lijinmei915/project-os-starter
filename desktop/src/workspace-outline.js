@@ -416,7 +416,7 @@ export const projectGovernanceOutline = [
         icon: "files",
         description: "源码、配置和工程入口。",
         items: [
-          { id: "engineering-files", title: "代码与配置", description: "源码、配置和工程目录。", relatedFiles: ["desktop/*", "cli/*", "package.json"] },
+          { id: "engineering-files", title: "代码与配置", description: "源码、配置和工程入口。", relatedFiles: ["desktop/*", "package.json"] },
         ],
       },
       {
@@ -440,14 +440,13 @@ export const projectGovernanceOutline = [
         ],
       },
       {
-        id: "assets-advanced-menu",
-        title: "高级资源",
-        meta: "高级",
+        id: "assets-schema-menu",
+        title: "数据契约",
+        meta: "契约",
         icon: "settings",
-        description: "数据契约、自动化与可分发模板。",
+        description: "Schema、manifest 和结构化数据契约。",
         items: [
           { id: "schema-assets", title: "数据契约", meta: "契约", description: "Schema、manifest 和结构化数据契约。", relatedFiles: ["schemas/*", "docs/data/*"] },
-          { id: "script-templates", title: "自动化与模板", meta: "模板", description: "运行脚本、模板和可分发资源。", relatedFiles: ["scripts/*", "templates/*", "adapters/*"] },
         ],
       },
     ],
@@ -458,7 +457,7 @@ export const projectGovernanceOutline = [
     title: "Agent 配置",
     meta: "配置",
     icon: "bot",
-    description: "模型、技能、工具和适配器。",
+    description: "模型、受控工具和安全边界。",
     children: [
       {
         id: "agent-models-menu",
@@ -478,26 +477,6 @@ export const projectGovernanceOutline = [
         description: "允许执行的工具和命令。",
         items: [
           { id: "tool-allowlist", title: "工具白名单", description: "受控读取、工程写入、检查和终端限制。", relatedFiles: ["desktop/src/agent-runtime/tool-registry.js", "desktop/src-tauri/src/runtime/app.rs", "desktop/src-tauri/src/runtime/patch.rs"] },
-        ],
-      },
-      {
-        id: "agent-skills-menu",
-        title: "Skill 能力",
-        meta: "技能",
-        icon: "bot",
-        description: "Agent 能力扩展。",
-        items: [
-          { id: "skill-capabilities", title: "Skill 能力", description: "Agent 技能定义和工程规范。", relatedFiles: [".agents/skills/*", "docs/SKILL_ENGINEERING.md"] },
-        ],
-      },
-      {
-        id: "agent-adapters-menu",
-        title: "适配器",
-        meta: "适配",
-        icon: "files",
-        description: "工具入口适配。",
-        items: [
-          { id: "adapters", title: "适配器", description: "Codex、Claude、Cursor 等工具入口。", relatedFiles: ["adapters/*", "CODEX.md", "CLAUDE.md"] },
         ],
       },
       {

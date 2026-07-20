@@ -93,11 +93,18 @@ async function readTerminalTrace() {
 }
 
 function readPersistedTerminalTrace() {
-  try {
-    return JSON.parse(fs.readFileSync(path.join(fixture, ".project-os", "native-terminal-trace.json"), "utf8"));
-  } catch {
-    return [];
+  const candidates = [
+    path.join(fixture, ".omnidesk", "cache", "native-terminal-trace.json"),
+    path.join(fixture, ".project-os", "native-terminal-trace.json"),
+  ];
+  for (const tracePath of candidates) {
+    try {
+      return JSON.parse(fs.readFileSync(tracePath, "utf8"));
+    } catch {
+      // A legacy fixture may not have activated the namespace yet.
+    }
   }
+  return [];
 }
 
 async function waitForPersistedTerminalStage(stage) {

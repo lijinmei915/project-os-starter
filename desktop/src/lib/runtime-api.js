@@ -38,6 +38,9 @@ export async function invokePreviewCommand(command, payload) {
   if (command === "resume_agent_run") {
     throw new Error("浏览器预览不能恢复 Hermes 运行，请在桌面 App 窗口里使用。");
   }
+  if (command === "continue_agent_run") {
+    throw new Error("浏览器预览不能继续 Hermes 运行，请在桌面 App 窗口里使用。");
+  }
   if (command === "approve_agent_run") {
     throw new Error("浏览器预览不能批准 Hermes 运行，请在桌面 App 窗口里使用。");
   }
