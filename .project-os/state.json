@@ -74,7 +74,9 @@
       "本地总回归与旧 CLI、installer、模板、报告和图谱链断开",
       "受保护 Agent Eval 使用 active .omnidesk Provider 与 evidence artifact",
       "Agent Run 持久化阶段 checkpoint、审批恢复和同一 Run 证据续接",
-      "Desktop 工作区移除冻结的 CLI、模板、adapter 与 routing Skill 入口"
+      "Desktop 工作区移除冻结的 CLI、模板、adapter 与 routing Skill 入口",
+      "旧 CLI crate 与 Desktop governance bridge 已退役",
+      "Desktop Runbook、Preview 与工程资产投影不再消费旧治理脚本、模板或 adapter"
     ],
     "doing": [
       "OmniDesk 产品与文档 SSOT 单内核收敛",
@@ -84,7 +86,7 @@
     ],
     "blocked": [],
     "next": [
-      "删除无生产、CI 或本地回归消费者的 governance bridge",
+      "审计并删除无生产、CI、本地回归或文档兼容消费者的 installer、scripts、templates、adapters 与 routing skill",
       "增加网络中断、应用重启和多文件任务恢复验收",
       "清理历史运行产物和兼容层"
     ]

@@ -15,6 +15,8 @@ depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
 
 ## 接手摘要
 
+- 2026-07-21 旧 CLI crate 与 Desktop `governance` bridge 已从仓库退役；Desktop Runbook、Preview 与工程资产投影也不再发现或展示旧 `scripts/check-runtime.sh`、`templates/` 或 `adapters/`。边界回归现在会阻止这些依赖重新进入 Desktop Runtime。验证：Desktop Node 442/442、`cargo check --manifest-path desktop/src-tauri/Cargo.toml`、`git diff --check` 通过。下一步是按消费者审计拆批清理 installer、scripts、templates、adapters 和 routing skill；`.project-os` 仍是迁移兼容源，不能删除。
+
 - 2026-07-21 Desktop 产品信息架构已断开冻结的 Project OS 资产：工作区不再展示 `cli/`、`templates/`、`adapters/`、`.agents/.claude` 的“自动化与模板 / Skill / 适配器”入口、路由、静态面板或文件索引；Agent 配置仅保留模型连接、受控工具和安全边界，工程资源默认范围也不再包含 `cli/*`。这些条目只参与导航和展示，不参与任务、权限或 Runtime 执行，因此删除不改变受控开发链路。验证：路由与领域边界 92/92、Web build、diff check 通过；首屏入口约 792 KiB / 800 KiB。
 
 - 2026-07-21 离线 Agent Eval 的 JS 状态契约已与 Rust Agent Run checkpoint 对齐：`checkpoint` 现在包含阶段、最后确认、下一动作、工具/参数/结果、允许文件、完成检查与修复预算。恢复 Eval 改为从已批准的 `applying` 状态重启，验证恢复后保留原审批和文件范围并重新计数 attempt；同时修复 `interrupted -> awaiting-approval` 未增加 attempt 的状态机缺陷。验证：Agent Runtime / Eval recovery 定向 10/10 通过。此路径仍是离线契约证据；真实 Provider 网络中断与多文件修复仍需受保护 Eval trace。

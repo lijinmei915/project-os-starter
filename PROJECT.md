@@ -22,7 +22,7 @@ depends_on: [AGENTS.md, docs/ARCHITECTURE.md, docs/PRODUCT_PLAN.md]
 
 OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生成计划和 Patch 草稿、执行独立审批、运行检查、有限修复并保存可审计证据。它不是 Project OS 安装器、AI 工程评分工具或跨工具模板分发产品。
 
-`Project OS` 是本仓库早期产品阶段留下的兼容命名和工具链。旧 CLI、安装脚本、模板、报告与 adapter 已冻结，不再承载新产品能力；待 Desktop Runtime 完成状态迁移和依赖断开后退役。
+`Project OS` 是本仓库早期产品阶段留下的兼容命名和工具链。旧 CLI 与 Desktop governance bridge 已退役；安装脚本、模板、报告与 adapter 已冻结，不再承载新产品能力，待其余消费者断开后删除。
 
 ## 当前架构
 
@@ -48,6 +48,7 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 - `.omnidesk/` v1 四分区 schema、非破坏性迁移器和启动激活已接入生产 Runtime：支持幂等复制、冲突拒绝、符号链接跳过和 legacy 回退。
 - Repository、Workspace、Provider、Task、Conversation、Agent Run 与 Preview 均通过同一逻辑路径映射读写；文件树和 Agent 读取工具隐藏两个物理状态目录。
 - Desktop Runtime 已停止编译旧 `governance` bridge，不再暴露 `run_project_os_action`，受控检查只执行 Desktop Node、Web build 与 Cargo 检查；浏览器 Preview 的事实刷新只重新读取只读 snapshot。
+- 旧 CLI crate 与 Desktop `governance` bridge 已从仓库删除；Desktop Runbook、Preview 和工程资产投影不再发现或展示旧治理脚本、模板与 adapter。
 - Desktop 工作区已移除旧 CLI、模板、adapter 与 routing Skill 的可见入口，仅呈现 OmniDesk Runtime 的模型、受控工具、安全边界、工程文件与证据。
 - 常规 CI 已删除旧 CLI 编译、installer 回归、AI 工程报告生成和 `.project-os` 报告上传，只保留 Desktop Runtime 回归与轻量仓库契约检查。
 - 受保护 Agent Eval 使用 active `.omnidesk/data` Provider 配置，并将每次真实结果、报告与 trace 固化到 `.omnidesk/evidence/agent-eval/<run-id>` 后上传。
@@ -71,7 +72,7 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 ## 下一步重点
 
 1. 将受保护 Eval 的临时 Provider 与 trace artifact 切换到 active `.omnidesk` 命名空间。
-2. 删除不再被 Desktop、CI 或本地回归使用的 governance bridge，并继续收敛 CLI、scripts、templates、adapters 与 routing skill。
+2. 审计并删除不再被 Desktop、CI、本地回归或文档兼容层使用的 installer、scripts、templates、adapters 与 routing skill。
 3. 持久化长任务 request checkpoint、阶段、上下文摘要和最后确认点，并覆盖网络中断、应用重启和多文件恢复。
 4. 将 Eval 原始 trace 固化为稳定 artifact，补齐原生端、中断和大型任务发布门槛。
 5. 完成全量验收后按保留策略清理 `.project-os` 历史产物和兼容层。

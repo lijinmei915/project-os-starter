@@ -192,7 +192,6 @@ function runbookCommandsPreview(projectRoot) {
     }
   }
   if (fs.existsSync(path.join(projectRoot, "desktop/src-tauri/Cargo.toml"))) commands.push({ id: "desktop:cargo-check", label: "桌面壳检查", command: "cargo check --manifest-path desktop/src-tauri/Cargo.toml", kind: "check", source: "desktop/src-tauri/Cargo.toml" });
-  if (fs.existsSync(path.join(projectRoot, "scripts/check-runtime.sh"))) commands.push({ id: "governance:runtime", label: "治理检查", command: "bash scripts/check-runtime.sh .", kind: "check", source: "scripts/check-runtime.sh" });
   return commands;
 }
 

@@ -6530,7 +6530,6 @@ fn classify_governance_file(file: &str, domains: &mut HashMap<&'static str, Vec<
     if lower.ends_with("package.json")
         || lower.contains("runbook")
         || lower.contains("readme")
-        || lower.starts_with("scripts/")
     {
         push_domain_file(domains, "runbook", file);
     }
@@ -6553,12 +6552,7 @@ fn classify_governance_file(file: &str, domains: &mut HashMap<&'static str, Vec<
     {
         push_domain_file(domains, "design-implementation", file);
     }
-    if lower.starts_with("desktop/src")
-        || lower.starts_with("desktop/src-tauri")
-        || lower.starts_with("scripts/")
-        || lower.starts_with("adapters/")
-        || lower.starts_with("templates/")
-    {
+    if lower.starts_with("desktop/src") || lower.starts_with("desktop/src-tauri") {
         push_domain_file(domains, "engineering-assets", file);
     }
 }
@@ -6803,10 +6797,8 @@ fn governance_domains_from_files(root: &Path) -> Vec<Value> {
             vec![
                 "desktop/src/*",
                 "desktop/src-tauri/*",
-                "scripts/*",
-                "templates/*",
             ],
-            "源码、脚本、模板或适配器文件变化时自动刷新。",
+            "桌面源码或 Runtime 文件变化时自动刷新。",
         ),
     ]
 }

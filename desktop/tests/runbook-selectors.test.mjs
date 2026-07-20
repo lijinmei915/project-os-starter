@@ -17,11 +17,11 @@ test("selects start commands while retaining detected environment requirements",
   const model = selectRunbook(runbookStore([
     { id: "web", label: "Web 开发预览", command: "npm run dev", kind: "start", source: "desktop/package.json" },
     { id: "cargo", label: "桌面壳检查", command: "cargo check", kind: "check", source: "Cargo.toml" },
-    { id: "runtime", label: "治理检查", command: "bash scripts/check-runtime.sh .", kind: "check", source: "scripts/check-runtime.sh" },
+    { id: "runtime", label: "Desktop 测试", command: "npm --prefix desktop test", kind: "check", source: "desktop/package.json" },
   ]));
   assert.equal(model.readiness.startCount, 1);
   assert.equal(model.status, "可启动");
-  assert.deepEqual(model.context.requirements, ["Node.js / npm", "Rust / Cargo", "Bash"]);
+  assert.deepEqual(model.context.requirements, ["Node.js / npm", "Rust / Cargo"]);
   assert.equal(model.context.workingDirectory, "/workspace/OmniDesk");
   assert.equal(model.startCommands[0].note, "来源：desktop/package.json");
   assert.equal("verificationCommands" in model, false);
