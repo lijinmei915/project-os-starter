@@ -21,11 +21,24 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: desktop/package-lock.json
+      - name: Install Patch Normalizer build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            libglib2.0-dev \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev
       - run: npm ci --prefix desktop
       - name: Install Hermes CLI
         run: |
           python3 -m pip install --user hermes-agent
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Verify Patch Normalizer
+        run: |
+          printf '%s' '{"diff":"--- README.md\n+++ README.md\n@@ -1 +1 @@\n-before\n+after\n","contexts":[{"path":"README.md","content":"before\n"}]}' \
+            | cargo run --quiet --manifest-path desktop/src-tauri/Cargo.toml --bin omnidesk-patch-normalizer \
+            | node -e 'let body=""; process.stdin.on("data", (chunk) => body += chunk).on("end", () => { const result = JSON.parse(body); if (!result.normalizedDiff.includes("+after")) process.exit(1); })'
       - name: Run the 12-case real evaluation
         env:
           OMNIDESK_AGENT_EVAL_KEY: ${{ secrets.OMNIDESK_AGENT_EVAL_KEY }}
