@@ -15,6 +15,8 @@ depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
 
 ## 接手摘要
 
+- 2026-07-21 受保护 Hermes Eval 的 `failed-check-repair` case 现先对隔离 fixture 执行原始失败检查，并将退出码和受限输出摘要写入 `initialCheck` trace；只有“初始检查失败 + Patch 通过 Gateway 审批并应用 + 最终检查通过”才计为成功。该改动补强真实 Eval 证据，不把预设失败文本当作修复闭环；本机未调用 Provider 或伪造 trace。验证：`node --check` 与 Desktop Node 442/442 通过。仍待受保护环境下一次真实运行产出新 artifact；当前 runner 尚未模拟原生窗口中的审批点击。
+
 - 2026-07-21 旧 CLI crate 与 Desktop `governance` bridge 已从仓库退役；Desktop Runbook、Preview 与工程资产投影也不再发现或展示旧 `scripts/check-runtime.sh`、`templates/` 或 `adapters/`。边界回归现在会阻止这些依赖重新进入 Desktop Runtime。验证：Desktop Node 442/442、`cargo check --manifest-path desktop/src-tauri/Cargo.toml`、`git diff --check` 通过。下一步是按消费者审计拆批清理 installer、scripts、templates、adapters 和 routing skill；`.project-os` 仍是迁移兼容源，不能删除。
 
 - 2026-07-21 Desktop 产品信息架构已断开冻结的 Project OS 资产：工作区不再展示 `cli/`、`templates/`、`adapters/`、`.agents/.claude` 的“自动化与模板 / Skill / 适配器”入口、路由、静态面板或文件索引；Agent 配置仅保留模型连接、受控工具和安全边界，工程资源默认范围也不再包含 `cli/*`。这些条目只参与导航和展示，不参与任务、权限或 Runtime 执行，因此删除不改变受控开发链路。验证：路由与领域边界 92/92、Web build、diff check 通过；首屏入口约 792 KiB / 800 KiB。

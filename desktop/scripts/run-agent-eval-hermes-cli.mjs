@@ -202,6 +202,9 @@ async function runPatchCase(caseId, definition) {
   const rawOutputPath = path.join(fixture, "raw-model-output.txt");
   const usagePath = path.join(fixture, "usage.json");
   const tracePath = path.join(fixture, "trace.json");
+  const initialCheck = caseId === "failed-check-repair"
+    ? summarizeFixtureCheck(definition.check(fixture))
+    : null;
   const contextText = Object.entries(definition.files)
     .map(([file, content]) => `\n--- AUTHORIZED FILE: ${file} ---\n${content}`)
     .join("\n");
@@ -276,6 +279,7 @@ async function runPatchCase(caseId, definition) {
     normalizedPatchApplicable: normalization.ok && applyResult.status === "completed",
     normalization: normalization.ok ? { status: "normalized", normalizedDiff: diff } : { status: "rejected", error: normalization.error },
     applyResult,
+    initialCheck,
     gitDiffCheck: { exitCode: gitDiffCheck.status, stderr: String(gitDiffCheck.stderr || "").slice(0, 4000) },
     fixtureCheckPassed,
     fixtureCheckError,
@@ -284,7 +288,7 @@ async function runPatchCase(caseId, definition) {
   fs.writeFileSync(tracePath, `${JSON.stringify(trace, null, 2)}\n`);
   return {
     caseId,
-    success: model.status === 0 && fixtureCheckPassed,
+    success: model.status === 0 && fixtureCheckPassed && (!initialCheck || !initialCheck.success),
     patchApplicable: normalization.ok && applyResult.status === "completed",
     rawPatchApplicable: rawApplyCheck.status === 0,
     normalizedPatchApplicable: normalization.ok && applyResult.status === "completed",
@@ -294,6 +298,14 @@ async function runPatchCase(caseId, definition) {
     durationMs: Date.now() - started,
     costUsd: Number(usage.estimated_cost_usd || 0),
     execution: { executor: "hermes-cli", fixture, executedAt: new Date().toISOString(), tracePath },
+  };
+}
+
+function summarizeFixtureCheck(result) {
+  return {
+    exitCode: Number.isInteger(result?.status) ? result.status : null,
+    output: String(result?.stderr || result?.stdout || "").trim().slice(0, 4000),
+    success: result?.status === 0,
   };
 }
 
