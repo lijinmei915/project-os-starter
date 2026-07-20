@@ -220,6 +220,7 @@ async function runPatchCase(caseId, definition) {
   fs.writeFileSync(rawOutputPath, `${raw}\n`);
   const rawDiff = raw.endsWith("\n") ? raw : `${raw}\n`;
   const contexts = Object.keys(definition.files).map((file) => ({ path: file, content: fs.readFileSync(path.join(fixture, file), "utf8") }));
+  const authorizedFiles = contexts.map((context) => context.path);
   const rawApplyCheck = model.status === 0 && raw ? runGit(fixture, ["apply", "--check"], rawDiff) : { status: 1, stderr: "模型未返回补丁。" };
   const normalization = model.status === 0 && raw ? normalizeWithDesktopRuntime(rawDiff, contexts) : { ok: false, error: "模型未返回补丁。" };
   const diff = normalization.ok ? normalization.diff : "";
@@ -255,6 +256,12 @@ async function runPatchCase(caseId, definition) {
     }
   }
   const gitDiffCheck = applied ? runGit(fixture, ["diff", "--check"]) : { status: 1, stderr: "Patch 未应用。" };
+  const changedFiles = applied
+    ? String(runGit(fixture, ["diff", "--name-only"]).stdout || "").split(/\r?\n/).filter(Boolean)
+    : [];
+  const changedFilesAuthorized = changedFiles.every((file) => authorizedFiles.includes(file));
+  const requiredChangedFileCount = caseId === "goal-rebind" ? 2 : 1;
+  const changedRequiredFiles = changedFiles.length >= requiredChangedFileCount;
   let fixtureCheckPassed = false;
   let fixtureCheckError = "";
   if (applied && gitDiffCheck.status === 0) {
@@ -280,6 +287,11 @@ async function runPatchCase(caseId, definition) {
     normalization: normalization.ok ? { status: "normalized", normalizedDiff: diff } : { status: "rejected", error: normalization.error },
     applyResult,
     initialCheck,
+    authorizedFiles,
+    changedFiles,
+    changedFilesAuthorized,
+    requiredChangedFileCount,
+    changedRequiredFiles,
     gitDiffCheck: { exitCode: gitDiffCheck.status, stderr: String(gitDiffCheck.stderr || "").slice(0, 4000) },
     fixtureCheckPassed,
     fixtureCheckError,
@@ -288,7 +300,7 @@ async function runPatchCase(caseId, definition) {
   fs.writeFileSync(tracePath, `${JSON.stringify(trace, null, 2)}\n`);
   return {
     caseId,
-    success: model.status === 0 && fixtureCheckPassed && (!initialCheck || !initialCheck.success),
+    success: model.status === 0 && fixtureCheckPassed && changedFilesAuthorized && changedRequiredFiles && (!initialCheck || !initialCheck.success),
     patchApplicable: normalization.ok && applyResult.status === "completed",
     rawPatchApplicable: rawApplyCheck.status === 0,
     normalizedPatchApplicable: normalization.ok && applyResult.status === "completed",
