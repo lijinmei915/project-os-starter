@@ -32,6 +32,7 @@
       "status": "frozen",
       "role": "compatibility-only",
       "desktopDependency": "disconnected",
+      "ciDependency": "disconnected",
       "paths": [
         "cli",
         "scripts",
@@ -68,18 +69,19 @@
       ".omnidesk 四分区 schema 与非破坏性幂等迁移器",
       "Runtime 启动激活、冲突回退与 Preview 路径切换",
       "状态目录与 Agent 工程文件读取隔离",
-      "Desktop Runtime 与旧 Project OS governance 执行链断开"
+      "Desktop Runtime 与旧 Project OS governance 执行链断开",
+      "常规 CI 与旧 CLI、installer 和 AI 工程报告链断开"
     ],
     "doing": [
       "OmniDesk 产品与文档 SSOT 单内核收敛",
-      "CI、仓库测试与文档的旧 Project OS 依赖退役",
+      "仓库测试与文档的旧 Project OS 依赖退役",
       "长任务 checkpoint 恢复",
       "Eval trace 稳定证据化"
     ],
     "blocked": [],
     "next": [
-      "建立旧工具链剩余依赖清单和退役门槛",
-      "替换 CI 与仓库测试对旧 CLI 和 Shell 检查的调用",
+      "拆除 tests/run-tests.sh 的旧 CLI、installer、模板和报告回归",
+      "删除无生产或 CI 消费者的 governance bridge",
       "增加网络中断、应用重启和多文件任务恢复验收",
       "清理历史运行产物和兼容层"
     ]

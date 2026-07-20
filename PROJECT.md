@@ -48,11 +48,12 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 - `.omnidesk/` v1 四分区 schema、非破坏性迁移器和启动激活已接入生产 Runtime：支持幂等复制、冲突拒绝、符号链接跳过和 legacy 回退。
 - Repository、Workspace、Provider、Task、Conversation、Agent Run 与 Preview 均通过同一逻辑路径映射读写；文件树和 Agent 读取工具隐藏两个物理状态目录。
 - Desktop Runtime 已停止编译旧 `governance` bridge，不再暴露 `run_project_os_action`，受控检查只执行 Desktop Node、Web build 与 Cargo 检查；浏览器 Preview 的事实刷新只重新读取只读 snapshot。
+- 常规 CI 已删除旧 CLI 编译、installer 回归、AI 工程报告生成和 `.project-os` 报告上传，只保留 Desktop Runtime 回归与轻量仓库契约检查。
 
 正在做：
 
 - 将产品与文档 SSOT 收敛到 OmniDesk Desktop Runtime。
-- 继续断开 CI、仓库测试和文档对旧 Project OS 分发工具链的真实依赖。
+- 继续断开仓库测试和文档对旧 Project OS 分发工具链的真实依赖。
 - 将长任务恢复从“整轮重试”提升为持久化 checkpoint 后按阶段恢复。
 - 将 Eval 原始 trace 从临时目录固化为可携带的发布证据。
 
@@ -61,13 +62,14 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 - 活跃 Provider 请求不能从中断 token 续传，只能基于 checkpoint 重新执行当前阶段。
 - 终端会话和屏幕输出仍在内存，Runtime 重启会终止会话。
 - `.project-os/` 仍作为非破坏性迁移源和 tracked 治理兼容文件；在 `AGENTS.md` 和旧工具链改用新 SSOT 前不能删除。
-- 旧 CLI、scripts、templates、adapters 与当前 CI/仓库测试仍有真实依赖，不能直接整目录删除；Desktop 生产运行时已不再依赖它们。
+- 旧 CLI、scripts、templates、adapters 与本地全量测试、文档仍有真实依赖，不能直接整目录删除；Desktop 生产运行时与常规 CI 已不再依赖它们。
+- 受保护 Agent Eval 仍通过 legacy `.project-os/desktop-provider.json` 逻辑路径注入临时 Provider；切换到 active `.omnidesk` artifact 前不能删除兼容映射。
 - 命名空间映射仍接受 `.project-os/...` 作为兼容逻辑路径；在旧调用者退役前，不能把字符串搜索结果误判为物理旧路径仍在被读写。
 
 ## 下一步重点
 
-1. 建立旧 CLI、installer、templates、adapters 和 routing skill 的剩余依赖清单与退役门槛。
-2. 先替换 CI 与仓库测试对旧 CLI / Shell 检查的调用，再删除不再编译的 Desktop governance bridge。
+1. 拆除 `tests/run-tests.sh` 中 CLI、installer、模板分发、报告和图谱的旧产品回归，只保留仍有 owner 的仓库契约。
+2. 删除不再被 Desktop 或 CI 使用的 governance bridge，并继续收敛 CLI、scripts、templates、adapters 与 routing skill。
 3. 持久化长任务 request checkpoint、阶段、上下文摘要和最后确认点，并覆盖网络中断、应用重启和多文件恢复。
 4. 将 Eval 原始 trace 固化为稳定 artifact，补齐原生端、中断和大型任务发布门槛。
 5. 完成全量验收后按保留策略清理 `.project-os` 历史产物和兼容层。

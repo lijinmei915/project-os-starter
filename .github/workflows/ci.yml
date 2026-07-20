@@ -54,87 +54,23 @@ jobs:
           cargo check --manifest-path desktop/src-tauri/Cargo.toml
           cargo test --manifest-path desktop/src-tauri/Cargo.toml
 
-  project-os:
-    name: Project OS regression
+  repository-contracts:
+    name: Repository contracts
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Show tool versions
-        run: |
-          bash --version
-          node --version
-          cargo --version
-
-      - name: Shell syntax check
-        run: |
-          bash -n scripts/check-runtime.sh
-          bash -n scripts/check-secrets.sh
-          bash -n scripts/check-template-sync.sh
-          bash -n scripts/check-ai-project.sh
-          bash -n scripts/ai-project.sh
-          bash -n scripts/exec/project-os.sh
-          bash -n scripts/validate/check-runtime.sh
-          bash -n scripts/validate/check-ai-project.sh
-          bash -n scripts/cleanup/prune-project-os-artifacts.sh
-          bash -n scripts/prune-project-os-artifacts.sh
-          bash -n scripts/install-project-os.sh
-          bash -n scripts/install-adapter.sh
-          bash -n scripts/sync-templates.sh
-          bash -n tests/screenshot-regression.sh
-          bash -n tests/run-tests.sh
-          node --check tests/visual-diff.mjs
-
-      - name: Validate JSON schemas and models
-        run: |
-          node -e "const fs=require('fs'); for (const file of ['schemas/project-state.schema.json','schemas/entry-context.schema.json','schemas/project-os-config.schema.json','schemas/ai-project-score.schema.json','schemas/ai-project-score.v0.2.json','schemas/ai-project-report.schema.json','schemas/ai-project-report.v0.1.json']) { JSON.parse(fs.readFileSync(file, 'utf8')); console.log('json ok:', file); }"
-
-      - name: Check native Project OS CLI
-        run: |
-          cargo check --manifest-path cli/Cargo.toml
-          bash scripts/build-project-os-cli.sh
-          bin/project-os context . --runtime-root . --trigger-source ci --output json --persist none > /tmp/project-os-cli-result.json
-          node -e "const fs=require('fs'); const r=JSON.parse(fs.readFileSync('/tmp/project-os-cli-result.json','utf8')); if(r.schemaVersion!=='project-os.cli-result.v0.1' || r.triggerSource!=='ci' || r.entryContext!==null || r.persist!=='none') process.exit(1); console.log('structured result ok:', r.command, r.persist)"
-          bin/project-os state sync . --output json > /tmp/project-os-state-sync.json
-          node -e "const fs=require('fs'); const r=JSON.parse(fs.readFileSync('/tmp/project-os-state-sync.json','utf8')); if(r.schemaVersion!=='project-os.state-sync-result.v0.1' || r.status!=='passed' || !r.bundle) process.exit(1); console.log('state sync ok:', r.bundle)"
-
-      - name: Run Project OS regression tests
+      - name: Validate repository contracts
         env:
           PROJECT_OS_ALLOW_EMPTY_PROVIDER_KEYS: "1"
-          PROJECT_OS_SKIP_SCREENSHOT: "1"
-        run: bash tests/run-tests.sh
-
-      - name: Check secret safety
-        env:
-          PROJECT_OS_ALLOW_EMPTY_PROVIDER_KEYS: "1"
-        run: bash scripts/check-secrets.sh .
-
-      - name: Generate AI project report
-        run: bash scripts/check-ai-project.sh . --write-report --html
-
-      - name: Check generated report markers
         run: |
-          grep -q "AI 工程上下文完整度" .project-os/reports/ai-project-report.md
-          grep -q "AI 工程成熟度" .project-os/reports/ai-project-report.md
-          grep -q "Maturity" .project-os/reports/ai-project-report.html
+          node -e "const fs=require('fs'); for (const file of ['.project-os/state.json','docs/data/doc-structure.manifest.json']) { JSON.parse(fs.readFileSync(file, 'utf8')); console.log('json ok:', file); }"
+          bash scripts/check-frontmatter.sh .
+          bash scripts/check-doc-structure.sh .
+          bash scripts/check-secrets.sh .
 
       - name: Ensure tracked files are unchanged
         run: git diff --exit-code
-
-      - name: Upload AI project report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ai-project-report
-          path: |
-            .project-os/reports/ai-project-report.md
-            .project-os/reports/ai-project-report.html
-            .project-os/entry-contexts/*.json
-            .project-os/state-bundles/*.json
-            tests/screenshots/*.png
-            tests/screenshots/current/*.png
-            tests/screenshots/diff/*.png
-          if-no-files-found: ignore
