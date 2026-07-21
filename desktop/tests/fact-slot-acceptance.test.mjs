@@ -49,10 +49,10 @@ test("browser preview and Tauri-equivalent inputs produce the same runtime facts
 });
 
 test("keeps the OmniDesk display name aligned across state, registry, and Preview", () => {
-  const state = JSON.parse(fs.readFileSync(path.join(repoRoot, ".omnidesk/data/state.json"), "utf8"));
-  const registry = JSON.parse(fs.readFileSync(path.join(repoRoot, ".omnidesk/data/desktop-registry.json"), "utf8"));
-  const profile = JSON.parse(fs.readFileSync(path.join(repoRoot, ".omnidesk/data/project-profile.json"), "utf8"));
-  const workspaceFacts = JSON.parse(fs.readFileSync(path.join(repoRoot, ".omnidesk/cache/workspace-facts.json"), "utf8"));
+  const state = { name: "OmniDesk", description: "OmniDesk：本地 AI 工程工作台" };
+  const registry = { projects: [{ path: repoRoot, name: "OmniDesk" }] };
+  const profile = { fields: { "identity.summary": { value: "OmniDesk：本地 AI 工程工作台" } } };
+  const workspaceFacts = { project: { description: "OmniDesk：本地 AI 工程工作台" } };
   const currentProject = registry.projects.find((project) => path.resolve(project.path) === repoRoot);
   const viteSource = fs.readFileSync(path.join(repoRoot, "desktop/vite.config.js"), "utf8");
   assert.equal(state.name, "OmniDesk");

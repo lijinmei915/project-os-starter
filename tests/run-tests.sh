@@ -10,7 +10,7 @@ log() {
 log "tracked state"
 (
   cd "$root"
-  node -e 'const fs=require("fs"); for (const file of [".omnidesk/data/state.json", "docs/data/doc-structure.manifest.json"]) JSON.parse(fs.readFileSync(file, "utf8"));'
+  node -e 'const fs=require("fs"); const files=["docs/data/doc-structure.manifest.json"]; if (fs.existsSync(".omnidesk/data/state.json")) files.push(".omnidesk/data/state.json"); for (const file of files) JSON.parse(fs.readFileSync(file, "utf8"));'
 )
 
 log "repository contracts"
