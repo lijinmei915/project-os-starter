@@ -236,7 +236,7 @@ impl Repository {
         });
         let event_path = crate::runtime::state_namespace::state_path_for_write(
             &self.root,
-            ".project-os/events",
+            ".omnidesk/runtime/events",
         )?
         .join(format!("{}.json", event["id"].as_str().unwrap_or("event")));
         write_atomic(
@@ -329,7 +329,7 @@ impl Repository {
         });
         let event_path = crate::runtime::state_namespace::state_path_for_write(
             &self.root,
-            ".project-os/events",
+            ".omnidesk/runtime/events",
         )?
         .join(format!("{}.json", event["id"].as_str().unwrap_or("event")));
         write_atomic(
@@ -346,7 +346,7 @@ impl Repository {
     pub fn recover_incomplete_transactions(&self) -> Result<(), String> {
         let directory = crate::runtime::state_namespace::state_path_for_read(
             &self.root,
-            ".project-os/transactions",
+            ".omnidesk/runtime/transactions",
         )?;
         let Ok(entries) = fs::read_dir(&directory) else {
             return Ok(());
@@ -380,9 +380,9 @@ impl Repository {
     fn transaction_path(&self, transaction_id: &str) -> PathBuf {
         crate::runtime::state_namespace::state_path_for_write(
             &self.root,
-            ".project-os/transactions",
+            ".omnidesk/runtime/transactions",
         )
-        .unwrap_or_else(|_| self.root.join(".project-os/transactions"))
+        .unwrap_or_else(|_| self.root.join(".omnidesk/runtime/transactions"))
         .join(format!("{transaction_id}.json"))
     }
 
@@ -501,7 +501,7 @@ struct RepositoryLock {
 impl RepositoryLock {
     fn acquire(root: &Path) -> Result<Self, String> {
         let path =
-            crate::runtime::state_namespace::state_path_for_write(root, ".project-os/locks")?
+            crate::runtime::state_namespace::state_path_for_write(root, ".omnidesk/runtime/locks")?
                 .join("omnidesk-repository.lock");
         let parent = path.parent().ok_or_else(|| "锁目录无效".to_string())?;
         fs::create_dir_all(parent).map_err(|err| err.to_string())?;
@@ -599,7 +599,7 @@ mod tests {
             "goal-a"
         );
         assert!(root
-            .join(".project-os/events")
+            .join(".omnidesk/runtime/events")
             .join(format!("{}.json", event["id"].as_str().unwrap()))
             .exists());
         fs::remove_dir_all(root).unwrap();
@@ -696,7 +696,7 @@ mod tests {
         repository
             .write_json(".project-os/goals.json", &json!({ "before": true }))
             .unwrap();
-        let transaction_dir = root.join(".project-os/transactions");
+        let transaction_dir = root.join(".omnidesk/runtime/transactions");
         fs::create_dir_all(&transaction_dir).unwrap();
         write_atomic(
             &transaction_dir.join("interrupted.json"),
@@ -726,7 +726,7 @@ mod tests {
         let repository = Repository::new(&root);
         let handoff = root.join("HANDOFF.md");
         write_atomic(&handoff, b"# Before\n\nOld note\n").unwrap();
-        let transaction_dir = root.join(".project-os/transactions");
+        let transaction_dir = root.join(".omnidesk/runtime/transactions");
         fs::create_dir_all(&transaction_dir).unwrap();
         write_atomic(
             &transaction_dir.join("interrupted-text.json"),
