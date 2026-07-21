@@ -912,6 +912,19 @@ fn archive_legacy_state_for_retirement(
 }
 
 #[tauri::command]
+fn cleanup_legacy_state_for_retirement(
+    input: ArchiveLegacyStateInput,
+) -> Result<crate::runtime::state_namespace::LegacyRetirementCleanup, String> {
+    if input.confirmation.trim() != "DELETE_LEGACY_PROJECT_OS" {
+        return Err("清理 legacy 状态需要独立的明确确认".to_string());
+    }
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let project = current_registry_project(&mut registry, &app_root)?;
+    crate::runtime::state_namespace::cleanup_legacy_state_for_retirement(&PathBuf::from(project.path))
+}
+
+#[tauri::command]
 fn get_workspace_snapshot() -> Result<WorkspaceSnapshot, String> {
     let app_root = find_workspace_root()?;
     let mut registry = load_or_seed_registry(&app_root)?;
@@ -8628,6 +8641,7 @@ pub fn run() {
             get_workspace_snapshot,
             update_project_capability,
             archive_legacy_state_for_retirement,
+            cleanup_legacy_state_for_retirement,
             refresh_workspace_facts_preview,
             start_workspace_file_watcher,
             add_registry_project,

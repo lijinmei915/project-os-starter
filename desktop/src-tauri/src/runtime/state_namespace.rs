@@ -65,6 +65,13 @@ pub struct LegacyRetentionArchiveFile {
     pub bytes: usize,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LegacyRetirementCleanup {
+    pub archive_relative: Option<String>,
+    pub removed_files: usize,
+}
+
 impl MigrationOutcome {
     pub fn status(&self, legacy_exists: bool) -> &'static str {
         if !legacy_exists {
@@ -331,6 +338,68 @@ pub fn archive_legacy_retirement_differences(root: &Path) -> Result<LegacyRetent
         archive_relative,
         files: archived,
     })
+}
+
+/// Deletes the legacy root only after proving every diverged source file is
+/// retained byte-for-byte in a prior archive. The caller owns user consent.
+pub fn cleanup_legacy_state_for_retirement(root: &Path) -> Result<LegacyRetirementCleanup, String> {
+    let readiness = legacy_retirement_readiness(root)?;
+    if !readiness.namespace_active || !readiness.legacy_exists {
+        return Err("legacy 状态目录不可清理".to_string());
+    }
+    if !readiness.missing_targets.is_empty() || !readiness.skipped.is_empty() {
+        return Err("legacy 状态仍有漏迁或符号链接，不能清理".to_string());
+    }
+
+    let legacy_root = root.join(LEGACY_STATE_ROOT);
+    let mut files = Vec::new();
+    let mut skipped = Vec::new();
+    collect_regular_files(&legacy_root, &legacy_root, &mut files, &mut skipped)?;
+    if !skipped.is_empty() {
+        return Err("legacy 状态包含符号链接，不能清理".to_string());
+    }
+    files.sort();
+    let mut mismatches = Vec::new();
+    for relative in &files {
+        let legacy_relative = relative.to_string_lossy().replace('\\', "/");
+        let (_, active_target) = migration_target(&legacy_relative)?;
+        let source = legacy_root.join(relative);
+        let target = root.join(&active_target);
+        if !target.is_file() {
+            return Err("legacy 状态仍有漏迁，不能清理".to_string());
+        }
+        if fs::read(&source).map_err(|error| error.to_string())?
+            != fs::read(&target).map_err(|error| error.to_string())?
+        {
+            mismatches.push((legacy_relative, source));
+        }
+    }
+
+    let archive_base = root.join(STATE_ROOT).join("evidence/legacy-retirement");
+    let mut archive_ids = fs::read_dir(&archive_base)
+        .map_err(|_| "未找到 legacy 差异保留归档，不能清理".to_string())?
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_type().map(|kind| kind.is_dir()).unwrap_or(false))
+        .map(|entry| entry.file_name().to_string_lossy().to_string())
+        .collect::<Vec<_>>();
+    archive_ids.sort_by(|left, right| right.cmp(left));
+
+    let archive_relative = archive_ids.into_iter().find_map(|id| {
+        let archive_root = archive_base.join(&id);
+        let all_retained = mismatches.iter().all(|(relative, source)| {
+            let archived = archive_root.join("source").join(relative);
+            archived.is_file()
+                && fs::read(&archived).ok().as_deref() == fs::read(source).ok().as_deref()
+        });
+        all_retained.then(|| format!("{STATE_ROOT}/evidence/legacy-retirement/{id}"))
+    });
+    if !mismatches.is_empty() && archive_relative.is_none() {
+        return Err("未找到与当前 legacy 差异逐字节一致的归档，不能清理".to_string());
+    }
+
+    let removed_files = files.len();
+    fs::remove_dir_all(&legacy_root).map_err(|error| error.to_string())?;
+    Ok(LegacyRetirementCleanup { archive_relative, removed_files })
 }
 
 pub fn namespace_is_active(root: &Path) -> bool {
@@ -721,6 +790,21 @@ mod tests {
         );
         assert!(root.join(".project-os/state.json").exists());
         assert!(root.join(&archive.archive_relative).join("manifest.json").exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn cleanup_requires_a_byte_identical_archive_before_removing_legacy() {
+        let root = test_root("retention-cleanup");
+        write_atomic(&root.join(".project-os/state.json"), br#"{\"version\":1}"#).unwrap();
+        ensure_active_state_namespace(&root).unwrap();
+        write_atomic(&root.join(".project-os/state.json"), br#"{\"version\":0}"#).unwrap();
+        assert!(cleanup_legacy_state_for_retirement(&root).is_err());
+        let archive = archive_legacy_retirement_differences(&root).unwrap();
+        let cleanup = cleanup_legacy_state_for_retirement(&root).unwrap();
+        assert_eq!(cleanup.archive_relative, Some(archive.archive_relative));
+        assert_eq!(cleanup.removed_files, 1);
+        assert!(!root.join(LEGACY_STATE_ROOT).exists());
         fs::remove_dir_all(root).unwrap();
     }
 
