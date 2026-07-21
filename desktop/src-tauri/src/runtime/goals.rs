@@ -2,11 +2,11 @@ use crate::runtime::repository::{JsonMutation, Repository};
 use serde_json::{json, Value};
 use std::path::Path;
 
-const GOALS_PATH: &str = ".project-os/goals.json";
-const PROJECT_GOALS_PATH: &str = ".project-os/project-goals.json";
-const GOAL_VALIDATION_PATH: &str = ".project-os/goal-validation.json";
-const GOAL_VALIDATION_REPORT_PATH: &str = ".project-os/goal-validation-report.json";
-const GOAL_SIGNOFF_HISTORY_PATH: &str = ".project-os/goal-signoff-history.json";
+const GOALS_PATH: &str = ".omnidesk/data/goals.json";
+const PROJECT_GOALS_PATH: &str = ".omnidesk/data/project-goals.json";
+const GOAL_VALIDATION_PATH: &str = ".omnidesk/data/goal-validation.json";
+const GOAL_VALIDATION_REPORT_PATH: &str = ".omnidesk/evidence/goal-validation-report.json";
+const GOAL_SIGNOFF_HISTORY_PATH: &str = ".omnidesk/evidence/goal-signoff-history.json";
 
 fn load_or_seed(repository: &Repository, project_name: &str) -> Value {
     repository.read_json(GOALS_PATH).unwrap_or_else(|| {
@@ -791,7 +791,8 @@ mod tests {
                 .unwrap()
                 .as_nanos()
         ));
-        fs::create_dir_all(root.join(".project-os")).unwrap();
+        fs::create_dir_all(root.join(".omnidesk/data")).unwrap();
+        fs::create_dir_all(root.join(".omnidesk/evidence")).unwrap();
         fs::write(
             root.join(PROJECT_GOALS_PATH),
             r#"{"activeProjectGoalId":"project-goal-1","projectGoals":[{"id":"project-goal-1","stageGoalIds":[]}]}"#,
@@ -817,7 +818,7 @@ mod tests {
             project_goals["projectGoals"][0]["stageGoalIds"],
             json!(["stage-1"])
         );
-        let events = fs::read_dir(root.join(".project-os/events"))
+        let events = fs::read_dir(root.join(".omnidesk/runtime/events"))
             .unwrap()
             .count();
         assert_eq!(events, 1);
@@ -832,7 +833,7 @@ mod tests {
                 .unwrap()
                 .as_nanos()
         ));
-        fs::create_dir_all(root.join(".project-os")).unwrap();
+        fs::create_dir_all(root.join(".omnidesk/data")).unwrap();
         fs::write(
             root.join(GOALS_PATH),
             r#"{"activeGoalId":"goal-1","goals":[{"id":"goal-1","status":"draft","taskIds":["task-a"]}]}"#,
@@ -864,7 +865,7 @@ mod tests {
                 .unwrap()
                 .as_nanos()
         ));
-        fs::create_dir_all(root.join(".project-os")).unwrap();
+        fs::create_dir_all(root.join(".omnidesk/data")).unwrap();
         fs::write(root.join(GOALS_PATH), r#"{"activeGoalId":"goal-1","goals":[{"id":"goal-1","parentProjectGoalId":"parent-1","status":"planned","taskIds":[]}]}"#).unwrap();
         fs::write(
             root.join(PROJECT_GOALS_PATH),
@@ -899,7 +900,7 @@ mod tests {
         ));
         let task_dir = crate::runtime::tasks::directory(&root);
         fs::create_dir_all(&task_dir).unwrap();
-        fs::create_dir_all(root.join(".project-os")).unwrap();
+        fs::create_dir_all(root.join(".omnidesk/data")).unwrap();
         fs::write(root.join(GOALS_PATH), r#"{"activeGoalId":"source","goals":[{"id":"source","status":"planned","taskIds":["task-1"]},{"id":"target","title":"Target","status":"planned","taskIds":[]}]}"#).unwrap();
         fs::write(
             root.join(PROJECT_GOALS_PATH),
@@ -936,7 +937,8 @@ mod tests {
                 .unwrap()
                 .as_nanos()
         ));
-        fs::create_dir_all(root.join(".project-os")).unwrap();
+        fs::create_dir_all(root.join(".omnidesk/data")).unwrap();
+        fs::create_dir_all(root.join(".omnidesk/evidence")).unwrap();
         fs::write(
             root.join(GOALS_PATH),
             r#"{"goals":[{"id":"goal-1","title":"Runtime","status":"pending-confirm"}]}"#,
@@ -967,7 +969,7 @@ mod tests {
             "goal-1"
         );
         assert_eq!(
-            fs::read_dir(root.join(".project-os/events"))
+            fs::read_dir(root.join(".omnidesk/runtime/events"))
                 .unwrap()
                 .count(),
             1
@@ -983,7 +985,7 @@ mod tests {
                 .unwrap()
                 .as_nanos()
         ));
-        fs::create_dir_all(root.join(".project-os")).unwrap();
+        fs::create_dir_all(root.join(".omnidesk/data")).unwrap();
         fs::write(
             root.join(GOALS_PATH),
             r#"{"goals":[{"id":"goal-1","status":"planned"}]}"#,
@@ -1006,7 +1008,7 @@ mod tests {
             "pending-confirm"
         );
         assert_eq!(
-            fs::read_dir(root.join(".project-os/events"))
+            fs::read_dir(root.join(".omnidesk/runtime/events"))
                 .unwrap()
                 .count(),
             1
