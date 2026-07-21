@@ -48,7 +48,7 @@ npm --prefix desktop run web:build
 
 Provider profile、模型健康缓存和隔离密钥均由 Desktop Runtime 管理：
 
-- profile 元数据位于 active `.omnidesk/data/`；未迁移项目才临时回退到 `.project-os/`。
+- profile 元数据位于 active `.omnidesk/data/`；旧项目必须先通过显式迁移进入该分区。
 - API Key 仅从本机环境或 Runtime 管理的本地密钥存储读取，不能写入源码、文档、测试 fixture 或提交到 Git。
 - Provider 返回成功不等于任务成功；Patch、独立审批、检查与最终证据都完成后才可结案。
 
@@ -92,7 +92,7 @@ Runtime 启动时将 legacy `.project-os/` 非破坏性迁移到 `.omnidesk/`：
 
 ### 旧状态没有立即显示
 
-不要手动复制或删除 `.project-os/`。启动 Runtime 后检查 `.omnidesk/namespace.json`；若出现冲突，Runtime 会保留 legacy 回退和迁移证据。
+不要手动复制或删除 `.project-os/`。启动 Runtime 后检查 `.omnidesk/namespace.json`；若出现冲突，Runtime 会保留迁移证据并拒绝启用 native 状态，必须先处理冲突，不能回退为 legacy 运行时读写。
 
 ## 本地验证
 

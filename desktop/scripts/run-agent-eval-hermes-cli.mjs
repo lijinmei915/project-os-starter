@@ -13,13 +13,7 @@ const argument = (name) => {
 };
 
 function providerStatePath() {
-  try {
-    const manifest = JSON.parse(fs.readFileSync(path.join(root, ".omnidesk", "namespace.json"), "utf8"));
-    if (manifest?.activeNamespace === "omnidesk") return path.join(root, ".omnidesk", "data", "desktop-provider.json");
-  } catch {
-    // Legacy workspaces remain readable until their namespace is activated.
-  }
-  return path.join(root, ".project-os", "desktop-provider.json");
+  return path.join(root, ".omnidesk", "data", "desktop-provider.json");
 }
 
 function readDotenvValue(key) {

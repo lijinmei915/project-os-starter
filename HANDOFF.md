@@ -15,6 +15,8 @@ depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
 
 ## 接手摘要
 
+- 2026-07-21 已清除剩余的生产 legacy fallback：真实 Eval Hermes runner 只读取 `.omnidesk/data/desktop-provider.json`；项目概览 facts schema 改为 native data/cache 分区；环境与运行手册不再描述 legacy Runtime 回退。验证：项目概览/slot/Eval 定向测试、Desktop Node 442/442、文档结构通过。审计发现 `cli/` 仅有未追踪 `target/` 缓存、`adapters/` 为空、`templates/` 未追踪；它们不属于当前提交，未删除。
+
 - 2026-07-21 已加固可携带发布证据与原生恢复：真实 Provider Eval 未传 `--trace-dir` 会被 suite 拒绝；有 artifact 目录时，复制后的原始 trace 位于 `.omnidesk/evidence/agent-eval/<run-id>/traces/`，`results.json` 改为引用相对 artifact 路径。原生 WebDriver fixture 已改为 native `.omnidesk`，并在应用重启后断言四文件授权、审批 token 与 `awaiting-approval` 恢复均保持。验证：Desktop Node 442/442、Rust 77/77、WebDriver feature 编译与原生 smoke 通过。下一步需要触发一次受保护真实 Eval，产出新格式 artifact。
 
 - 2026-07-21 已完成 normal Runtime 的 native path 收敛：Workspace、App、Repository、Provider Preview、Workbench 来源与 Vite Preview 均改为 `.omnidesk/data|runtime|cache|evidence`。`state_path_for_read/write` 明确拒绝 `.project-os/...`，旧目录只在显式迁移、归档与删除前证据流程中读取。验证：Rust 77/77、Desktop Node 441/441、Web build 通过。下一步应在无逻辑别名的 native namespace 上补原生重启与发布验收。
