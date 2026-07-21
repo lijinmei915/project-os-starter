@@ -15,6 +15,8 @@ depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
 
 ## 接手摘要
 
+- 2026-07-21 用户以精确确认值执行 legacy 差异归档。Runtime 在当前工作区重新预检：namespace active、0 漏迁、0 符号链接、9 处内容差异；随后将 9 个 legacy 源文件复制到 `.omnidesk/evidence/legacy-retirement/1784572963533/source/`，manifest 记录其 active target 和字节数。归档副本已逐字节与 `.project-os` 源文件复验，`.project-os` 仍保留全部 2,320 个文件，未发生删除。下一步必须取得新的用户明确删除确认，不能把本次归档确认视为删除授权。
+
 - 2026-07-21 受保护真实 Agent Eval `29767685402` 已通过。工作流先安装 Patch Normalizer 的 Linux GTK/GIO 依赖并运行最小预检，随后真实 Provider 运行 12-case。下载 artifact 后复验 trace gate 与基线门槛均通过：12/12 case、任务成功率 100%、Patch 可应用率 90.9%、检查通过率 100%、恢复成功率 100%。`failed-check-repair` 保留了真实初始失败输出，`goal-rebind` 证明四份授权文件均已变更，未手写成功结果。下一步是用户明确确认后仅归档 9 处 legacy 历史差异；不得删除 `.project-os`。
 
 - 2026-07-21 12-case Eval 的多文件与网络恢复证据已加固，未手写更新 baseline：`goal-rebind` 升级为四份关联文件的一致性 Patch，并要求受保护 trace 证明四份授权文件实际改变；`interrupted-run` 的本地 Runtime trace 记录 `network-unavailable`、未接受 Provider 响应、重启后保留原审批。真实 Provider 网络中断和这份更高难度 Patch 的新基线仍须由 protected workflow 产出。验证：Desktop Node 443/443、Eval baseline 检查、diff check 通过。
