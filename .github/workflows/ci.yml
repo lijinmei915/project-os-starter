@@ -41,6 +41,9 @@ jobs:
       - name: Install Desktop dependencies
         run: npm ci --prefix desktop
 
+      - name: Build Patch Normalizer
+        run: cargo build --manifest-path desktop/src-tauri/Cargo.toml --bin omnidesk-patch-normalizer
+
       - name: Install browser for Desktop smoke tests
         run: cd desktop && npx playwright install --with-deps chromium
 
