@@ -4,9 +4,9 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-const PROVIDER_CONFIG_PATH: &str = ".project-os/desktop-provider.json";
-const MODEL_CATALOG_PATH: &str = ".project-os/model-catalog.json";
-const MODEL_HEALTH_PATH: &str = ".project-os/model-health.json";
+const PROVIDER_CONFIG_PATH: &str = ".omnidesk/data/desktop-provider.json";
+const MODEL_CATALOG_PATH: &str = ".omnidesk/data/model-catalog.json";
+const MODEL_HEALTH_PATH: &str = ".omnidesk/cache/model-health.json";
 
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
