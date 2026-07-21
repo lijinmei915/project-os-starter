@@ -80,16 +80,17 @@
       "旧静态站、AI 工程评分报告与历史设计提案已退役",
       "原生重启恢复待审批 Agent Run 已验证",
       "迁移兼容层退役预检已接入 Workspace snapshot",
-      "受保护真实 Agent Eval 29767685402 已通过并上传原始 trace"
+      "受保护真实 Agent Eval 29767685402 已通过并上传原始 trace",
+      "9 处 legacy 历史差异已归档并逐字节复验"
     ],
     "doing": [
       "OmniDesk 产品与文档 SSOT 单内核收敛",
       "遗留文档与迁移兼容层的旧 Project OS 依赖退役",
-      "迁移兼容层的历史差异保留与最终退役"
+      "等待用户单独确认清理 .project-os 后完成兼容层退役"
     ],
     "blocked": [],
     "next": [
-      "归档 9 处不一致 legacy 文件后，由用户确认清理 .project-os",
+      "由用户确认清理 .project-os",
       "删除兼容层后完成全量验收"
     ]
   }
