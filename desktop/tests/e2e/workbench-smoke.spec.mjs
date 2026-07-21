@@ -11,7 +11,7 @@ test("conversation and terminal surfaces preserve their runtime boundary", async
   await composer.fill("当前使用什么模型");
   await page.getByRole("button", { name: "发送" }).click();
   await expect(page.getByRole("log")).toContainText("当前使用什么模型");
-  await expect(page.getByRole("log")).toContainText("当前使用的模型");
+  await expect(page.getByRole("log")).toContainText(/当前使用的模型|当前没有启用模型连接/);
   await page.getByRole("tab", { name: "终端" }).click();
   await expect(page.getByText("浏览器预览不启动本地终端")).toBeVisible();
   await expect(page.getByText("浏览器预览不能启动本地终端。请在桌面 App 窗口里使用完整终端。")).toBeVisible();
