@@ -2,7 +2,8 @@ use crate::runtime::repository::{JsonMutation, Repository, TextMutation};
 use serde_json::{json, Value};
 use std::path::Path;
 
-const AUDIT_PATH: &str = ".project-os/runs/execution-audit.json";
+const AUDIT_PATH: &str = ".omnidesk/evidence/execution-audit.json";
+const RUN_SUMMARY_PATH: &str = ".omnidesk/evidence/desktop-summary.md";
 const MAX_EVENTS: usize = 2_000;
 
 /// Appends a bounded execution audit entry through the same locked transaction
@@ -33,7 +34,7 @@ pub fn append_audit(
 pub fn append_run_summary(root: &Path, summary: &str) -> Result<(), String> {
     Repository::new(root).text_transaction_with("append-run-summary", |repository| {
         let existing = repository
-            .read_text(".project-os/runs/desktop-summary.md")
+            .read_text(RUN_SUMMARY_PATH)
             .unwrap_or_else(|| {
                 "# Desktop Run Summary\n\n> OmniDesk 自动生成的任务摘要。\n\n".to_string()
             });
@@ -41,7 +42,7 @@ pub fn append_run_summary(root: &Path, summary: &str) -> Result<(), String> {
         Ok((
             (),
             vec![TextMutation::upsert(
-                ".project-os/runs/desktop-summary.md",
+                RUN_SUMMARY_PATH,
                 content,
             )],
         ))
@@ -72,11 +73,12 @@ mod tests {
                 .unwrap()
                 .as_nanos()
         ));
+        crate::runtime::state_namespace::ensure_active_state_namespace(&root).unwrap();
         append_audit(&root, "patch-apply", true, json!({"stage":"apply"}), "now").unwrap();
         let audit = Repository::new(&root).read_json(AUDIT_PATH).unwrap();
         assert_eq!(audit["schemaVersion"], "project-os.execution-audit.v0.1");
         assert_eq!(audit["events"][0]["action"], "patch-apply");
-        assert!(root.join(".project-os/events").is_dir());
+        assert!(root.join(".omnidesk/runtime/events").is_dir());
     }
 
     #[test]
@@ -89,17 +91,18 @@ mod tests {
                 .as_nanos()
         ));
         std::fs::create_dir_all(&root).unwrap();
+        crate::runtime::state_namespace::ensure_active_state_namespace(&root).unwrap();
         std::fs::write(root.join("HANDOFF.md"), "# 当前交接\n").unwrap();
         append_run_summary(&root, "## First").unwrap();
         append_run_summary(&root, "## Second").unwrap();
         append_handoff(&root, "\n## First handoff").unwrap();
         append_handoff(&root, "\n## Second handoff").unwrap();
         let summary =
-            std::fs::read_to_string(root.join(".project-os/runs/desktop-summary.md")).unwrap();
+            std::fs::read_to_string(root.join(RUN_SUMMARY_PATH)).unwrap();
         let handoff = std::fs::read_to_string(root.join("HANDOFF.md")).unwrap();
         assert!(summary.contains("## First") && summary.contains("## Second"));
         assert!(handoff.contains("## First handoff") && handoff.contains("## Second handoff"));
-        let events = std::fs::read_dir(root.join(".project-os/events"))
+        let events = std::fs::read_dir(root.join(".omnidesk/runtime/events"))
             .unwrap()
             .count();
         assert_eq!(events, 4);
