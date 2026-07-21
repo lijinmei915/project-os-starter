@@ -5,7 +5,10 @@ use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const TASK_SCHEMA_VERSION: &str = "project-os.desktop-task.v0.1";
-const TASK_DIRECTORY: &str = ".project-os/runs/desktop-tasks";
+const TASK_DIRECTORY: &str = ".omnidesk/data/tasks";
+const CONVERSATION_DIRECTORY: &str = ".omnidesk/data/conversations";
+const GOALS_PATH: &str = ".omnidesk/data/goals.json";
+const BACKLOG_PATH: &str = ".omnidesk/data/task-backlog.json";
 
 pub fn directory(root: &Path) -> std::path::PathBuf {
     crate::runtime::state_namespace::state_path_for_read(root, TASK_DIRECTORY)
@@ -177,9 +180,9 @@ pub fn save(
         mark_persisted(&mut task, &id, timestamp);
         let mut mutations = vec![JsonMutation::upsert(task_relative, task.clone())];
         let goal_id = task.get("goalId").and_then(Value::as_str).unwrap_or("");
-        if let Some(mut goals) = repository.read_json(".project-os/goals.json") {
+        if let Some(mut goals) = repository.read_json(GOALS_PATH) {
             crate::runtime::goals::rebind_task(&mut goals, &id, goal_id, timestamp);
-            mutations.push(JsonMutation::upsert(".project-os/goals.json", goals));
+            mutations.push(JsonMutation::upsert(GOALS_PATH, goals));
         }
         Ok((task, mutations))
     })
@@ -309,7 +312,7 @@ pub fn delete(root: &Path, id: &str, timestamp: &str) -> Result<(), String> {
             mutations.push(JsonMutation::delete(task_relative));
         }
         for (relative, conversation) in
-            repository.list_json_records(".project-os/runs/desktop-conversations")?
+            repository.list_json_records(CONVERSATION_DIRECTORY)?
         {
             let belongs_to_task = conversation.get("taskId").and_then(Value::as_str) == Some(id)
                 || task_conversation_id.as_deref()
@@ -319,8 +322,8 @@ pub fn delete(root: &Path, id: &str, timestamp: &str) -> Result<(), String> {
             }
         }
         for (relative_path, collection_key) in [
-            (".project-os/goals.json", "goals"),
-            (".project-os/task-backlog.json", "items"),
+            (GOALS_PATH, "goals"),
+            (BACKLOG_PATH, "items"),
         ] {
             let Some(mut document) = repository.read_json(relative_path) else {
                 continue;
@@ -364,7 +367,7 @@ mod tests {
                 .unwrap()
                 .as_nanos()
         ));
-        let directory = root.join(".project-os/runs/desktop-tasks");
+        let directory = root.join(TASK_DIRECTORY);
         fs::create_dir_all(&directory).unwrap();
         fs::write(directory.join("manifest.json"), r#"{"updatedAt":"999"}"#).unwrap();
         fs::write(
@@ -405,19 +408,19 @@ mod tests {
                 .unwrap()
                 .as_nanos()
         ));
-        let task_dir = root.join(".project-os/runs/desktop-tasks");
-        let conversation_dir = root.join(".project-os/runs/desktop-conversations");
+        let task_dir = root.join(TASK_DIRECTORY);
+        let conversation_dir = root.join(CONVERSATION_DIRECTORY);
         fs::create_dir_all(&task_dir).unwrap();
         fs::create_dir_all(&conversation_dir).unwrap();
         fs::write(task_dir.join("task-1.json"), r#"{"schemaVersion":"project-os.desktop-task.v0.1","id":"task-1","conversationId":"conversation-1"}"#).unwrap();
         fs::write(conversation_dir.join("conversation-1.json"), r#"{"schemaVersion":"project-os.desktop-conversation.v0.1","id":"conversation-1","taskId":"task-1"}"#).unwrap();
         fs::write(
-            root.join(".project-os/goals.json"),
+            root.join(GOALS_PATH),
             r#"{"goals":[{"id":"goal-1","taskIds":["task-1"]}]}"#,
         )
         .unwrap();
         fs::write(
-            root.join(".project-os/task-backlog.json"),
+            root.join(BACKLOG_PATH),
             r#"{"items":[{"id":"task-1"}]}"#,
         )
         .unwrap();
@@ -425,7 +428,7 @@ mod tests {
         assert!(!task_dir.join("task-1.json").exists());
         assert!(!conversation_dir.join("conversation-1.json").exists());
         assert_eq!(
-            read_json(&root.join(".project-os/goals.json")).unwrap()["goals"][0]["taskIds"],
+            read_json(&root.join(GOALS_PATH)).unwrap()["goals"][0]["taskIds"],
             serde_json::json!([])
         );
     }
@@ -439,9 +442,9 @@ mod tests {
                 .unwrap()
                 .as_nanos()
         ));
-        fs::create_dir_all(root.join(".project-os")).unwrap();
+        fs::create_dir_all(root.join(".omnidesk/data")).unwrap();
         fs::write(
-            root.join(".project-os/goals.json"),
+            root.join(GOALS_PATH),
             r#"{"goals":[{"id":"goal-a","taskIds":["task-old"]},{"id":"goal-b","taskIds":[]}]}"#,
         )
         .unwrap();
@@ -449,7 +452,7 @@ mod tests {
         assert_eq!(saved["schemaVersion"], TASK_SCHEMA_VERSION);
         assert_eq!(saved["requestTrace"]["taskId"], "task-new");
         assert_eq!(saved["requestTrace"]["runtime"], "tauri");
-        let goals = read_json(&root.join(".project-os/goals.json")).unwrap();
+        let goals = read_json(&root.join(GOALS_PATH)).unwrap();
         assert_eq!(
             goals["goals"][1]["taskIds"],
             serde_json::json!(["task-new"])
