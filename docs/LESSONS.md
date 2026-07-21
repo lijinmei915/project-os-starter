@@ -1,7 +1,7 @@
 ---
 layer: knowledge
 type: log
-last_verified: 2026-07-20
+last_verified: 2026-07-21
 teaches: "历史踩坑记录、错误模式和已确立的避坑约束"
 use_when: "AI 即将做类似操作前检查是否有已知的坑、或犯错后需要记录新教训时"
 ---
@@ -13,6 +13,14 @@ use_when: "AI 即将做类似操作前检查是否有已知的坑、或犯错后
 > 不要写什么：成功经验、普通进展、重复的 changelog 内容、当前状态摘要。
 > 每次犯错后立即记录。
 > 格式：犯的错 / 根本原因 / 加了什么规则。
+
+### 2026-07-21 WebDriver feature 专用 Runtime 代码必须按 feature 编译
+
+**犯的错**：为原生多文件恢复 fixture 增加审批证据时，在 `append_evidence(&mut run, ...)` 调用中同时读取了 `run.checkpoint.allowed_files`。默认 `cargo check` 没有编译该 `#[cfg(feature = "webdriver")]` 分支，直到原生 smoke 启动时才暴露 Rust 借用冲突。
+
+**根本原因**：把默认 crate 编译当成了所有条件编译路径的验证，遗漏了 native smoke 实际启用的 WebDriver feature。
+
+**加了什么规则**：修改 `#[cfg(feature = "webdriver")]` 的 Runtime 或测试 fixture 后，必须运行 `cargo check --manifest-path desktop/src-tauri/Cargo.toml --no-default-features --features webdriver`，再运行 `npm --prefix desktop run test:native`；所有对可变对象的证据 payload 必须在取得可变借用前先复制所需字段。
 
 ### 2026-07-20 共享 Rust 源文件改依赖后必须验证所有消费 crate
 

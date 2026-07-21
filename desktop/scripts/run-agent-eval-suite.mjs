@@ -12,6 +12,9 @@ const argument = (name) => {
 const outputPath = path.resolve(argument("--output") || path.join(os.tmpdir(), "omnidesk-agent-eval-results.json"));
 const traceDirectory = argument("--trace-dir") ? path.resolve(argument("--trace-dir")) : "";
 const requestedCaseId = argument("--case");
+if (process.env.OMNIDESK_AGENT_EVAL_API_KEY_ENV && !traceDirectory) {
+  throw new Error("真实 Agent Eval 必须提供 --trace-dir 以固化 artifact 证据");
+}
 const allCases = JSON.parse(fs.readFileSync(path.join(desktopRoot, "evals", "agent-development-cases.json"), "utf8")).cases;
 const cases = requestedCaseId ? allCases.filter((item) => item.id === requestedCaseId) : allCases;
 if (requestedCaseId && !cases.length) throw new Error(`未知 Agent Eval case：${requestedCaseId}`);
@@ -27,6 +30,11 @@ function copyEvidence(caseId, result) {
   if (!fs.existsSync(tracePath)) return;
   const traceTarget = path.join(traceDirectory, `${caseId}.trace.json`);
   fs.copyFileSync(tracePath, traceTarget);
+  result.execution = {
+    ...result.execution,
+    // Results travel with the artifact, not the temporary isolated fixture.
+    tracePath: path.relative(path.dirname(outputPath), traceTarget).replaceAll(path.sep, "/"),
+  };
   try {
     const trace = JSON.parse(fs.readFileSync(tracePath, "utf8"));
     for (const [field, suffix] of [["rawOutputPath", "raw-model-output.txt"], ["usagePath", "usage.json"]]) {

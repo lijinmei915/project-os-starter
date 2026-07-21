@@ -16,10 +16,15 @@ let app;
 let sessionId;
 
 function writeFixture() {
-  fs.mkdirSync(path.join(fixture, ".project-os"), { recursive: true });
+  fs.mkdirSync(path.join(fixture, ".omnidesk", "data"), { recursive: true });
   fs.writeFileSync(path.join(fixture, "AGENTS.md"), "# Native WebDriver fixture\n", "utf8");
   fs.writeFileSync(path.join(fixture, "PROJECT.md"), "# Native WebDriver fixture\n", "utf8");
-  fs.writeFileSync(path.join(fixture, ".project-os", "state.json"), JSON.stringify({
+  fs.writeFileSync(path.join(fixture, ".omnidesk", "namespace.json"), JSON.stringify({
+    schemaVersion: "omnidesk.state-namespace.v1",
+    activeNamespace: "omnidesk",
+    readMode: "omnidesk-primary",
+  }), "utf8");
+  fs.writeFileSync(path.join(fixture, ".omnidesk", "data", "state.json"), JSON.stringify({
     name: "Native WebDriver fixture",
     phase: "stabilizing",
     status: "testing"
@@ -93,18 +98,11 @@ async function readTerminalTrace() {
 }
 
 function readPersistedTerminalTrace() {
-  const candidates = [
-    path.join(fixture, ".omnidesk", "cache", "native-terminal-trace.json"),
-    path.join(fixture, ".project-os", "native-terminal-trace.json"),
-  ];
-  for (const tracePath of candidates) {
-    try {
-      return JSON.parse(fs.readFileSync(tracePath, "utf8"));
-    } catch {
-      // A legacy fixture may not have activated the namespace yet.
-    }
+  try {
+    return JSON.parse(fs.readFileSync(path.join(fixture, ".omnidesk", "cache", "native-terminal-trace.json"), "utf8"));
+  } catch {
+    return [];
   }
-  return [];
 }
 
 async function waitForPersistedTerminalStage(stage) {
@@ -166,7 +164,7 @@ function startApp() {
       TAURI_WEBDRIVER_PORT: String(webdriverPort),
       OMNIDESK_WEBDRIVER_WORKSPACE_ROOT: fixture
     },
-    stdio: "ignore"
+    stdio: diagnoseTerminal ? "inherit" : "ignore"
   });
 }
 
@@ -223,7 +221,9 @@ try {
   }
 
   const seeded = await invokeNative("seed_native_agent_run_for_recovery");
-  if (seeded?.status !== "awaiting-approval" || seeded?.approval?.token !== "native-recovery-approval") {
+  const expectedAuthorizedFiles = ["README.md", "AGENTS.md", "PROJECT.md", "docs/TESTING.md"];
+  if (seeded?.status !== "awaiting-approval" || seeded?.approval?.token !== "native-recovery-approval"
+    || JSON.stringify(seeded?.checkpoint?.allowedFiles) !== JSON.stringify(expectedAuthorizedFiles)) {
     throw new Error(`原生恢复夹具未创建等待审批 Run：${JSON.stringify(seeded)}`);
   }
   await closeSession();
@@ -232,7 +232,9 @@ try {
   startApp();
   await openSession();
   const interrupted = await invokeNative("read_native_agent_run_for_recovery");
-  if (interrupted?.status !== "interrupted" || interrupted?.checkpoint?.nextAction !== "resume-approval" || interrupted?.approval?.token !== "native-recovery-approval") {
+  if (interrupted?.status !== "interrupted" || interrupted?.checkpoint?.nextAction !== "resume-approval"
+    || interrupted?.approval?.token !== "native-recovery-approval"
+    || JSON.stringify(interrupted?.checkpoint?.allowedFiles) !== JSON.stringify(expectedAuthorizedFiles)) {
     throw new Error(`原生重启未保留审批 checkpoint：${JSON.stringify(interrupted)}`);
   }
   const resumed = await invokeNative("resume_agent_run", { input: { id: "native-recovery-run" } });

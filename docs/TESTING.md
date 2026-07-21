@@ -116,7 +116,7 @@ bash tests/run-tests.sh
 
 检查项：
 - 旧项目没有 capability manifest 时保持兼容。
-- 状态命名空间未激活时读取 legacy，无冲突激活后优先读取 `.omnidesk/`，且不改写 `.project-os/` 源数据。
+- Runtime 与 Preview 只读取 active `.omnidesk/` 分区；旧 `.project-os/` 仅能由显式、幂等的迁移流程导入，不能作为普通读写回退。
 - 任一迁移冲突必须阻止 namespace 激活；符号链接、路径逃逸和非授权状态目录不得进入新状态根。
 - 旧目录退役预检必须拒绝未激活、漏迁、内容不一致或包含符号链接的状态；只有逐文件字节一致的已激活命名空间才可进入用户确认的清理流程。
 - active 状态切换后产生的 legacy 历史差异必须通过独立确认动作归档到 `.omnidesk/evidence/legacy-retirement/`；归档只复制差异源文件与 manifest，不得删除 `.project-os/`。
@@ -141,7 +141,7 @@ macOS 原生窗口 smoke 不使用官方 `tauri-driver`。它通过仅测试构�
 npm --prefix desktop run test:native
 ```
 
-该命令验证原生窗口的 DOM/React 输入与发送状态，并从 active `.omnidesk/cache`（未迁移 fixture 才回退 `.project-os`）读取原生终端 trace。它还会建立一条待审批 Agent Run、重启原生应用、断言 Run 被标为 `interrupted` 且保留审批 token，随后恢复到 `awaiting-approval`。它不把浏览器 Preview 当成桌面证据，不执行终端、检查、Patch 或模型请求；原生窗口中的实际批准点击和 Provider 网络中断仍需单独 fixture 覆盖。
+该命令验证原生窗口的 DOM/React 输入与发送状态，并从 active `.omnidesk/cache` 读取原生终端 trace。它还会建立一条四文件授权的待审批 Agent Run、重启原生应用、断言 Run 被标为 `interrupted` 且保留审批 token 与全部授权文件，随后恢复到 `awaiting-approval`。它不把浏览器 Preview 当成桌面证据，不执行终端、检查、Patch 或模型请求；Provider 网络中断的真实链路由受保护 Agent Eval 的原始 trace 覆盖。
 
 ### 8. CI 自动化检查
 
@@ -170,7 +170,7 @@ CI 文件：
 npm --prefix desktop run check:agent-eval
 ```
 
-`.github/workflows/agent-eval.yml` 在受保护的 `agent-eval` environment 中按日或手动运行。它需要 `OMNIDESK_AGENT_EVAL_KEY` secret 与 `OMNIDESK_AGENT_EVAL_MODEL` variable，执行 12-case suite、保留真实 trace，并拒绝成功率、Patch 可应用率或检查通过率回退。`goal-rebind` 必须证明四份授权文件均实际变更；`interrupted-run` 必须记录网络不可用分类、未接受 Provider 响应和恢复后的原审批。报告没有真实 trace 时不能替代该门槛。
+`.github/workflows/agent-eval.yml` 在受保护的 `agent-eval` environment 中按日或手动运行。它需要 `OMNIDESK_AGENT_EVAL_KEY` secret 与 `OMNIDESK_AGENT_EVAL_MODEL` variable，执行 12-case suite、保留真实 trace，并拒绝成功率、Patch 可应用率或检查通过率回退。真实 Provider Eval 强制提供 `--trace-dir`：suite 会把 trace 复制到 `.omnidesk/evidence/agent-eval/<run-id>/traces/`，并将 `results.json` 中的 trace 引用写成相对 artifact 路径。`goal-rebind` 必须证明四份授权文件均实际变更；`interrupted-run` 必须记录网络不可用分类、未接受 Provider 响应和恢复后的原审批。报告没有真实 trace 时不能替代该门槛。
 
 ---
 

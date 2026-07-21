@@ -44,7 +44,7 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 - Agent Run 持久化、独立审批、Patch 应用、检查、最多两轮修复，以及工具边界的阶段 checkpoint 恢复。
 - Workspace、Conversation、Task、Goal、Provider、Execution 的 Runtime 模块与 Repository 事务边界。
 - 正式 12-case Eval：任务成功率 100%、Patch 可应用率 90.9%、检查通过率 100%、恢复成功率 100%。
-- 当前工作树回归：Desktop Node 443/443、Runtime Rust 75/75、Patch Normalizer 5/5、原生 WebDriver smoke；Web build 与 800 KiB 首屏软预算通过。
+- 当前工作树回归：Desktop Node 442/442、Runtime Rust 77/77、Patch Normalizer 5/5、原生 WebDriver smoke；Web build 与 800 KiB 首屏软预算通过。
 - `.omnidesk/` v1 四分区 schema、非破坏性迁移器和启动激活已接入生产 Runtime：支持幂等复制、冲突拒绝、符号链接跳过和 legacy 回退。
 - Repository、Workspace、Provider、Task、Conversation、Agent Run 与 Preview 均按分区直接读写；文件树和 Agent 读取工具隐藏 Runtime 状态目录与可能遗留的旧目录。
 - Desktop Runtime 已停止编译旧 `governance` bridge，不再暴露 `run_project_os_action`，受控检查只执行 Desktop Node、Web build 与 Cargo 检查；浏览器 Preview 的事实刷新只重新读取只读 snapshot。
@@ -55,12 +55,14 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 - 受保护 Eval `29767685402` 已通过：12/12 case 完成，任务成功率 100%、Patch 可应用率 90.9%、检查通过率 100%、恢复成功率 100%；artifact 中包含四文件目标改绑、初始失败检查与修复、网络中断恢复的原始 trace。
 - 根目录旧静态站、在线站/截图/报告模型测试、AI 工程评分报告 schema 与历史设计提案已删除；Desktop 只保留任务执行与目标验收证据。
 - 原生窗口重启会把待审批 Agent Run 标记为中断、保留审批 token，并恢复到等待审批状态。
+- 原生 WebDriver smoke 使用 native `.omnidesk` fixture，并验证四文件授权的待审批 Patch 在重启后仍保留完整授权集与原审批。
+- 真实 Provider Eval 强制提供 artifact trace 目录；结果中的 trace 引用为 artifact 相对路径，不再指向临时 fixture。
 - `.project-os` 已在归档和逐字节复验后删除；9 处历史差异保留于 `.omnidesk/evidence/legacy-retirement/1784572963533/`。
 
 正在做：
 
 - 将产品与文档 SSOT 收敛到 OmniDesk Desktop Runtime。
-- 将 Eval 原始 trace 从临时目录固化为可携带的发布证据。
+- 在 native namespace 上完成下一次受保护真实 Eval，复验新的相对 artifact 引用。
 - 将 Eval 原始 trace 从临时目录固化为可携带的发布证据。
 
 当前风险：
@@ -71,5 +73,5 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 
 ## 下一步重点
 
-1. 在 native namespace 上完成原生重启、网络中断和多文件任务的发布验收。
-2. 将 Eval 原始 trace 从临时目录固化为可携带的发布证据。
+1. 在 native namespace 上完成下一次受保护真实 Eval，复验网络中断与多文件 trace 的 artifact 相对引用。
+2. 审计并收口仍描述旧 Project OS 兼容期的历史交接内容。

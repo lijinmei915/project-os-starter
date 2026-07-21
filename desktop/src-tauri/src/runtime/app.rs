@@ -5818,7 +5818,7 @@ fn seed_native_agent_run_for_recovery() -> Result<crate::runtime::agent_runs::Pe
         "native-recovery-run".to_string(),
         "native-recovery-request".to_string(),
         project.id,
-        "Native WebDriver recovery fixture. Do not execute tools.".to_string(),
+        "Native WebDriver multi-file recovery fixture. Do not execute tools.".to_string(),
         1,
         String::new(),
         &timestamp,
@@ -5828,24 +5828,30 @@ fn seed_native_agent_run_for_recovery() -> Result<crate::runtime::agent_runs::Pe
         "status": "pending",
         "name": "apply_patch",
         "arguments": {
-            "allowedFiles": ["README.md"],
-            "diff": "diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1 +1 @@\n-# Native WebDriver fixture\n+# Native WebDriver fixture\n"
+            "allowedFiles": ["README.md", "AGENTS.md", "PROJECT.md", "docs/TESTING.md"],
+            "diff": "diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1 +1 @@\n-# Native WebDriver fixture\n+# Native WebDriver fixture\ndiff --git a/AGENTS.md b/AGENTS.md\n--- a/AGENTS.md\n+++ b/AGENTS.md\n@@ -1 +1 @@\n-# Native WebDriver fixture\n+# Native WebDriver fixture\n"
         }
     });
     run.status = "awaiting-approval".to_string();
-    run.summary = "原生恢复夹具正在等待 Patch 审批。".to_string();
+    run.summary = "原生多文件恢复夹具正在等待 Patch 审批。".to_string();
     run.approval = Some(approval.clone());
     run.checkpoint.phase = "awaiting-approval".to_string();
     run.checkpoint.context_summary = run.summary.clone();
     run.checkpoint.last_confirmation = Some(approval);
     run.checkpoint.next_action = "resume-approval".to_string();
     run.checkpoint.tool_name = "apply_patch".to_string();
-    run.checkpoint.allowed_files = vec!["README.md".to_string()];
+    run.checkpoint.allowed_files = vec![
+        "README.md".to_string(),
+        "AGENTS.md".to_string(),
+        "PROJECT.md".to_string(),
+        "docs/TESTING.md".to_string(),
+    ];
+    let authorized_files = run.checkpoint.allowed_files.clone();
     crate::runtime::agent_runs::append_evidence(
         &mut run,
         "approval",
-        "Native WebDriver recovery fixture created.",
-        json!({ "fixture": true }),
+        "Native WebDriver multi-file recovery fixture created.",
+        json!({ "fixture": true, "authorizedFiles": authorized_files }),
         &timestamp,
     );
     crate::runtime::agent_runs::persist(&app_root, &run)?;
