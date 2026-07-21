@@ -4,7 +4,7 @@ use serde_json::{json, Value};
 use std::path::Path;
 
 const AGENT_RUN_SCHEMA_VERSION: &str = "omnidesk.agent-run.v0.1";
-const AGENT_RUN_DIRECTORY: &str = ".project-os/runs/agent-runs";
+const AGENT_RUN_DIRECTORY: &str = ".omnidesk/data/agent-runs";
 
 #[derive(Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
@@ -86,7 +86,7 @@ fn relative_path(id: &str) -> Result<String, String> {
     {
         return Err("Agent Run id 非法。".to_string());
     }
-    Ok(format!(".project-os/runs/agent-runs/{id}.json"))
+    Ok(format!(".omnidesk/data/agent-runs/{id}.json"))
 }
 
 pub fn persist(root: &Path, run: &PersistedAgentRun) -> Result<(), String> {

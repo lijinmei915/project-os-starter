@@ -2,7 +2,7 @@ use crate::runtime::repository::{JsonMutation, Repository};
 use serde_json::Value;
 use std::path::Path;
 
-const CONVERSATION_DIRECTORY: &str = ".project-os/runs/desktop-conversations";
+const CONVERSATION_DIRECTORY: &str = ".omnidesk/data/conversations";
 
 fn safe_file_stem(id: &str) -> String {
     id.chars()
@@ -18,7 +18,7 @@ fn safe_file_stem(id: &str) -> String {
 
 fn relative_path(id: &str) -> String {
     format!(
-        ".project-os/runs/desktop-conversations/{}.json",
+        ".omnidesk/data/conversations/{}.json",
         safe_file_stem(id)
     )
 }
