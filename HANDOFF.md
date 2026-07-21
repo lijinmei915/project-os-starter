@@ -15,6 +15,8 @@ depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
 
 ## 接手摘要
 
+- 2026-07-21 已完成 normal Runtime 的 native path 收敛：Workspace、App、Repository、Provider Preview、Workbench 来源与 Vite Preview 均改为 `.omnidesk/data|runtime|cache|evidence`。`state_path_for_read/write` 明确拒绝 `.project-os/...`，旧目录只在显式迁移、归档与删除前证据流程中读取。验证：Rust 77/77、Desktop Node 441/441、Web build 通过。下一步应在无逻辑别名的 native namespace 上补原生重启与发布验收。
+
 - 2026-07-21 用户确认后，受控 Runtime cleanup 已删除物理 `.project-os/`：删除前核验 active namespace、零漏迁、零符号链接、9 个差异源文件均与 `.omnidesk/evidence/legacy-retirement/1784572963533/` 的归档副本逐字节一致；实际删除 2,320 个文件。原生 WebDriver 随后确认 `legacyExists=false`、`namespaceActive=true`、`ready=true` 且目标数据可读。完整回归通过：Desktop Node 443/443、Rust Runtime 77/77、Web build、800 KiB bundle 预算和 Eval baseline。物理迁移已完成，但 Runtime 仍有 `.project-os/...` 逻辑路径别名；下一批应按领域模块改为 native `.omnidesk` 路径并删除映射层。
 
 - 2026-07-21 用户以精确确认值执行 legacy 差异归档。Runtime 在当前工作区重新预检：namespace active、0 漏迁、0 符号链接、9 处内容差异；随后将 9 个 legacy 源文件复制到 `.omnidesk/evidence/legacy-retirement/1784572963533/source/`，manifest 记录其 active target 和字节数。归档副本已逐字节与 `.project-os` 源文件复验，`.project-os` 仍保留全部 2,320 个文件，未发生删除。下一步必须取得新的用户明确删除确认，不能把本次归档确认视为删除授权。

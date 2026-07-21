@@ -108,7 +108,7 @@ export function ProjectMemoryPanel({ onOpenSource, renderSourceButtons }) {
       title="长期记忆"
       description="已确认的内容会在后续相关对话中作为协作上下文使用；候选内容必须先由你确认。"
       meta={<span>{memory.updatedAt ? `更新于 ${formatTime(memory.updatedAt)}` : "尚未沉淀记忆"}</span>}
-      sources={renderSourceButtons(onOpenSource, [".project-os/memory.json", "docs/DECISIONS.md", "docs/LESSONS.md"])}
+      sources={renderSourceButtons(onOpenSource, [".omnidesk/data/memory.json", "docs/DECISIONS.md", "docs/LESSONS.md"])}
       status={<Badge variant={confirmed.length ? "success" : "neutral"}>{confirmed.length ? `${confirmed.length} 条已确认` : "尚未确认"}</Badge>}
     />
     {error ? <Notice variant="danger">{error}</Notice> : null}

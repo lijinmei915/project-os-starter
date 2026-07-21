@@ -110,7 +110,7 @@ export function selectCurrentProgress(store) {
     nextAction: Object.freeze(nextAction),
     evidence: Object.freeze({
       count: files.length,
-      files: Object.freeze([...new Set([".project-os/workspace-facts.json", ...files.map((file) => file.path).filter(Boolean)])]),
+      files: Object.freeze([...new Set([".omnidesk/cache/workspace-facts.json", ...files.map((file) => file.path).filter(Boolean)])]),
       updatedAt: evidence.updatedAt || evidence.observedAt || null,
       status: evidence.status || "自动汇总",
     }),

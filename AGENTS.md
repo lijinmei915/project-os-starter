@@ -19,7 +19,7 @@ use_when: "AI 首次进入仓库、修改 Desktop Runtime、状态、Agent 执�
 
 ## Quick Start For Agents
 
-1. 先读 `PROJECT.md` 与 `HANDOFF.md`；状态以 `.project-os/state.json` 和 active `.omnidesk/data/state.json` 的命名空间规则为准。
+1. 先读 `PROJECT.md` 与 `HANDOFF.md`；状态以 active `.omnidesk/data/state.json` 为准。
 2. 修改状态、Runtime 或执行链路前，阅读相关 `desktop/src-tauri/src/runtime/` 模块和 `docs/TESTING.md`。
 3. 修改文档前阅读 `docs/DOCUMENTATION.md`；新增文档前阅读 `docs/NAMING.md`。
 4. 修改用户可见工作台前，保持现有信息架构与 tokens，不新增与 Runtime 无关的管理入口。
@@ -70,7 +70,7 @@ bash tests/run-tests.sh
 ## Documentation Governance
 
 - 当前产品状态归 `PROJECT.md`；接手摘要归 `HANDOFF.md`；两者不复制完整内容。
-- 状态发生变化时同步 `.project-os/state.json` 与 active `.omnidesk/data/state.json`，直到兼容层退役。
+- 状态发生变化时同步 active `.omnidesk/data/state.json`；旧状态仅能通过显式迁移导入，不作为运行时状态源。
 - 发生误改、误判或 bug 时，在 `docs/LESSONS.md` 记录根因和新增约束。
 - 新增或改变 `docs/*.md` 职责时，更新 `docs/data/doc-structure.manifest.json` 并运行文档结构检查。
 

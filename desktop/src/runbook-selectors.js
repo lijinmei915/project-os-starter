@@ -39,7 +39,7 @@ export function selectRunbook(store) {
       requirements: Object.freeze(requirements),
     }),
     startCommands: Object.freeze(startCommands),
-    sources: Object.freeze([...new Set([".project-os/workspace-facts.json", ...startCommands.map((command) => command.source).filter(Boolean)])]),
+    sources: Object.freeze([...new Set([".omnidesk/cache/workspace-facts.json", ...startCommands.map((command) => command.source).filter(Boolean)])]),
     state: Object.freeze({
       missing: ["runbook.summary", "runbook.commands", "runbook.context"].filter((id) => store.get(id)?.status === "missing"),
       freshness: ["runbook.summary", "runbook.commands", "runbook.context"].some((id) => store.get(id)?.freshness === "stale") ? "stale" : "fresh",

@@ -99,7 +99,7 @@ export function selectEngineeringStructure(store) {
   const directories = unique(valueOf(store, "engineering.directories"));
   return section("project-overview.engineering-structure", "工程结构", "关键目录", [
     { id: "application", label: "应用代码", value: directories.filter((item) => /^(src|app|apps|desktop|cli|packages)$/i.test(item)) },
-    { id: "governance", label: "治理与文档", value: directories.filter((item) => /^(\.project-os|docs|schemas)$/i.test(item)) },
+    { id: "governance", label: "治理与文档", value: directories.filter((item) => /^(\.omnidesk|docs|schemas)$/i.test(item)) },
     { id: "quality", label: "构建与质量", value: directories.filter((item) => /^(scripts|tests|templates|\.github)$/i.test(item)) },
   ], factState(store, dependencies));
 }

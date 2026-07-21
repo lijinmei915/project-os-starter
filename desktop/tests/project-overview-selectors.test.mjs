@@ -55,7 +55,7 @@ test("selects header labels and propagates fact state without runtime dependenci
   assert.equal(header.version, "0.1.0");
   assert.equal(header.phase.label, "打磨中");
   assert.equal(header.state.freshness, "fresh");
-  assert.equal(header.sources.includes(".project-os/desktop-registry.json"), true);
+  assert.equal(header.sources.includes(".omnidesk/data/desktop-registry.json"), true);
 });
 
 test("prefers the current registry display name over a stale snapshot identity", () => {
@@ -66,7 +66,7 @@ test("prefers the current registry display name over a stale snapshot identity",
     },
   }));
   assert.equal(header.name, "OmniDesk");
-  assert.equal(header.sources.includes(".project-os/desktop-registry.json"), true);
+  assert.equal(header.sources.includes(".omnidesk/data/desktop-registry.json"), true);
 });
 
 test("hides data sections when all dependent facts are missing", () => {

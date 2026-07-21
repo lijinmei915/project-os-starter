@@ -3,7 +3,7 @@ import { OverviewPageHeader, OverviewSection } from "./overview-section";
 
 export function AgentConfigSurfacePanel({ onOpenSource, renderSourceButtons, type }) {
   const specs = {
-    "model-connections": ["模型连接", "配置当前 Provider、可用性与默认模型。", [".project-os/desktop-provider.json"], ["当前连接", "可用性", "默认模型"]],
+    "model-connections": ["模型连接", "配置当前 Provider、可用性与默认模型。", [".omnidesk/data/desktop-provider.json"], ["当前连接", "可用性", "默认模型"]],
     "tool-allowlist": ["工具白名单", "明确 Agent 可以调用的受控能力与限制。", ["desktop/src-tauri/src/main.rs"], ["允许工具", "确认边界", "禁止范围"]],
     "security-boundary": ["安全边界", "明确数据、命令和写入操作的安全限制。", ["AGENTS.md"], ["数据边界", "执行边界", "确认动作"]],
   };

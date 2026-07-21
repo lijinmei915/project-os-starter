@@ -447,8 +447,7 @@ impl Repository {
 /// not safe to persist. Governance documents migrate on their own schedule;
 /// this strict boundary starts with task, conversation, and Agent Run state.
 fn validate_state_schema(relative_path: &str, value: &Value) -> Result<(), String> {
-    if !relative_path.starts_with(".project-os/runs/")
-        && !relative_path.starts_with(".omnidesk/data/tasks/")
+    if !relative_path.starts_with(".omnidesk/data/tasks/")
         && !relative_path.starts_with(".omnidesk/data/conversations/")
         && !relative_path.starts_with(".omnidesk/data/agent-runs/")
     {
@@ -580,13 +579,13 @@ mod tests {
                 "task-rebind",
                 &[
                     JsonMutation {
-                        relative_path: ".project-os/goals.json".to_string(),
+                        relative_path: ".omnidesk/data/goals.json".to_string(),
                         value: Some(
                             json!({ "schemaVersion": "project-os.goals.v0.1", "goals": [] }),
                         ),
                     },
                     JsonMutation {
-                        relative_path: ".project-os/runs/desktop-tasks/task-1.json".to_string(),
+                        relative_path: ".omnidesk/data/tasks/task-1.json".to_string(),
                         value: Some(json!({ "schemaVersion": "project-os.desktop-task.v0.1", "id": "task-1", "goalId": "goal-a" })),
                     },
                 ],
@@ -594,7 +593,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             repository
-                .read_json(".project-os/runs/desktop-tasks/task-1.json")
+                .read_json(".omnidesk/data/tasks/task-1.json")
                 .unwrap()["goalId"],
             "goal-a"
         );
@@ -606,10 +605,10 @@ mod tests {
     }
 
     #[test]
-    fn active_namespace_routes_logical_legacy_paths_to_partitioned_storage() {
+    fn native_namespace_writes_stay_in_the_partitioned_storage() {
         let root = test_root("active-namespace");
         write_atomic(
-            &root.join(".project-os/goals.json"),
+            &root.join(".omnidesk/data/goals.json"),
             br#"{"schemaVersion":"omnidesk.goals.v0.1","goals":[]}"#,
         )
         .unwrap();
@@ -620,20 +619,19 @@ mod tests {
             .transaction(
                 "update-goals",
                 &[JsonMutation::upsert(
-                    ".project-os/goals.json",
+                    ".omnidesk/data/goals.json",
                     json!({ "schemaVersion": "omnidesk.goals.v0.1", "goals": [{ "id": "g1" }] }),
                 )],
             )
             .unwrap();
 
         assert_eq!(
-            repository.read_json(".project-os/goals.json").unwrap()["goals"][0]["id"],
+            repository.read_json(".omnidesk/data/goals.json").unwrap()["goals"][0]["id"],
             "g1"
         );
-        assert_eq!(
-            fs::read_to_string(root.join(".project-os/goals.json")).unwrap(),
-            r#"{"schemaVersion":"omnidesk.goals.v0.1","goals":[]}"#
-        );
+        assert!(fs::read_to_string(root.join(".omnidesk/data/goals.json"))
+            .unwrap()
+            .contains("g1"));
         assert!(root.join(".omnidesk/data/goals.json").is_file());
         assert!(root.join(".omnidesk/runtime/events").is_dir());
         assert!(root.join(".omnidesk/runtime/transactions").is_dir());
@@ -648,20 +646,20 @@ mod tests {
             .transaction(
                 "seed",
                 &[JsonMutation::upsert(
-                    ".project-os/state.json",
+                    ".omnidesk/data/state.json",
                     json!({"value": 1}),
                 )],
             )
             .unwrap();
         let result = repository
             .transaction_with("increment", |repository| {
-                let value = repository.read_json(".project-os/state.json").unwrap()["value"]
+                let value = repository.read_json(".omnidesk/data/state.json").unwrap()["value"]
                     .as_i64()
                     .unwrap();
                 Ok((
                     value + 1,
                     vec![JsonMutation::upsert(
-                        ".project-os/state.json",
+                        ".omnidesk/data/state.json",
                         json!({"value": value + 1}),
                     )],
                 ))
@@ -669,7 +667,7 @@ mod tests {
             .unwrap();
         assert_eq!(result, 2);
         assert_eq!(
-            repository.read_json(".project-os/state.json").unwrap()["value"],
+            repository.read_json(".omnidesk/data/state.json").unwrap()["value"],
             2
         );
     }
@@ -681,7 +679,7 @@ mod tests {
             .transaction(
                 "save-task",
                 &[JsonMutation::upsert(
-                    ".project-os/runs/desktop-tasks/task-1.json",
+                    ".omnidesk/data/tasks/task-1.json",
                     json!({ "id": "task-1" }),
                 )],
             )
@@ -694,7 +692,7 @@ mod tests {
         let root = test_root("recovery");
         let repository = Repository::new(&root);
         repository
-            .write_json(".project-os/goals.json", &json!({ "before": true }))
+            .write_json(".omnidesk/data/goals.json", &json!({ "before": true }))
             .unwrap();
         let transaction_dir = root.join(".omnidesk/runtime/transactions");
         fs::create_dir_all(&transaction_dir).unwrap();
@@ -703,18 +701,18 @@ mod tests {
             serde_json::to_string_pretty(&json!({
                 "schemaVersion": "omnidesk.repository-transaction.v0.1",
                 "state": "prepared",
-                "mutations": [{ "path": ".project-os/goals.json", "previous": { "before": true } }]
+                "mutations": [{ "path": ".omnidesk/data/goals.json", "previous": { "before": true } }]
             }))
             .unwrap()
             .as_bytes(),
         )
         .unwrap();
         repository
-            .write_json(".project-os/goals.json", &json!({ "after": true }))
+            .write_json(".omnidesk/data/goals.json", &json!({ "after": true }))
             .unwrap();
         repository.recover_incomplete_transactions().unwrap();
         assert_eq!(
-            repository.read_json(".project-os/goals.json").unwrap()["before"],
+            repository.read_json(".omnidesk/data/goals.json").unwrap()["before"],
             true
         );
         fs::remove_dir_all(root).unwrap();
@@ -758,7 +756,7 @@ mod tests {
         let repository = Repository::new(&root);
         repository
             .write_json(
-                ".project-os/runs/desktop-tasks/task-1.json",
+                ".omnidesk/data/tasks/task-1.json",
                 &json!({ "schemaVersion": "project-os.desktop-task.v0.1", "id": "task-1" }),
             )
             .unwrap();
@@ -766,19 +764,19 @@ mod tests {
             .transaction(
                 "delete-desktop-task",
                 &[
-                    JsonMutation::delete(".project-os/runs/desktop-tasks/task-1.json"),
+                    JsonMutation::delete(".omnidesk/data/tasks/task-1.json"),
                     JsonMutation::upsert(
-                        ".project-os/goals.json",
+                        ".omnidesk/data/goals.json",
                         json!({ "goals": [{ "taskIds": [] }] }),
                     ),
                 ],
             )
             .unwrap();
         assert!(repository
-            .read_json(".project-os/runs/desktop-tasks/task-1.json")
+            .read_json(".omnidesk/data/tasks/task-1.json")
             .is_none());
         assert_eq!(
-            repository.read_json(".project-os/goals.json").unwrap()["goals"][0]["taskIds"],
+            repository.read_json(".omnidesk/data/goals.json").unwrap()["goals"][0]["taskIds"],
             json!([])
         );
         fs::remove_dir_all(root).unwrap();
@@ -790,19 +788,19 @@ mod tests {
         let repository = Repository::new(&root);
         repository
             .write_json(
-                ".project-os/runs/desktop-tasks/task-1.json",
+                ".omnidesk/data/tasks/task-1.json",
                 &json!({ "schemaVersion": "project-os.desktop-task.v0.1", "id": "task-1" }),
             )
             .unwrap();
         repository
             .write_json(
-                ".project-os/runs/desktop-tasks/task-2.json",
+                ".omnidesk/data/tasks/task-2.json",
                 &json!({ "schemaVersion": "project-os.desktop-task.v0.1", "id": "task-2" }),
             )
             .unwrap();
 
         let records = repository
-            .list_json_records(".project-os/runs/desktop-tasks")
+            .list_json_records(".omnidesk/data/tasks")
             .unwrap();
         assert_eq!(
             records
@@ -810,8 +808,8 @@ mod tests {
                 .map(|(path, _)| path.as_str())
                 .collect::<Vec<_>>(),
             vec![
-                ".project-os/runs/desktop-tasks/task-1.json",
-                ".project-os/runs/desktop-tasks/task-2.json"
+                ".omnidesk/data/tasks/task-1.json",
+                ".omnidesk/data/tasks/task-2.json"
             ]
         );
         fs::remove_dir_all(root).unwrap();

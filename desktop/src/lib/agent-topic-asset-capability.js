@@ -14,7 +14,7 @@ export function assetCapabilitySpec(topicId, { assetDomainFileCount, assetDomain
     "report-artifacts": {
       title: "报告产物", status: snapshot?.goalValidationReport?.status || "待生成", tone: snapshot?.goalValidationReport?.status === "failed" ? "danger" : snapshot?.goalValidationReport?.status ? "success" : "warning",
       value: "让接入项目有评分、建议、验收和运行证据，用户能知道报告下一步能干嘛。",
-      next: "把评分、建议和失败验收直接连接到修复任务。", files: reportDomain?.files || [".project-os/reports/*", ".project-os/recommendations/*", ".project-os/goal-validation-report.json"],
+      next: "把评分、建议和失败验收直接连接到修复任务。", files: reportDomain?.files || [".omnidesk/evidence/reports/*", ".omnidesk/cache/recommendations/*", ".omnidesk/evidence/goal-validation-report.json"],
     },
     "schema-assets": {
       title: "Schema", status: assetDomainFileCount(schemaDomain) ? "已发现" : "待补齐", tone: assetDomainFileCount(schemaDomain) ? "success" : "warning",

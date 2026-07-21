@@ -40,7 +40,7 @@ test("normalizes project overview facts with source evidence", () => {
   const store = buildProjectFactStore({ snapshot, report, observedAt: "2026-07-11T23:11:00+08:00" });
   assert.equal(store.facts.length, 20);
   assert.equal(store.get("project.name").value, "OmniDesk");
-  assert.equal(store.get("project.name").selectedSource, ".project-os/desktop-registry.json");
+  assert.equal(store.get("project.name").selectedSource, ".omnidesk/data/desktop-registry.json");
   assert.equal(store.get("project.version").value, "0.1.0");
   assert.equal(store.get("technology.stack").freshness, "fresh");
 });
@@ -49,7 +49,7 @@ test("uses declared fallback sources without changing source priority", () => {
   const store = buildProjectFactStore({ snapshot: { ...snapshot, projectProfile: {} }, report });
   const description = store.get("project.description");
   assert.equal(description.value, "报告描述");
-  assert.equal(description.selectedSource, ".project-os/state.json");
+  assert.equal(description.selectedSource, ".omnidesk/data/state.json");
   assert.equal(description.sources[0].role, "primary");
   assert.equal(description.sources[1].role, "fallback");
 });
@@ -86,7 +86,7 @@ test("marks incompatible confirmed evidence as conflict while retaining the sele
   const name = store.get("project.name");
   assert.equal(name.status, "conflict");
   assert.equal(name.value, "OmniDesk");
-  assert.equal(name.selectedSource, ".project-os/desktop-registry.json");
+  assert.equal(name.selectedSource, ".omnidesk/data/desktop-registry.json");
   assert.equal(name.sources.some((source) => source.value === "OmniDesk Report"), true);
 });
 

@@ -141,7 +141,7 @@ Agent Run 已持久化 attempt、审批、观察、request checkpoint、当前�
 
 Provider 密钥继续存放在受保护的环境文件或系统密钥能力中，不进入 Repository event、trace 或普通 JSON 状态。
 
-工程文件树、Agent 读取工具和默认治理扫描都必须隐藏 `.project-os/` 与 `.omnidesk/` 两个物理目录。界面在兼容期可继续使用 `.project-os/...` 逻辑路径，但真实读写必须经过 namespace resolver。
+工程文件树、Agent 读取工具和默认治理扫描都必须隐藏 `.omnidesk/` 与可能遗留的 `.project-os/` 状态目录。Runtime 与 Preview 只接受 native `.omnidesk/...` 分区路径；旧状态只由显式迁移器读取，不能通过普通 resolver 回退。
 
 ## 架构约束
 

@@ -7,12 +7,12 @@ export function getProviderStatus(fallbackProvider) {
 
 export function getModelCatalog(fallbackModelCatalog) {
   if (isTauriRuntime()) return invokeTauriCommand("get_model_catalog");
-  return loadPreviewJson("/.project-os/model-catalog.json", fallbackModelCatalog);
+  return loadPreviewJson("/.omnidesk/data/model-catalog.json", fallbackModelCatalog);
 }
 
 export function getModelHealth(fallbackModelHealth = { schemaVersion: "project-os.model-health.v0.1", entries: [] }) {
   if (isTauriRuntime()) return invokeTauriCommand("get_model_health");
-  return loadPreviewJson("/.project-os/model-health.json", fallbackModelHealth);
+  return loadPreviewJson("/.omnidesk/cache/model-health.json", fallbackModelHealth);
 }
 
 export function saveProviderConfig(input) {

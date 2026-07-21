@@ -67,7 +67,7 @@ fn is_patch_context_path(path: &str) -> bool {
         && !path.contains("..")
         && !path.starts_with(".env")
         && !path.contains("/.env")
-        && !path.contains(".project-os/desktop-provider")
+        && !path.contains(".omnidesk/desktop-provider")
 }
 
 pub fn normalize_hermes_unified_diff(

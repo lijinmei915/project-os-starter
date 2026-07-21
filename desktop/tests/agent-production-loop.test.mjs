@@ -23,7 +23,7 @@ test("keeps patch, approval, failed check, repair, and final verification on one
     persistTask,
     runCheck: async () => ({ id: "test", label: "测试", output: "expected true", success: false }),
     task: initial.task,
-    writeRunSummary: async () => ".project-os/runs/desktop-summary.md",
+    writeRunSummary: async () => ".omnidesk/evidence/desktop-summary.md",
   });
   assert.equal(failedCheck.task.status, "repair pending");
   assert.equal(failedCheck.task.repair.remaining, 2);
@@ -42,7 +42,7 @@ test("keeps patch, approval, failed check, repair, and final verification on one
     persistTask,
     runCheck: async () => ({ id: "test", label: "测试", success: true }),
     task: repair.task,
-    writeRunSummary: async () => ".project-os/runs/desktop-summary.md",
+    writeRunSummary: async () => ".omnidesk/evidence/desktop-summary.md",
   });
   assert.equal(completed.task.status, "done");
   assert.deepEqual(

@@ -3,16 +3,16 @@ import { OverviewPageHeader, OverviewSection, OverviewTagList } from "./overview
 import { ProjectMemoryPanel } from "./project-memory-panel";
 
 const memorySpecs = {
-  "project-facts": { title: "项目事实", description: "集中查看已确认的项目事实、来源与新鲜度。", sources: [".project-os/project-profile.json", ".project-os/workspace-facts.json"], sections: [["事实档案", "项目定位、阶段和技术组成只以已确认事实呈现。"], ["来源依据", "每项事实保留来源文件，推断内容不直接写成项目事实。"], ["新鲜度", "事实变化后需要重新扫描或确认，避免使用过期上下文。"]] },
-  "user-preferences": { title: "用户偏好", description: "区分当前项目协作偏好与跨项目长期偏好。", sources: [".project-os/project-profile.json"], sections: [["项目偏好", "记录当前项目的表达方式、协作边界和风险取向。"], ["全局偏好", "跨项目长期有效的偏好不混入当前项目事实。"], ["确认边界", "从对话提取的偏好需要用户确认后才作为稳定偏好使用。"]] },
-  "long-term-memory": { title: "长期记忆", description: "沉淀可跨轮次复用的决策、经验和重要上下文。", sources: [".project-os/memory/", "docs/DECISIONS.md", "docs/LESSONS.md"], sections: [["重要决策", "长期有效的取舍归档为决策，不复制当前任务细节。"], ["经验约束", "已经验证的避坑规则沉淀为经验教训。"], ["保留策略", "只有后续工作仍需要的内容进入长期记忆，临时对话不默认沉淀。"]] },
-  "conversation-summary": { title: "会话摘要", description: "把对话中的主题、结论和未决事项压缩为可继续的上下文。", sources: [".project-os/conversations/", ".project-os/runs/desktop-tasks/"], sections: [["会话主题", "保留当前讨论的核心主题，短追问可以继承上下文。"], ["已得结论", "已确认的结论、约束和执行结果被归纳，避免重复解释。"], ["未决事项", "尚待确认或尚未执行的事项保留为后续入口，不直接当成已完成。"]] },
+  "project-facts": { title: "项目事实", description: "集中查看已确认的项目事实、来源与新鲜度。", sources: [".omnidesk/data/project-profile.json", ".omnidesk/cache/workspace-facts.json"], sections: [["事实档案", "项目定位、阶段和技术组成只以已确认事实呈现。"], ["来源依据", "每项事实保留来源文件，推断内容不直接写成项目事实。"], ["新鲜度", "事实变化后需要重新扫描或确认，避免使用过期上下文。"]] },
+  "user-preferences": { title: "用户偏好", description: "区分当前项目协作偏好与跨项目长期偏好。", sources: [".omnidesk/data/project-profile.json"], sections: [["项目偏好", "记录当前项目的表达方式、协作边界和风险取向。"], ["全局偏好", "跨项目长期有效的偏好不混入当前项目事实。"], ["确认边界", "从对话提取的偏好需要用户确认后才作为稳定偏好使用。"]] },
+  "long-term-memory": { title: "长期记忆", description: "沉淀可跨轮次复用的决策、经验和重要上下文。", sources: [".omnidesk/data/memory/", "docs/DECISIONS.md", "docs/LESSONS.md"], sections: [["重要决策", "长期有效的取舍归档为决策，不复制当前任务细节。"], ["经验约束", "已经验证的避坑规则沉淀为经验教训。"], ["保留策略", "只有后续工作仍需要的内容进入长期记忆，临时对话不默认沉淀。"]] },
+  "conversation-summary": { title: "会话摘要", description: "把对话中的主题、结论和未决事项压缩为可继续的上下文。", sources: [".omnidesk/data/conversations/", ".omnidesk/data/tasks/"], sections: [["会话主题", "保留当前讨论的核心主题，短追问可以继承上下文。"], ["已得结论", "已确认的结论、约束和执行结果被归纳，避免重复解释。"], ["未决事项", "尚待确认或尚未执行的事项保留为后续入口，不直接当成已完成。"]] },
 };
 
 const assetSpecs = {
   "engineering-files": { title: "工程文件", description: "定位源码入口、目录职责和可只读预览的工程文件。", sources: ["desktop/src/", "desktop/src-tauri/"], sections: [["关键入口", "识别应用、配置和核心模块入口。"], ["目录职责", "按职责理解目录，不把治理文档混入工程代码。"], ["只读预览", "文件内容通过工程文件预览查看，不在资产页直接编辑。"]] },
   "governance-files": { title: "治理文件", description: "查看项目规则、状态和交接文件的健康情况。", sources: ["AGENTS.md", "PROJECT.md", "HANDOFF.md"], sections: [["健康结论", "按正常、变更、缺失和过期识别需要关注的治理文件。"], ["治理文件", "规则、当前状态和交接各自有唯一事实来源。"], ["处理动作", "文件缺口可生成治理任务，进入受控执行与验证链路。"]] },
-  "report-artifacts": { title: "执行证据", description: "管理任务执行与验收形成的可追溯记录。", sources: [".project-os/runs/", ".project-os/goal-validation-report.json"], sections: [["证据目录", "每次受控执行和验收都保留独立记录。"], ["证据用途", "证据用于追溯写入、审批、检查和最终结论。"], ["保留边界", "运行证据不替代当前项目状态和交接记录。"]] },
+  "report-artifacts": { title: "执行证据", description: "管理任务执行与验收形成的可追溯记录。", sources: [".omnidesk/evidence/runs/", ".omnidesk/evidence/goal-validation-report.json"], sections: [["证据目录", "每次受控执行和验收都保留独立记录。"], ["证据用途", "证据用于追溯写入、审批、检查和最终结论。"], ["保留边界", "运行证据不替代当前项目状态和交接记录。"]] },
   "schema-assets": { title: "Schema", description: "管理机器可读结构、版本和校验边界。", sources: ["schemas/", "docs/data/"], sections: [["契约目录", "Schema 与版本化数据定义状态、配置、报告和运行记录的结构。"], ["使用范围", "页面、CLI 与检查脚本复用同一结构化契约，不各自猜测字段。"], ["校验边界", "结构变化需经过 Schema 校验；业务解释仍归对应的治理页面。"]] },
 };
 

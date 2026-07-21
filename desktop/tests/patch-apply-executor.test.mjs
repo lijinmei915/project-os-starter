@@ -22,7 +22,7 @@ function createHarness(overrides = {}) {
       task: { id: "task-1", plan: {}, status: "waiting approval" },
       writeRunSummary: async (task) => {
         calls.push({ id: "summary", task });
-        return ".project-os/runs/desktop-summary.md";
+        return ".omnidesk/evidence/desktop-summary.md";
       },
       ...overrides,
     },
@@ -37,7 +37,7 @@ test("executes and durably persists an Apply workflow without checks", async () 
   assert.equal(result.success, true);
   assert.equal(result.task.status, "done");
   assert.equal(result.task.applyResult.success, true);
-  assert.equal(result.task.runSummary, ".project-os/runs/desktop-summary.md");
+  assert.equal(result.task.runSummary, ".omnidesk/evidence/desktop-summary.md");
   assert.deepEqual(harness.calls.filter((call) => call.id === "persist").map((call) => call.options), [
     { durable: true },
     { durable: true },

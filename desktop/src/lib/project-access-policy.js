@@ -22,7 +22,7 @@ export function projectAccessPresentation(value) {
     summary: mode === projectAccessModes.browse
       ? "只读取项目，不写入治理文件或工程文件。"
       : mode === projectAccessModes.governed
-        ? "可写入 .project-os 治理记录，不修改工程文件。"
+        ? "可写入 .omnidesk Runtime 记录，不修改工程文件。"
         : "可在每次确认后应用工程变更并运行验证。",
   };
 }

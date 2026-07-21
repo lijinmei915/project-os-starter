@@ -2,19 +2,19 @@ import { requireWorkspaceRoute } from "./workspace-route-registry.js";
 
 const governanceMeta = {
   "工作台": {
-    files: ["PROJECT.md", "HANDOFF.md", "docs/RUNBOOK.md", ".project-os/state.json"],
+    files: ["PROJECT.md", "HANDOFF.md", "docs/RUNBOOK.md", ".omnidesk/data/state.json"],
     governanceRole: "工作台总览入口，回答当前项目状态、进度、启动方式、风险和本地接入状态。",
     maturity: "状态化",
     nextAction: "把工作台总览继续接到真实扫描、运行命令和风险任务生成。",
-    statusSource: ".project-os/state.json",
+    statusSource: ".omnidesk/data/state.json",
     updatesWhen: "项目接入、当前进度、启动方式、风险或本地状态变化时更新。",
   },
   "认识项目": {
-    files: ["PROJECT.md", ".project-os/state.json", "README.md", "HANDOFF.md"],
+    files: ["PROJECT.md", ".omnidesk/data/state.json", "README.md", "HANDOFF.md"],
     governanceRole: "项目事实入口，回答这个项目是什么、到哪一步、当前风险是什么。",
     maturity: "状态化",
     nextAction: "继续把工作区事实自动生成接到真实项目扫描。",
-    statusSource: ".project-os/state.json",
+    statusSource: ".omnidesk/data/state.json",
     updatesWhen: "接入项目、项目阶段变化、启动方式变化或风险变化时更新。",
   },
   "定义目标": {
@@ -42,11 +42,11 @@ const governanceMeta = {
     updatesWhen: "架构、数据模型、界面规范或代码结构变化时更新。",
   },
   "验证交付": {
-    files: ["docs/TESTING.md", "docs/RUNBOOK.md", "scripts/*", ".project-os/runs/*"],
+    files: ["docs/TESTING.md", "docs/RUNBOOK.md", "scripts/*", ".omnidesk/evidence/runs/*"],
     governanceRole: "质量治理入口，负责检查项、验收报告和运行记录。",
     maturity: "状态化",
     nextAction: "把失败验收直接转成修复任务，并沉淀验证证据。",
-    statusSource: ".project-os/runs/*",
+    statusSource: ".omnidesk/evidence/runs/*",
     updatesWhen: "检查命令、验收标准、交付产物或质量记录变化时更新。",
   },
   "复盘沉淀": {
@@ -60,7 +60,7 @@ const governanceMeta = {
 };
 
 const itemMeta = {
-  "项目概览": { statusSource: ".project-os/state.json" },
+  "项目概览": { statusSource: ".omnidesk/data/state.json" },
   "当前进度": { statusSource: "HANDOFF.md" },
   "启动方式": {
     statusSource: "docs/RUNBOOK.md",
@@ -69,10 +69,10 @@ const itemMeta = {
     nextAction: "把启动命令、构建命令和检查命令做成可读命令面板，避免停留在文档说明。",
   },
   "风险边界": { statusSource: "HANDOFF.md" },
-  "项目接入": { statusSource: ".project-os/state.json" },
-  "当前阶段目标": { statusSource: ".project-os/goals.json" },
-  "验收标准": { statusSource: ".project-os/goal-validation.json" },
-  "目标历史": { statusSource: ".project-os/goals.json" },
+  "项目接入": { statusSource: ".omnidesk/data/state.json" },
+  "当前阶段目标": { statusSource: ".omnidesk/data/goals.json" },
+  "验收标准": { statusSource: ".omnidesk/data/goal-validation.json" },
+  "目标历史": { statusSource: ".omnidesk/data/goals.json" },
   "协作边界": { statusSource: "AGENTS.md" },
   "执行权限": { statusSource: "AGENTS.md" },
   "文档规则": { statusSource: "docs/DOCUMENTATION.md" },
@@ -84,34 +84,34 @@ const itemMeta = {
   "实现结构": { statusSource: "docs/ARCHITECTURE.md" },
   "检查项": { statusSource: "docs/TESTING.md" },
   "验收报告": {
-    statusSource: ".project-os/goal-validation-report.json",
+    statusSource: ".omnidesk/evidence/goal-validation-report.json",
     maturity: "状态化",
     governanceRole: "目标验收结果入口，回答最近一次验收是否通过、哪些检查失败、下一步怎么处理。",
     nextAction: "把验收结果、检查项和失败修复入口展示成报告工作面。",
   },
-  "运行记录": { statusSource: ".project-os/runs/*" },
+  "运行记录": { statusSource: ".omnidesk/evidence/runs/*" },
   "交接记录": { statusSource: "HANDOFF.md" },
   "决策记录": { statusSource: "docs/DECISIONS.md" },
   "经验教训": { statusSource: "docs/LESSONS.md" },
-  "项目事实": { statusSource: ".project-os/workspace-facts.json" },
+  "项目事实": { statusSource: ".omnidesk/cache/workspace-facts.json" },
   "用户偏好": { statusSource: "OmniDesk global: user-profile.json" },
-  "长期记忆": { statusSource: ".project-os/memory/*" },
-  "会话摘要": { statusSource: ".project-os/conversations/*" },
-  "当前任务": { statusSource: ".project-os/runs/desktop-tasks/*" },
-  "任务队列": { statusSource: ".project-os/runs/desktop-tasks/*" },
-  "执行终端": { statusSource: ".project-os/runs/*" },
-  "执行结果": { statusSource: ".project-os/runs/desktop-summary.md" },
+  "长期记忆": { statusSource: ".omnidesk/data/memory/*" },
+  "会话摘要": { statusSource: ".omnidesk/data/conversations/*" },
+  "当前任务": { statusSource: ".omnidesk/data/tasks/*" },
+  "任务队列": { statusSource: ".omnidesk/data/tasks/*" },
+  "执行终端": { statusSource: ".omnidesk/evidence/runs/*" },
+  "执行结果": { statusSource: ".omnidesk/evidence/desktop-summary.md" },
   "工程文件": { statusSource: "project tree" },
-  "治理文件": { statusSource: ".project-os/workspace-facts.json" },
+  "治理文件": { statusSource: ".omnidesk/cache/workspace-facts.json" },
   "报告产物": {
-    statusSource: ".project-os/reports/*",
+    statusSource: ".omnidesk/evidence/reports/*",
     maturity: "状态化",
     governanceRole: "工程治理报告入口，展示扫描、评分、推荐和验收等生成产物，不是普通视觉页面。",
     nextAction: "明确每个报告产物的来源、用途和下一步动作，避免用户不知道报告能干嘛。",
   },
   "Schema": { statusSource: "schemas/*" },
   "脚本模板": { statusSource: "scripts/*" },
-  "模型连接": { statusSource: ".project-os/desktop-provider.json" },
+  "模型连接": { statusSource: ".omnidesk/data/desktop-provider.json" },
   "工具白名单": { statusSource: "desktop/src-tauri/src/main.rs" },
   "安全边界": { statusSource: "docs/AI_SAFETY.md" },
 };
@@ -209,11 +209,11 @@ export const projectGovernanceFlow = [
     icon: "book",
     description: "项目基本状态。",
     items: [
-      { id: "project-identity", title: "项目概览", description: "名称、用途和阶段。", relatedFiles: ["PROJECT.md", ".project-os/state.json"] },
+      { id: "project-identity", title: "项目概览", description: "名称、用途和阶段。", relatedFiles: ["PROJECT.md", ".omnidesk/data/state.json"] },
       { id: "project-progress", title: "项目进展", description: "项目到哪一步，以及唯一下一步。", relatedFiles: ["PROJECT.md", "HANDOFF.md"] },
       { id: "project-runbook", title: "启动方式", description: "启动入口与运行环境。", relatedFiles: ["README.md", "desktop/package.json", "docs/RUNBOOK.md", "docs/ARCHITECTURE.md"] },
       { id: "project-risks", title: "风险边界", description: "已知风险和边界。", relatedFiles: ["HANDOFF.md", "docs/LESSONS.md"] },
-      { id: "local-project-state", title: "项目接入", description: "接入登记和治理准备。", relatedFiles: [".project-os/state.json", ".project-os/desktop-registry.json"] },
+      { id: "local-project-state", title: "项目接入", description: "接入登记和治理准备。", relatedFiles: [".omnidesk/data/state.json", ".omnidesk/data/desktop-registry.json"] },
     ],
   },
   {
@@ -223,9 +223,9 @@ export const projectGovernanceFlow = [
     icon: "clipboard",
     description: "当前目标、验收标准和目标历史。",
     items: [
-      { id: "current-goal", title: "当前阶段目标", description: "项目目标下正在推进的阶段目标和范围。", relatedFiles: [".project-os/goals.json", "PROJECT.md", "HANDOFF.md"] },
-      { id: "acceptance-criteria", title: "验收标准", description: "完成判断和检查条件。", relatedFiles: [".project-os/goal-validation.json", "docs/TESTING.md"] },
-      { id: "goal-history", title: "目标历史", description: "已完成、待确认和历史目标。", relatedFiles: [".project-os/goals.json", ".project-os/goal-signoff-history.json"] },
+      { id: "current-goal", title: "当前阶段目标", description: "项目目标下正在推进的阶段目标和范围。", relatedFiles: [".omnidesk/data/goals.json", "PROJECT.md", "HANDOFF.md"] },
+      { id: "acceptance-criteria", title: "验收标准", description: "完成判断和检查条件。", relatedFiles: [".omnidesk/data/goal-validation.json", "docs/TESTING.md"] },
+      { id: "goal-history", title: "目标历史", description: "已完成、待确认和历史目标。", relatedFiles: [".omnidesk/data/goals.json", ".omnidesk/data/goal-signoff-history.json"] },
     ],
   },
   {
@@ -271,8 +271,8 @@ export const projectGovernanceFlow = [
     description: "验收、测试和交付结果。",
     items: [
       { id: "validation-checks", title: "检查项", description: "当前项目可运行的检查。", relatedFiles: ["docs/TESTING.md", "desktop/package.json", "desktop/src-tauri/Cargo.toml"] },
-      { id: "validation-report", title: "验收报告", description: "目标验收和检查结果。", relatedFiles: [".project-os/goal-validation-report.json"] },
-      { id: "run-records", title: "运行记录", description: "检查、扫描和执行历史。", relatedFiles: [".project-os/runs/*", ".project-os/runs/desktop-summary.md"] },
+      { id: "validation-report", title: "验收报告", description: "目标验收和检查结果。", relatedFiles: [".omnidesk/evidence/goal-validation-report.json"] },
+      { id: "run-records", title: "运行记录", description: "检查、扫描和执行历史。", relatedFiles: [".omnidesk/evidence/runs/*", ".omnidesk/evidence/desktop-summary.md"] },
     ],
   },
   {
@@ -323,7 +323,7 @@ export const projectGovernanceOutline = [
         icon: "clipboard",
         description: "在同一页面查看目标信息并推进关联任务。",
         items: [
-          { id: "task-list", title: "目标与任务", description: "查看目标、验收、历史和关联任务。", relatedFiles: [".project-os/goals.json", ".project-os/goal-validation.json", ".project-os/runs/desktop-tasks/*", ".project-os/task-backlog.json"] },
+          { id: "task-list", title: "目标与任务", description: "查看目标、验收、历史和关联任务。", relatedFiles: [".omnidesk/data/goals.json", ".omnidesk/data/goal-validation.json", ".omnidesk/data/tasks/*", ".omnidesk/data/task-backlog.json"] },
         ],
       },
       {
@@ -333,7 +333,7 @@ export const projectGovernanceOutline = [
         icon: "terminal",
         description: "命令执行入口。",
         items: [
-          { id: "execution-terminal", title: "执行终端", description: "本地命令、检查和输出。", relatedFiles: [".project-os/runs/*"] },
+          { id: "execution-terminal", title: "执行终端", description: "本地命令、检查和输出。", relatedFiles: [".omnidesk/evidence/runs/*"] },
         ],
       },
       {
@@ -343,7 +343,7 @@ export const projectGovernanceOutline = [
         icon: "check",
         description: "任务结果和验证摘要。",
         items: [
-          { id: "execution-results", title: "执行结果", description: "执行摘要、变更和验证结果。", relatedFiles: [".project-os/runs/desktop-summary.md", "HANDOFF.md"] },
+          { id: "execution-results", title: "执行结果", description: "执行摘要、变更和验证结果。", relatedFiles: [".omnidesk/evidence/desktop-summary.md", "HANDOFF.md"] },
         ],
       },
     ],
@@ -363,7 +363,7 @@ export const projectGovernanceOutline = [
         icon: "book",
         description: "项目长期事实。",
         items: [
-          { id: "project-facts", title: "项目事实", description: "项目身份、阶段、事实来源和可信度。", relatedFiles: [".project-os/workspace-facts.json", ".project-os/state.json", "PROJECT.md"] },
+          { id: "project-facts", title: "项目事实", description: "项目身份、阶段、事实来源和可信度。", relatedFiles: [".omnidesk/cache/workspace-facts.json", ".omnidesk/data/state.json", "PROJECT.md"] },
         ],
       },
       {
@@ -383,7 +383,7 @@ export const projectGovernanceOutline = [
         icon: "brain",
         description: "可跨会话复用的记忆。",
         items: [
-          { id: "long-term-memory", title: "长期记忆", description: "沉淀后的长期上下文。", relatedFiles: [".project-os/memory/*", "docs/data/knowledge-registry.json"] },
+          { id: "long-term-memory", title: "长期记忆", description: "沉淀后的长期上下文。", relatedFiles: [".omnidesk/data/memory/*", "docs/data/knowledge-registry.json"] },
         ],
       },
       {
@@ -393,7 +393,7 @@ export const projectGovernanceOutline = [
         icon: "book",
         description: "对话摘要和可沉淀内容。",
         items: [
-          { id: "conversation-summary", title: "会话摘要", description: "历史对话和摘要。", relatedFiles: [".project-os/conversations/*"] },
+          { id: "conversation-summary", title: "会话摘要", description: "历史对话和摘要。", relatedFiles: [".omnidesk/data/conversations/*"] },
         ],
       },
     ],
@@ -434,7 +434,7 @@ export const projectGovernanceOutline = [
         icon: "clipboard",
         description: "检查、验收和推荐形成的可追溯证据。",
         items: [
-          { id: "report-artifacts", title: "报告与证据", description: "验收和任务执行产生的可追溯证据。", relatedFiles: [".project-os/goal-validation-report.json", ".project-os/runs/*"] },
+          { id: "report-artifacts", title: "报告与证据", description: "验收和任务执行产生的可追溯证据。", relatedFiles: [".omnidesk/evidence/goal-validation-report.json", ".omnidesk/evidence/runs/*"] },
         ],
       },
       {
@@ -464,7 +464,7 @@ export const projectGovernanceOutline = [
         icon: "settings",
         description: "Provider 和模型。",
         items: [
-          { id: "model-connections", title: "模型连接", description: "Provider、API Base、Key 和模型列表。", relatedFiles: [".project-os/desktop-provider.json", ".project-os/model-catalog.json", ".project-os/model-health.json"] },
+          { id: "model-connections", title: "模型连接", description: "Provider、API Base、Key 和模型列表。", relatedFiles: [".omnidesk/data/desktop-provider.json", ".omnidesk/data/model-catalog.json", ".omnidesk/cache/model-health.json"] },
         ],
       },
       {

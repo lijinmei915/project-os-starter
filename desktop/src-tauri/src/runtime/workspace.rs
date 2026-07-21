@@ -5,10 +5,15 @@ use std::fs;
 use std::path::Path;
 use std::time::UNIX_EPOCH;
 
-const CAPABILITIES_PATH: &str = ".project-os/project-capabilities.json";
-const MEMORY_PATH: &str = ".project-os/memory.json";
-const PROFILE_PATH: &str = ".project-os/project-profile.json";
-const BACKLOG_PATH: &str = ".project-os/task-backlog.json";
+const STATE_PATH: &str = ".omnidesk/data/state.json";
+const CAPABILITIES_PATH: &str = ".omnidesk/data/project-capabilities.json";
+const MEMORY_PATH: &str = ".omnidesk/data/memory.json";
+const PROFILE_PATH: &str = ".omnidesk/data/project-profile.json";
+const BACKLOG_PATH: &str = ".omnidesk/data/task-backlog.json";
+const FACT_FRESHNESS_PATH: &str = ".omnidesk/cache/fact-freshness.json";
+const GOALS_PATH: &str = ".omnidesk/data/goals.json";
+const PROVIDER_PATH: &str = ".omnidesk/data/desktop-provider.json";
+const MODEL_CATALOG_PATH: &str = ".omnidesk/data/model-catalog.json";
 
 pub struct WorkspaceProjectionState {
     pub state: Option<Value>,
@@ -53,8 +58,8 @@ fn source_paths() -> [&'static str; 19] {
         "desktop/package.json",
         "Cargo.toml",
         "desktop/src-tauri/Cargo.toml",
-        ".project-os/state.json",
-        ".project-os/project-profile.json",
+        STATE_PATH,
+        PROFILE_PATH,
         "src",
         "desktop/src",
         "server",
@@ -89,7 +94,7 @@ fn source_fingerprints(root: &Path) -> serde_json::Map<String, Value> {
 
 pub fn fact_freshness(root: &Path) -> Value {
     let current = source_fingerprints(root);
-    let saved = read_json(root, ".project-os/fact-freshness.json");
+    let saved = read_json(root, FACT_FRESHNESS_PATH);
     let saved_fingerprints = saved
         .as_ref()
         .and_then(|value| value.get("fingerprints"))
@@ -110,7 +115,7 @@ pub fn fact_freshness(root: &Path) -> Value {
 
 pub fn record_fact_freshness(root: &Path, timestamp: &str) -> Result<(), String> {
     Repository::new(root).transaction("record-fact-freshness", &[JsonMutation::upsert(
-        ".project-os/fact-freshness.json",
+        FACT_FRESHNESS_PATH,
         json!({ "schemaVersion": "project-os.fact-freshness.v0.1", "updatedAt": timestamp, "fingerprints": source_fingerprints(root) }),
     )])?;
     Ok(())
@@ -132,12 +137,12 @@ pub fn detected_capabilities(root: &Path) -> Value {
         ("files", "enabled", vec!["core"]),
         (
             "goals",
-            if crate::runtime::state_namespace::state_path_exists(root, ".project-os/goals.json") {
+            if crate::runtime::state_namespace::state_path_exists(root, GOALS_PATH) {
                 "detected"
             } else {
                 "available"
             },
-            vec![".project-os/goals.json"],
+            vec![GOALS_PATH],
         ),
         (
             "rules",
@@ -180,16 +185,16 @@ pub fn detected_capabilities(root: &Path) -> Value {
         ),
         (
             "agent-configuration",
-            if crate::runtime::state_namespace::state_path_exists(root, ".project-os/desktop-provider.json")
-                || crate::runtime::state_namespace::state_path_exists(root, ".project-os/model-catalog.json")
+            if crate::runtime::state_namespace::state_path_exists(root, PROVIDER_PATH)
+                || crate::runtime::state_namespace::state_path_exists(root, MODEL_CATALOG_PATH)
             {
                 "detected"
             } else {
                 "available"
             },
             vec![
-                ".project-os/desktop-provider.json",
-                ".project-os/model-catalog.json",
+                PROVIDER_PATH,
+                MODEL_CATALOG_PATH,
             ],
         ),
     ];
@@ -237,8 +242,8 @@ pub fn detected_capabilities(root: &Path) -> Value {
         ("cli", root.join("cli").exists(), vec!["cli"]),
         (
             "ai",
-            crate::runtime::state_namespace::state_path_exists(root, ".project-os/model-catalog.json") || package_text.contains("openai"),
-            vec![".project-os/model-catalog.json"],
+            crate::runtime::state_namespace::state_path_exists(root, MODEL_CATALOG_PATH) || package_text.contains("openai"),
+            vec![MODEL_CATALOG_PATH],
         ),
         (
             "testing",
@@ -339,24 +344,24 @@ pub fn load_memory(root: &Path, project_id: &str) -> Value {
 pub fn load_projection_state(root: &Path) -> WorkspaceProjectionState {
     let repository = Repository::new(root);
     WorkspaceProjectionState {
-        state: repository.read_json(".project-os/state.json"),
-        recommendations: repository.read_json(".project-os/recommendations/recommend-next.json"),
-        task_backlog: repository.read_json(".project-os/task-backlog.json"),
+        state: repository.read_json(STATE_PATH),
+        recommendations: repository.read_json(".omnidesk/cache/recommendations/recommend-next.json"),
+        task_backlog: repository.read_json(BACKLOG_PATH),
         goal_validation: repository
-            .read_json(".project-os/goal-validation.json")
+            .read_json(".omnidesk/data/goal-validation.json")
             .unwrap_or_else(|| json!({ "criteria": [] })),
         goal_validation_report: repository
-            .read_json(".project-os/goal-validation-report.json")
+            .read_json(".omnidesk/evidence/goal-validation-report.json")
             .unwrap_or_else(|| json!({ "status": "missing", "checks": [] })),
         goal_signoff_history: repository
-            .read_json(".project-os/goal-signoff-history.json")
+            .read_json(".omnidesk/data/goal-signoff-history.json")
             .unwrap_or_else(|| json!({ "entries": [] })),
         workspace_facts: repository
-            .read_json(".project-os/workspace-facts.json")
+            .read_json(".omnidesk/cache/workspace-facts.json")
             .unwrap_or_else(|| json!(null)),
-        goals: repository.read_json(".project-os/goals.json"),
+        goals: repository.read_json(GOALS_PATH),
         project_goals: repository
-            .read_json(".project-os/project-goals.json")
+            .read_json(".omnidesk/data/project-goals.json")
             .unwrap_or_else(|| json!({ "activeProjectGoalId": "", "projectGoals": [] })),
     }
 }
@@ -451,7 +456,7 @@ pub fn update_backlog_item(
     Repository::new(root).transaction_with("update-task-backlog-item", |repository| {
         let mut backlog = repository
             .read_json(BACKLOG_PATH)
-            .ok_or_else(|| "未找到任务池文件 .project-os/task-backlog.json".to_string())?;
+            .ok_or_else(|| "未找到任务池文件 .omnidesk/data/task-backlog.json".to_string())?;
         let items = backlog
             .get_mut("items")
             .and_then(Value::as_array_mut)
@@ -546,16 +551,16 @@ mod tests {
         assert_eq!(fact_freshness(&root)["status"], "stale");
         record_fact_freshness(&root, "now").unwrap();
         assert_eq!(fact_freshness(&root)["status"], "fresh");
-        assert!(root.join(".project-os/events").exists());
+        assert!(root.join(".omnidesk/runtime/events").exists());
     }
 
     #[test]
     fn capability_scan_preserves_user_dismissal() {
         let root = test_root("capability");
-        fs::create_dir_all(root.join(".project-os")).unwrap();
+        fs::create_dir_all(root.join(".omnidesk/data")).unwrap();
         fs::write(root.join("AGENTS.md"), "rules").unwrap();
         fs::write(
-            root.join(".project-os/project-capabilities.json"),
+            root.join(CAPABILITIES_PATH),
             r#"{ "workspaceCapabilities": [{ "id": "rules", "status": "dismissed" }] }"#,
         )
         .unwrap();
@@ -609,7 +614,7 @@ mod tests {
         .unwrap();
         assert_eq!(memory["schemaVersion"], "project-os.memory.v0.1");
         assert_eq!(load_memory(&root, "project-b")["projectId"], "project-a");
-        assert!(root.join(".project-os/events").is_dir());
+        assert!(root.join(".omnidesk/runtime/events").is_dir());
         fs::remove_dir_all(root).unwrap();
     }
 
@@ -645,7 +650,7 @@ mod tests {
         assert_eq!(profile["fields"]["product.coreValue"]["confidence"], 1.0);
         assert!(profile["fields"].get("unsafe.path").is_none());
         assert_eq!(
-            fs::read_dir(root.join(".project-os/events"))
+            fs::read_dir(root.join(".omnidesk/runtime/events"))
                 .unwrap()
                 .count(),
             1
@@ -665,7 +670,7 @@ mod tests {
     #[test]
     fn backlog_update_is_locked_and_emits_one_event() {
         let root = test_root("backlog");
-        fs::create_dir_all(root.join(".project-os")).unwrap();
+        fs::create_dir_all(root.join(".omnidesk/data")).unwrap();
         fs::write(
             root.join(BACKLOG_PATH),
             r#"{"items":[{"id":"task-1","status":"planned"}]}"#,
@@ -676,7 +681,7 @@ mod tests {
         assert_eq!(backlog["items"][0]["status"], "running");
         assert_eq!(backlog["updatedAt"], "now");
         assert_eq!(
-            fs::read_dir(root.join(".project-os/events"))
+            fs::read_dir(root.join(".omnidesk/runtime/events"))
                 .unwrap()
                 .count(),
             1

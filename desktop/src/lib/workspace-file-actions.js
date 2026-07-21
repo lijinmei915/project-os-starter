@@ -20,7 +20,7 @@ export function createWorkspaceFileActions({ fileClient, setActiveTaskId, setPla
       }
       if (file.virtual) {
         setSelectedEngineeringFile({ ...nextFile, loading: false, preview: {
-          content: "这个入口属于 OmniDesk 全局记忆，不属于当前项目文件。\n\n建议后续保存到应用级本地配置：\n- user-profile.json：用户画像\n- global-preferences.json：全局偏好\n\n这样它会跨项目生效，不污染当前项目的 .project-os/。",
+          content: "这个入口属于 OmniDesk 全局记忆，不属于当前项目文件。\n\n建议后续保存到应用级本地配置：\n- user-profile.json：用户画像\n- global-preferences.json：全局偏好\n\n这样它会跨项目生效，不污染当前项目的 .omnidesk/。",
           language: "text", name: file.path.replace("OmniDesk global: ", ""), size: 0, truncated: false,
         } });
         return;

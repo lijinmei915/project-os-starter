@@ -31,7 +31,7 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 - 模型执行：普通 Provider 与 Hermes 都经过同一授权文件、Patch 校验、审批和检查边界。
 - 状态事务：Runtime Repository 使用 schema、锁和原子事务维护跨实体一致性。
 - 浏览器 Preview：仅用于只读预览和 UI 验证，不执行文件写入、终端或受控检查。
-- 当前状态根：`.omnidesk/` 是唯一物理状态根；旧 `.project-os/` 已迁移、归档并删除。Runtime 暂保留逻辑路径映射，供尚未收敛的内部调用读取 active 分区。
+- 当前状态根：`.omnidesk/` 是唯一物理状态根；旧 `.project-os/` 已迁移、归档并删除。Runtime 与 Preview 仅接受 native `.omnidesk/data|runtime|cache|evidence` 路径；历史导入由迁移器单独处理。
 - 评测：`desktop/evals/` 保存固定 12-case 基线；受保护 Provider Eval `29767685402` 已产生并上传真实报告与 trace。
 
 详细模块边界见 `docs/ARCHITECTURE.md`，测试与发布门槛见 `docs/TESTING.md`。
@@ -46,7 +46,7 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 - 正式 12-case Eval：任务成功率 100%、Patch 可应用率 90.9%、检查通过率 100%、恢复成功率 100%。
 - 当前工作树回归：Desktop Node 443/443、Runtime Rust 75/75、Patch Normalizer 5/5、原生 WebDriver smoke；Web build 与 800 KiB 首屏软预算通过。
 - `.omnidesk/` v1 四分区 schema、非破坏性迁移器和启动激活已接入生产 Runtime：支持幂等复制、冲突拒绝、符号链接跳过和 legacy 回退。
-- Repository、Workspace、Provider、Task、Conversation、Agent Run 与 Preview 均通过同一逻辑路径映射读写；文件树和 Agent 读取工具隐藏两个物理状态目录。
+- Repository、Workspace、Provider、Task、Conversation、Agent Run 与 Preview 均按分区直接读写；文件树和 Agent 读取工具隐藏 Runtime 状态目录与可能遗留的旧目录。
 - Desktop Runtime 已停止编译旧 `governance` bridge，不再暴露 `run_project_os_action`，受控检查只执行 Desktop Node、Web build 与 Cargo 检查；浏览器 Preview 的事实刷新只重新读取只读 snapshot。
 - 旧 CLI crate 与 Desktop `governance` bridge 已从仓库删除；Desktop Runbook、Preview 和工程资产投影不再发现或展示旧治理脚本、模板与 adapter。
 - Desktop 工作区已移除旧 CLI、模板、adapter 与 routing Skill 的可见入口，仅呈现 OmniDesk Runtime 的模型、受控工具、安全边界、工程文件与证据。
@@ -60,17 +60,16 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 正在做：
 
 - 将产品与文档 SSOT 收敛到 OmniDesk Desktop Runtime。
-- 继续断开遗留文档和迁移兼容层对旧 Project OS 分发工具链的真实依赖。
+- 将 Eval 原始 trace 从临时目录固化为可携带的发布证据。
 - 将 Eval 原始 trace 从临时目录固化为可携带的发布证据。
 
 当前风险：
 
 - 活跃 Provider 请求不能从中断 token 续传；重启后只能从最近持久化阶段重新请求模型，不能续接原网络流。
 - 终端会话和屏幕输出仍在内存，Runtime 重启会终止会话。
-- 受保护 Agent Eval 现使用 active `.omnidesk` 命名空间；迁移兼容映射仍被内部逻辑路径使用。
-- 命名空间映射仍接受 `.project-os/...` 作为逻辑路径；其物理目录已不存在，后续需要按领域模块移除这些内部别名。
+- 历史工程如需导入旧 `.project-os/`，必须先运行幂等迁移并处理冲突；Runtime 不会回退读取旧路径。
 
 ## 下一步重点
 
-1. 按领域模块移除 `.project-os/...` 的内部逻辑路径别名。
-2. 在无兼容映射的 active namespace 上完成原生与发布验收。
+1. 在 native namespace 上完成原生重启、网络中断和多文件任务的发布验收。
+2. 将 Eval 原始 trace 从临时目录固化为可携带的发布证据。

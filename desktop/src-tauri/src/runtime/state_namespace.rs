@@ -417,22 +417,8 @@ pub fn namespace_is_active(root: &Path) -> bool {
 
 pub fn state_path_for_read(root: &Path, relative_path: &str) -> Result<PathBuf, String> {
     let normalized = normalize_relative_path(relative_path)?;
-    if normalized == STATE_ROOT || normalized.starts_with(&format!("{STATE_ROOT}/")) {
-        return Ok(root.join(normalized));
-    }
-    if normalized == LEGACY_STATE_ROOT {
-        return Ok(if namespace_is_active(root) {
-            root.join(STATE_ROOT)
-        } else {
-            root.join(LEGACY_STATE_ROOT)
-        });
-    }
-    let Some(legacy_relative) = normalized.strip_prefix(&format!("{LEGACY_STATE_ROOT}/")) else {
-        return Ok(root.join(normalized));
-    };
-    if namespace_is_active(root) {
-        let (_, target) = migration_target(legacy_relative)?;
-        return Ok(root.join(target));
+    if normalized == LEGACY_STATE_ROOT || normalized.starts_with(&format!("{LEGACY_STATE_ROOT}/")) {
+        return Err("旧 .project-os 路径只允许通过迁移导入，Runtime 读写必须使用 .omnidesk 分区".to_string());
     }
     Ok(root.join(normalized))
 }
@@ -446,33 +432,8 @@ pub fn state_path_exists(root: &Path, relative_path: &str) -> bool {
         .is_ok_and(|path| path.exists())
 }
 
-pub fn legacy_relative_from_absolute(path: &Path) -> Option<(PathBuf, String)> {
-    let components = path.components().collect::<Vec<_>>();
-    let legacy_index = components.iter().position(|component| {
-        matches!(component, Component::Normal(value) if *value == std::ffi::OsStr::new(LEGACY_STATE_ROOT))
-    })?;
-    let root = components[..legacy_index]
-        .iter()
-        .fold(PathBuf::new(), |mut result, component| {
-            result.push(component.as_os_str());
-            result
-        });
-    let suffix = components[legacy_index + 1..]
-        .iter()
-        .fold(PathBuf::new(), |mut result, component| {
-            result.push(component.as_os_str());
-            result
-        })
-        .to_string_lossy()
-        .replace('\\', "/");
-    Some((root, format!("{LEGACY_STATE_ROOT}/{suffix}")))
-}
-
 pub fn state_path_from_absolute(path: &Path) -> Result<PathBuf, String> {
-    let Some((root, legacy_relative)) = legacy_relative_from_absolute(path) else {
-        return Ok(path.to_path_buf());
-    };
-    state_path_for_read(&root, &legacy_relative)
+    Ok(path.to_path_buf())
 }
 
 pub fn namespace_manifest(outcome: &MigrationOutcome, legacy_exists: bool) -> Value {
@@ -668,7 +629,7 @@ mod tests {
     }
 
     #[test]
-    fn activation_refuses_conflicts_and_keeps_legacy_reads() {
+    fn activation_refuses_conflicts_without_enabling_legacy_runtime_reads() {
         let root = test_root("activation-conflict");
         write_atomic(&root.join(".project-os/state.json"), br#"{"source":"legacy"}"#).unwrap();
         write_atomic(
@@ -683,19 +644,12 @@ mod tests {
             vec![".omnidesk/data/state.json".to_string()]
         );
         assert!(!namespace_is_active(&root));
-        assert_eq!(
-            state_path_for_read(&root, ".project-os/state.json").unwrap(),
-            root.join(".project-os/state.json")
-        );
-        assert_eq!(
-            fs::read(state_path_for_read(&root, ".project-os/state.json").unwrap()).unwrap(),
-            br#"{"source":"legacy"}"#
-        );
+        assert!(state_path_for_read(&root, ".project-os/state.json").is_err());
         fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
-    fn activation_switches_legacy_logical_paths_to_partitioned_state() {
+    fn activation_requires_native_paths_after_migration() {
         let root = test_root("activation");
         let legacy = root.join(".project-os/goals.json");
         write_atomic(&legacy, br#"{"goals":[]}"#).unwrap();
@@ -703,12 +657,9 @@ mod tests {
         let outcome = ensure_active_state_namespace(&root).unwrap();
         assert_eq!(outcome.copied, 1);
         assert!(namespace_is_active(&root));
+        assert!(state_path_for_read(&root, ".project-os/goals.json").is_err());
         assert_eq!(
-            state_path_for_read(&root, ".project-os/goals.json").unwrap(),
-            root.join(".omnidesk/data/goals.json")
-        );
-        assert_eq!(
-            fs::read(state_path_for_read(&root, ".project-os/goals.json").unwrap()).unwrap(),
+            fs::read(state_path_for_read(&root, ".omnidesk/data/goals.json").unwrap()).unwrap(),
             br#"{"goals":[]}"#
         );
 

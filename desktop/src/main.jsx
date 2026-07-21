@@ -516,21 +516,21 @@ async function loadPreviewWorkspaceSnapshot() {
   } catch {
     // Older dev servers fall back to static preview files.
   }
-  const backlog = await loadPreviewJson("/.project-os/task-backlog.json", {
+  const backlog = await loadPreviewJson("/.omnidesk/data/task-backlog.json", {
     items: fallbackSnapshot.queue,
   });
-  const goalValidation = await loadPreviewJson("/.project-os/goal-validation.json", {
+  const goalValidation = await loadPreviewJson("/.omnidesk/data/goal-validation.json", {
     criteria: [],
   });
-  const goalValidationReport = await loadPreviewJson("/.project-os/goal-validation-report.json", {
+  const goalValidationReport = await loadPreviewJson("/.omnidesk/evidence/goal-validation-report.json", {
     status: "missing",
     checks: [],
   });
-  const goalSignoffHistory = await loadPreviewJson("/.project-os/goal-signoff-history.json", {
+  const goalSignoffHistory = await loadPreviewJson("/.omnidesk/data/goal-signoff-history.json", {
     entries: [],
   });
-  const goals = await loadPreviewJson("/.project-os/goals.json", fallbackSnapshot.goals);
-  const registry = await loadPreviewJson("/.project-os/desktop-registry.json", {
+  const goals = await loadPreviewJson("/.omnidesk/data/goals.json", fallbackSnapshot.goals);
+  const registry = await loadPreviewJson("/.omnidesk/data/desktop-registry.json", {
     currentProjectId: fallbackSnapshot.currentProjectId,
     projects: fallbackSnapshot.projects.map((project) => ({
       id: project.id,
@@ -541,10 +541,10 @@ async function loadPreviewWorkspaceSnapshot() {
   });
   const registryProjects = Array.isArray(registry.projects) ? registry.projects : [];
   const currentProject = registryProjects.find((project) => project.id === registry.currentProjectId) || registryProjects[0] || fallbackSnapshot.projects[0];
-  const projectProfileFile = await loadPreviewJson("/.project-os/project-profile.json", null);
+  const projectProfileFile = await loadPreviewJson("/.omnidesk/data/project-profile.json", null);
   const projectProfile = previewProjectProfile(projectProfileFile);
-  const workspaceFacts = await loadPreviewJson("/.project-os/workspace-facts.json", null);
-  const projectCapabilities = await loadPreviewJson("/.project-os/project-capabilities.json", { capabilities: [] });
+  const workspaceFacts = await loadPreviewJson("/.omnidesk/cache/workspace-facts.json", null);
+  const projectCapabilities = await loadPreviewJson("/.omnidesk/data/project-capabilities.json", { capabilities: [] });
   const queue = Array.isArray(backlog.items) && backlog.items.length
     ? backlog.items.map((item) => ({
         id: item.id,
@@ -1113,7 +1113,7 @@ function previewChatResult(message, hasAttachments, snapshot = {}, tasks = [], d
   const references = riskLike
     ? [
       { kind: "file", label: "项目状态", target: "PROJECT.md" },
-      { kind: "file", label: "任务清单", target: ".project-os/task-backlog.json" },
+      { kind: "file", label: "任务清单", target: ".omnidesk/data/task-backlog.json" },
     ]
     : statusLike
       ? [
@@ -1121,7 +1121,7 @@ function previewChatResult(message, hasAttachments, snapshot = {}, tasks = [], d
         { kind: "file", label: "当前交接", target: "HANDOFF.md" },
       ]
       : developLike
-        ? [{ kind: "file", label: "任务清单", target: ".project-os/task-backlog.json" }]
+        ? [{ kind: "file", label: "任务清单", target: ".omnidesk/data/task-backlog.json" }]
         : [];
   return {
     intent: shouldCreatePlan ? "task" : questionLike ? "question" : "chat",
@@ -2562,7 +2562,7 @@ function CurrentGoalPanel({ decomposingGoal, onConfirmDecomposition, onGenerateD
     : "尚未记录更新时间";
   const status = goal ? goalStatusLabelText(goal.status) : "待建立";
   const nextAction = currentGoalNextAction(goal);
-  const sources = [".project-os/goals.json", "PROJECT.md", "HANDOFF.md"];
+  const sources = [".omnidesk/data/goals.json", "PROJECT.md", "HANDOFF.md"];
   return (
     <section className="overviewSurface currentGoalSurface">
       <OverviewPageHeader
@@ -2635,7 +2635,7 @@ function AcceptanceCriteriaPanel({ onNavigate, onOpenSource, snapshot }) {
     ? `更新于 ${new Date(updatedAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}`
     : "尚未记录验收时间";
   const reportStatus = goalValidationStatusLabel(report.status || "missing");
-  const sources = [".project-os/goal-validation.json", "docs/TESTING.md"];
+  const sources = [".omnidesk/data/goal-validation.json", "docs/TESTING.md"];
   return (
     <section className="overviewSurface acceptanceCriteriaSurface">
       <OverviewPageHeader
@@ -2677,7 +2677,7 @@ function GoalHistoryPanel({ onOpenSource, snapshot }) {
   const updatedLabel = updatedAt
     ? `更新于 ${new Date(updatedAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}`
     : "尚未记录完成时间";
-  const sources = [".project-os/goals.json", ".project-os/goal-signoff-history.json"];
+  const sources = [".omnidesk/data/goals.json", ".omnidesk/data/goal-signoff-history.json"];
   return (
     <section className="overviewSurface goalHistorySurface">
       <OverviewPageHeader
@@ -2720,7 +2720,7 @@ function ValidationReportPanel({ onOpenSource, snapshot }) {
   const checks = Array.isArray(report.checks) ? report.checks : [];
   const passed = checks.filter((check) => check?.success).length;
   const status = goalValidationStatusLabel(report.status || "missing");
-  const sources = [".project-os/goal-validation-report.json"];
+  const sources = [".omnidesk/evidence/goal-validation-report.json"];
   return (
     <section className="overviewSurface validationReportSurface">
       <OverviewPageHeader
@@ -2752,7 +2752,7 @@ function ValidationReportPanel({ onOpenSource, snapshot }) {
 function RunRecordsPanel({ onOpenSource, snapshot }) {
   const runCount = Number(snapshot?.runCount || 0);
   const report = snapshot?.goalValidationReport || {};
-  const sources = [".project-os/runs/desktop-summary.md", ".project-os/goal-validation-report.json"];
+  const sources = [".omnidesk/evidence/desktop-summary.md", ".omnidesk/evidence/goal-validation-report.json"];
   return (
     <section className="overviewSurface runRecordsSurface">
       <OverviewPageHeader
@@ -2835,7 +2835,7 @@ function LocalProjectStatePanel({ onOpenSource, report, snapshot }) {
   const statusFor = (path) => statuses.find((item) => item.path === path)?.status || "unknown";
   const sources = [...new Set((summary.sources || domain.files || []).filter((path) => path && !path.endsWith("/")))].slice(0, 5);
   const selectedProject = (snapshot?.projects || []).find((project) => project.isCurrent);
-  const stateChanged = statusFor(".project-os/state.json") === "changed";
+  const stateChanged = statusFor(".omnidesk/data/state.json") === "changed";
   return (
     <section className="localStateSurface">
       <OverviewPageHeader
@@ -2847,7 +2847,7 @@ function LocalProjectStatePanel({ onOpenSource, report, snapshot }) {
       />
       <OverviewSection title="接入状态" subtitle="当前工作区是否已登记并可继续使用" items={[
         { id: "project", label: "当前项目", content: selectedProject?.name || snapshot?.projectName || "尚未选择" },
-        { id: "registry", label: "工作区登记", content: <Badge>{statusFor(".project-os/desktop-registry.json") === "found" ? "已登记" : "待确认"}</Badge> },
+        { id: "registry", label: "工作区登记", content: <Badge>{statusFor(".omnidesk/data/desktop-registry.json") === "found" ? "已登记" : "待确认"}</Badge> },
       ]} />
       <OverviewSection title="治理准备" subtitle="继续使用 OmniDesk 所需的基础信息" items={[
         { id: "state", label: "状态文件", content: stateChanged ? "检测到本地变化，已纳入当前状态" : <Badge>可用</Badge> },
@@ -3531,7 +3531,7 @@ function EngineeringFileTab({
     );
     const taskTitle = { "task-list": "目标与任务", "execution-terminal": "执行终端", "execution-results": "执行结果" }[topicRouteId];
     const taskDescription = { "task-list": "按目标查看任务进展与审核状态。", "execution-terminal": "在受控终端中运行命令并查看输出。", "execution-results": "查看完成或失败任务的验证结果与后续处理。" }[topicRouteId];
-    const taskExecutionPanel = isTaskExecutionTopic ? <section className="overviewSurface taskExecutionSurface"><OverviewPageHeader title={taskTitle} description={taskDescription} meta={<span>任务状态变化时自动更新</span>} sources={<RuleSourceButtons onOpenSource={openSourceFile} sources={selectedTopic.relatedFiles || [".project-os/runs/desktop-tasks/*"]} />} />{agentTopic}</section> : null;
+    const taskExecutionPanel = isTaskExecutionTopic ? <section className="overviewSurface taskExecutionSurface"><OverviewPageHeader title={taskTitle} description={taskDescription} meta={<span>任务状态变化时自动更新</span>} sources={<RuleSourceButtons onOpenSource={openSourceFile} sources={selectedTopic.relatedFiles || [".omnidesk/data/tasks/*"]} />} />{agentTopic}</section> : null;
     const capabilityPanel = surface === "agent-topic" ? agentTopic : null;
     const topicBody = (
       <EngineeringTopicSurfaceComposer

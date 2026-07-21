@@ -38,18 +38,18 @@ function embeddedBrowserCompatibility() {
   };
 }
 const previewFiles = new Map([
-  ["/.project-os/desktop-provider.json", ".project-os/desktop-provider.json"],
-  ["/.project-os/model-catalog.json", ".project-os/model-catalog.json"],
-  ["/.project-os/model-health.json", ".project-os/model-health.json"],
-  ["/.project-os/project-profile.json", ".project-os/project-profile.json"],
-  ["/.project-os/project-capabilities.json", ".project-os/project-capabilities.json"],
-  ["/.project-os/workspace-facts.json", ".project-os/workspace-facts.json"],
-  ["/.project-os/desktop-registry.json", ".project-os/desktop-registry.json"],
-  ["/.project-os/task-backlog.json", ".project-os/task-backlog.json"],
-  ["/.project-os/goals.json", ".project-os/goals.json"],
-  ["/.project-os/goal-validation.json", ".project-os/goal-validation.json"],
-  ["/.project-os/goal-validation-report.json", ".project-os/goal-validation-report.json"],
-  ["/.project-os/goal-signoff-history.json", ".project-os/goal-signoff-history.json"],
+  ["/.omnidesk/data/desktop-provider.json", ".omnidesk/data/desktop-provider.json"],
+  ["/.omnidesk/data/model-catalog.json", ".omnidesk/data/model-catalog.json"],
+  ["/.omnidesk/cache/model-health.json", ".omnidesk/cache/model-health.json"],
+  ["/.omnidesk/data/project-profile.json", ".omnidesk/data/project-profile.json"],
+  ["/.omnidesk/data/project-capabilities.json", ".omnidesk/data/project-capabilities.json"],
+  ["/.omnidesk/cache/workspace-facts.json", ".omnidesk/cache/workspace-facts.json"],
+  ["/.omnidesk/data/desktop-registry.json", ".omnidesk/data/desktop-registry.json"],
+  ["/.omnidesk/data/task-backlog.json", ".omnidesk/data/task-backlog.json"],
+  ["/.omnidesk/data/goals.json", ".omnidesk/data/goals.json"],
+  ["/.omnidesk/data/goal-validation.json", ".omnidesk/data/goal-validation.json"],
+  ["/.omnidesk/evidence/goal-validation-report.json", ".omnidesk/evidence/goal-validation-report.json"],
+  ["/.omnidesk/data/goal-signoff-history.json", ".omnidesk/data/goal-signoff-history.json"],
 ]);
 
 export function stateNamespaceActive(projectRoot) {
@@ -236,7 +236,7 @@ function buildTreePreview(projectRoot) {
 
 function safePreviewPath(relativePath) {
   const text = String(relativePath || "").trim();
-  if (!text || text.startsWith(".env") || text.includes("/.env") || text === ".omnidesk" || text.startsWith(".omnidesk/") || text.includes(".project-os/desktop-provider")) return "";
+  if (!text || text.startsWith(".env") || text.includes("/.env") || text === ".omnidesk" || text.startsWith(".omnidesk/") || text.includes(".omnidesk/desktop-provider")) return "";
   const normalized = path.normalize(text);
   if (path.isAbsolute(normalized) || normalized.startsWith("..") || normalized.includes(`..${path.sep}`)) return "";
   return normalized;
@@ -336,7 +336,7 @@ function executeAgentReadToolPreview(input = {}) {
 
 function listAgentRunsPreview() {
   const { projectRoot } = currentPreviewProject();
-  const directory = resolvedProjectPath(projectRoot, ".project-os/runs/agent-runs");
+  const directory = resolvedProjectPath(projectRoot, ".omnidesk/evidence/runs/agent-runs");
   if (!fs.existsSync(directory)) return [];
   return fs.readdirSync(directory).filter((name) => name.endsWith(".json")).map((name) => {
     try { return JSON.parse(fs.readFileSync(path.join(directory, name), "utf8")); } catch { return null; }
@@ -344,7 +344,7 @@ function listAgentRunsPreview() {
 }
 
 function currentPreviewProject() {
-  const registry = readProjectJson(".project-os/desktop-registry.json", {
+  const registry = readProjectJson(".omnidesk/data/desktop-registry.json", {
     currentProjectId: "current",
     projects: [{
       id: "current",
@@ -369,11 +369,11 @@ function currentPreviewProject() {
 }
 
 function desktopTasksDir(projectRoot) {
-  return resolvedProjectPath(projectRoot, ".project-os/runs/desktop-tasks");
+  return resolvedProjectPath(projectRoot, ".omnidesk/evidence/runs/desktop-tasks");
 }
 
 function desktopConversationsDir(projectRoot) {
-  return resolvedProjectPath(projectRoot, ".project-os/runs/desktop-conversations");
+  return resolvedProjectPath(projectRoot, ".omnidesk/evidence/runs/desktop-conversations");
 }
 
 function safeTaskFileName(id) {
@@ -389,13 +389,13 @@ function listDesktopTasksPreview() {
   } catch {
     directoryFiles = [];
   }
-  const manifest = readJsonAt(projectRoot, ".project-os/runs/desktop-tasks/manifest.json", null);
+  const manifest = readJsonAt(projectRoot, ".omnidesk/data/tasks/manifest.json", null);
   const files = reconcileTaskFileNames(
     Array.isArray(manifest?.tasks) ? manifest.tasks : [],
     directoryFiles
   );
   return files
-    .map((file) => readJsonAt(projectRoot, `.project-os/runs/desktop-tasks/${file}`, null))
+    .map((file) => readJsonAt(projectRoot, `.omnidesk/data/tasks/${file}`, null))
     .filter(Boolean)
     .sort((a, b) => String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")));
 }
@@ -410,7 +410,7 @@ function listDesktopConversationsPreview() {
     files = [];
   }
   return files
-    .map((file) => readJsonAt(projectRoot, `.project-os/runs/desktop-conversations/${file}`, null))
+    .map((file) => readJsonAt(projectRoot, `.omnidesk/data/conversations/${file}`, null))
     .filter(Boolean)
     .sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")))
     .slice(0, 50);
@@ -426,12 +426,12 @@ export function readJsonAt(projectRoot, relativePath, fallback) {
 
 function projectMemoryPreview() {
   const { currentProject, projectRoot } = currentPreviewProject();
-  return readJsonAt(projectRoot, ".project-os/memory.json", {
+  return readJsonAt(projectRoot, ".omnidesk/data/memory.json", {
     schemaVersion: "project-os.memory.v0.1", projectId: currentProject.id, updatedAt: "", items: [],
   });
 }
 
-const factSourcePaths = ["README.md", "PROJECT.md", "HANDOFF.md", "AGENTS.md", "package.json", "desktop/package.json", "Cargo.toml", "desktop/src-tauri/Cargo.toml", ".project-os/state.json", ".project-os/project-profile.json", "src", "desktop/src", "server", "backend", "api", "prisma", "migrations", "tests", ".github/workflows"];
+const factSourcePaths = ["README.md", "PROJECT.md", "HANDOFF.md", "AGENTS.md", "package.json", "desktop/package.json", "Cargo.toml", "desktop/src-tauri/Cargo.toml", ".omnidesk/data/state.json", ".omnidesk/data/project-profile.json", "src", "desktop/src", "server", "backend", "api", "prisma", "migrations", "tests", ".github/workflows"];
 
 function factSourceFingerprints(projectRoot) {
   return Object.fromEntries(factSourcePaths.flatMap((relative) => {
@@ -440,14 +440,14 @@ function factSourceFingerprints(projectRoot) {
 }
 
 function factFreshnessPreview(projectRoot) {
-  const saved = readJsonAt(projectRoot, ".project-os/fact-freshness.json", null);
+  const saved = readJsonAt(projectRoot, ".omnidesk/cache/fact-freshness.json", null);
   const current = factSourceFingerprints(projectRoot);
   const changedSources = Object.entries(current).filter(([relative, fingerprint]) => saved?.fingerprints?.[relative] !== fingerprint).map(([relative]) => relative);
   return { status: saved?.fingerprints && !changedSources.length ? "fresh" : "stale", updatedAt: saved?.updatedAt || "", changedSources };
 }
 
 function detectedProjectCapabilities(projectRoot) {
-  const saved = readJsonAt(projectRoot, ".project-os/project-capabilities.json", { capabilities: [] });
+  const saved = readJsonAt(projectRoot, ".omnidesk/data/project-capabilities.json", { capabilities: [] });
   const savedWorkspaceCapabilities = saved.workspaceCapabilities || saved.capabilities || [];
   const savedById = new Map(savedWorkspaceCapabilities.map((item) => [item.id, item]));
   const exists = (...paths) => paths.some((relative) => fs.existsSync(resolvedProjectPath(projectRoot, relative)));
@@ -455,12 +455,12 @@ function detectedProjectCapabilities(projectRoot) {
     ["project-overview", "enabled", ["core"]],
     ["tasks", "enabled", ["core"]],
     ["files", "enabled", ["core"]],
-    ["goals", exists(".project-os/goals.json") ? "detected" : "available", [".project-os/goals.json"]],
+    ["goals", exists(".omnidesk/data/goals.json") ? "detected" : "available", [".omnidesk/data/goals.json"]],
     ["rules", exists("AGENTS.md") ? "detected" : "available", ["AGENTS.md"]],
     ["design-implementation", exists("src", "desktop", "docs/ARCHITECTURE.md") ? "recommended" : "available", ["src", "desktop", "docs/ARCHITECTURE.md"]],
     ["validation-delivery", exists("tests", "docs/TESTING.md") ? "recommended" : "available", ["tests", "docs/TESTING.md"]],
     ["knowledge-memory", exists("HANDOFF.md", "docs/DECISIONS.md") ? "detected" : "available", ["HANDOFF.md", "docs/DECISIONS.md"]],
-    ["agent-configuration", exists(".project-os/desktop-provider.json", ".project-os/model-catalog.json") ? "detected" : "available", [".project-os/desktop-provider.json", ".project-os/model-catalog.json"]],
+    ["agent-configuration", exists(".omnidesk/data/desktop-provider.json", ".omnidesk/data/model-catalog.json") ? "detected" : "available", [".omnidesk/data/desktop-provider.json", ".omnidesk/data/model-catalog.json"]],
   ];
   const rank = { available: 0, detected: 1, recommended: 2, enabled: 3 };
   const workspaceCapabilities = specs.map(([id, detectedStatus, signals]) => {
@@ -483,7 +483,7 @@ function detectedProjectCapabilities(projectRoot) {
     ["database", exists("prisma", "migrations", "schema.sql"), ["prisma", "migrations", "schema.sql"]],
     ["desktop", exists("desktop/src-tauri", "src-tauri"), ["desktop/src-tauri", "src-tauri"]],
     ["cli", exists("cli"), ["cli"]],
-    ["ai", exists(".project-os/model-catalog.json") || /openai/i.test(packageText), [".project-os/model-catalog.json"]],
+    ["ai", exists(".omnidesk/data/model-catalog.json") || /openai/i.test(packageText), [".omnidesk/data/model-catalog.json"]],
     ["testing", exists("tests", "test"), ["tests", "test"]],
     ["deployment", exists(".github/workflows", "Dockerfile"), [".github/workflows", "Dockerfile"]],
   ];
@@ -631,9 +631,9 @@ function profileForPreview(profile, context = {}) {
 
 function workspaceSnapshotPreview() {
   const { projects, currentProject, projectRoot } = currentPreviewProject();
-  const state = readJsonAt(projectRoot, ".project-os/state.json", {});
-  const backlog = readJsonAt(projectRoot, ".project-os/task-backlog.json", { items: [] });
-  const goals = readJsonAt(projectRoot, ".project-os/goals.json", {
+  const state = readJsonAt(projectRoot, ".omnidesk/data/state.json", {});
+  const backlog = readJsonAt(projectRoot, ".omnidesk/data/task-backlog.json", { items: [] });
+  const goals = readJsonAt(projectRoot, ".omnidesk/data/goals.json", {
     schemaVersion: "project-os.goals.v0.1",
     activeGoalId: "",
     goals: [],
@@ -662,15 +662,15 @@ function workspaceSnapshotPreview() {
       tone: item.tone || "neutral",
     })),
     goals,
-    projectGoals: readJsonAt(projectRoot, ".project-os/project-goals.json", { activeProjectGoalId: "", projectGoals: [] }),
-    goalValidation: readJsonAt(projectRoot, ".project-os/goal-validation.json", { criteria: [] }),
-    goalValidationReport: readJsonAt(projectRoot, ".project-os/goal-validation-report.json", { status: "missing", checks: [] }),
-    goalSignoffHistory: readJsonAt(projectRoot, ".project-os/goal-signoff-history.json", { entries: [] }),
-    workspaceFacts: readJsonAt(projectRoot, ".project-os/workspace-facts.json", null),
+    projectGoals: readJsonAt(projectRoot, ".omnidesk/project-goals.json", { activeProjectGoalId: "", projectGoals: [] }),
+    goalValidation: readJsonAt(projectRoot, ".omnidesk/data/goal-validation.json", { criteria: [] }),
+    goalValidationReport: readJsonAt(projectRoot, ".omnidesk/evidence/goal-validation-report.json", { status: "missing", checks: [] }),
+    goalSignoffHistory: readJsonAt(projectRoot, ".omnidesk/data/goal-signoff-history.json", { entries: [] }),
+    workspaceFacts: readJsonAt(projectRoot, ".omnidesk/cache/workspace-facts.json", null),
     runbookCommands: runbookCommandsPreview(projectRoot),
     projectCapabilities: detectedProjectCapabilities(projectRoot),
     factFreshness: factFreshnessPreview(projectRoot),
-    projectProfile: profileForPreview(readJsonAt(projectRoot, ".project-os/project-profile.json", { fields: {} }), {
+    projectProfile: profileForPreview(readJsonAt(projectRoot, ".omnidesk/data/project-profile.json", { fields: {} }), {
       agentsMd: readTextAt(projectRoot, "AGENTS.md"),
       handoff: readTextAt(projectRoot, "HANDOFF.md"),
       productPlan: readTextAt(projectRoot, "docs/PRODUCT_PLAN.md"),
@@ -716,7 +716,7 @@ function readDotenvValuePreview(key, projectRoot = rootDir) {
 
 function providerRevisionPreview(projectRoot) {
   try {
-    const stat = fs.statSync(resolvedProjectPath(projectRoot, ".project-os/desktop-provider.json"));
+    const stat = fs.statSync(resolvedProjectPath(projectRoot, ".omnidesk/data/desktop-provider.json"));
     return `${Math.floor(stat.mtimeMs)}-${stat.size}`;
   } catch {
     return "missing";
@@ -725,7 +725,7 @@ function providerRevisionPreview(projectRoot) {
 
 function providerStatusPreview() {
   const { projectRoot } = currentPreviewProject();
-  const config = readJsonAt(projectRoot, ".project-os/desktop-provider.json", {
+  const config = readJsonAt(projectRoot, ".omnidesk/data/desktop-provider.json", {
     schemaVersion: "project-os.desktop-provider.v0.1",
     profiles: [],
   });
@@ -866,7 +866,7 @@ export default defineConfig({
     strictPort: true,
     watch: {
       // Runtime data is owned by the desktop adapter, not the preview server.
-      ignored: ["**/.project-os/**", "**/.omnidesk/**"],
+      ignored: ["**/.omnidesk/**", "**/.omnidesk/**"],
     },
   },
   build: {

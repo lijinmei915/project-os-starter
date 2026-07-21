@@ -6,7 +6,7 @@ export function agentConfigCapabilitySpec(topicId, provider) {
       tone: provider?.enabled && provider?.model ? "success" : "warning",
       value: "让接入项目知道当前 Agent 用哪个模型、Key 存在哪里、模型是否可用。",
       next: provider?.enabled ? "测试当前模型可用性，并补充项目级默认模型策略。" : "配置 Provider、API Base、Key 环境变量和默认模型。",
-      files: [".project-os/desktop-provider.json", ".project-os/model-catalog.json", ".project-os/model-health.json"],
+      files: [".omnidesk/data/desktop-provider.json", ".omnidesk/data/model-catalog.json", ".omnidesk/cache/model-health.json"],
     },
     "tool-allowlist": {
       title: "工具白名单", status: "待产品化", tone: "warning",

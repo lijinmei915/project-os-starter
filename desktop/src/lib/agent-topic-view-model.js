@@ -10,7 +10,7 @@ const aggregatePaths = new Set(["desktop/*", "docs/*", "schemas/*", "docs/data/*
 
 export function canPreviewAgentTopicFile(file) {
   if (!file || typeof file !== "string" || file.includes("*") || file.endsWith("/") || file.includes(":")) return false;
-  if (file.startsWith("/") || file.startsWith(".env") || file.includes("/.env") || file.includes(".project-os/desktop-provider")) return false;
+  if (file.startsWith("/") || file.startsWith(".env") || file.includes("/.env") || file.includes(".omnidesk/desktop-provider")) return false;
   if (file.split("/").includes("..") || aggregatePaths.has(file)) return false;
   return previewExtensions.has(file.split(".").pop());
 }

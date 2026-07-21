@@ -21,6 +21,17 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, State};
 use tokio_util::sync::CancellationToken;
 
+const STATE_PATH: &str = ".omnidesk/data/state.json";
+const PROFILE_PATH: &str = ".omnidesk/data/project-profile.json";
+const GOALS_PATH: &str = ".omnidesk/data/goals.json";
+const BACKLOG_PATH: &str = ".omnidesk/data/task-backlog.json";
+const GOAL_VALIDATION_REPORT_PATH: &str = ".omnidesk/evidence/goal-validation-report.json";
+const REGISTRY_PATH: &str = ".omnidesk/data/desktop-registry.json";
+const RUN_SUMMARY_PATH: &str = ".omnidesk/evidence/desktop-summary.md";
+const PROVIDER_PATH: &str = ".omnidesk/data/desktop-provider.json";
+const THEME_PATH: &str = ".omnidesk/data/desktop-theme.json";
+const WORKSPACE_FACTS_PATH: &str = ".omnidesk/cache/workspace-facts.json";
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct TreeItem {
@@ -1262,7 +1273,7 @@ fn sync_task_goal_index(
     goal_id: &str,
     timestamp: &str,
 ) -> Result<(), String> {
-    let goals_path = root.join(".project-os/goals.json");
+    let goals_path = root.join(GOALS_PATH);
     let Some(mut goals) = read_json(goals_path.clone()) else {
         return Ok(());
     };
@@ -1270,7 +1281,7 @@ fn sync_task_goal_index(
     crate::runtime::repository::Repository::new(root).transaction(
         "sync-task-goal-index",
         &[crate::runtime::repository::JsonMutation::upsert(
-            ".project-os/goals.json",
+            GOALS_PATH,
             goals,
         )],
     )?;
@@ -1443,7 +1454,7 @@ fn add_registry_project(input: AddRegistryProjectInput) -> Result<WorkspaceSnaps
 
     let mut registry = load_or_seed_registry(&app_root)?;
     let project_path = project_root.display().to_string();
-    let state = read_json(project_root.join(".project-os/state.json"));
+    let state = read_json(project_root.join(STATE_PATH));
     let name = project_root
         .file_name()
         .and_then(|name| name.to_str())
@@ -1513,7 +1524,7 @@ fn preview_project_path(input: PreviewProjectInput) -> Result<Value, String> {
         .and_then(|value| value.to_str())
         .unwrap_or("workspace");
     let has = |file_name: &str| root.join(file_name).exists();
-    let has_omnidesk_state = runtime_state_exists(&root, ".project-os");
+    let has_omnidesk_state = runtime_state_exists(&root, ".omnidesk");
     let has_project_manifest = has("package.json") || has("pyproject.toml") || has("Cargo.toml");
     let mut risks = Vec::new();
     if !has(".git") {
@@ -1602,7 +1613,7 @@ fn relocate_registry_project(
         .find(|project| project.id == input.id)
         .ok_or_else(|| "未找到这个项目".to_string())?;
 
-    let state = read_json(next_root.join(".project-os/state.json"));
+    let state = read_json(next_root.join(STATE_PATH));
     project.path = next_root.display().to_string();
     if !project.name_locked {
         project.name = next_root
@@ -1837,7 +1848,7 @@ fn compact_json_items(value: Option<&Value>, key: &str, limit: usize) -> Vec<Str
 
 fn chat_project_evidence(root: &Path, state: Option<&Value>) -> (Value, Vec<MessageReference>) {
     let project_status = state.and_then(|value| value.get("status")).or(state);
-    let goals = read_json(root.join(".project-os/goals.json"));
+    let goals = read_json(root.join(GOALS_PATH));
     let active_goal_id = goals
         .as_ref()
         .and_then(|value| value.get("activeGoalId"))
@@ -1889,7 +1900,7 @@ fn chat_project_evidence(root: &Path, state: Option<&Value>) -> (Value, Vec<Mess
     let mut changed_files = git_changed_files(root).into_iter().collect::<Vec<_>>();
     changed_files.sort();
     changed_files.truncate(12);
-    let validation = read_json(root.join(".project-os/goal-validation-report.json"));
+    let validation = read_json(root.join(GOAL_VALIDATION_REPORT_PATH));
     let validation_status = validation
         .as_ref()
         .and_then(|value| value.get("status"))
@@ -1900,8 +1911,8 @@ fn chat_project_evidence(root: &Path, state: Option<&Value>) -> (Value, Vec<Mess
     for (path, label) in [
         ("PROJECT.md", "项目状态"),
         ("HANDOFF.md", "当前交接"),
-        (".project-os/task-backlog.json", "任务清单"),
-        (".project-os/goal-validation-report.json", "验收报告"),
+        (BACKLOG_PATH, "任务清单"),
+        (GOAL_VALIDATION_REPORT_PATH, "验收报告"),
     ] {
         if root.join(path).is_file() {
             references.push(MessageReference {
@@ -2007,7 +2018,7 @@ async fn chat_with_model(
     let current_project = current_registry_project(&mut registry, &app_root)?;
     let root = PathBuf::from(&current_project.path);
     let configured_provider = load_or_seed_provider_config(&app_root)?;
-    let state = read_json(root.join(".project-os/state.json"));
+    let state = read_json(root.join(STATE_PATH));
     let project_name = state
         .as_ref()
         .and_then(|json| json.get("name"))
@@ -2207,7 +2218,7 @@ async fn generate_readonly_plan(
     let current_project = current_registry_project(&mut registry, &app_root)?;
     let configured_provider = load_or_seed_provider_config(&app_root)?;
     let root = PathBuf::from(&current_project.path);
-    let state = read_json(root.join(".project-os/state.json"));
+    let state = read_json(root.join(STATE_PATH));
 
     let project_name = state
         .as_ref()
@@ -2389,7 +2400,7 @@ fn run_goal_validation(input: GoalValidationInput) -> Result<WorkspaceSnapshot, 
     if goal_id.is_empty() {
         return Err("验收必须绑定当前目标。".to_string());
     }
-    let goals = read_json(root.join(".project-os/goals.json"))
+    let goals = read_json(root.join(GOALS_PATH))
         .ok_or_else(|| "未找到目标列表".to_string())?;
     let goal = goals
         .get("goals")
@@ -2748,7 +2759,7 @@ fn write_run_summary(input: WriteRunSummaryInput) -> Result<RunSummaryResult, St
     crate::runtime::execution::append_run_summary(&root, &summary)?;
 
     Ok(RunSummaryResult {
-        path: ".project-os/runs/desktop-summary.md".to_string(),
+        path: RUN_SUMMARY_PATH.to_string(),
         message: "任务摘要已写入本地 run summary".to_string(),
         summary,
     })
@@ -4589,7 +4600,7 @@ fn is_patch_context_path(path: &str) -> bool {
         || path.contains("/.env")
         || path == ".omnidesk"
         || path.starts_with(".omnidesk/")
-        || path.contains(".project-os/desktop-provider")
+        || path.contains(".omnidesk/desktop-provider")
     {
         return false;
     }
@@ -4606,7 +4617,7 @@ fn is_safe_engineering_preview_path(path: &str) -> bool {
         || path.contains("/.env")
         || path == ".omnidesk"
         || path.starts_with(".omnidesk/")
-        || path.contains(".project-os/desktop-provider")
+        || path.contains(".omnidesk/desktop-provider")
     {
         return false;
     }
@@ -5548,7 +5559,7 @@ fn save_terminal_image(input: SaveTerminalImageInput) -> Result<String, String> 
     }
     let dir = crate::runtime::state_namespace::state_path_for_write(
         &root,
-        ".project-os/tmp/terminal-images",
+        ".omnidesk/cache/terminal-images",
     )?;
     fs::create_dir_all(&dir).map_err(|err| err.to_string())?;
     let safe_name: String = input
@@ -5773,7 +5784,7 @@ fn record_native_terminal_trace(stage: String) -> Result<(), String> {
     let root = find_workspace_root()?;
     let path = crate::runtime::state_namespace::state_path_for_write(
         &root,
-        ".project-os/native-terminal-trace.json",
+        ".omnidesk/cache/native-terminal-trace.json",
     )?;
     let mut entries = fs::read_to_string(&path)
         .ok()
@@ -6193,8 +6204,8 @@ fn build_project_profile(root: &Path, project_name: &str) -> ProjectProfile {
     let product_plan = read_text(root, "docs/PRODUCT_PLAN.md");
     let handoff = read_text(root, "HANDOFF.md");
     let agents_md = read_text(root, "AGENTS.md");
-    let state_json = read_json(root.join(".project-os/state.json"));
-    let profile_json = read_json(root.join(".project-os/project-profile.json"));
+    let state_json = read_json(root.join(STATE_PATH));
+    let profile_json = read_json(root.join(PROFILE_PATH));
 
     let intro = first_non_empty(vec![
         profile_field_value(&profile_json, "identity.summary"),
@@ -6458,7 +6469,7 @@ fn detected_stack(root: &Path) -> Vec<String> {
             stack.push("Vite".to_string());
         }
     }
-    if runtime_state_exists(root, ".project-os") {
+    if runtime_state_exists(root, ".omnidesk") {
         stack.push("OmniDesk".to_string());
     }
     stack.sort();
@@ -6616,7 +6627,7 @@ fn classify_governance_file(file: &str, domains: &mut HashMap<&'static str, Vec<
     {
         push_domain_file(domains, "risk-boundary", file);
     }
-    if lower.starts_with(".project-os/") {
+    if lower.starts_with(".omnidesk/") {
         push_domain_file(domains, "local-state", file);
     }
     if lower.starts_with("docs/")
@@ -6685,10 +6696,10 @@ fn governance_file_status(root: &Path, changed: &HashSet<String>, file: &str) ->
     if file.contains('*') || file.ends_with('/') {
         return "ignored";
     }
-    if file.starts_with(".project-os/runs/") {
+    if file.starts_with(".omnidesk/evidence/") {
         return "generated";
     }
-    if file.starts_with(".project-os/") {
+    if file.starts_with(".omnidesk/") {
         return if runtime_state_exists(root, file) {
             "found"
         } else {
@@ -6784,8 +6795,8 @@ fn governance_domains_from_files(root: &Path) -> Vec<Value> {
             vec![
                 "PROJECT.md",
                 "README.md",
-                ".project-os/project-profile.json",
-                ".project-os/state.json",
+                PROFILE_PATH,
+                STATE_PATH,
             ],
             "项目定位、类型、阶段或工作区状态变化时自动刷新。",
         ),
@@ -6799,8 +6810,8 @@ fn governance_domains_from_files(root: &Path) -> Vec<Value> {
             vec![
                 "HANDOFF.md",
                 "PROJECT.md",
-                ".project-os/goals.json",
-                ".project-os/state.json",
+                GOALS_PATH,
+                STATE_PATH,
             ],
             "目标任务、交接记录或 git 状态变化时自动刷新。",
         ),
@@ -6829,7 +6840,7 @@ fn governance_domains_from_files(root: &Path) -> Vec<Value> {
             vec![
                 "HANDOFF.md",
                 "PROJECT.md",
-                ".project-os/project-profile.json",
+                PROFILE_PATH,
             ],
             "协作规则、风险说明或项目档案变化时自动刷新。",
         ),
@@ -6841,9 +6852,9 @@ fn governance_domains_from_files(root: &Path) -> Vec<Value> {
             "本地状态",
             "Git、本地工作区、运行状态和 Project OS 状态。",
             vec![
-                ".project-os/state.json",
-                ".project-os/runs/",
-                ".project-os/desktop-registry.json",
+                STATE_PATH,
+                ".omnidesk/evidence/",
+                REGISTRY_PATH,
             ],
             "文件变更、git 状态或 Project OS 运行状态变化时自动刷新。",
         ),
@@ -6910,7 +6921,7 @@ fn build_health_score(
         !overview.trim().is_empty(),
         !profile.phase_summary.trim().is_empty(),
         !profile.architecture_summary.trim().is_empty(),
-        runtime_state_exists(root, ".project-os/project-profile.json"),
+        runtime_state_exists(root, PROFILE_PATH),
     ]);
     let governed_file_count = governance_domains
         .iter()
@@ -6921,7 +6932,7 @@ fn build_health_score(
         governed_file_count >= 8,
         root.join("PROJECT.md").exists() || root.join("README.md").exists(),
         root.join("HANDOFF.md").exists(),
-        runtime_state_exists(root, ".project-os/state.json"),
+        runtime_state_exists(root, STATE_PATH),
     ]);
     let run_validation = score_from_checks(&[
         !scripts.trim().is_empty(),
@@ -6938,9 +6949,9 @@ fn build_health_score(
         root.join("HANDOFF.md").exists(),
     ]);
     let continuous_governance = score_from_checks(&[
-        runtime_state_exists(root, ".project-os"),
-        runtime_state_exists(root, ".project-os/runs"),
-        runtime_state_exists(root, ".project-os/workspace-facts.json"),
+        runtime_state_exists(root, ".omnidesk"),
+        runtime_state_exists(root, ".omnidesk/evidence"),
+        runtime_state_exists(root, WORKSPACE_FACTS_PATH),
         root.join(".github/workflows").exists() || root.join(".gitlab-ci.yml").exists(),
     ]);
     let dimensions = vec![
@@ -7006,7 +7017,7 @@ fn build_health_score(
 }
 
 fn build_workspace_facts_preview(root: &Path, project_name: &str) -> Value {
-    let state_json = read_json(root.join(".project-os/state.json"));
+    let state_json = read_json(root.join(STATE_PATH));
     let profile = build_project_profile(root, project_name);
     let project_md = read_text(root, "PROJECT.md");
     let handoff = read_text(root, "HANDOFF.md");
@@ -7037,7 +7048,7 @@ fn build_workspace_facts_preview(root: &Path, project_name: &str) -> Value {
     let risk_boundary = first_non_empty(vec![
         markdown_section(&handoff, &["风险与注意", "风险"]),
         profile_field_value(
-            &read_json(root.join(".project-os/project-profile.json")),
+            &read_json(root.join(PROFILE_PATH)),
             "memory.risks",
         ),
         "老项目默认只读扫描，用户确认前不修改工程文件。".to_string(),
@@ -7045,7 +7056,7 @@ fn build_workspace_facts_preview(root: &Path, project_name: &str) -> Value {
     let local_state = format!(
         "{} {}",
         git_status,
-        if runtime_state_exists(root, ".project-os") {
+        if runtime_state_exists(root, ".omnidesk") {
             "已发现 OmniDesk 工作区状态。"
         } else {
             "未发现 OmniDesk 工作区状态。"
@@ -7070,7 +7081,7 @@ fn build_workspace_facts_preview(root: &Path, project_name: &str) -> Value {
     json!({
         "schemaVersion": "project-os.workspace-facts.v0.1",
         "generatedAt": now,
-        "mode": if runtime_state_exists(root, ".project-os") { "existing-project" } else { "temporary-readonly" },
+        "mode": if runtime_state_exists(root, ".omnidesk") { "existing-project" } else { "temporary-readonly" },
         "status": "connected",
         "healthScore": health_score,
         "governanceLevel": {
@@ -7091,14 +7102,14 @@ fn build_workspace_facts_preview(root: &Path, project_name: &str) -> Value {
             "name": project_name,
             "id": if package_name.is_empty() { project_name } else { &package_name },
             "path": root.display().to_string(),
-            "kind": profile_field_value(&read_json(root.join(".project-os/project-profile.json")), "identity.type"),
+            "kind": profile_field_value(&read_json(root.join(PROFILE_PATH)), "identity.type"),
             "version": package_version,
             "createdAt": created_at,
             "detectedStack": stack,
             "dependencies": dependencies,
             "directories": directories,
-            "coreCapabilities": profile_field_value(&read_json(root.join(".project-os/project-profile.json")), "product.coreValue"),
-            "owner": profile_field_value(&read_json(root.join(".project-os/project-profile.json")), "project.owner"),
+            "coreCapabilities": profile_field_value(&read_json(root.join(PROFILE_PATH)), "product.coreValue"),
+            "owner": profile_field_value(&read_json(root.join(PROFILE_PATH)), "project.owner"),
             "milestone": json_string_value(&state_json, "/stage"),
             "lifecycle": json_string_value(&state_json, "/phase"),
             "description": overview
@@ -7108,7 +7119,7 @@ fn build_workspace_facts_preview(root: &Path, project_name: &str) -> Value {
                 "status": if overview.is_empty() { "missing" } else { "confirmed" },
                 "title": "项目概览",
                 "body": if overview.is_empty() { "尚未识别到项目概览。".to_string() } else { overview.clone() },
-                "sources": ["PROJECT.md", ".project-os/state.json", ".project-os/project-profile.json"],
+                "sources": ["PROJECT.md", STATE_PATH, PROFILE_PATH],
                 "confidence": 0.82
             },
             "currentProgress": {
@@ -7129,14 +7140,14 @@ fn build_workspace_facts_preview(root: &Path, project_name: &str) -> Value {
                 "status": if risk_boundary.is_empty() { "missing" } else { "inferred" },
                 "title": "风险边界",
                 "body": if risk_boundary.is_empty() { "尚未识别到风险边界。".to_string() } else { risk_boundary.clone() },
-                "sources": ["HANDOFF.md", ".project-os/project-profile.json"],
+                "sources": ["HANDOFF.md", PROFILE_PATH],
                 "confidence": 0.68
             },
             "localState": {
                 "status": "confirmed",
                 "title": "本地状态",
                 "body": local_state,
-                "sources": ["git status", ".project-os/"],
+                "sources": ["git status", ".omnidesk/"],
                 "confidence": 0.82
             }
         },
@@ -7144,8 +7155,8 @@ fn build_workspace_facts_preview(root: &Path, project_name: &str) -> Value {
             { "source": "PROJECT.md", "kind": "project-status", "status": if root.join("PROJECT.md").exists() { "found" } else { "missing" }, "note": "项目状态展示层。" },
             { "source": "HANDOFF.md", "kind": "handoff", "status": if root.join("HANDOFF.md").exists() { "found" } else { "missing" }, "note": "当前交接和风险来源。" },
             { "source": "desktop/package.json", "kind": "run-config", "status": if root.join("desktop/package.json").exists() { "found" } else { "missing" }, "note": "桌面端启动脚本来源。" },
-            { "source": ".project-os/state.json", "kind": "project-state", "status": if runtime_state_exists(root, ".project-os/state.json") { "found" } else { "missing" }, "note": "机器可读项目状态。" },
-            { "source": ".project-os/project-profile.json", "kind": "project-profile", "status": if runtime_state_exists(root, ".project-os/project-profile.json") { "found" } else { "missing" }, "note": "结构化项目档案。" }
+            { "source": STATE_PATH, "kind": "project-state", "status": if runtime_state_exists(root, STATE_PATH) { "found" } else { "missing" }, "note": "机器可读项目状态。" },
+            { "source": PROFILE_PATH, "kind": "project-profile", "status": if runtime_state_exists(root, PROFILE_PATH) { "found" } else { "missing" }, "note": "结构化项目档案。" }
         ],
         "governanceDomains": governance_domains,
         "recommendations": [
@@ -7157,7 +7168,7 @@ fn build_workspace_facts_preview(root: &Path, project_name: &str) -> Value {
                 "impact": "后续无法稳定比较新老项目，也难以跟踪治理改善效果。",
                 "action": "基于文档完整度、启动方式、风险边界、本地状态和验证记录生成健康分。",
                 "severity": "medium",
-                "files": ["schemas/workspace-facts.schema.json", ".project-os/workspace-facts.json"],
+                "files": ["schemas/workspace-facts.schema.json", WORKSPACE_FACTS_PATH],
                 "canPromoteToL3": false
             },
             {
@@ -7200,7 +7211,7 @@ fn build_workspace_facts_preview(root: &Path, project_name: &str) -> Value {
                 "title": format!("{}待补齐", field),
                 "body": "该字段尚未从当前事实源中稳定识别。",
                 "severity": "low",
-                "sources": [".project-os/project-profile.json"]
+                "sources": [PROFILE_PATH]
             })).collect::<Vec<_>>(),
             "risks": [
                 {
@@ -7223,14 +7234,14 @@ fn build_workspace_facts_preview(root: &Path, project_name: &str) -> Value {
 fn provider_config_path(app_root: &Path) -> PathBuf {
     crate::runtime::state_namespace::state_path_for_read(
         app_root,
-        ".project-os/desktop-provider.json",
+        PROVIDER_PATH,
     )
-    .unwrap_or_else(|_| app_root.join(".project-os/desktop-provider.json"))
+    .unwrap_or_else(|_| app_root.join(PROVIDER_PATH))
 }
 
 fn desktop_theme_path(app_root: &Path) -> PathBuf {
-    crate::runtime::state_namespace::state_path_for_read(app_root, ".project-os/desktop-theme.json")
-        .unwrap_or_else(|_| app_root.join(".project-os/desktop-theme.json"))
+    crate::runtime::state_namespace::state_path_for_read(app_root, THEME_PATH)
+        .unwrap_or_else(|_| app_root.join(THEME_PATH))
 }
 
 fn write_file_atomic(path: &Path, content: &[u8]) -> Result<(), String> {
@@ -7295,7 +7306,7 @@ fn save_desktop_theme_file(app_root: &Path, config: &DesktopThemeConfig) -> Resu
     crate::runtime::repository::Repository::new(app_root).transaction(
         "save-desktop-theme",
         &[crate::runtime::repository::JsonMutation::upsert(
-            ".project-os/desktop-theme.json",
+            THEME_PATH,
             serde_json::to_value(config).map_err(|err| err.to_string())?,
         )],
     )?;
@@ -7720,9 +7731,9 @@ fn remove_dotenv_value(root: &Path, key: &str) -> Result<(), String> {
 fn registry_path(app_root: &Path) -> PathBuf {
     crate::runtime::state_namespace::state_path_for_read(
         app_root,
-        ".project-os/desktop-registry.json",
+        REGISTRY_PATH,
     )
-    .unwrap_or_else(|_| app_root.join(".project-os/desktop-registry.json"))
+    .unwrap_or_else(|_| app_root.join(REGISTRY_PATH))
 }
 
 fn load_or_seed_registry(app_root: &Path) -> Result<RegistryFile, String> {
@@ -7736,7 +7747,7 @@ fn load_or_seed_registry(app_root: &Path) -> Result<RegistryFile, String> {
         }
     }
 
-    let state = read_json(app_root.join(".project-os/state.json"));
+    let state = read_json(app_root.join(STATE_PATH));
     let name = state
         .as_ref()
         .and_then(|json| json.get("name"))
@@ -7771,7 +7782,7 @@ fn save_registry(app_root: &Path, registry: &RegistryFile) -> Result<(), String>
     crate::runtime::repository::Repository::new(app_root).transaction(
         "save-registry",
         &[crate::runtime::repository::JsonMutation::upsert(
-            ".project-os/desktop-registry.json",
+            REGISTRY_PATH,
             serde_json::to_value(registry).map_err(|err| err.to_string())?,
         )],
     )?;
@@ -7871,7 +7882,7 @@ fn project_health(project: &RegistryFileProject) -> (String, String) {
     if !root.exists() || !root.is_dir() {
         return ("missing".to_string(), "路径失效".to_string());
     }
-    let has_state = runtime_state_exists(&root, ".project-os/state.json");
+    let has_state = runtime_state_exists(&root, STATE_PATH);
     let has_project = root.join("PROJECT.md").is_file();
     let has_handoff = root.join("HANDOFF.md").is_file();
     if has_state && has_project && has_handoff {
@@ -7944,7 +7955,7 @@ fn project_id_from_path(path: &str) -> String {
 }
 
 fn count_run_records(root: &Path) -> usize {
-    let Some(runs_dir) = runtime_state_path(root, ".project-os/runs") else {
+    let Some(runs_dir) = runtime_state_path(root, ".omnidesk/evidence/runs") else {
         return 0;
     };
     fs::read_dir(runs_dir)
@@ -8190,7 +8201,7 @@ mod task_storage_tests {
     fn workspace_tree_hides_runtime_and_generated_assets() {
         let dir = test_directory("tree-asset-policy");
         fs::create_dir_all(dir.join("src")).unwrap();
-        fs::create_dir_all(dir.join(".project-os/events")).unwrap();
+        fs::create_dir_all(dir.join(".omnidesk/runtime/events")).unwrap();
         fs::create_dir_all(dir.join(".omnidesk/data")).unwrap();
         fs::create_dir_all(dir.join("tmp")).unwrap();
         fs::create_dir_all(dir.join("target")).unwrap();
@@ -8205,7 +8216,6 @@ mod task_storage_tests {
 
         assert!(labels.contains(&"src".to_string()));
         assert!(labels.contains(&".env.example".to_string()));
-        assert!(!labels.contains(&".project-os".to_string()));
         assert!(!labels.contains(&".omnidesk".to_string()));
         assert!(!labels.contains(&"tmp".to_string()));
         assert!(!labels.contains(&"target".to_string()));
@@ -8600,10 +8610,10 @@ mod task_storage_tests {
     #[test]
     fn task_goal_index_moves_a_task_to_its_current_goal() {
         let root = test_directory("task-goal-index");
-        let project_os = root.join(".project-os");
-        fs::create_dir_all(&project_os).unwrap();
+        let omnidesk = root.join(".omnidesk/data");
+        fs::create_dir_all(&omnidesk).unwrap();
         fs::write(
-            project_os.join("goals.json"),
+            omnidesk.join("goals.json"),
             serde_json::to_string_pretty(&json!({
                 "schemaVersion": "project-os.goals.v0.1",
                 "goals": [
@@ -8617,7 +8627,7 @@ mod task_storage_tests {
 
         sync_task_goal_index(&root, "task-1", "goal-b", "2026-07-18T00:00:00Z").unwrap();
 
-        let goals = read_json(project_os.join("goals.json")).unwrap();
+        let goals = read_json(omnidesk.join("goals.json")).unwrap();
         let items = goals.get("goals").and_then(Value::as_array).unwrap();
         assert_eq!(items[0].get("taskIds").unwrap(), &json!(["legacy-task"]));
         assert_eq!(items[1].get("taskIds").unwrap(), &json!(["task-1"]));

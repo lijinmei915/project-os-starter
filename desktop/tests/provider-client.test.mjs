@@ -23,8 +23,8 @@ test("reads provider state from preview files without probing remote models", as
     assert.deepEqual(await getModelHealth(), { schemaVersion: "project-os.model-health.v0.1", entries: [{ model: "gpt-5" }], enabled: true });
     assert.deepEqual(requests, [
       "/__project-os/provider-status",
-      "/.project-os/model-catalog.json",
-      "/.project-os/model-health.json",
+      "/.omnidesk/data/model-catalog.json",
+      "/.omnidesk/cache/model-health.json",
     ]);
   } finally {
     globalThis.fetch = originalFetch;
