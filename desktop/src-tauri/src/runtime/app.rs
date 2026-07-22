@@ -4974,12 +4974,7 @@ fn recover_runtime_transactions_on_start() {
 }
 
 fn prepare_state_namespace(root: &Path) {
-    let repository = crate::runtime::repository::Repository::new(root);
-    if let Err(error) = repository.recover_incomplete_transactions() {
-        eprintln!("OmniDesk 状态事务恢复失败（{}）：{}", root.display(), error);
-        return;
-    }
-    match crate::runtime::state_namespace::ensure_active_state_namespace(root) {
+    match crate::runtime::state_namespace::recover_and_activate_runtime_state(root) {
         Ok(outcome) if !outcome.conflicts.is_empty() => {
             eprintln!(
                 "OmniDesk 状态迁移存在 {} 个冲突，继续使用旧命名空间（{}）",
@@ -4987,19 +4982,9 @@ fn prepare_state_namespace(root: &Path) {
                 root.display()
             );
         }
-        Ok(_) => {
-            if let Err(error) =
-                crate::runtime::repository::Repository::new(root).recover_incomplete_transactions()
-            {
-                eprintln!(
-                    "OmniDesk 新状态事务恢复失败（{}）：{}",
-                    root.display(),
-                    error
-                );
-            }
-        }
+        Ok(_) => {}
         Err(error) => {
-            eprintln!("OmniDesk 状态迁移失败（{}）：{}", root.display(), error);
+            eprintln!("OmniDesk 状态初始化失败（{}）：{}", root.display(), error);
         }
     }
 }

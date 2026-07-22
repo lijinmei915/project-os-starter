@@ -1408,3 +1408,13 @@ test("keeps terminal session, cache, and trace behavior outside the Tauri comman
   assert.match(terminal, /pub fn record_native_trace/);
   assert.match(terminal, /#\[cfg\(test\)\]/);
 });
+
+test("keeps state transaction recovery and namespace activation together", () => {
+  const app = source("src-tauri/src/runtime/app.rs");
+  const namespace = source("src-tauri/src/runtime/state_namespace.rs");
+  assert.doesNotMatch(app, /fn recover_and_activate_runtime_state\(/);
+  assert.doesNotMatch(app, /ensure_active_state_namespace\(root\)/);
+  assert.match(app, /state_namespace::recover_and_activate_runtime_state/);
+  assert.match(namespace, /pub fn recover_and_activate_runtime_state/);
+  assert.match(namespace, /recover_incomplete_transactions\(\)\?/);
+});

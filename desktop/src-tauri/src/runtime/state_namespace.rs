@@ -221,6 +221,19 @@ pub fn ensure_active_state_namespace(root: &Path) -> Result<MigrationOutcome, St
     Ok(outcome)
 }
 
+/// Repairs interrupted transactions before and after namespace activation.
+/// The caller owns process-wide startup orchestration; this operation owns the
+/// persistence ordering required before any state is read by a domain service.
+pub fn recover_and_activate_runtime_state(root: &Path) -> Result<MigrationOutcome, String> {
+    let repository = crate::runtime::repository::Repository::new(root);
+    repository.recover_incomplete_transactions()?;
+    let outcome = ensure_active_state_namespace(root)?;
+    if outcome.conflicts.is_empty() {
+        crate::runtime::repository::Repository::new(root).recover_incomplete_transactions()?;
+    }
+    Ok(outcome)
+}
+
 /// Produces the evidence required before an explicitly approved cleanup can
 /// delete `.project-os`. It re-reads all legacy files instead of trusting a
 /// historical migration manifest because source data can change after cutover.
@@ -671,6 +684,18 @@ mod tests {
         let second = ensure_active_state_namespace(&root).unwrap();
         assert_eq!(second, MigrationOutcome::default());
         assert_eq!(fs::read(legacy).unwrap(), br#"{"goals":[]}"#);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn startup_preparation_recovers_then_activates_native_state() {
+        let root = test_root("startup-preparation");
+        write_atomic(&root.join(".project-os/goals.json"), br#"{\"goals\":[]}"#).unwrap();
+
+        let outcome = recover_and_activate_runtime_state(&root).unwrap();
+        assert_eq!(outcome.copied, 1);
+        assert!(namespace_is_active(&root));
+        assert!(!root.join(".omnidesk/runtime/transactions").exists());
         fs::remove_dir_all(root).unwrap();
     }
 
