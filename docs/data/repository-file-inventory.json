@@ -1,6 +1,6 @@
 {
   "schemaVersion": "omnidesk.repository-file-inventory.v1",
-  "generatedAt": "2026-07-22T04:23:16.170Z",
+  "generatedAt": "2026-07-22T04:32:11.891Z",
   "sourceOfTruth": "git ls-files",
   "scope": "受版本控制文件；忽略的本地运行数据和构建输出不在本账本内。",
   "reviewContract": {
@@ -24,7 +24,7 @@
     "rule": "没有消费者证据的文件不自动删除；必须由对应 Owner 审核并通过验证后才能退役。"
   },
   "totals": {
-    "files": 512,
+    "files": 513,
     "byKind": {
       "repository": 2,
       "ci": 2,
@@ -33,14 +33,14 @@
       "eval": 9,
       "native": 65,
       "runtime": 22,
-      "frontend": 241,
+      "frontend": 242,
       "test": 109,
       "documentation": 19,
       "documentation-data": 5,
       "schema": 14,
       "repository-tooling": 5
     },
-    "classified": 484,
+    "classified": 485,
     "candidates": 0,
     "inProgress": 3,
     "reviewed": 25
@@ -136,7 +136,7 @@
       "path": "HANDOFF.md",
       "kind": "root-document",
       "owner": "Documentation Governance",
-      "bytes": 259802,
+      "bytes": 260231,
       "pathMentions": [
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
         "desktop/src/lib/agent-topic-cards.js",
@@ -189,7 +189,7 @@
       "path": "PROJECT.md",
       "kind": "root-document",
       "owner": "Documentation Governance",
-      "bytes": 8845,
+      "bytes": 9076,
       "pathMentions": [
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
         "desktop/src/lib/agent-topic-runtime-capability.js",
@@ -5896,6 +5896,23 @@
       "decisionEvidence": "inventory-default-retention"
     },
     {
+      "path": "desktop/src/lib/task-workflow-presentation.js",
+      "kind": "frontend",
+      "owner": "Desktop Frontend",
+      "bytes": 773,
+      "pathMentions": [],
+      "moduleConsumers": [
+        "desktop/src/main.jsx"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
+    },
+    {
       "path": "desktop/src/lib/terminal-client.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
@@ -8264,7 +8281,7 @@
       "path": "docs/data/repository-file-inventory.json",
       "kind": "documentation-data",
       "owner": "Documentation Governance",
-      "bytes": 438029,
+      "bytes": 438788,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",

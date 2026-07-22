@@ -15,6 +15,8 @@ depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
 
 ## 接手摘要
 
+- 2026-07-22 文件治理继续推进：任务状态文案与计划检查选择已从 `main.jsx` 下沉到 `lib/task-workflow-presentation.js`，Workbench 只注入当前状态字典和受控检查能力。新增静态 Owner 边界回归。验证：Desktop Node 461/461、Web build、原生 WebDriver smoke 及受保护真实 Eval `29890989675` 通过，后者保留 12/12 artifact-relative trace 并维持全部核心指标。
+
 - 2026-07-22 文件治理继续推进：启动时的“事务恢复 → native namespace 激活 → 二次事务恢复”已从 `runtime/app.rs` 下沉到 `runtime/state_namespace.rs`；`app.rs` 只负责跨工作区扫描和 Agent Run 恢复。新增启动 preparation 与静态 Owner 边界回归。验证：完整本地回归（Node 461/461、Rust 113/113、Web build、账本、离线 Eval、diff integrity）、原生 WebDriver smoke 和受保护真实 Eval `29890521784` 均通过，后者 12/12 trace 完整且四项核心指标保持基线。
 
 - 2026-07-22 文件治理继续推进：PTY 会话创建、输入/尺寸/停止、终端图片缓存与 WebDriver trace 已从 `runtime/app.rs` 下沉到 `runtime/terminal.rs`；Tauri command 只解析当前项目并调用领域操作。新增静态 Owner 边界与 session-id 归一化回归。验证：完整本地回归（Node 460/460、Rust 112/112、Web build、账本、离线 Eval、diff integrity）、原生 WebDriver smoke 及受保护真实 Eval `29889968324` 均通过；后者保留 12/12 artifact-relative trace，任务成功率 100%、Patch 可应用率 90.9%、检查通过率与恢复率均为 100%。
