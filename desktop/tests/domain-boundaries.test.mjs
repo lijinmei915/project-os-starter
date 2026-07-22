@@ -1418,3 +1418,13 @@ test("keeps state transaction recovery and namespace activation together", () =>
   assert.match(namespace, /pub fn recover_and_activate_runtime_state/);
   assert.match(namespace, /recover_incomplete_transactions\(\)\?/);
 });
+
+test("keeps task workflow presentation helpers outside the Workbench entrypoint", () => {
+  const workbench = source("src/main.jsx");
+  const presentation = source("src/lib/task-workflow-presentation.js");
+  assert.doesNotMatch(workbench, /function taskStatusLabel\(/);
+  assert.doesNotMatch(workbench, /function checksForPlan\(/);
+  assert.match(workbench, /task-workflow-presentation/);
+  assert.match(presentation, /export function taskStatusLabel/);
+  assert.match(presentation, /export function checksForPlan/);
+});

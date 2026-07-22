@@ -98,6 +98,7 @@ import { activeProviderProfileName } from "./lib/provider-presentation";
 import { taskConversationAction, taskNextAction } from "./lib/task-next-action";
 import { taskContinuationPrompt } from "./lib/task-conversation-prompt";
 import { taskCardPrimaryAction } from "./lib/task-card-action";
+import { checksForPlan as planChecksFor, taskStatusLabel as taskStatusText } from "./lib/task-workflow-presentation";
 import { buildAgentTopicViewModel, canPreviewAgentTopicFile } from "./lib/agent-topic-view-model";
 import { displayStateRelativePath } from "./lib/state-namespace";
 import { applyPendingConversationPatch } from "./lib/conversation-patch-apply";
@@ -297,6 +298,9 @@ const taskStatuses = {
   done: "done",
   failed: "failed",
 };
+
+const taskStatusLabel = (status) => taskStatusText(status, taskStatuses);
+const checksForPlan = (plan) => planChecksFor(plan, guardedCheckCapabilities);
 
 function buildPreviewPlan(input, snapshot) {
   const task = safeDisplayText(input?.task, "未命名任务").trim() || "未命名任务";
@@ -715,26 +719,6 @@ function createTaskFromPlan(plan, taskText, snapshot, options = {}) {
     plan,
     runs: [],
   };
-}
-
-function taskStatusLabel(status) {
-  return {
-    [taskStatuses.planned]: "待确认",
-    [taskStatuses.waitingApproval]: "已确认",
-    [taskStatuses.running]: "进行中",
-    [taskStatuses.done]: "已完成",
-    [taskStatuses.failed]: "失败",
-    [taskStatuses.repairPending]: "待修复",
-    [taskStatuses.waitingRepairApproval]: "待确认修复",
-    [taskStatuses.repairFailed]: "修复失败",
-  }[status] || status || "待确认";
-}
-
-function checksForPlan(plan) {
-  const checks = Array.isArray(plan?.checks) ? plan.checks : [];
-  return guardedCheckCapabilities.filter((check) =>
-    checks.some((item) => item.includes(check.command) || item.includes(check.id) || item.includes(check.label))
-  );
 }
 
 function previewChatResult(message, hasAttachments, snapshot = {}, tasks = [], dialogueContext = {}) {
