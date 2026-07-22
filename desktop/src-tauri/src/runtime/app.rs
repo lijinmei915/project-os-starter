@@ -27,11 +27,7 @@ use crate::runtime::provider::{
     ModelCatalog, ModelHealthCache, ModelHealthEntry, ProviderConfig, ProviderProfile,
     PROVIDER_SCHEMA_VERSION,
 };
-use crate::runtime::terminal::{
-    default_cols as default_terminal_cols, default_rows as default_terminal_rows,
-    default_session_id as default_terminal_session_id,
-    terminate_session as terminate_terminal_session, TerminalSession, TerminalState,
-};
+use crate::runtime::terminal::TerminalState;
 use crate::runtime::theme::{DesktopThemeConfig, load_or_seed as load_or_seed_desktop_theme, normalize as normalize_desktop_theme, save as save_desktop_theme_file};
 use crate::runtime::workspace::{
     build_project_profile, runbook_commands, ProjectProfile, TreeEntry,
@@ -40,12 +36,10 @@ use crate::runtime::workspace::{
     normalize_project_path, project_id_from_path, registry_project_summaries, save_registry,
     RegistryProjectSummary,
 };
-use base64::Engine;
 use futures_util::StreamExt;
 use notify::{
     Config as NotifyConfig, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher,
 };
-use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashSet;
@@ -285,43 +279,6 @@ struct RunGuardedCheckInput {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct StartTerminalSessionInput {
-    #[serde(default = "default_terminal_session_id")]
-    session_id: String,
-    #[serde(default = "default_terminal_cols")]
-    cols: u16,
-    #[serde(default = "default_terminal_rows")]
-    rows: u16,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct WriteTerminalSessionInput {
-    #[serde(default = "default_terminal_session_id")]
-    session_id: String,
-    data: String,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ResizeTerminalSessionInput {
-    #[serde(default = "default_terminal_session_id")]
-    session_id: String,
-    #[serde(default = "default_terminal_cols")]
-    cols: u16,
-    #[serde(default = "default_terminal_rows")]
-    rows: u16,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct StopTerminalSessionInput {
-    #[serde(default = "default_terminal_session_id")]
-    session_id: String,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
 struct DesktopTaskInput {
     task: Value,
 }
@@ -497,24 +454,6 @@ struct GuardedCheckResult {
     success: bool,
     code: Option<i32>,
     output: String,
-}
-
-#[derive(Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct TerminalSessionResult {
-    session_id: String,
-    cwd: String,
-    generation: u64,
-    shell: String,
-    running: bool,
-}
-
-#[derive(Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct TerminalOutputEvent {
-    session_id: String,
-    generation: u64,
-    data: String,
 }
 
 #[derive(Serialize, Clone)]
@@ -4006,278 +3945,51 @@ fn save_terminal_image(input: SaveTerminalImageInput) -> Result<String, String> 
     let mut registry = load_or_seed_registry(&app_root)?;
     let current_project = current_registry_project(&mut registry, &app_root)?;
     let root = PathBuf::from(&current_project.path);
-    let extension = Path::new(&input.name)
-        .extension()
-        .and_then(|value| value.to_str())
-        .unwrap_or("png")
-        .to_ascii_lowercase();
-    if !matches!(
-        extension.as_str(),
-        "png" | "jpg" | "jpeg" | "gif" | "webp" | "svg"
-    ) {
-        return Err("终端图片只支持 PNG、JPG、GIF、WebP 或 SVG".to_string());
-    }
-    let (mime, encoded) = input
-        .data_url
-        .split_once(",")
-        .ok_or_else(|| "图片数据格式无效".to_string())?;
-    if !mime.starts_with("data:image/") {
-        return Err("终端只接受图片数据".to_string());
-    }
-    let bytes = base64::engine::general_purpose::STANDARD
-        .decode(encoded)
-        .map_err(|err| format!("图片解码失败：{err}"))?;
-    if bytes.len() > 8 * 1024 * 1024 {
-        return Err("终端图片不能超过 8 MB".to_string());
-    }
-    let dir = crate::runtime::state_namespace::state_path_for_write(
-        &root,
-        ".omnidesk/cache/terminal-images",
-    )?;
-    fs::create_dir_all(&dir).map_err(|err| err.to_string())?;
-    let safe_name: String = input
-        .name
-        .chars()
-        .filter(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-' | '_'))
-        .collect();
-    let stamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|err| err.to_string())?
-        .as_millis();
-    let file_name = format!(
-        "omnidesk-image-{stamp}.{}",
-        if safe_name.is_empty() {
-            extension.clone()
-        } else {
-            extension
-        }
-    );
-    let path = dir.join(file_name);
-    fs::write(&path, bytes).map_err(|err| err.to_string())?;
-    Ok(path.to_string_lossy().to_string())
+    crate::runtime::terminal::save_image(&root, &input.name, &input.data_url)
 }
 
 #[tauri::command]
 fn start_terminal_session(
     app: AppHandle,
     state: State<TerminalState>,
-    input: StartTerminalSessionInput,
-) -> Result<TerminalSessionResult, String> {
+    input: crate::runtime::terminal::StartTerminalSessionInput,
+) -> Result<crate::runtime::terminal::TerminalSessionResult, String> {
     let app_root = find_workspace_root()?;
     let mut registry = load_or_seed_registry(&app_root)?;
     let current_project = current_registry_project(&mut registry, &app_root)?;
     let root = PathBuf::from(&current_project.path);
-    if !root.exists() || !root.is_dir() {
-        return Err("当前项目路径不存在或不是目录".to_string());
-    }
-
-    let session_id = if input.session_id.trim().is_empty() {
-        default_terminal_session_id()
-    } else {
-        input.session_id.trim().to_string()
-    };
-    let generation = {
-        let mut next_generation = state.generation.lock().map_err(|err| err.to_string())?;
-        *next_generation += 1;
-        *next_generation
-    };
-
-    {
-        let mut sessions = state.sessions.lock().map_err(|err| err.to_string())?;
-        if let Some(mut existing) = sessions.remove(&session_id) {
-            terminate_terminal_session(&mut existing);
-        }
-    }
-
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
-    let pty_system = native_pty_system();
-    let cols = input.cols.clamp(20, 400);
-    let rows = input.rows.clamp(8, 200);
-    let pair = pty_system
-        .openpty(PtySize {
-            rows,
-            cols,
-            pixel_width: 0,
-            pixel_height: 0,
-        })
-        .map_err(|err| err.to_string())?;
-
-    let mut command = CommandBuilder::new(shell.clone());
-    command.cwd(root.clone());
-    command.env("TERM", "xterm-256color");
-    command.env("COLORTERM", "truecolor");
-    command.env("PROMPT_EOL_MARK", "");
-
-    let child = pair
-        .slave
-        .spawn_command(command)
-        .map_err(|err| err.to_string())?;
-    let mut reader = pair
-        .master
-        .try_clone_reader()
-        .map_err(|err| err.to_string())?;
-    let writer = pair.master.take_writer().map_err(|err| err.to_string())?;
-    let reader_session_id = session_id.clone();
-    let reader_app = app.clone();
-    let reader_generation = generation;
-
-    std::thread::spawn(move || {
-        let mut buffer = [0_u8; 4096];
-        loop {
-            match reader.read(&mut buffer) {
-                Ok(0) => break,
-                Ok(size) => {
-                    let data = String::from_utf8_lossy(&buffer[..size]).to_string();
-                    let _ = reader_app.emit(
-                        "terminal://output",
-                        TerminalOutputEvent {
-                            session_id: reader_session_id.clone(),
-                            generation: reader_generation,
-                            data,
-                        },
-                    );
-                }
-                Err(_) => break,
-            }
-        }
-    });
-
-    let mut sessions = state.sessions.lock().map_err(|err| err.to_string())?;
-    sessions.insert(
-        session_id.clone(),
-        TerminalSession {
-            child,
-            master: pair.master,
-            writer,
-        },
-    );
-
-    Ok(TerminalSessionResult {
-        session_id,
-        cwd: root.to_string_lossy().to_string(),
-        generation,
-        shell,
-        running: true,
-    })
+    crate::runtime::terminal::start_session(app, &state, root, input)
 }
 
 #[tauri::command]
 fn write_terminal_session(
     state: State<TerminalState>,
-    input: WriteTerminalSessionInput,
+    input: crate::runtime::terminal::WriteTerminalSessionInput,
 ) -> Result<(), String> {
-    let session_id = if input.session_id.trim().is_empty() {
-        default_terminal_session_id()
-    } else {
-        input.session_id.trim().to_string()
-    };
-    let mut sessions = state.sessions.lock().map_err(|err| err.to_string())?;
-    let session = sessions
-        .get_mut(&session_id)
-        .ok_or_else(|| "终端还没有启动".to_string())?;
-    session
-        .writer
-        .write_all(input.data.as_bytes())
-        .map_err(|err| err.to_string())?;
-    session.writer.flush().map_err(|err| err.to_string())
+    crate::runtime::terminal::write_session(&state, input)
 }
 
 #[tauri::command]
 fn resize_terminal_session(
     state: State<TerminalState>,
-    input: ResizeTerminalSessionInput,
+    input: crate::runtime::terminal::ResizeTerminalSessionInput,
 ) -> Result<(), String> {
-    let session_id = if input.session_id.trim().is_empty() {
-        default_terminal_session_id()
-    } else {
-        input.session_id.trim().to_string()
-    };
-    let sessions = state.sessions.lock().map_err(|err| err.to_string())?;
-    let session = sessions
-        .get(&session_id)
-        .ok_or_else(|| "终端还没有启动".to_string())?;
-    session
-        .master
-        .resize(PtySize {
-            rows: input.rows.clamp(8, 200),
-            cols: input.cols.clamp(20, 400),
-            pixel_width: 0,
-            pixel_height: 0,
-        })
-        .map_err(|err| err.to_string())
+    crate::runtime::terminal::resize_session(&state, input)
 }
 
 #[tauri::command]
 fn stop_terminal_session(
     state: State<TerminalState>,
-    input: StopTerminalSessionInput,
+    input: crate::runtime::terminal::StopTerminalSessionInput,
 ) -> Result<(), String> {
-    let session_id = if input.session_id.trim().is_empty() {
-        default_terminal_session_id()
-    } else {
-        input.session_id.trim().to_string()
-    };
-    let mut sessions = state.sessions.lock().map_err(|err| err.to_string())?;
-    if let Some(mut session) = sessions.remove(&session_id) {
-        terminate_terminal_session(&mut session);
-    }
-    Ok(())
+    crate::runtime::terminal::stop_session(&state, input)
 }
 
 #[cfg(feature = "webdriver")]
 #[tauri::command]
 fn record_native_terminal_trace(stage: String) -> Result<(), String> {
-    const ALLOWED_STAGES: &[&str] = &[
-        "terminal-session.start-before",
-        "terminal-session.start-complete",
-        "terminal-session.start-error",
-        "terminal-session.effect-start",
-        "terminal-session.output-subscribed",
-        "terminal-session.effect-error",
-        "terminal-session.effect-cleanup",
-        "terminal-dock.mount",
-        "terminal-dock.xterm-created",
-        "terminal-dock.xterm-opened",
-        "terminal-dock.initial-focus-start",
-        "terminal-dock.initial-focus-complete",
-        "terminal-dock.initial-focus-error",
-        "terminal-dock.fit-start",
-        "terminal-dock.fit-complete",
-        "terminal-dock.fit-error",
-        "terminal-dock.active-effect",
-        "terminal-dock.active-focus-start",
-        "terminal-dock.active-focus-complete",
-        "terminal-dock.active-focus-error",
-        "terminal-dock.cleanup",
-    ];
-    if !ALLOWED_STAGES.contains(&stage.as_str()) {
-        return Err("WebDriver terminal trace stage is not allowed".to_string());
-    }
-
     let root = find_workspace_root()?;
-    let path = crate::runtime::state_namespace::state_path_for_write(
-        &root,
-        ".omnidesk/cache/native-terminal-trace.json",
-    )?;
-    let mut entries = fs::read_to_string(&path)
-        .ok()
-        .and_then(|content| serde_json::from_str::<Vec<Value>>(&content).ok())
-        .unwrap_or_default();
-    if entries
-        .iter()
-        .any(|entry| entry.get("stage").and_then(Value::as_str) == Some(stage.as_str()))
-    {
-        return Ok(());
-    }
-    entries.push(json!({ "at": current_timestamp_string(), "stage": stage }));
-    if entries.len() > 30 {
-        entries.drain(..entries.len() - 30);
-    }
-    fs::write(
-        &path,
-        serde_json::to_vec(&entries).map_err(|err| err.to_string())?,
-    )
-    .map_err(|err| err.to_string())
+    crate::runtime::terminal::record_native_trace(&root, &stage, &current_timestamp_string())
 }
 
 #[cfg(feature = "webdriver")]

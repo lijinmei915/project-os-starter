@@ -1,6 +1,6 @@
 {
   "schemaVersion": "omnidesk.repository-file-inventory.v1",
-  "generatedAt": "2026-07-22T03:50:31.309Z",
+  "generatedAt": "2026-07-22T03:58:46.113Z",
   "sourceOfTruth": "git ls-files",
   "scope": "受版本控制文件；忽略的本地运行数据和构建输出不在本账本内。",
   "reviewContract": {
@@ -1539,7 +1539,7 @@
       "path": "desktop/src-tauri/src/runtime/app.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 185834,
+      "bytes": 176893,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/main.rs",
@@ -1815,6 +1815,7 @@
         "desktop/src-tauri/src/runtime/mod.rs",
         "desktop/src-tauri/src/runtime/repository.rs",
         "desktop/src-tauri/src/runtime/tasks.rs",
+        "desktop/src-tauri/src/runtime/terminal.rs",
         "desktop/src-tauri/src/runtime/theme.rs",
         "desktop/src-tauri/src/runtime/workspace.rs",
         "desktop/src-tauri/src/runtime/workspace_governance.rs"
@@ -1852,7 +1853,7 @@
       "path": "desktop/src-tauri/src/runtime/terminal.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 1358,
+      "bytes": 10673,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/app.rs",
@@ -6949,7 +6950,7 @@
       "path": "desktop/tests/domain-boundaries.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 61968,
+      "bytes": 62601,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -8263,7 +8264,7 @@
       "path": "docs/data/repository-file-inventory.json",
       "kind": "documentation-data",
       "owner": "Documentation Governance",
-      "bytes": 437975,
+      "bytes": 438029,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",

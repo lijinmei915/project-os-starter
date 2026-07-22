@@ -1395,3 +1395,16 @@ test("keeps Workspace facts projection outside the Tauri command assembly", () =
   assert.match(workspace, /pub fn build_workspace_facts_preview/);
   assert.match(app, /workspace::build_workspace_facts_preview/);
 });
+
+test("keeps terminal session, cache, and trace behavior outside the Tauri command assembly", () => {
+  const app = source("src-tauri/src/runtime/app.rs");
+  const terminal = source("src-tauri/src/runtime/terminal.rs");
+  assert.doesNotMatch(app, /native_pty_system/);
+  assert.doesNotMatch(app, /fn normalized_session_id\(/);
+  assert.doesNotMatch(app, /fn save_image\(/);
+  assert.doesNotMatch(app, /fn record_native_trace\(/);
+  assert.match(terminal, /pub fn start_session/);
+  assert.match(terminal, /pub fn save_image/);
+  assert.match(terminal, /pub fn record_native_trace/);
+  assert.match(terminal, /#\[cfg\(test\)\]/);
+});
