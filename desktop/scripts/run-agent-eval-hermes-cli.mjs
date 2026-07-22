@@ -94,7 +94,7 @@ const patchCases = Object.freeze({
   },
   "test-regression": {
     files: { "state.test.mjs": "import assert from \"node:assert/strict\";\nimport test from \"node:test\";\n\nfunction recover(state) {\n  return state === \"running\" ? \"interrupted\" : state;\n}\n\ntest(\"recovers running state\", () => {\n  assert.equal(recover(\"running\"), \"interrupted\");\n});\n" },
-    prompt: "Return only a unified diff that adds a node:test regression in state.test.mjs proving recover preserves the `waiting-approval` state. Keep existing test unchanged. Do not use tools, do not explain, and do not use markdown fences.",
+    prompt: "Return only a unified diff that adds a node:test regression in state.test.mjs proving recover preserves the `waiting-approval` state. Keep existing test unchanged. Your hunk must include at least the existing `test(\"recovers running state\"` block as unchanged context before the added test; do not emit an add-only hunk. Do not use tools, do not explain, and do not use markdown fences.",
     verify(fixture) {
       return fs.readFileSync(path.join(fixture, "state.test.mjs"), "utf8").includes('recover("waiting-approval"), "waiting-approval"');
     },
