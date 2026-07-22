@@ -75,7 +75,7 @@ pub fn is_context_path(path: &str) -> bool {
     }
     matches!(
         Path::new(path).extension().and_then(|value| value.to_str()),
-        Some("js" | "jsx" | "ts" | "tsx" | "css" | "rs" | "md" | "json" | "toml")
+        Some("js" | "mjs" | "cjs" | "jsx" | "ts" | "tsx" | "css" | "rs" | "md" | "json" | "toml")
     )
 }
 
@@ -665,5 +665,18 @@ mod tests {
         let diff = "--- a/state.test.mjs\n+++ b/state.test.mjs\n@@ -1,0 +1,2 @@\n+test(\"new\", () => {});\n+\n";
 
         assert!(normalize_hermes_unified_diff(diff, &context).is_err());
+    }
+
+    #[test]
+    fn accepts_contextual_node_module_test_diffs() {
+        let context = vec![(
+            "state.test.mjs".to_string(),
+            "test(\"existing\", () => {});\n".to_string(),
+        )];
+        let diff = "--- a/state.test.mjs\n+++ b/state.test.mjs\n@@ -1 +1,2 @@\n test(\"existing\", () => {});\n+test(\"new\", () => {});\n";
+
+        assert!(normalize_hermes_unified_diff(diff, &context).is_ok());
+        assert!(is_context_path("scripts/check.mjs"));
+        assert!(is_context_path("scripts/check.cjs"));
     }
 }

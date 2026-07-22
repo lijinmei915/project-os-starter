@@ -1,6 +1,6 @@
 {
   "schemaVersion": "omnidesk.repository-file-inventory.v1",
-  "generatedAt": "2026-07-22T03:21:32.941Z",
+  "generatedAt": "2026-07-22T03:41:29.593Z",
   "sourceOfTruth": "git ls-files",
   "scope": "受版本控制文件；忽略的本地运行数据和构建输出不在本账本内。",
   "reviewContract": {
@@ -24,7 +24,7 @@
     "rule": "没有消费者证据的文件不自动删除；必须由对应 Owner 审核并通过验证后才能退役。"
   },
   "totals": {
-    "files": 483,
+    "files": 512,
     "byKind": {
       "repository": 2,
       "ci": 2,
@@ -32,15 +32,15 @@
       "desktop-support": 13,
       "eval": 9,
       "native": 65,
-      "runtime": 13,
-      "frontend": 228,
-      "test": 107,
+      "runtime": 22,
+      "frontend": 241,
+      "test": 109,
       "documentation": 19,
-      "documentation-data": 2,
+      "documentation-data": 5,
       "schema": 14,
-      "repository-tooling": 3
+      "repository-tooling": 5
     },
-    "classified": 455,
+    "classified": 484,
     "candidates": 0,
     "inProgress": 3,
     "reviewed": 25
@@ -446,7 +446,7 @@
       "path": "desktop/scripts/run-agent-eval-hermes-cli.mjs",
       "kind": "eval",
       "owner": "Agent Reliability",
-      "bytes": 20210,
+      "bytes": 20369,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -1554,6 +1554,79 @@
       "decisionEvidence": "manual-review-registry"
     },
     {
+      "path": "desktop/src-tauri/src/runtime/chat_content.rs",
+      "kind": "runtime",
+      "owner": "Local Agent Runtime",
+      "bytes": 15693,
+      "pathMentions": [],
+      "moduleConsumers": [
+        "desktop/src-tauri/src/runtime/app.rs",
+        "desktop/src-tauri/src/runtime/mod.rs"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/chat_routing.rs",
+      "kind": "runtime",
+      "owner": "Local Agent Runtime",
+      "bytes": 2730,
+      "pathMentions": [],
+      "moduleConsumers": [
+        "desktop/src-tauri/src/runtime/app.rs",
+        "desktop/src-tauri/src/runtime/chat_content.rs",
+        "desktop/src-tauri/src/runtime/mod.rs"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/chat_runtime.rs",
+      "kind": "runtime",
+      "owner": "Local Agent Runtime",
+      "bytes": 2681,
+      "pathMentions": [],
+      "moduleConsumers": [
+        "desktop/src-tauri/src/runtime/app.rs",
+        "desktop/src-tauri/src/runtime/mod.rs"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/chat_stream.rs",
+      "kind": "runtime",
+      "owner": "Local Agent Runtime",
+      "bytes": 3234,
+      "pathMentions": [],
+      "moduleConsumers": [
+        "desktop/src-tauri/src/runtime/app.rs",
+        "desktop/src-tauri/src/runtime/mod.rs"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
+    },
+    {
       "path": "desktop/src-tauri/src/runtime/conversations.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
@@ -1610,6 +1683,24 @@
       "decisionEvidence": "inventory-default-retention"
     },
     {
+      "path": "desktop/src-tauri/src/runtime/hermes_protocol.rs",
+      "kind": "runtime",
+      "owner": "Local Agent Runtime",
+      "bytes": 9379,
+      "pathMentions": [],
+      "moduleConsumers": [
+        "desktop/src-tauri/src/runtime/app.rs",
+        "desktop/src-tauri/src/runtime/mod.rs"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
+    },
+    {
       "path": "desktop/src-tauri/src/runtime/mod.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
@@ -1628,7 +1719,7 @@
       "path": "desktop/src-tauri/src/runtime/patch.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 25739,
+      "bytes": 26293,
       "pathMentions": [
         "desktop/src/lib/agent-topic-agent-config.js",
         "desktop/src/workspace-outline.js"
@@ -1647,6 +1738,25 @@
       "decisionEvidence": "inventory-default-retention"
     },
     {
+      "path": "desktop/src-tauri/src/runtime/planning.rs",
+      "kind": "runtime",
+      "owner": "Local Agent Runtime",
+      "bytes": 8858,
+      "pathMentions": [],
+      "moduleConsumers": [
+        "desktop/src-tauri/src/runtime/app.rs",
+        "desktop/src-tauri/src/runtime/chat_content.rs",
+        "desktop/src-tauri/src/runtime/mod.rs"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
+    },
+    {
       "path": "desktop/src-tauri/src/runtime/provider.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
@@ -1654,7 +1764,9 @@
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/app.rs",
-        "desktop/src-tauri/src/runtime/mod.rs"
+        "desktop/src-tauri/src/runtime/chat_content.rs",
+        "desktop/src-tauri/src/runtime/mod.rs",
+        "desktop/src-tauri/src/runtime/planning.rs"
       ],
       "consumerEvidence": "static-module-consumer",
       "consumerReview": "静态 import/mod 关系已记录。",
@@ -1680,6 +1792,7 @@
         "desktop/src-tauri/src/runtime/provider.rs",
         "desktop/src-tauri/src/runtime/state_namespace.rs",
         "desktop/src-tauri/src/runtime/tasks.rs",
+        "desktop/src-tauri/src/runtime/theme.rs",
         "desktop/src-tauri/src/runtime/workspace.rs"
       ],
       "consumerEvidence": "static-module-consumer",
@@ -1702,7 +1815,9 @@
         "desktop/src-tauri/src/runtime/mod.rs",
         "desktop/src-tauri/src/runtime/repository.rs",
         "desktop/src-tauri/src/runtime/tasks.rs",
-        "desktop/src-tauri/src/runtime/workspace.rs"
+        "desktop/src-tauri/src/runtime/theme.rs",
+        "desktop/src-tauri/src/runtime/workspace.rs",
+        "desktop/src-tauri/src/runtime/workspace_governance.rs"
       ],
       "consumerEvidence": "static-module-consumer",
       "consumerReview": "静态 import/mod 关系已记录。",
@@ -1720,9 +1835,46 @@
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/app.rs",
+        "desktop/src-tauri/src/runtime/chat_content.rs",
         "desktop/src-tauri/src/runtime/goals.rs",
         "desktop/src-tauri/src/runtime/mod.rs",
         "desktop/src-tauri/src/runtime/workspace.rs"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/terminal.rs",
+      "kind": "runtime",
+      "owner": "Local Agent Runtime",
+      "bytes": 1358,
+      "pathMentions": [],
+      "moduleConsumers": [
+        "desktop/src-tauri/src/runtime/app.rs",
+        "desktop/src-tauri/src/runtime/mod.rs"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/theme.rs",
+      "kind": "runtime",
+      "owner": "Local Agent Runtime",
+      "bytes": 3807,
+      "pathMentions": [],
+      "moduleConsumers": [
+        "desktop/src-tauri/src/runtime/app.rs",
+        "desktop/src-tauri/src/runtime/mod.rs"
       ],
       "consumerEvidence": "static-module-consumer",
       "consumerReview": "静态 import/mod 关系已记录。",
@@ -1740,7 +1892,28 @@
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/app.rs",
-        "desktop/src-tauri/src/runtime/mod.rs"
+        "desktop/src-tauri/src/runtime/chat_content.rs",
+        "desktop/src-tauri/src/runtime/mod.rs",
+        "desktop/src-tauri/src/runtime/workspace_governance.rs"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/workspace_governance.rs",
+      "kind": "runtime",
+      "owner": "Local Agent Runtime",
+      "bytes": 17651,
+      "pathMentions": [],
+      "moduleConsumers": [
+        "desktop/src-tauri/src/runtime/chat_content.rs",
+        "desktop/src-tauri/src/runtime/mod.rs",
+        "desktop/src-tauri/src/runtime/workspace.rs"
       ],
       "consumerEvidence": "static-module-consumer",
       "consumerReview": "静态 import/mod 关系已记录。",
@@ -1995,12 +2168,15 @@
         "desktop/src/components/workbench/component-governance-panel.jsx",
         "desktop/src/components/workbench/conversation-history-item.jsx",
         "desktop/src/components/workbench/conversation-transcript.jsx",
+        "desktop/src/components/workbench/current-progress-panel.jsx",
         "desktop/src/components/workbench/engineering-topic-frame.jsx",
         "desktop/src/components/workbench/plan-views.jsx",
         "desktop/src/components/workbench/project-capability-dialog.jsx",
         "desktop/src/components/workbench/project-memory-panel.jsx",
         "desktop/src/components/workbench/project-overview-renderer.jsx",
         "desktop/src/components/workbench/readonly-file-preview.jsx",
+        "desktop/src/components/workbench/risk-boundary-panel.jsx",
+        "desktop/src/components/workbench/runbook-panel.jsx",
         "desktop/src/components/workbench/task-card.jsx",
         "desktop/src/components/workbench/task-rail.jsx",
         "desktop/src/components/workbench/token-governance-panel.jsx",
@@ -2028,11 +2204,14 @@
         "desktop/src/components/workbench/agent-topic-task-groups.jsx",
         "desktop/src/components/workbench/assistant-ui-conversation-poc.jsx",
         "desktop/src/components/workbench/component-governance-panel.jsx",
+        "desktop/src/components/workbench/project-access-dialogs.jsx",
         "desktop/src/components/workbench/project-capability-dialog.jsx",
         "desktop/src/components/workbench/project-memory-panel.jsx",
         "desktop/src/components/workbench/project-overview-renderer.jsx",
+        "desktop/src/components/workbench/project-sidebar.jsx",
         "desktop/src/components/workbench/provider-connection-summary.jsx",
         "desktop/src/components/workbench/provider-submit-controls.jsx",
+        "desktop/src/components/workbench/runbook-panel.jsx",
         "desktop/src/components/workbench/system-settings-menu.jsx",
         "desktop/src/components/workbench/task-action-dialog.jsx",
         "desktop/src/components/workbench/task-command-bar.jsx",
@@ -2061,6 +2240,7 @@
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/components/workbench/agent-topic-task-dialogs.jsx",
+        "desktop/src/components/workbench/project-access-dialogs.jsx",
         "desktop/src/components/workbench/project-capability-dialog.jsx",
         "desktop/src/components/workbench/task-action-dialog.jsx",
         "desktop/src/components/workbench/top-bar.jsx",
@@ -2084,6 +2264,7 @@
         "desktop/src/components/workbench/agent-topic-task-board.jsx",
         "desktop/src/components/workbench/agent-topic-task-groups.jsx",
         "desktop/src/components/workbench/chat-composer.jsx",
+        "desktop/src/components/workbench/project-list.jsx",
         "desktop/src/components/workbench/system-settings-menu.jsx",
         "desktop/src/components/workbench/theme-menu.jsx",
         "desktop/src/main.jsx"
@@ -2104,6 +2285,7 @@
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/components/workbench/agent-topic-task-dialogs.jsx",
+        "desktop/src/components/workbench/project-access-dialogs.jsx",
         "desktop/src/components/workbench/provider-advanced-settings.jsx",
         "desktop/src/components/workbench/provider-form-fields.jsx",
         "desktop/src/main.jsx"
@@ -2125,6 +2307,7 @@
       "moduleConsumers": [
         "desktop/src/components/workbench/agent-topic-task-dialogs.jsx",
         "desktop/src/components/workbench/component-governance-panel.jsx",
+        "desktop/src/components/workbench/project-access-dialogs.jsx",
         "desktop/src/components/workbench/project-memory-panel.jsx",
         "desktop/src/components/workbench/provider-advanced-settings.jsx",
         "desktop/src/components/workbench/provider-form-fields.jsx",
@@ -2151,10 +2334,13 @@
         "desktop/src/components/workbench/agent-topic-task-groups.jsx",
         "desktop/src/components/workbench/agent-workspace-auxiliary-tabs.jsx",
         "desktop/src/components/workbench/component-governance-panel.jsx",
+        "desktop/src/components/workbench/project-access-dialogs.jsx",
         "desktop/src/components/workbench/project-memory-panel.jsx",
         "desktop/src/components/workbench/provider-connections.jsx",
         "desktop/src/components/workbench/provider-submit-controls.jsx",
         "desktop/src/components/workbench/readonly-file-preview.jsx",
+        "desktop/src/components/workbench/risk-boundary-panel.jsx",
+        "desktop/src/components/workbench/runbook-panel.jsx",
         "desktop/src/components/workbench/task-action-dialog.jsx",
         "desktop/src/components/workbench/terminal-dock.jsx",
         "desktop/src/main.jsx"
@@ -2199,6 +2385,7 @@
       "bytes": 2395,
       "pathMentions": [],
       "moduleConsumers": [
+        "desktop/src/components/workbench/project-sidebar.jsx",
         "desktop/src/components/workbench/right-rail-components.jsx",
         "desktop/src/components/workbench/workspace-tree.jsx",
         "desktop/src/main.jsx"
@@ -2283,6 +2470,8 @@
         "desktop/src/components/workbench/conversation-history-item.jsx",
         "desktop/src/components/workbench/project-memory-panel.jsx",
         "desktop/src/components/workbench/project-overview-renderer.jsx",
+        "desktop/src/components/workbench/project-sidebar.jsx",
+        "desktop/src/components/workbench/runbook-panel.jsx",
         "desktop/src/components/workbench/system-settings-menu.jsx",
         "desktop/src/components/workbench/task-conversation-context.jsx",
         "desktop/src/components/workbench/task-rail.jsx",
@@ -2642,6 +2831,23 @@
       "decisionEvidence": "inventory-default-retention"
     },
     {
+      "path": "desktop/src/components/workbench/current-progress-panel.jsx",
+      "kind": "frontend",
+      "owner": "Workbench",
+      "bytes": 4774,
+      "pathMentions": [],
+      "moduleConsumers": [
+        "desktop/src/main.jsx"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
+    },
+    {
       "path": "desktop/src/components/workbench/engineering-topic-frame.jsx",
       "kind": "frontend",
       "owner": "Workbench",
@@ -2701,8 +2907,11 @@
       "moduleConsumers": [
         "desktop/src/components/workbench/agent-config-surface-panel.jsx",
         "desktop/src/components/workbench/component-governance-panel.jsx",
+        "desktop/src/components/workbench/current-progress-panel.jsx",
         "desktop/src/components/workbench/project-memory-panel.jsx",
         "desktop/src/components/workbench/project-overview-renderer.jsx",
+        "desktop/src/components/workbench/risk-boundary-panel.jsx",
+        "desktop/src/components/workbench/runbook-panel.jsx",
         "desktop/src/components/workbench/token-governance-panel.jsx",
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
         "desktop/src/main.jsx"
@@ -2737,14 +2946,33 @@
       "decisionEvidence": "inventory-default-retention"
     },
     {
+      "path": "desktop/src/components/workbench/project-access-dialogs.jsx",
+      "kind": "frontend",
+      "owner": "Workbench",
+      "bytes": 6653,
+      "pathMentions": [],
+      "moduleConsumers": [
+        "desktop/src/components/workbench/project-sidebar.jsx"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
+    },
+    {
       "path": "desktop/src/components/workbench/project-capability-dialog.jsx",
       "kind": "frontend",
       "owner": "Workbench",
       "bytes": 2971,
       "pathMentions": [],
-      "moduleConsumers": [],
-      "consumerEvidence": "no-static-module-consumer",
-      "consumerReview": "没有静态 import/mod 关系；路径提及、Owner 和领域回归构成保留证据，删除前必须补运行时或发布消费者复核。",
+      "moduleConsumers": [
+        "desktop/src/components/workbench/project-sidebar.jsx"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
       "decision": "keep",
       "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
       "reviewStatus": "classified",
@@ -2757,9 +2985,28 @@
       "owner": "Workbench",
       "bytes": 3363,
       "pathMentions": [],
-      "moduleConsumers": [],
-      "consumerEvidence": "no-static-module-consumer",
-      "consumerReview": "没有静态 import/mod 关系；路径提及、Owner 和领域回归构成保留证据，删除前必须补运行时或发布消费者复核。",
+      "moduleConsumers": [
+        "desktop/src/components/workbench/project-sidebar.jsx"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
+    },
+    {
+      "path": "desktop/src/components/workbench/project-list.jsx",
+      "kind": "frontend",
+      "owner": "Workbench",
+      "bytes": 2249,
+      "pathMentions": [],
+      "moduleConsumers": [
+        "desktop/src/components/workbench/project-sidebar.jsx"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
       "decision": "keep",
       "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
       "reviewStatus": "classified",
@@ -2788,6 +3035,23 @@
       "kind": "frontend",
       "owner": "Workbench",
       "bytes": 4051,
+      "pathMentions": [],
+      "moduleConsumers": [
+        "desktop/src/main.jsx"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
+    },
+    {
+      "path": "desktop/src/components/workbench/project-sidebar.jsx",
+      "kind": "frontend",
+      "owner": "Workbench",
+      "bytes": 14068,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/main.jsx"
@@ -2940,6 +3204,40 @@
       "kind": "frontend",
       "owner": "Workbench",
       "bytes": 2257,
+      "pathMentions": [],
+      "moduleConsumers": [
+        "desktop/src/main.jsx"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
+    },
+    {
+      "path": "desktop/src/components/workbench/risk-boundary-panel.jsx",
+      "kind": "frontend",
+      "owner": "Workbench",
+      "bytes": 3006,
+      "pathMentions": [],
+      "moduleConsumers": [
+        "desktop/src/main.jsx"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
+    },
+    {
+      "path": "desktop/src/components/workbench/runbook-panel.jsx",
+      "kind": "frontend",
+      "owner": "Workbench",
+      "bytes": 4454,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/main.jsx"
@@ -3469,9 +3767,11 @@
       "owner": "Workbench",
       "bytes": 2094,
       "pathMentions": [],
-      "moduleConsumers": [],
-      "consumerEvidence": "no-static-module-consumer",
-      "consumerReview": "没有静态 import/mod 关系；路径提及、Owner 和领域回归构成保留证据，删除前必须补运行时或发布消费者复核。",
+      "moduleConsumers": [
+        "desktop/src/components/workbench/project-sidebar.jsx"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
       "decision": "keep",
       "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
       "reviewStatus": "classified",
@@ -3484,9 +3784,11 @@
       "owner": "Workbench",
       "bytes": 6349,
       "pathMentions": [],
-      "moduleConsumers": [],
-      "consumerEvidence": "no-static-module-consumer",
-      "consumerReview": "没有静态 import/mod 关系；路径提及、Owner 和领域回归构成保留证据，删除前必须补运行时或发布消费者复核。",
+      "moduleConsumers": [
+        "desktop/src/components/workbench/project-sidebar.jsx"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
       "decision": "keep",
       "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
       "reviewStatus": "classified",
@@ -3873,9 +4175,11 @@
       "owner": "Workbench",
       "bytes": 15251,
       "pathMentions": [],
-      "moduleConsumers": [],
-      "consumerEvidence": "no-static-module-consumer",
-      "consumerReview": "没有静态 import/mod 关系；路径提及、Owner 和领域回归构成保留证据，删除前必须补运行时或发布消费者复核。",
+      "moduleConsumers": [
+        "desktop/src/components/workbench/project-sidebar.jsx"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
       "decision": "keep",
       "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
       "reviewStatus": "classified",
@@ -4257,6 +4561,7 @@
       "bytes": 423,
       "pathMentions": [],
       "moduleConsumers": [
+        "desktop/src/components/workbench/current-progress-panel.jsx",
         "desktop/tests/fact-slot-acceptance.test.mjs"
       ],
       "consumerEvidence": "static-module-consumer",
@@ -4328,6 +4633,8 @@
       "bytes": 3786,
       "pathMentions": [],
       "moduleConsumers": [
+        "desktop/src/components/workbench/current-progress-panel.jsx",
+        "desktop/src/components/workbench/runbook-panel.jsx",
         "desktop/src/main.jsx",
         "desktop/tests/current-progress-selectors.test.mjs",
         "desktop/tests/fact-slot-acceptance.test.mjs",
@@ -5064,6 +5371,23 @@
       "decisionEvidence": "inventory-default-retention"
     },
     {
+      "path": "desktop/src/lib/project-access-presentation.js",
+      "kind": "frontend",
+      "owner": "Desktop Frontend",
+      "bytes": 601,
+      "pathMentions": [],
+      "moduleConsumers": [
+        "desktop/src/components/workbench/project-access-dialogs.jsx"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
+    },
+    {
       "path": "desktop/src/lib/project-identity.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
@@ -5126,9 +5450,11 @@
       "owner": "Desktop Frontend",
       "bytes": 1852,
       "pathMentions": [],
-      "moduleConsumers": [],
-      "consumerEvidence": "no-static-module-consumer",
-      "consumerReview": "没有静态 import/mod 关系；路径提及、Owner 和领域回归构成保留证据，删除前必须补运行时或发布消费者复核。",
+      "moduleConsumers": [
+        "desktop/src/components/workbench/project-sidebar.jsx"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
       "decision": "keep",
       "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
       "reviewStatus": "classified",
@@ -5754,6 +6080,7 @@
       "bytes": 1821,
       "pathMentions": [],
       "moduleConsumers": [
+        "desktop/src/components/workbench/project-sidebar.jsx",
         "desktop/src/main.jsx",
         "desktop/tests/workspace-registry-client.test.mjs"
       ],
@@ -5882,6 +6209,7 @@
       "bytes": 389,
       "pathMentions": [],
       "moduleConsumers": [
+        "desktop/src/components/workbench/runbook-panel.jsx",
         "desktop/tests/fact-slot-acceptance.test.mjs"
       ],
       "consumerEvidence": "static-module-consumer",
@@ -5932,12 +6260,103 @@
       "decisionEvidence": "manual-review-registry"
     },
     {
+      "path": "desktop/src/styles/base.css",
+      "kind": "frontend",
+      "owner": "Desktop Frontend",
+      "bytes": 1100,
+      "pathMentions": [],
+      "moduleConsumers": [],
+      "consumerEvidence": "no-static-module-consumer",
+      "consumerReview": "没有静态 import/mod 关系；路径提及、Owner 和领域回归构成保留证据，删除前必须补运行时或发布消费者复核。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
+    },
+    {
+      "path": "desktop/src/styles/conversation.css",
+      "kind": "frontend",
+      "owner": "Desktop Frontend",
+      "bytes": 29949,
+      "pathMentions": [],
+      "moduleConsumers": [],
+      "consumerEvidence": "no-static-module-consumer",
+      "consumerReview": "没有静态 import/mod 关系；路径提及、Owner 和领域回归构成保留证据，删除前必须补运行时或发布消费者复核。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
+    },
+    {
+      "path": "desktop/src/styles/provider-rail.css",
+      "kind": "frontend",
+      "owner": "Desktop Frontend",
+      "bytes": 16619,
+      "pathMentions": [],
+      "moduleConsumers": [],
+      "consumerEvidence": "no-static-module-consumer",
+      "consumerReview": "没有静态 import/mod 关系；路径提及、Owner 和领域回归构成保留证据，删除前必须补运行时或发布消费者复核。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
+    },
+    {
+      "path": "desktop/src/styles/terminal.css",
+      "kind": "frontend",
+      "owner": "Desktop Frontend",
+      "bytes": 35236,
+      "pathMentions": [],
+      "moduleConsumers": [],
+      "consumerEvidence": "no-static-module-consumer",
+      "consumerReview": "没有静态 import/mod 关系；路径提及、Owner 和领域回归构成保留证据，删除前必须补运行时或发布消费者复核。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
+    },
+    {
+      "path": "desktop/src/styles/theme.css",
+      "kind": "frontend",
+      "owner": "Desktop Frontend",
+      "bytes": 37920,
+      "pathMentions": [],
+      "moduleConsumers": [],
+      "consumerEvidence": "no-static-module-consumer",
+      "consumerReview": "没有静态 import/mod 关系；路径提及、Owner 和领域回归构成保留证据，删除前必须补运行时或发布消费者复核。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
+    },
+    {
+      "path": "desktop/src/styles/workspace.css",
+      "kind": "frontend",
+      "owner": "Desktop Frontend",
+      "bytes": 108439,
+      "pathMentions": [],
+      "moduleConsumers": [],
+      "consumerEvidence": "no-static-module-consumer",
+      "consumerReview": "没有静态 import/mod 关系；路径提及、Owner 和领域回归构成保留证据，删除前必须补运行时或发布消费者复核。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
+    },
+    {
       "path": "desktop/src/workspace-outline.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
       "bytes": 23055,
       "pathMentions": [],
       "moduleConsumers": [
+        "desktop/src/components/workbench/project-sidebar.jsx",
         "desktop/src/main.jsx",
         "desktop/tests/workspace-capabilities.test.mjs",
         "desktop/tests/workspace-route-registry.test.mjs"
@@ -6587,6 +7006,21 @@
       "decisionEvidence": "inventory-default-retention"
     },
     {
+      "path": "desktop/tests/environment-contract.test.mjs",
+      "kind": "test",
+      "owner": "Desktop Quality",
+      "bytes": 1284,
+      "pathMentions": [],
+      "moduleConsumers": [],
+      "consumerEvidence": "no-static-module-consumer",
+      "consumerReview": "没有静态 import/mod 关系；路径提及、Owner 和领域回归构成保留证据，删除前必须补运行时或发布消费者复核。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
+    },
+    {
       "path": "desktop/tests/execution-action-controller.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
@@ -7026,6 +7460,21 @@
       "kind": "test",
       "owner": "Desktop Quality",
       "bytes": 1605,
+      "pathMentions": [],
+      "moduleConsumers": [],
+      "consumerEvidence": "no-static-module-consumer",
+      "consumerReview": "没有静态 import/mod 关系；路径提及、Owner 和领域回归构成保留证据，删除前必须补运行时或发布消费者复核。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
+    },
+    {
+      "path": "desktop/tests/schema-identity.test.mjs",
+      "kind": "test",
+      "owner": "Desktop Quality",
+      "bytes": 1594,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -7694,7 +8143,9 @@
       "kind": "documentation",
       "owner": "Documentation Governance",
       "bytes": 2567,
-      "pathMentions": [],
+      "pathMentions": [
+        "desktop/src-tauri/src/runtime/planning.rs"
+      ],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
       "consumerReview": "没有静态 import/mod 关系；路径提及、Owner 和领域回归构成保留证据，删除前必须补运行时或发布消费者复核。",
@@ -7807,6 +8258,51 @@
       "reviewStatus": "reviewed",
       "verification": "bash scripts/check-doc-structure.sh . && bash scripts/check-frontmatter.sh .",
       "decisionEvidence": "manual-review-registry"
+    },
+    {
+      "path": "docs/data/repository-file-inventory.json",
+      "kind": "documentation-data",
+      "owner": "Documentation Governance",
+      "bytes": 437975,
+      "pathMentions": [],
+      "moduleConsumers": [],
+      "consumerEvidence": "no-static-module-consumer",
+      "consumerReview": "没有静态 import/mod 关系；路径提及、Owner 和领域回归构成保留证据，删除前必须补运行时或发布消费者复核。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
+    },
+    {
+      "path": "docs/data/repository-file-review.json",
+      "kind": "documentation-data",
+      "owner": "Documentation Governance",
+      "bytes": 14645,
+      "pathMentions": [],
+      "moduleConsumers": [],
+      "consumerEvidence": "no-static-module-consumer",
+      "consumerReview": "没有静态 import/mod 关系；路径提及、Owner 和领域回归构成保留证据，删除前必须补运行时或发布消费者复核。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
+    },
+    {
+      "path": "docs/data/schema-contract-inventory.json",
+      "kind": "documentation-data",
+      "owner": "Documentation Governance",
+      "bytes": 13335,
+      "pathMentions": [],
+      "moduleConsumers": [],
+      "consumerEvidence": "no-static-module-consumer",
+      "consumerReview": "没有静态 import/mod 关系；路径提及、Owner 和领域回归构成保留证据，删除前必须补运行时或发布消费者复核。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
     },
     {
       "path": "docs/design/component-index.md",
@@ -8026,9 +8522,11 @@
       "owner": "Runtime Contracts",
       "bytes": 1524,
       "pathMentions": [],
-      "moduleConsumers": [],
-      "consumerEvidence": "no-static-module-consumer",
-      "consumerReview": "没有静态 import/mod 关系；路径提及、Owner 和领域回归构成保留证据，删除前必须补运行时或发布消费者复核。",
+      "moduleConsumers": [
+        "desktop/src/components/workbench/current-progress-panel.jsx"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
       "decision": "keep",
       "rationale": "仅由前端 slot runtime 读取；已迁移到 omnidesk 版本和 native state 分区路径。",
       "reviewStatus": "reviewed",
@@ -8041,9 +8539,11 @@
       "owner": "Runtime Contracts",
       "bytes": 841,
       "pathMentions": [],
-      "moduleConsumers": [],
-      "consumerEvidence": "no-static-module-consumer",
-      "consumerReview": "没有静态 import/mod 关系；路径提及、Owner 和领域回归构成保留证据，删除前必须补运行时或发布消费者复核。",
+      "moduleConsumers": [
+        "desktop/src/components/workbench/runbook-panel.jsx"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
       "decision": "keep",
       "rationale": "仅由前端 slot runtime 读取；已迁移到 omnidesk 版本和 native cache 路径。",
       "reviewStatus": "reviewed",
@@ -8070,6 +8570,36 @@
       "kind": "schema",
       "owner": "Runtime Contracts",
       "bytes": 9919,
+      "pathMentions": [],
+      "moduleConsumers": [],
+      "consumerEvidence": "no-static-module-consumer",
+      "consumerReview": "没有静态 import/mod 关系；路径提及、Owner 和领域回归构成保留证据，删除前必须补运行时或发布消费者复核。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
+    },
+    {
+      "path": "scripts/audit-repository-files.mjs",
+      "kind": "repository-tooling",
+      "owner": "Repository Quality",
+      "bytes": 8664,
+      "pathMentions": [],
+      "moduleConsumers": [],
+      "consumerEvidence": "no-static-module-consumer",
+      "consumerReview": "没有静态 import/mod 关系；路径提及、Owner 和领域回归构成保留证据，删除前必须补运行时或发布消费者复核。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
+    },
+    {
+      "path": "scripts/audit-schema-contracts.mjs",
+      "kind": "repository-tooling",
+      "owner": "Repository Quality",
+      "bytes": 3315,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",

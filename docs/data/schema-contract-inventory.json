@@ -1,6 +1,6 @@
 {
   "schemaVersion": "omnidesk.schema-contract-inventory.v1",
-  "generatedAt": "2026-07-22T03:21:33.620Z",
+  "generatedAt": "2026-07-22T03:40:51.624Z",
   "sourceOfTruth": "schemas/*.json plus git grep consumer evidence",
   "totals": {
     "contracts": 14,
@@ -13,12 +13,22 @@
       "id": "https://omnidesk.local/schemas/agent-run.schema.json",
       "title": "OmniDesk Agent Run",
       "schemaVersion": "omnidesk.agent-run.v0.1",
-      "pathConsumers": [],
+      "pathConsumers": [
+        "desktop/tests/schema-identity.test.mjs",
+        "docs/data/repository-file-inventory.json",
+        "docs/data/repository-file-review.json",
+        "docs/data/schema-contract-inventory.json"
+      ],
       "versionConsumers": [
         "desktop/src-tauri/src/runtime/agent_runs.rs",
-        "desktop/src/agent-runtime/contract.js"
+        "desktop/src/agent-runtime/contract.js",
+        "desktop/tests/schema-identity.test.mjs",
+        "docs/data/repository-file-inventory.json",
+        "docs/data/repository-file-review.json",
+        "docs/data/schema-contract-inventory.json"
       ],
       "runtimeConsumers": [
+        "desktop/tests/schema-identity.test.mjs",
         "desktop/src-tauri/src/runtime/agent_runs.rs",
         "desktop/src/agent-runtime/contract.js"
       ],
@@ -31,13 +41,24 @@
       "title": "OmniDesk Conversation Event",
       "schemaVersion": "omnidesk.conversation-event.v0.1",
       "pathConsumers": [
+        "desktop/tests/schema-identity.test.mjs",
+        "docs/data/repository-file-inventory.json",
+        "docs/data/repository-file-review.json",
+        "docs/data/schema-contract-inventory.json",
         "schemas/conversation.schema.json"
       ],
       "versionConsumers": [
         "HANDOFF.md",
-        "desktop/src/conversation-runtime/event-contract.js"
+        "desktop/src-tauri/src/runtime/chat_runtime.rs",
+        "desktop/src/conversation-runtime/event-contract.js",
+        "desktop/tests/schema-identity.test.mjs",
+        "docs/data/repository-file-inventory.json",
+        "docs/data/repository-file-review.json",
+        "docs/data/schema-contract-inventory.json"
       ],
       "runtimeConsumers": [
+        "desktop/tests/schema-identity.test.mjs",
+        "desktop/src-tauri/src/runtime/chat_runtime.rs",
         "desktop/src/conversation-runtime/event-contract.js"
       ],
       "status": "active-contract",
@@ -48,10 +69,14 @@
       "id": "https://omnidesk.local/schemas/conversation.schema.json",
       "title": "OmniDesk Conversation",
       "schemaVersion": "omnidesk.conversation.v0.3",
-      "pathConsumers": [],
+      "pathConsumers": [
+        "docs/data/repository-file-inventory.json",
+        "docs/data/schema-contract-inventory.json"
+      ],
       "versionConsumers": [
         "desktop/src/conversation-runtime/schema.js",
-        "desktop/tests/conversation-runtime.test.mjs"
+        "desktop/tests/conversation-runtime.test.mjs",
+        "docs/data/schema-contract-inventory.json"
       ],
       "runtimeConsumers": [
         "desktop/src/conversation-runtime/schema.js",
@@ -65,12 +90,18 @@
       "id": "https://omnidesk.local/schemas/fact-freshness.schema.json",
       "title": "OmniDesk Fact Freshness",
       "schemaVersion": "omnidesk.fact-freshness.v0.1",
-      "pathConsumers": [],
+      "pathConsumers": [
+        "docs/data/repository-file-inventory.json",
+        "docs/data/schema-contract-inventory.json"
+      ],
       "versionConsumers": [
-        "desktop/src-tauri/src/runtime/workspace.rs"
+        "desktop/src-tauri/src/runtime/workspace.rs",
+        "desktop/tests/schema-identity.test.mjs",
+        "docs/data/schema-contract-inventory.json"
       ],
       "runtimeConsumers": [
-        "desktop/src-tauri/src/runtime/workspace.rs"
+        "desktop/src-tauri/src/runtime/workspace.rs",
+        "desktop/tests/schema-identity.test.mjs"
       ],
       "status": "active-contract",
       "migrationRule": "先增加 OmniDesk 版本读取/写入迁移与回归，再退役旧版本。"
@@ -81,14 +112,19 @@
       "title": "OmniDesk Project Capabilities",
       "schemaVersion": "omnidesk.project-capabilities.v0.1",
       "pathConsumers": [
-        "HANDOFF.md"
+        "HANDOFF.md",
+        "docs/data/repository-file-inventory.json",
+        "docs/data/schema-contract-inventory.json"
       ],
       "versionConsumers": [
         "desktop/src-tauri/src/runtime/workspace.rs",
-        "desktop/vite.config.js"
+        "desktop/tests/schema-identity.test.mjs",
+        "desktop/vite.config.js",
+        "docs/data/schema-contract-inventory.json"
       ],
       "runtimeConsumers": [
-        "desktop/src-tauri/src/runtime/workspace.rs"
+        "desktop/src-tauri/src/runtime/workspace.rs",
+        "desktop/tests/schema-identity.test.mjs"
       ],
       "status": "active-contract",
       "migrationRule": "先增加 OmniDesk 版本读取/写入迁移与回归，再退役旧版本。"
@@ -99,10 +135,13 @@
       "title": "OmniDesk Project Fact Store",
       "schemaVersion": "omnidesk.project-fact-store.v0.1",
       "pathConsumers": [
-        "desktop/tests/fact-store.test.mjs"
+        "desktop/tests/fact-store.test.mjs",
+        "docs/data/repository-file-inventory.json",
+        "docs/data/schema-contract-inventory.json"
       ],
       "versionConsumers": [
-        "desktop/src/fact-store.js"
+        "desktop/src/fact-store.js",
+        "docs/data/schema-contract-inventory.json"
       ],
       "runtimeConsumers": [
         "desktop/tests/fact-store.test.mjs",
@@ -118,6 +157,9 @@
       "schemaVersion": "",
       "pathConsumers": [
         "desktop/tests/fact-store.test.mjs",
+        "docs/data/repository-file-inventory.json",
+        "docs/data/repository-file-review.json",
+        "docs/data/schema-contract-inventory.json",
         "schemas/project-fact-store.schema.json"
       ],
       "versionConsumers": [],
@@ -137,9 +179,13 @@
         "desktop/src/main.jsx",
         "desktop/tests/fact-slot-acceptance.test.mjs",
         "desktop/tests/project-overview-contract.test.mjs",
-        "desktop/tests/slot-runtime.test.mjs"
+        "desktop/tests/slot-runtime.test.mjs",
+        "docs/data/repository-file-inventory.json",
+        "docs/data/schema-contract-inventory.json"
       ],
-      "versionConsumers": [],
+      "versionConsumers": [
+        "docs/data/schema-contract-inventory.json"
+      ],
       "runtimeConsumers": [
         "desktop/src/main.jsx",
         "desktop/tests/fact-slot-acceptance.test.mjs",
@@ -154,10 +200,17 @@
       "id": "https://omnidesk.local/schemas/project-overview-view-model.schema.json",
       "title": "Project Overview View Model",
       "schemaVersion": "omnidesk.project-overview-view-model.v0.1",
-      "pathConsumers": [],
+      "pathConsumers": [
+        "docs/data/repository-file-inventory.json",
+        "docs/data/repository-file-review.json",
+        "docs/data/schema-contract-inventory.json"
+      ],
       "versionConsumers": [
         "desktop/src/project-overview-selectors.js",
-        "desktop/tests/project-overview-selectors.test.mjs"
+        "desktop/tests/project-overview-selectors.test.mjs",
+        "docs/data/repository-file-inventory.json",
+        "docs/data/repository-file-review.json",
+        "docs/data/schema-contract-inventory.json"
       ],
       "runtimeConsumers": [
         "desktop/src/project-overview-selectors.js",
@@ -171,12 +224,18 @@
       "id": "https://omnidesk.local/schemas/project-profile.schema.json",
       "title": "OmniDesk Project Profile",
       "schemaVersion": "omnidesk.project-profile.v0.1",
-      "pathConsumers": [],
+      "pathConsumers": [
+        "docs/data/repository-file-inventory.json",
+        "docs/data/schema-contract-inventory.json"
+      ],
       "versionConsumers": [
-        "desktop/src-tauri/src/runtime/workspace.rs"
+        "desktop/src-tauri/src/runtime/workspace.rs",
+        "desktop/tests/schema-identity.test.mjs",
+        "docs/data/schema-contract-inventory.json"
       ],
       "runtimeConsumers": [
-        "desktop/src-tauri/src/runtime/workspace.rs"
+        "desktop/src-tauri/src/runtime/workspace.rs",
+        "desktop/tests/schema-identity.test.mjs"
       ],
       "status": "active-contract",
       "migrationRule": "先增加 OmniDesk 版本读取/写入迁移与回归，再退役旧版本。"
@@ -187,13 +246,19 @@
       "title": "",
       "schemaVersion": "omnidesk.project-progress-contract.v0.1",
       "pathConsumers": [
+        "desktop/src/components/workbench/current-progress-panel.jsx",
         "desktop/tests/fact-slot-acceptance.test.mjs",
-        "desktop/tests/project-overview-contract.test.mjs"
+        "desktop/tests/project-overview-contract.test.mjs",
+        "docs/data/repository-file-inventory.json",
+        "docs/data/repository-file-review.json",
+        "docs/data/schema-contract-inventory.json"
       ],
       "versionConsumers": [
-        "desktop/tests/project-overview-contract.test.mjs"
+        "desktop/tests/project-overview-contract.test.mjs",
+        "docs/data/schema-contract-inventory.json"
       ],
       "runtimeConsumers": [
+        "desktop/src/components/workbench/current-progress-panel.jsx",
         "desktop/tests/fact-slot-acceptance.test.mjs",
         "desktop/tests/project-overview-contract.test.mjs"
       ],
@@ -206,13 +271,19 @@
       "title": "",
       "schemaVersion": "omnidesk.project-runbook-contract.v0.1",
       "pathConsumers": [
+        "desktop/src/components/workbench/runbook-panel.jsx",
         "desktop/tests/fact-slot-acceptance.test.mjs",
-        "desktop/tests/project-overview-contract.test.mjs"
+        "desktop/tests/project-overview-contract.test.mjs",
+        "docs/data/repository-file-inventory.json",
+        "docs/data/repository-file-review.json",
+        "docs/data/schema-contract-inventory.json"
       ],
       "versionConsumers": [
-        "desktop/tests/project-overview-contract.test.mjs"
+        "desktop/tests/project-overview-contract.test.mjs",
+        "docs/data/schema-contract-inventory.json"
       ],
       "runtimeConsumers": [
+        "desktop/src/components/workbench/runbook-panel.jsx",
         "desktop/tests/fact-slot-acceptance.test.mjs",
         "desktop/tests/project-overview-contract.test.mjs"
       ],
@@ -225,7 +296,10 @@
       "title": "OmniDesk Project State",
       "schemaVersion": "",
       "pathConsumers": [
-        "desktop/src/components/workbench/workspace-static-surfaces.jsx"
+        "desktop/src/components/workbench/workspace-static-surfaces.jsx",
+        "docs/data/repository-file-inventory.json",
+        "docs/data/repository-file-review.json",
+        "docs/data/schema-contract-inventory.json"
       ],
       "versionConsumers": [],
       "runtimeConsumers": [
@@ -241,10 +315,13 @@
       "schemaVersion": "omnidesk.workspace-facts.v0.1",
       "pathConsumers": [
         "HANDOFF.md",
-        "desktop/src-tauri/src/runtime/workspace.rs"
+        "desktop/src-tauri/src/runtime/workspace.rs",
+        "docs/data/repository-file-inventory.json",
+        "docs/data/schema-contract-inventory.json"
       ],
       "versionConsumers": [
-        "desktop/src-tauri/src/runtime/workspace.rs"
+        "desktop/src-tauri/src/runtime/workspace.rs",
+        "docs/data/schema-contract-inventory.json"
       ],
       "runtimeConsumers": [
         "desktop/src-tauri/src/runtime/workspace.rs"
