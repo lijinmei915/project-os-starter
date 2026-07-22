@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { open as openTauriDialog } from "@tauri-apps/plugin-dialog";
-import { Activity, AlertTriangle, ArrowLeftRight, ArrowRight, ArrowUpDown, Bot, Brain, Check, ChevronDown, ChevronsDownUp, ChevronsUpDown, ClipboardList, Clock3, Copy, Eraser, ExternalLink, FileText, Filter, Loader2, MessageSquare, MoreVertical, Package, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Play, Plus, RotateCcw, Server, ShieldAlert, ShieldCheck, Square, TerminalSquare, X } from "lucide-react";
+import { AlertTriangle, ArrowRight, ArrowUpDown, Bot, Check, ChevronDown, ClipboardList, Clock3, Eraser, ExternalLink, FileText, Filter, Loader2, MessageSquare, MoreVertical, PanelRightClose, PanelRightOpen, Play, Plus, RotateCcw, Server, ShieldAlert, ShieldCheck, Square, X } from "lucide-react";
 import { ChatDock } from "./components/workbench/chat-dock";
 import { AppWorkbenchSurface } from "./components/workbench/app-workbench-surface";
 import { GoalStatusIcon, GoalTaskItem, ProjectProfileItem, RailDisclosure } from "./components/workbench/right-rail-components";
@@ -61,17 +61,16 @@ import { ReadonlyFilePreview } from "./components/workbench/readonly-file-previe
 import { EngineeringTopicFrame } from "./components/workbench/engineering-topic-frame";
 import { EngineeringTopicSurfaceComposer } from "./components/workbench/engineering-topic-surface-composer";
 import { AssetSurfacePanel, GovernanceSurfacePanel, MemorySurfacePanel } from "./components/workbench/workspace-static-surfaces";
-import { WorkspaceTree } from "./components/workbench/workspace-tree";
-import { ProjectFileTree } from "./components/workbench/project-file-tree";
-import { ProjectCapabilityDialog } from "./components/workbench/project-capability-dialog";
-import { useProjectSidebarState } from "./components/workbench/use-project-sidebar-state";
+import { ProjectSidebar } from "./components/workbench/project-sidebar";
 import { useSidebarLayout } from "./components/workbench/use-sidebar-layout";
-import { useProjectPathCopy } from "./components/workbench/use-project-path-copy";
 import { useWorkspaceCapabilityActions } from "./components/workbench/use-workspace-capability-actions";
 import { useProviderTestRecord } from "./components/workbench/use-provider-test-record";
 import { useAgentWorkspaceInputActions } from "./components/workbench/use-agent-workspace-input-actions";
 import { useProviderComposerViewModel } from "./components/workbench/use-provider-composer-view-model";
 import { WorkspaceTabStrip } from "./components/workbench/workspace-tab-strip";
+import { CurrentProgressPanel } from "./components/workbench/current-progress-panel";
+import { RunbookPanel } from "./components/workbench/runbook-panel";
+import { RiskBoundaryPanel } from "./components/workbench/risk-boundary-panel";
 import { OverviewPageHeader, OverviewSection, OverviewTagList } from "./components/workbench/overview-section";
 import { Button } from "./components/ui/button";
 import { Badge } from "./components/ui/badge";
@@ -86,7 +85,7 @@ import { Select } from "./components/ui/select";
 import { Switch } from "./components/ui/switch";
 import { Tabs, TabsContent } from "./components/ui/tabs";
 import { Tooltip } from "./components/ui/tooltip";
-import { projectGovernanceOutline, workspaceOutlineForCapabilities } from "./workspace-outline";
+import { projectGovernanceOutline } from "./workspace-outline";
 import { workspaceRouteById } from "./workspace-route-registry";
 import { collapseDuplicateOpenTasks, taskGoalName, taskProgressSummary, taskUpdatedLabel } from "./lib/task-presentation";
 import { stageGoalCandidateFromMessage } from "./lib/stage-goal-candidate";
@@ -99,7 +98,6 @@ import { activeProviderProfileName } from "./lib/provider-presentation";
 import { taskConversationAction, taskNextAction } from "./lib/task-next-action";
 import { taskContinuationPrompt } from "./lib/task-conversation-prompt";
 import { taskCardPrimaryAction } from "./lib/task-card-action";
-import { discoverableProjectCapabilities, projectRuntimeStatus } from "./lib/project-sidebar-view-model";
 import { buildAgentTopicViewModel, canPreviewAgentTopicFile } from "./lib/agent-topic-view-model";
 import { displayStateRelativePath } from "./lib/state-namespace";
 import { applyPendingConversationPatch } from "./lib/conversation-patch-apply";
@@ -129,10 +127,6 @@ import { createProjectOverviewSlotRuntime } from "./project-overview-slot-runtim
 import { capabilityManifestSignature } from "./capability-policy";
 import { exposeDesktopPerformanceBaseline, recordWorkbenchReady } from "./lib/performance-baseline";
 import projectOverviewContract from "../../schemas/project-overview-contract.v0.1.json";
-import projectRunbookContract from "../../schemas/project-runbook-contract.v0.1.json";
-import { compileRunbookSlots } from "./runbook-slot-runtime";
-import projectProgressContract from "../../schemas/project-progress-contract.v0.1.json";
-import { compileCurrentProgressSlots } from "./current-progress-slot-runtime";
 import "./styles.css";
 
 const AssistantUiConversationPoc = React.lazy(() => import("./components/workbench/assistant-ui-conversation-poc").then((module) => ({ default: module.AssistantUiConversationPoc })));
@@ -170,12 +164,12 @@ class AppErrorBoundary extends React.Component {
 }
 
 const fallbackSnapshot = {
-  projectName: "project-os-starter",
+  projectName: "omnidesk-starter",
   projectCapabilities: { capabilities: [] },
   currentProjectId: "current",
   currentProjectPath: "/Users/heqiao/Desktop/Claude练习/project-starter-pack",
   phase: "stabilizing",
-  stage: "Project OS Console 内核收口期 / Desktop v0.1 方向确认期",
+  stage: "OmniDesk Desktop Runtime 收口期 / Desktop v0.1 方向确认期",
   fileCount: 0,
   docsCount: 0,
   recommendationCount: 0,
@@ -183,14 +177,14 @@ const fallbackSnapshot = {
   projects: [
     {
       id: "current",
-      name: "project-os-starter",
+      name: "omnidesk-starter",
       path: "/Users/heqiao/Desktop/Claude练习/project-starter-pack",
       phase: "stabilizing",
       isCurrent: true,
     },
   ],
   tree: [
-    { label: "project-os-starter", depth: 0, kind: "folder" },
+    { label: "omnidesk-starter", depth: 0, kind: "folder" },
     { label: "docs", depth: 1, kind: "folder" },
     { label: "ARCHITECTURE.md", depth: 2, kind: "file" },
     { label: "desktop", depth: 1, kind: "folder" },
@@ -240,7 +234,7 @@ const fallbackSnapshot = {
     {
       marker: "Δ",
       title: "已学习方向",
-      body: "用户希望 Project OS 成为长期使用的本地 AI 工作台。",
+      body: "用户希望 OmniDesk 成为长期使用的本地 AI 工作台。",
       muted: false,
     },
     {
@@ -275,13 +269,13 @@ const fallbackSnapshot = {
     entries: [],
   },
   goals: {
-    schemaVersion: "project-os.goals.v0.1",
+    schemaVersion: "omnidesk.goals.v0.1",
     activeGoalId: "desktop-v0.1-direction-confirmation",
     goals: [
       {
         id: "desktop-v0.1-direction-confirmation",
-        title: "Project OS Console 内核收口期 / Desktop v0.1 方向确认期",
-        projectName: "project-os-starter",
+        title: "OmniDesk Desktop Runtime 收口期 / Desktop v0.1 方向确认期",
+        projectName: "omnidesk-starter",
         status: "done",
         validationStatus: "passed",
         summary: "Desktop v0.1 目标验收已通过并确认完成。",
@@ -352,7 +346,7 @@ const planCards = [
 ];
 
 const fallbackModelCatalog = {
-  schemaVersion: "project-os.model-catalog.v0.1",
+  schemaVersion: "omnidesk.model-catalog.v0.1",
   providers: [
   {
     id: "openai",
@@ -399,7 +393,7 @@ const fallbackModelCatalog = {
 
 async function loadWorkspaceSnapshot() {
   if (!isTauriRuntime()) {
-    const response = await fetch("/__project-os/workspace-snapshot");
+    const response = await fetch("/__omnidesk/workspace-snapshot");
     if (response.ok) return response.json();
     return loadPreviewWorkspaceSnapshot();
   }
@@ -418,7 +412,7 @@ async function refreshWorkspaceFactsPreview() {
 }
 
 function factRefreshFailureStorageKey(projectKey) {
-  return `project-os:fact-refresh-failure:${encodeURIComponent(projectKey || "current-project")}`;
+  return `omnidesk:fact-refresh-failure:${encodeURIComponent(projectKey || "current-project")}`;
 }
 
 function readFactRefreshFailure(projectKey) {
@@ -492,7 +486,7 @@ async function copyTextToSystemClipboard(text) {
     return { ok: true };
   }
 
-  const response = await fetch("/__project-os/copy-text", {
+  const response = await fetch("/__omnidesk/copy-text", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text }),
@@ -506,7 +500,7 @@ async function copyTextToSystemClipboard(text) {
 
 async function loadPreviewWorkspaceSnapshot() {
   try {
-    const response = await fetch("/__project-os/workspace-snapshot");
+    const response = await fetch("/__omnidesk/workspace-snapshot");
     if (response.ok) {
       return {
         ...fallbackSnapshot,
@@ -690,330 +684,6 @@ const dedicatedSurfaceByTopic = Object.freeze({
   "project-runbook": "runbook",
   "local-project-state": "local-project-state",
 });
-
-function ProjectSidebar({ collapsed, copyTextToSystemClipboard, onResizeStart, onToggleCollapsed, snapshot, tasks = [], projectActivities = {}, planLoading, terminalRunningId, onSwitchProject, onPickProject, onOpenProjectFolder, onRelocateProject, onRenameProject, onRemoveProject, onSelectEngineeringFile, onUpdateCapability, onProjectActionError, onProjectActivitySeen, onProjectPathCopied, projectActionError, selectedEngineeringFile }) {
-  const {
-    accessDialogOpen, accessSettingsProject, capabilityDialogOpen, capabilityLoadingId, confirmControlledProjectAccess, confirmProjectAccess, connectedProjectAccess, controlledConfirmOpen, dismissCapability, enableCapability, openExistingProject, openProjectAccessSettings,
-    fileTreeExpanded, openRenameDialog, projectsOpen, renameName, renameProject,
-    projectScan, revokeProjectWriteAccess, scanDetailsOpen, selectedProjectAccessMode, selectedModulesByCapability, setAccessSettingsProject, setCapabilityDialogOpen, setFileTreeExpanded, setProjectAccessDialogOpen,
-    setControlledConfirmOpen, setScanDetailsOpen, setSelectedProjectAccessMode,
-    setName, setProjectsOpen, setRenameProject, setSidebarView, setSelectedModulesByCapability,
-    sidebarView, startProjectAccess, submitRename, changeProjectAccess,
-  } = useProjectSidebarState({ onPickProject, onPreviewProject: workspaceRegistryClient.previewWorkspaceProject, onRenameProject, onSwitchProject, onUpdateCapability, projects: snapshot.projects });
-
-  useProjectPathCopy({ copyTextToSystemClipboard, onProjectActionError, onProjectPathCopied });
-
-  useEffect(() => {
-    window.addEventListener("project-os:request-project-access", startProjectAccess);
-    return () => window.removeEventListener("project-os:request-project-access", startProjectAccess);
-  }, [startProjectAccess]);
-
-  const projectStatus = (project) => projectRuntimeStatus(project, { planLoading, projectActivities, taskStatuses, tasks, terminalRunningId });
-  const discoverableCapabilities = discoverableProjectCapabilities(snapshot, capabilityLabels);
-  const recommendationCount = discoverableCapabilities.filter((capability) => capability.status !== "available").length;
-
-  if (collapsed) {
-    return (
-      <aside className="left left-collapsed" aria-label="左侧工作区已折叠">
-        <div className="collapsedRail">
-          <Tooltip content="项目">
-            <button className="collapsedRailItem active" type="button" onClick={onToggleCollapsed} aria-label="项目">
-              <Package strokeWidth={2.15} aria-hidden="true" />
-            </button>
-          </Tooltip>
-          <Tooltip content="项目流程">
-            <button className="collapsedRailItem" type="button" onClick={onToggleCollapsed} aria-label="项目流程">
-              <ClipboardList strokeWidth={2.15} aria-hidden="true" />
-            </button>
-          </Tooltip>
-          <Tooltip content="记忆">
-            <button className="collapsedRailItem" type="button" onClick={onToggleCollapsed} aria-label="记忆">
-              <Brain strokeWidth={2.15} aria-hidden="true" />
-            </button>
-          </Tooltip>
-          <Tooltip content="展开工作区">
-            <Button className="railToggleButton sideCornerButton" size="icon" variant="ghost" type="button" onClick={onToggleCollapsed} aria-label="展开工作区">
-              <PanelLeftOpen strokeWidth={1.75} aria-hidden="true" />
-            </Button>
-          </Tooltip>
-        </div>
-      </aside>
-    );
-  }
-
-  return (
-    <aside className="left">
-      <div className="leftScroll">
-        <button
-          className={`uiSectionTitle leftRailSection workbenchRootLink${selectedEngineeringFile?.path === "workbench-overview" ? " active" : ""}`}
-          type="button"
-          onClick={() => onSelectEngineeringFile?.({
-            description: "跨项目状态与下一步入口。",
-            group: "工作台",
-            id: "workbench-overview",
-            path: "workbench-overview",
-            title: "工作台",
-            virtual: true,
-          })}
-        >
-          <Activity strokeWidth={1.8} aria-hidden="true" />
-          <span>工作台</span>
-        </button>
-        <SectionGroup
-          className="leftRailSection projectRailSection"
-            title="项目"
-            meta={snapshot.projects.length}
-            open={projectsOpen}
-            onToggle={() => setProjectsOpen((value) => !value)}
-            toggleLabel={projectsOpen ? "收起项目" : "展开项目"}
-            actions={(
-              <Tooltip content="添加项目">
-                <button className="sectionIconAction projectAddHeaderButton" type="button" onClick={startProjectAccess} aria-label="添加项目">
-                  <Plus strokeWidth={1.75} aria-hidden="true" />
-                </button>
-              </Tooltip>
-            )}
-          >
-            <div className="projectList" aria-label="已接入项目">
-              {snapshot.projects.map((project) => (
-                <div className="projectRowWrap" key={project.id}>
-                  <button
-                    className={`projectRow${project.isCurrent ? " active" : ""}`}
-                    type="button"
-                    onClick={() => {
-                      onProjectActivitySeen?.(project.id);
-                      onSwitchProject(project.id);
-                    }}
-                    aria-label={`切换到项目 ${project.name}`}
-                    aria-current={project.isCurrent ? "true" : undefined}
-                  >
-                    {(() => {
-                      const runtimeStatus = projectStatus(project);
-                      return runtimeStatus.tone ? (
-                        <span
-                          className={`projectStatusDot projectStatusDot-${runtimeStatus.tone}`}
-                          title={runtimeStatus.label}
-                          aria-label={runtimeStatus.label}
-                        />
-                      ) : <span className="projectStatusDot projectStatusDot-empty" aria-hidden="true" />;
-                    })()}
-                    <span className="projectRowText">
-                      <strong title={project.name}>{project.name}</strong>
-                      <span title={project.path}>{project.path}</span>
-                    </span>
-                  </button>
-                  <div className="projectRowActions" role="group" aria-label={`${project.name} 项目操作`}>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button className="projectMenuButton" type="button" aria-label={`项目菜单：${project.name}`}>
-                          <MoreVertical strokeWidth={2.25} aria-hidden="true" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <DropdownMenuItem onSelect={() => onOpenProjectFolder(project.id)}>查看本地文件</DropdownMenuItem>
-                        <button className="uiDropdownItem" type="button" data-copy-project-path={project.path}>
-                          复制路径
-                        </button>
-                        <DropdownMenuItem onSelect={() => onRelocateProject(project.id)}>重新定位路径</DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => openRenameDialog(project)}>修改显示名称</DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => openProjectAccessSettings(project)}>接入权限</DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="dangerMenuItem" onSelect={() => onRemoveProject(project.id)}>
-                          从工作台移除
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-              ))}
-            </div>
-          {projectActionError ? <div className="projectError">{projectActionError}</div> : null}
-        </SectionGroup>
-        <Dialog open={Boolean(renameProject)} onOpenChange={(open) => {
-          if (!open) {
-            setRenameProject(null);
-            setName("");
-          }
-        }}>
-          <DialogContent
-            title="修改显示名称"
-            description="这里只修改 OmniDesk 工作台里的显示名称，不会重命名本地文件夹。"
-          >
-            <form className="projectRenameForm" onSubmit={submitRename}>
-              <Field label="项目名称" htmlFor="project-rename-input">
-                <Input
-                  autoFocus
-                  id="project-rename-input"
-                  maxLength={60}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="输入项目名称"
-                  value={renameName}
-                />
-              </Field>
-              <div className="projectRenameActions">
-                <DialogClose asChild>
-                  <Button type="button" variant="ghost">取消</Button>
-                </DialogClose>
-                <Button disabled={!renameName.trim()} type="submit" variant="primary">保存</Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-        <Dialog open={accessDialogOpen} onOpenChange={setProjectAccessDialogOpen}>
-          <DialogContent title={connectedProjectAccess ? "项目已接入" : projectScan?.existingProject ? `“${projectScan.project?.name || "项目"}”已接入` : projectScan?.project?.name ? `接入“${projectScan.project.name}”` : "接入项目"} description={connectedProjectAccess ? `“${connectedProjectAccess.name}”已成为当前项目。` : projectScan?.existingProject ? `当前权限：${projectScan.existingProject.accessMode === "controlled" ? "允许受控修改" : projectScan.existingProject.accessMode === "governed" ? "接入治理" : "仅浏览"}。` : "请选择接入权限。"}>
-            {connectedProjectAccess ? <div className="projectConnectedResult"><div className="projectAccessSettingsSummary"><strong>{connectedProjectAccess.accessMode === "controlled" ? "允许受控修改" : connectedProjectAccess.accessMode === "governed" ? "接入治理" : "仅浏览"}</strong><span>{connectedProjectAccess.accessMode === "controlled" ? "确认后可修改工程文件并运行验证。" : connectedProjectAccess.accessMode === "governed" ? "可写入项目治理记录，不修改工程文件。" : "只读取、扫描并生成建议。"}</span></div><div className="projectConnectedActions"><Button onClick={() => { setProjectAccessDialogOpen(false); onSelectEngineeringFile?.({ description: "项目名称、用途和阶段。", group: "项目流程", id: "project-identity", path: "project-identity", title: "项目概览", virtual: true }); }} type="button" variant="primary">查看项目概览</Button><Button onClick={() => { setProjectAccessDialogOpen(false); window.dispatchEvent(new Event("project-os:open-conversation")); }} type="button" variant="outline">发起项目讨论</Button></div></div> : <>
-            {projectScan?.loading ? <Notice variant="muted">正在检查项目。</Notice> : projectScan?.error ? <Notice variant="danger">{projectScan.error}</Notice> : projectScan ? <div className="projectScanResult"><div className="projectScanConclusion"><strong>检查完成</strong><span>请选择接入权限。</span></div></div> : null}
-            {projectScan?.existingProject ? null : <fieldset className="projectAccessFieldset" disabled={projectScan?.loading || Boolean(projectScan?.error) || !projectScan}>
-              <legend>选择接入权限</legend>
-              <div className="projectAccessChoices" role="group" aria-label="选择接入权限">
-                {[['browse', '仅浏览', '只读取、扫描并生成建议。'], ['governed', '接入治理', '允许写入项目治理记录。'], ['controlled', '允许受控修改', '每次确认后修改工程文件并运行验证。']].map(([mode, title, description]) => <button aria-pressed={selectedProjectAccessMode === mode} className={`projectAccessChoice${selectedProjectAccessMode === mode ? " selected" : ""}`} key={mode} onClick={() => setSelectedProjectAccessMode(mode)} type="button"><span className="projectAccessChoiceTitle">{title}</span><small>{description}</small></button>)}
-              </div>
-            </fieldset>}
-            <div className="projectAccessActions">
-              <DialogClose asChild><Button type="button" variant="ghost">取消</Button></DialogClose>
-              {projectScan?.existingProject ? <Button onClick={openExistingProject} type="button" variant="primary">{projectScan.existingProject.isCurrent ? "继续使用此项目" : "切换到此项目"}</Button> : <Button disabled={projectScan?.loading || Boolean(projectScan?.error) || !projectScan} onClick={() => selectedProjectAccessMode === "controlled" ? setControlledConfirmOpen(true) : confirmProjectAccess(selectedProjectAccessMode)} type="button" variant="primary">{selectedProjectAccessMode === "browse" ? "以仅浏览方式接入" : selectedProjectAccessMode === "governed" ? "接入并管理记录" : "接入并允许受控修改"}</Button>}
-            </div>
-            </>}
-          </DialogContent>
-        </Dialog>
-        <Dialog open={controlledConfirmOpen} onOpenChange={setControlledConfirmOpen}>
-          <DialogContent title="允许受控修改？" description="之后每次修改工程文件前都会展示变更，并等待你的确认。">
-            <Notice variant="info">这项权限允许应用已确认的文件修改并运行验证；不会自动提交或发布。</Notice>
-            <div className="projectRenameActions">
-              <DialogClose asChild><Button type="button" variant="ghost">返回</Button></DialogClose>
-              <Button onClick={confirmControlledProjectAccess} type="button" variant="primary">确认并接入</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-        <Dialog open={Boolean(accessSettingsProject)} onOpenChange={(open) => { if (!open) setAccessSettingsProject(null); }}>
-          <DialogContent title="接入权限" description={accessSettingsProject ? `“${accessSettingsProject.name}”当前允许的操作范围。` : "查看项目接入权限。"}>
-            {accessSettingsProject ? <div className="projectAccessSettingsSummary"><strong>{accessSettingsProject.accessMode === "controlled" ? "允许受控修改" : accessSettingsProject.accessMode === "governed" ? "接入治理" : "仅浏览"}</strong><span>{accessSettingsProject.accessMode === "controlled" ? "确认后可修改工程文件并运行验证。" : accessSettingsProject.accessMode === "governed" ? "可写入项目治理记录，不修改工程文件。" : "只读取、扫描并生成建议。"}</span></div> : null}
-            <div className="projectRenameActions">
-              <DialogClose asChild><Button type="button" variant="ghost">关闭</Button></DialogClose>
-              {accessSettingsProject ? <>
-                {accessSettingsProject.accessMode !== "browse" ? <Button onClick={() => changeProjectAccess("browse")} type="button" variant="outline">改为仅浏览</Button> : null}
-                {accessSettingsProject.accessMode !== "governed" ? <Button onClick={() => changeProjectAccess("governed")} type="button" variant="outline">改为接入治理</Button> : null}
-                {accessSettingsProject.accessMode !== "controlled" ? <Button onClick={() => changeProjectAccess("controlled")} type="button" variant="outline">允许受控修改</Button> : null}
-              </> : null}
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {sidebarView === "workspace" ? (
-          <>
-            <WorkspaceTree
-            actions={(
-              <Tooltip content={recommendationCount ? `更多能力，${recommendationCount} 项建议` : "更多能力"}>
-                <Button className="sectionIconAction" size="icon" variant="ghost" type="button" onClick={() => setCapabilityDialogOpen(true)} aria-label="更多能力">
-                  <Plus aria-hidden="true" size={15} />
-                </Button>
-              </Tooltip>
-            )}
-            inlineAction={(
-              <Tooltip content="切换到项目文件">
-                <button
-                  className="sectionInlineSwitch"
-                  type="button"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    setSidebarView("files");
-                  }}
-                  aria-label="切换到项目文件"
-                >
-                  <ArrowLeftRight strokeWidth={1.5} aria-hidden="true" />
-                </button>
-              </Tooltip>
-            )}
-            activeTopicPath={selectedEngineeringFile?.path}
-            onSelectTopic={onSelectEngineeringFile}
-            outline={workspaceOutlineForCapabilities(
-              projectGovernanceOutline
-                .filter((node) => node.id !== "workbench-overview")
-                .map((node) => node.id === "project-governance"
-                  ? { ...node, children: (node.children || []).filter((child) => child.id !== "define-goal") }
-                  : node),
-              snapshot?.projectCapabilities,
-            )}
-            sectionTitle="工作区"
-            snapshot={snapshot}
-            />
-            <ProjectCapabilityDialog
-              capabilities={discoverableCapabilities}
-              descriptions={capabilityDescriptions}
-              labels={capabilityLabels}
-              loadingId={capabilityLoadingId}
-              moduleLabels={workspaceModuleLabels}
-              onDismiss={dismissCapability}
-              onEnable={enableCapability}
-              onOpenChange={setCapabilityDialogOpen}
-              onSelectedModulesChange={(capabilityId, candidates, checked, moduleId) => setSelectedModulesByCapability((current) => ({
-                ...current,
-                [capabilityId]: checked ? [...new Set([...(current[capabilityId] || candidates), moduleId])] : (current[capabilityId] || candidates).filter((id) => id !== moduleId),
-              }))}
-              open={capabilityDialogOpen}
-              selectedModulesByCapability={selectedModulesByCapability}
-              snapshot={snapshot}
-            />
-          </>
-        ) : (
-          <SectionGroup
-              className="leftRailSection"
-              title="项目文件"
-              open
-              onToggle={() => setSidebarView("workspace")}
-              inlineAction={(
-                <Tooltip content="切换到工作区">
-                  <button
-                    className="sectionInlineSwitch"
-                    type="button"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      setSidebarView("workspace");
-                    }}
-                    aria-label="切换到工作区"
-                  >
-                    <ArrowLeftRight strokeWidth={1.5} aria-hidden="true" />
-                  </button>
-                </Tooltip>
-              )}
-              actions={(
-                <Tooltip content={fileTreeExpanded ? "收起全部子项" : "展开全部子项"}>
-                  <Button
-                    className="sectionIconAction"
-                    size="icon"
-                    variant="ghost"
-                    type="button"
-                    onClick={() => setFileTreeExpanded((value) => !value)}
-                    aria-label={fileTreeExpanded ? "收起全部子项" : "展开全部子项"}
-                  >
-                    {fileTreeExpanded
-                      ? <ChevronsDownUp strokeWidth={1.75} aria-hidden="true" />
-                      : <ChevronsUpDown strokeWidth={1.75} aria-hidden="true" />}
-                  </Button>
-                </Tooltip>
-              )}
-              toggleLabel="切换到工作区"
-            >
-            <ProjectFileTree
-              activePath={selectedEngineeringFile?.path}
-              expanded={fileTreeExpanded}
-              snapshot={snapshot}
-              onSelectFile={onSelectEngineeringFile}
-            />
-          </SectionGroup>
-        )}
-      </div>
-      <Tooltip content="折叠工作区">
-        <Button className="sideCornerButton sideCornerButton-left" size="icon" variant="ghost" type="button" onClick={onToggleCollapsed} aria-label="折叠工作区">
-          <PanelLeftClose strokeWidth={1.75} aria-hidden="true" />
-        </Button>
-      </Tooltip>
-      <div className="sidebarResizer sidebarResizer-left" role="separator" aria-label="拖拽调整左侧宽度" onPointerDown={onResizeStart} />
-    </aside>
-  );
-}
 
 function createTaskFromPlan(plan, taskText, snapshot, options = {}) {
   const title = taskText?.trim() || plan?.summary || "未命名任务";
@@ -2421,125 +2091,6 @@ function DesignImplementationHealthSection({ onCreateDesignGovernanceTask, onRea
   );
 }
 
-function CurrentProgressSlot({ model, onNavigate, onOpenSource }) {
-  const updatedAt = model.evidence.updatedAt
-    ? new Date(model.evidence.updatedAt).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })
-    : null;
-  const validationMeta = model.validation.meta && model.validation.meta !== "--"
-    ? `更新于 ${new Date(model.validation.meta).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}`
-    : model.validation.meta;
-  const acceptanceValue = model.acceptance.kind === "missing-required"
-    ? <Badge variant="warning">{model.acceptance.label}</Badge>
-    : <strong>{model.acceptance.label}</strong>;
-  const acceptanceContent = <div className="currentProgressOverviewItem">{acceptanceValue}<span>{model.acceptance.meta}</span></div>;
-  const validationValue = model.validation.kind === "empty"
-    ? <strong>{model.validation.label}</strong>
-    : <Badge>{model.validation.label}</Badge>;
-  const nextActionItems = [
-    {
-      id: `next-${model.nextAction.id}`,
-      content: (
-        <div className="currentProgressOverviewItem">
-          <strong>{model.nextAction.title}</strong>
-          <span>{model.nextAction.meta}</span>
-        </div>
-      ),
-      onClick: () => onNavigate?.(model.nextAction.routeId),
-    },
-  ];
-  return (
-    <section className="workspaceFacts projectOverviewSurface currentProgressBoard">
-      <OverviewPageHeader
-        title="项目进展"
-        description={model.summary}
-        meta={<span>{updatedAt ? `更新于 ${updatedAt}` : "随项目事实自动更新"}</span>}
-        sources={<div className="overviewSourceButtons">{model.evidence.files.slice(0, 5).map((source) => <button key={source} type="button" onClick={() => onOpenSource?.(source)}><FileText aria-hidden="true" size={12} /><span>{source}</span></button>)}</div>}
-      />
-      <OverviewSection
-        title="项目位置"
-        subtitle="项目目标与当前阶段目标"
-        items={[
-          {
-            id: "project-goal",
-            label: "项目目标",
-            content: model.projectGoal,
-          },
-          {
-            id: "milestone",
-            label: "当前里程碑",
-            content: model.milestone,
-          },
-          {
-            id: "goal",
-            label: "当前阶段目标",
-            content: (
-              <div className="currentProgressOverviewItem">
-                <strong>{model.goal.title}</strong>
-                <Badge>{model.goal.status}</Badge>
-              </div>
-            ),
-            onClick: () => onNavigate?.(model.goal.routeId),
-          },
-        ]}
-      />
-      <OverviewSection
-        title="目标阶段"
-        subtitle={model.stage.label}
-        items={[
-          {
-            id: "stage",
-            content: (
-              <div className="projectProgressStages" aria-label={`当前项目目标阶段：${model.stage.label}`}>
-                {model.stage.steps.map((step) => (
-                  <div className="projectProgressStage" data-state={step.state} key={step.id}>
-                    <span aria-hidden="true" />
-                    <strong>{step.label}</strong>
-                  </div>
-                ))}
-              </div>
-            ),
-          },
-        ]}
-      />
-      <OverviewSection
-        title="验收与风险"
-        subtitle="项目级判断依据"
-        items={[
-          {
-            id: "acceptance",
-            label: "验收标准",
-            content: acceptanceContent,
-            onClick: model.acceptance.kind === "ready" ? () => onNavigate?.(model.acceptance.routeId) : undefined,
-          },
-          {
-            id: "validation",
-            label: "最近验收",
-            content: <div className="currentProgressOverviewItem">{validationValue}<span>{validationMeta}</span></div>,
-            onClick: () => onNavigate?.(model.validation.routeId),
-          },
-          {
-            id: "risks",
-            label: "项目风险",
-            content: <div className="currentProgressOverviewItem"><strong>{model.risks.count} 项</strong><span>{model.risks.meta}</span></div>,
-            onClick: () => onNavigate?.(model.risks.routeId),
-          },
-        ]}
-      />
-      <OverviewSection
-        title="下一步"
-        subtitle="项目级唯一建议"
-        items={nextActionItems}
-      />
-    </section>
-  );
-}
-
-function CurrentProgressPanel({ onNavigate, onOpenSource, report, snapshot, tasks = [] }) {
-  const store = buildProjectFactStore({ report, snapshot, tasks });
-  const descriptors = compileCurrentProgressSlots({ capabilityManifest: snapshot?.projectCapabilities, components: { CurrentProgressSlot }, contract: projectProgressContract, store });
-  return descriptors.map((descriptor) => <descriptor.component key={descriptor.id} model={descriptor.props} onNavigate={onNavigate} onOpenSource={onOpenSource} />);
-}
-
 function currentGoalNextAction(goal) {
   if (!goal) return { detail: "先建立一个可验收的当前目标。", routeId: "current-goal", title: "建立当前目标" };
   if (goal.status === "draft") return { detail: "确认范围后，才能进入任务拆解。", routeId: "current-goal", title: "确认当前目标" };
@@ -2775,54 +2326,7 @@ function RunRecordsPanel({ onOpenSource, snapshot }) {
       <OverviewSection
         title="保留边界"
         subtitle="历史产物按本地策略自动清理"
-        items={[{ id: "run-retention", content: "运行历史属于本地治理产物；清理策略由 Project OS 配置维护，交接只沉淀仍与当前项目决策相关的结果。" }]}
-      />
-    </section>
-  );
-}
-
-function RiskBoundaryPanel({ onOpenSource, report, snapshot }) {
-  const boundary = report?.summary?.riskBoundary || report?.project?.riskBoundary || {};
-  const summaryRisks = Array.isArray(report?.findings?.risks) ? report.findings.risks : [];
-  const profileRisks = Array.isArray(snapshot?.projectProfile?.fields?.["memory.risks"]?.value)
-    ? snapshot.projectProfile.fields["memory.risks"].value.map((body) => ({ body, severity: "medium", title: "项目约束" }))
-    : [];
-  const risks = (summaryRisks.length ? summaryRisks : profileRisks).slice(0, 3);
-  const sources = [...new Set([...(boundary.sources || []), ...risks.flatMap((risk) => risk.sources || [])])].slice(0, 5);
-  const status = risks.length ? "需关注" : "暂无项目风险";
-
-  return (
-    <section className="overviewSurface riskBoundarySurface">
-      <OverviewPageHeader
-        description={boundary.body || "集中查看会影响项目推进的已知风险，以及当前阶段明确不覆盖的范围。"}
-        meta={<span>{boundary.status === "confirmed" ? "已确认" : "基于项目事实"}</span>}
-        sources={sources.length ? <div className="overviewSourceButtons">{sources.map((source) => <button key={source} type="button" onClick={() => onOpenSource?.(source)}><FileText aria-hidden="true" size={12} /><span>{source}</span></button>)}</div> : null}
-        status={<Badge status={risks.length ? "waiting" : "done"}>{status}</Badge>}
-        title="风险边界"
-      />
-      <OverviewSection
-        subtitle={risks.length ? `${risks.length} 项需要持续关注` : "当前未发现需要处理的项目级风险"}
-        title="已知风险"
-        items={[{
-          id: "known-risks",
-          content: risks.length ? (
-            <div className="riskBoundaryList">
-              {risks.map((risk) => <article key={`${risk.title}-${risk.body}`}>
-                <div><strong>{risk.title || "未命名风险"}</strong><Badge status={risk.severity === "high" ? "failed" : risk.severity === "low" ? "planned" : "waiting"}>{risk.severity === "high" ? "高" : risk.severity === "low" ? "低" : "中"}</Badge></div>
-                <p>{risk.body}</p>
-              </article>)}
-            </div>
-          ) : <Notice variant="success">当前项目没有记录需要处理的风险。</Notice>,
-        }]}
-      />
-      <OverviewSection
-        subtitle="不在这里执行或重复展示，由对应页面承接"
-        title="当前边界"
-        items={[
-          { id: "execution-boundary", label: "任务与验证", content: "失败任务、运行日志和修复动作进入执行结果。" },
-          { id: "asset-boundary", label: "文件健康", content: "缺失、变更和过期文件进入治理文件。" },
-          { id: "security-boundary", label: "安全与权限", content: "确认动作、密钥和命令限制进入安全边界。" },
-        ]}
+        items={[{ id: "run-retention", content: "运行历史属于本地治理产物；清理策略由 OmniDesk Runtime 维护，交接只沉淀仍与当前项目决策相关的结果。" }]}
       />
     </section>
   );
@@ -2855,100 +2359,6 @@ function LocalProjectStatePanel({ onOpenSource, report, snapshot }) {
       ]} />
     </section>
   );
-}
-
-function RunbookCommandList({ commands, copiedCommandId, copyErrorId, onCopy, onSendToTerminal }) {
-  if (!commands.length) return <Notice variant="info">尚未识别到命令，请先在 package scripts 或运行文档登记。</Notice>;
-  return (
-    <div className="runbookCommandList">
-      {commands.map((item) => {
-        const copied = copiedCommandId === item.id;
-        const failed = copyErrorId === item.id;
-        return (
-          <div className="runbookCommandRow" key={item.id || item.label}>
-            <div className="runbookCommandIdentity">
-              <strong>{item.label}</strong>
-              <span>{item.source}</span>
-            </div>
-            <code>{item.command}</code>
-            <div className="runbookCommandAction">
-              <div className="runbookCommandButtons">
-                <Tooltip content="发送到终端">
-                  <Button aria-label={`发送${item.label}命令到终端`} onClick={() => onSendToTerminal?.(item.command)} size="icon" type="button" variant="ghost">
-                    <TerminalSquare aria-hidden="true" />
-                  </Button>
-                </Tooltip>
-                <Tooltip content={failed ? "复制失败" : copied ? "已复制" : "复制命令"}>
-                  <Button aria-label={`复制${item.label}命令`} onClick={() => onCopy(item)} size="icon" type="button" variant="ghost">
-                    {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
-                  </Button>
-                </Tooltip>
-              </div>
-              {copied || failed ? <span className={failed ? "error" : "success"} role="status">{failed ? "复制失败" : "已复制"}</span> : null}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function RunbookSlot({ model, onSendToTerminal }) {
-  const [copiedCommandId, setCopiedCommandId] = useState("");
-  const [copyErrorId, setCopyErrorId] = useState("");
-  const copyCommand = async (item) => {
-    setCopyErrorId("");
-    try {
-      await copyTextToSystemClipboard(item.command);
-      setCopiedCommandId(item.id);
-    } catch {
-      setCopiedCommandId("");
-      setCopyErrorId(item.id);
-    }
-  };
-  return (
-    <section className="workspaceFacts projectOverviewSurface runbookSurface">
-      <OverviewPageHeader
-        title="启动方式"
-        description={model.description}
-        sources={<div className="overviewSourceButtons">{model.sources.slice(0, 5).map((source) => <button key={source} type="button" onClick={() => onOpenSource?.(source)}><FileText aria-hidden="true" size={12} /><span>{source}</span></button>)}</div>}
-        status={<Badge>{model.status}</Badge>}
-      />
-      <OverviewSection
-        title="运行环境"
-        subtitle="工作目录与依赖"
-        items={[
-          {
-            id: "directory",
-            label: "工作目录",
-            className: "overviewSectionItem-mono",
-            content: model.context.workingDirectory,
-          },
-          {
-            id: "requirements",
-            label: "环境要求",
-            content: model.context.requirements.length
-              ? <OverviewTagList items={model.context.requirements} />
-              : <span className="runbookEmptyValue">尚未识别</span>,
-          },
-        ]}
-      />
-      <OverviewSection
-        title="启动入口"
-        subtitle={`${model.readiness.startCount} 个已确认入口`}
-        items={[{
-          id: "start-commands",
-          content: <RunbookCommandList commands={model.startCommands} copiedCommandId={copiedCommandId} copyErrorId={copyErrorId} onCopy={copyCommand} onSendToTerminal={onSendToTerminal} />,
-        }]}
-      />
-    </section>
-  );
-}
-
-function RunbookPanel({ onOpenSource, onSendToTerminal, report, snapshot }) {
-  const store = buildProjectFactStore({ report, snapshot });
-  const descriptors = compileRunbookSlots({ capabilityManifest: snapshot?.projectCapabilities, components: { RunbookSlot }, contract: projectRunbookContract, store });
-  return descriptors.map((descriptor) => <descriptor.component key={descriptor.id} model={descriptor.props} onOpenSource={onOpenSource} onSendToTerminal={onSendToTerminal} />);
 }
 
 function WorkspaceFactsPreview({ globalOverview = false, onCreateGovernanceTask, onNavigate, onRequestProjectAccess, provider, report, snapshot, tasks = [] }) {
@@ -3474,7 +2884,7 @@ function EngineeringFileTab({
     const assetSurfacePanel = isAssetSurfaceTopic ? <AssetSurfacePanel onOpenSource={openSourceFile} renderSourceButtons={(callback, sources) => <RuleSourceButtons onOpenSource={callback} sources={sources} />} type={topicRouteId} /> : null;
     const agentConfigSurfacePanel = isAgentConfigSurfaceTopic ? <AgentConfigSurfacePanel onGetHermesExecutorStatus={onGetHermesExecutorStatus} onOpenSource={openSourceFile} renderSourceButtons={(callback, sources) => <RuleSourceButtons onOpenSource={callback} sources={sources} />} type={topicRouteId} /> : null;
     const runbookPanel = isRunbookTopic && snapshot?.workspaceFacts
-      ? <RunbookPanel onOpenSource={openSourceFile} onSendToTerminal={onPrepareTerminalCommand} report={snapshot.workspaceFacts} snapshot={snapshot} />
+      ? <RunbookPanel onCopyCommand={copyTextToSystemClipboard} onOpenSource={openSourceFile} onSendToTerminal={onPrepareTerminalCommand} report={snapshot.workspaceFacts} snapshot={snapshot} />
       : null;
     const riskBoundaryPanel = isRiskBoundaryTopic && snapshot?.workspaceFacts
       ? <RiskBoundaryPanel onOpenSource={openSourceFile} report={snapshot.workspaceFacts} snapshot={snapshot} />
@@ -4236,7 +3646,7 @@ function App() {
     showToast,
     snapshot,
   });
-  const requestProjectAccess = () => window.dispatchEvent(new Event("project-os:request-project-access"));
+  const requestProjectAccess = () => window.dispatchEvent(new Event("omnidesk:request-project-access"));
 
   const { selectEngineeringFile } = createWorkspaceFileActions({ fileClient: workspaceFileClient, setActiveTaskId, setPlanError, setReadonlyPlan, setSelectedEngineeringFile });
 
@@ -4360,7 +3770,7 @@ function App() {
     chatTurns,
     goalStatusLabelText,
     isNoiseTask,
-    onOpenConversation: () => window.dispatchEvent(new Event("project-os:open-conversation")),
+    onOpenConversation: () => window.dispatchEvent(new Event("omnidesk:open-conversation")),
     setActiveTaskId,
     setReadonlyPlan,
     setSelectedEngineeringFile,
@@ -4469,6 +3879,8 @@ function App() {
     projectSidebar={(
       <ProjectSidebar
           copyTextToSystemClipboard={copyTextToSystemClipboard}
+          capabilityDescriptions={capabilityDescriptions}
+          capabilityLabels={capabilityLabels}
           collapsed={leftCollapsed}
           onResizeStart={(event) => beginSidebarResize("left", event)}
           onToggleCollapsed={() => setLeftCollapsed((value) => !value)}
@@ -4490,6 +3902,8 @@ function App() {
           onProjectPathCopied={() => showToast("已复制项目路径。")}
           projectActionError={projectActionError}
           selectedEngineeringFile={selectedEngineeringFile}
+          taskStatuses={taskStatuses}
+          workspaceModuleLabels={workspaceModuleLabels}
         />
     )}
     agentWorkspace={(

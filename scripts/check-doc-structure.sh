@@ -56,7 +56,7 @@ function markdownLinks(source) {
   return links;
 }
 
-if (data.schemaVersion !== "project-os.doc-structure.v0.1") {
+if (data.schemaVersion !== "omnidesk.doc-structure.v0.1") {
   fail(`unexpected schemaVersion: ${data.schemaVersion}`);
 }
 if (data.sourceOfTruth !== "docs/DOCUMENTATION.md") {

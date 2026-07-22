@@ -16,7 +16,7 @@ test("reads tasks from the preview endpoint", async () => {
   };
   try {
     assert.deepEqual(await listDesktopTasks(), [{ id: "task-1" }]);
-    assert.equal(request.url, "/__project-os/desktop-tasks");
+    assert.equal(request.url, "/__omnidesk/desktop-tasks");
     assert.equal(request.options, undefined);
   } finally {
     globalThis.fetch = originalFetch;

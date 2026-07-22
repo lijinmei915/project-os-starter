@@ -1,4 +1,4 @@
-export const turnSummaryVersion = "project-os.turn-summary.v0.1";
+export const turnSummaryVersion = "omnidesk.turn-summary.v0.1";
 
 function compactText(value, maxLength = 240) {
   return String(value || "").trim().replace(/\s+/g, " ").slice(0, maxLength);

@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://project-os.local/schemas/project-fact-store.schema.json",
-  "title": "Project Fact Store",
+  "$id": "https://omnidesk.local/schemas/project-fact-store.schema.json",
+  "title": "OmniDesk Project Fact Store",
   "type": "object",
   "required": ["schemaVersion", "projectId", "observedAt", "facts"],
   "properties": {
-    "schemaVersion": { "const": "project-os.project-fact-store.v0.1" },
+    "schemaVersion": { "const": "omnidesk.project-fact-store.v0.1" },
     "projectId": { "type": "string", "minLength": 1 },
     "observedAt": { "type": "string" },
     "facts": {

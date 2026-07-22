@@ -12,11 +12,12 @@ import { namespaceManifestPath, resolvedStateRelativePath } from "./src/lib/stat
 
 const execFileAsync = promisify(execFile);
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const embeddedBrowserMode = process.env.PROJECT_OS_EMBEDDED_BROWSER === "1";
+const embeddedBrowserMode = process.env.OMNIDESK_EMBEDDED_BROWSER === "1"
+  || process.env.PROJECT_OS_EMBEDDED_BROWSER === "1";
 
 function embeddedBrowserCompatibility() {
   return {
-    name: "project-os-embedded-browser-compatibility",
+    name: "omnidesk-embedded-browser-compatibility",
     enforce: "post",
     configureServer(server) {
       if (!embeddedBrowserMode) return;
@@ -348,7 +349,7 @@ function currentPreviewProject() {
     currentProjectId: "current",
     projects: [{
       id: "current",
-      name: "project-os-starter",
+      name: "omnidesk-starter",
       path: rootDir,
       phase: "stabilizing",
     }],
@@ -356,7 +357,7 @@ function currentPreviewProject() {
   const projects = Array.isArray(registry.projects) ? registry.projects : [];
   const currentProject = projects.find((project) => project.id === registry.currentProjectId) || projects[0] || {
     id: "current",
-    name: "project-os-starter",
+    name: "omnidesk-starter",
     path: rootDir,
     phase: "stabilizing",
   };
@@ -426,9 +427,13 @@ export function readJsonAt(projectRoot, relativePath, fallback) {
 
 function projectMemoryPreview() {
   const { currentProject, projectRoot } = currentPreviewProject();
-  return readJsonAt(projectRoot, ".omnidesk/data/memory.json", {
-    schemaVersion: "project-os.memory.v0.1", projectId: currentProject.id, updatedAt: "", items: [],
+  const memory = readJsonAt(projectRoot, ".omnidesk/data/memory.json", {
+    schemaVersion: "omnidesk.memory.v0.1", projectId: currentProject.id, updatedAt: "", items: [],
   });
+  if (memory?.schemaVersion === "project-os.memory.v0.1") {
+    return { ...memory, schemaVersion: "omnidesk.memory.v0.1", schemaMigration: { from: "project-os.memory.v0.1", mode: "read-projection" } };
+  }
+  return memory;
 }
 
 const factSourcePaths = ["README.md", "PROJECT.md", "HANDOFF.md", "AGENTS.md", "package.json", "desktop/package.json", "Cargo.toml", "desktop/src-tauri/Cargo.toml", ".omnidesk/data/state.json", ".omnidesk/data/project-profile.json", "src", "desktop/src", "server", "backend", "api", "prisma", "migrations", "tests", ".github/workflows"];
@@ -487,8 +492,8 @@ function detectedProjectCapabilities(projectRoot) {
     ["testing", exists("tests", "test"), ["tests", "test"]],
     ["deployment", exists(".github/workflows", "Dockerfile"), [".github/workflows", "Dockerfile"]],
   ];
-  return {
-    schemaVersion: "project-os.project-capabilities.v0.1",
+  const projection = {
+    schemaVersion: "omnidesk.project-capabilities.v0.1",
     updatedAt: saved.updatedAt || "",
     capabilities: workspaceCapabilities,
     workspaceCapabilities,
@@ -499,6 +504,10 @@ function detectedProjectCapabilities(projectRoot) {
       signals: signals.filter((signal) => fs.existsSync(path.join(projectRoot, signal))),
     })),
   };
+  if (saved?.schemaVersion === "project-os.project-capabilities.v0.1") {
+    projection.schemaMigration = { from: "project-os.project-capabilities.v0.1", mode: "read-projection" };
+  }
+  return projection;
 }
 
 function readTextAt(projectRoot, relativePath) {
@@ -634,14 +643,14 @@ function workspaceSnapshotPreview() {
   const state = readJsonAt(projectRoot, ".omnidesk/data/state.json", {});
   const backlog = readJsonAt(projectRoot, ".omnidesk/data/task-backlog.json", { items: [] });
   const goals = readJsonAt(projectRoot, ".omnidesk/data/goals.json", {
-    schemaVersion: "project-os.goals.v0.1",
+    schemaVersion: "omnidesk.goals.v0.1",
     activeGoalId: "",
     goals: [],
   });
   return {
     currentProjectId: currentProject.id,
     currentProjectPath: projectRoot,
-    projectName: currentProject.name || state.name || "project-os-starter",
+    projectName: currentProject.name || state.name || "omnidesk-starter",
     phase: state.phase || currentProject.phase || "stabilizing",
     stage: state.stage || "未读取到阶段信息",
     tree: buildTreePreview(projectRoot),
@@ -675,13 +684,13 @@ function workspaceSnapshotPreview() {
       handoff: readTextAt(projectRoot, "HANDOFF.md"),
       productPlan: readTextAt(projectRoot, "docs/PRODUCT_PLAN.md"),
       projectMd: readTextAt(projectRoot, "PROJECT.md"),
-      projectName: currentProject.name || state.name || "project-os-starter",
+      projectName: currentProject.name || state.name || "omnidesk-starter",
       state,
     }),
     trace: [
       `ROOT: ${projectRoot}`,
       `REGISTRY: ${projects.length} project(s)`,
-      `STATE: ${currentProject.name || state.name || "project-os-starter"} / ${state.phase || currentProject.phase || "stabilizing"}`,
+      `STATE: ${currentProject.name || state.name || "omnidesk-starter"} / ${state.phase || currentProject.phase || "stabilizing"}`,
     ],
   };
 }
@@ -726,7 +735,7 @@ function providerRevisionPreview(projectRoot) {
 function providerStatusPreview() {
   const { projectRoot } = currentPreviewProject();
   const config = readJsonAt(projectRoot, ".omnidesk/data/desktop-provider.json", {
-    schemaVersion: "project-os.desktop-provider.v0.1",
+    schemaVersion: "omnidesk.desktop-provider.v0.1",
     profiles: [],
   });
   const profiles = Array.isArray(config.profiles) ? config.profiles : [];
@@ -769,9 +778,9 @@ async function copyTextPreview(input) {
   }
 }
 
-function projectOsPreviewFiles() {
+function omnideskPreviewFiles() {
   return {
-    name: "project-os-preview-files",
+    name: "omnidesk-preview-files",
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
         // Preview has no mutation transport. Keep this server-side guard ahead
@@ -781,57 +790,57 @@ function projectOsPreviewFiles() {
           sendJson(res, 403, { error: "浏览器预览不能执行此操作，请在桌面 App 窗口里使用。" });
           return;
         }
-        if (req.method === "GET" && req.url === "/__project-os/workspace-snapshot") {
+        if (req.method === "GET" && req.url === "/__omnidesk/workspace-snapshot") {
           sendJson(res, 200, workspaceSnapshotPreview());
           return;
         }
-        if (req.method === "GET" && req.url === "/__project-os/provider-status") {
+        if (req.method === "GET" && req.url === "/__omnidesk/provider-status") {
           sendJson(res, 200, providerStatusPreview());
           return;
         }
-        if (req.method === "POST" && req.url === "/__project-os/preview-project-path") {
+        if (req.method === "POST" && req.url === "/__omnidesk/preview-project-path") {
           const input = await readRequestJson(req);
           const result = previewProjectPath(input);
           sendJson(res, result.error ? 400 : 200, result);
           return;
         }
-        if (req.method === "GET" && req.url === "/__project-os/desktop-tasks") {
+        if (req.method === "GET" && req.url === "/__omnidesk/desktop-tasks") {
           sendJson(res, 200, listDesktopTasksPreview());
           return;
         }
-        if (req.method === "GET" && req.url === "/__project-os/desktop-conversations") {
+        if (req.method === "GET" && req.url === "/__omnidesk/desktop-conversations") {
           sendJson(res, 200, listDesktopConversationsPreview());
           return;
         }
-        if (req.method === "GET" && req.url === "/__project-os/project-memory") {
+        if (req.method === "GET" && req.url === "/__omnidesk/project-memory") {
           sendJson(res, 200, projectMemoryPreview());
           return;
         }
-        if (req.method === "POST" && req.url === "/__project-os/read-engineering-file") {
+        if (req.method === "POST" && req.url === "/__omnidesk/read-engineering-file") {
           const input = await readRequestJson(req);
           const result = readEngineeringFilePreview(input);
           sendJson(res, result.error ? 400 : 200, result);
           return;
         }
-        if (req.method === "POST" && req.url === "/__project-os/execute-agent-read-tool") {
+        if (req.method === "POST" && req.url === "/__omnidesk/execute-agent-read-tool") {
           const input = await readRequestJson(req);
           try { sendJson(res, 200, executeAgentReadToolPreview(input?.input || input)); } catch (error) { sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) }); }
           return;
         }
-        if (req.method === "POST" && req.url === "/__project-os/agent-runs") {
+        if (req.method === "POST" && req.url === "/__omnidesk/agent-runs") {
           sendJson(res, 200, listAgentRunsPreview());
           return;
         }
-        if (req.method === "POST" && req.url === "/__project-os/get-hermes-executor-status") {
+        if (req.method === "POST" && req.url === "/__omnidesk/get-hermes-executor-status") {
           sendJson(res, 200, await probeHermesExecutorPreview());
           return;
         }
-        if (req.method === "POST" && req.url === "/__project-os/generate-patch-draft") {
+        if (req.method === "POST" && req.url === "/__omnidesk/generate-patch-draft") {
           const input = await readRequestJson(req);
           sendJson(res, 200, generatePatchDraftPreview(input));
           return;
         }
-        if (req.method === "POST" && req.url === "/__project-os/copy-text") {
+        if (req.method === "POST" && req.url === "/__omnidesk/copy-text") {
           const input = await readRequestJson(req);
           const result = await copyTextPreview(input);
           sendJson(res, result.error ? 500 : 200, result);
@@ -858,7 +867,7 @@ function projectOsPreviewFiles() {
 }
 
 export default defineConfig({
-  plugins: [react({ fastRefresh: !embeddedBrowserMode }), projectOsPreviewFiles(), embeddedBrowserCompatibility()],
+  plugins: [react({ fastRefresh: !embeddedBrowserMode }), omnideskPreviewFiles(), embeddedBrowserCompatibility()],
   server: {
     host: "127.0.0.1",
     hmr: embeddedBrowserMode ? false : undefined,

@@ -16,7 +16,9 @@ log "tracked state"
 log "repository contracts"
 bash "$root/scripts/check-frontmatter.sh" "$root"
 bash "$root/scripts/check-doc-structure.sh" "$root"
-PROJECT_OS_ALLOW_EMPTY_PROVIDER_KEYS=1 bash "$root/scripts/check-secrets.sh" "$root"
+OMNIDESK_ALLOW_EMPTY_PROVIDER_KEYS=1 bash "$root/scripts/check-secrets.sh" "$root"
+node "$root/scripts/audit-repository-files.mjs" --check
+node "$root/scripts/audit-schema-contracts.mjs" --check
 
 log "desktop node regression"
 npm --prefix "$root/desktop" test

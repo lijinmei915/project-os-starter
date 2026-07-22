@@ -1,9 +1,9 @@
 {
-  "schemaVersion": "project-os.project-runbook-contract.v0.1",
+  "schemaVersion": "omnidesk.project-runbook-contract.v0.1",
   "allowedSelectors": ["selectRunbook"],
   "allowedComponents": ["RunbookSlot"],
   "facts": [
-    { "id": "runbook.summary", "primary": ".project-os/workspace-facts.json" },
+    { "id": "runbook.summary", "primary": ".omnidesk/cache/workspace-facts.json" },
     { "id": "runbook.commands", "primary": "scanner:package-scripts" },
     { "id": "runbook.context", "primary": "runtime:snapshot" }
   ],

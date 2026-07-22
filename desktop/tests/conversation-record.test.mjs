@@ -13,7 +13,7 @@ test("builds a compact project conversation record", () => {
   assert.equal(record.preview, "已完成。");
   assert.equal(record.contextState.currentTopic, "检查 对话持久化");
   assert.equal(record.contextState.previousConclusion, "已完成。");
-  assert.equal(record.summary.version, "project-os.turn-summary.v0.1");
+  assert.equal(record.summary.version, "omnidesk.turn-summary.v0.1");
   assert.equal(record.summary.coveredTurnCount, 0);
 });
 

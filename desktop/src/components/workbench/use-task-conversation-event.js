@@ -16,8 +16,8 @@ export function useTaskConversationEvent({ onOpenTaskConversation, onSelectTask,
     const openTaskConversation = (event) => {
       openTaskConversationWorkspace(event.detail?.taskId);
     };
-    window.addEventListener("project-os:open-task-conversation", openTaskConversation);
-    return () => window.removeEventListener("project-os:open-task-conversation", openTaskConversation);
+    window.addEventListener("omnidesk:open-task-conversation", openTaskConversation);
+    return () => window.removeEventListener("omnidesk:open-task-conversation", openTaskConversation);
   }, [openTaskConversationWorkspace]);
 
   return { openTaskConversationWorkspace };

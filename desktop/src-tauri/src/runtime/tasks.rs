@@ -4,7 +4,8 @@ use std::fs;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const TASK_SCHEMA_VERSION: &str = "project-os.desktop-task.v0.1";
+const TASK_SCHEMA_VERSION: &str = "omnidesk.desktop-task.v0.1";
+const LEGACY_TASK_SCHEMA_VERSION: &str = "project-os.desktop-task.v0.1";
 const TASK_DIRECTORY: &str = ".omnidesk/data/tasks";
 const CONVERSATION_DIRECTORY: &str = ".omnidesk/data/conversations";
 const GOALS_PATH: &str = ".omnidesk/data/goals.json";
@@ -28,7 +29,7 @@ pub fn list_repository_records(repository: &Repository) -> Result<Vec<(String, V
 pub fn list(root: &Path) -> Result<Vec<Value>, String> {
     let mut tasks = list_repository_records(&Repository::new(root))?
         .into_iter()
-        .map(|(_, task)| project_legacy_execution_state(task))
+        .map(|(_, task)| project_legacy_execution_state(project_task_schema(task)))
         .collect::<Vec<_>>();
     tasks.sort_by(|a, b| {
         let a_time = a
@@ -44,6 +45,31 @@ pub fn list(root: &Path) -> Result<Vec<Value>, String> {
         b_time.cmp(a_time)
     });
     Ok(tasks)
+}
+
+// Reading legacy records is non-destructive. The next explicit task write
+// persists the OmniDesk identity through save(), while list() remains able to
+// project existing user history without a bulk rewrite.
+fn project_task_schema(mut task: Value) -> Value {
+    if task.get("schemaVersion").and_then(Value::as_str) != Some(LEGACY_TASK_SCHEMA_VERSION) {
+        return task;
+    }
+    let Some(object) = task.as_object_mut() else {
+        return task;
+    };
+    object.insert(
+        "schemaVersion".to_string(),
+        Value::String(TASK_SCHEMA_VERSION.to_string()),
+    );
+    object.insert(
+        "schemaMigration".to_string(),
+        serde_json::json!({
+            "from": LEGACY_TASK_SCHEMA_VERSION,
+            "mode": "read-projection",
+            "to": TASK_SCHEMA_VERSION,
+        }),
+    );
+    task
 }
 
 /// Old desktop records can contain a syntactically valid placeholder diff for
@@ -169,6 +195,7 @@ pub fn save(
             "schemaVersion".to_string(),
             Value::String(TASK_SCHEMA_VERSION.to_string()),
         );
+        object.remove("schemaMigration");
         object.insert(
             "updatedAt".to_string(),
             Value::String(timestamp.to_string()),
@@ -400,6 +427,17 @@ mod tests {
     }
 
     #[test]
+    fn projects_legacy_task_schema_without_rewriting_history() {
+        let projected = project_task_schema(serde_json::json!({
+            "schemaVersion": "project-os.desktop-task.v0.1",
+            "id": "legacy-task"
+        }));
+        assert_eq!(projected["schemaVersion"], TASK_SCHEMA_VERSION);
+        assert_eq!(projected["schemaMigration"]["from"], LEGACY_TASK_SCHEMA_VERSION);
+        assert_eq!(projected["schemaMigration"]["mode"], "read-projection");
+    }
+
+    #[test]
     fn delete_removes_all_task_owned_state_in_one_transaction() {
         let root = std::env::temp_dir().join(format!(
             "omnidesk-task-delete-{}",
@@ -450,6 +488,7 @@ mod tests {
         .unwrap();
         let saved = save(&root, "/project", serde_json::json!({"id":"task-new","requestId":"request-1","goalId":"goal-b","title":"Refactor runtime","requestTrace":{"requestId":"request-1"}}), "now").unwrap();
         assert_eq!(saved["schemaVersion"], TASK_SCHEMA_VERSION);
+        assert!(saved.get("schemaMigration").is_none());
         assert_eq!(saved["requestTrace"]["taskId"], "task-new");
         assert_eq!(saved["requestTrace"]["runtime"], "tauri");
         let goals = read_json(&root.join(GOALS_PATH)).unwrap();

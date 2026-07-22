@@ -1,17 +1,17 @@
 {
-  "schemaVersion": "project-os.project-progress-contract.v0.1",
+  "schemaVersion": "omnidesk.project-progress-contract.v0.1",
   "allowedSelectors": ["selectCurrentProgress"],
   "allowedComponents": ["CurrentProgressSlot"],
   "facts": [
-    { "id": "project.goal", "primary": ".project-os/project-goals.json" },
-    { "id": "product.goal", "primary": ".project-os/project-profile.json" },
-    { "id": "progress.summary", "primary": ".project-os/workspace-facts.json" },
-    { "id": "progress.milestone", "primary": ".project-os/workspace-facts.json" },
-    { "id": "progress.goal", "primary": ".project-os/goals.json" },
-    { "id": "progress.acceptance", "primary": ".project-os/goal-validation.json" },
-    { "id": "progress.validation-report", "primary": ".project-os/goal-validation-report.json" },
-    { "id": "progress.risks", "primary": ".project-os/workspace-facts.json" },
-    { "id": "progress.evidence", "primary": ".project-os/workspace-facts.json" }
+    { "id": "project.goal", "primary": ".omnidesk/data/project-goals.json" },
+    { "id": "product.goal", "primary": ".omnidesk/data/project-profile.json" },
+    { "id": "progress.summary", "primary": ".omnidesk/cache/workspace-facts.json" },
+    { "id": "progress.milestone", "primary": ".omnidesk/cache/workspace-facts.json" },
+    { "id": "progress.goal", "primary": ".omnidesk/data/goals.json" },
+    { "id": "progress.acceptance", "primary": ".omnidesk/data/goal-validation.json" },
+    { "id": "progress.validation-report", "primary": ".omnidesk/data/goal-validation-report.json" },
+    { "id": "progress.risks", "primary": ".omnidesk/cache/workspace-facts.json" },
+    { "id": "progress.evidence", "primary": ".omnidesk/cache/workspace-facts.json" }
   ],
   "slots": [
     { "id": "project-progress.main", "surface": "project-progress", "region": "body", "order": 10, "selector": "selectCurrentProgress", "component": "CurrentProgressSlot", "renderWhen": "always", "dependencies": ["product.goal", "progress.summary", "progress.milestone", "progress.goal", "progress.acceptance", "progress.validation-report", "progress.risks", "progress.evidence"], "capability": { "id": "project-overview", "moduleId": "project-progress" } }

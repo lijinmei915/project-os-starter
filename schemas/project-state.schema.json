@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "project-state.schema.json",
-  "title": "Project OS State",
-  "description": "Machine-readable project state. Authoritative source for AI. Human-readable presentation layer is PROJECT.md.",
+  "$id": "https://omnidesk.local/schemas/project-state.schema.json",
+  "title": "OmniDesk Project State",
+  "description": "Machine-readable project state. Runtime data is authoritative; PROJECT.md is its human-readable status source.",
   "type": "object",
   "required": ["phase"],
   "properties": {

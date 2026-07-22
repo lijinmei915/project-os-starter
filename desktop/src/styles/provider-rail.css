@@ -1,0 +1,815 @@
+.providerPanel {
+  display: grid;
+  gap: 10px;
+  margin: 8px 0 0;
+}
+
+.providerSavedConnections {
+  display: grid;
+  gap: 8px;
+}
+
+.providerConnectionSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+  padding: 0 0 12px;
+}
+
+.providerConnectionSummary > div:first-child {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.providerConnectionSummary strong {
+  color: var(--desktop-text-primary);
+  font-size: var(--desktop-text-caption);
+  font-weight: var(--desktop-font-bold);
+}
+
+.providerConnectionSummary span {
+  color: var(--desktop-text-muted);
+  font-size: var(--desktop-text-meta);
+}
+
+.providerConnectionSummaryAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.providerConnectionSummary.available .providerConnectionSummaryAction > span {
+  color: var(--desktop-text-success);
+}
+
+.providerConnectionSummary.unavailable .providerConnectionSummaryAction > span {
+  color: var(--desktop-danger);
+}
+
+.providerConnectionSummary.authentication-failed .providerConnectionSummaryAction > span,
+.providerConnectionSummary.model-unavailable .providerConnectionSummaryAction > span,
+.providerConnectionSummary.network-unavailable .providerConnectionSummaryAction > span,
+.providerConnectionSummary.quota-exhausted .providerConnectionSummaryAction > span {
+  color: #a16207;
+}
+
+.providerConnectionList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.providerConnectionError {
+  margin-top: 2px;
+}
+
+.providerConnectionItem {
+  position: relative;
+  display: grid;
+  align-content: center;
+  width: fit-content;
+  max-width: 148px;
+  min-height: 48px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--desktop-surface-card-soft);
+  padding: 7px 8px;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.providerConnectionItem:hover,
+.providerConnectionItem:focus-within {
+  border-color: var(--desktop-border-strong);
+  background: var(--desktop-hover-surface);
+}
+
+.providerConnectionItem.active {
+  border-color: var(--desktop-border-accent);
+  background: var(--desktop-state-accent-bg);
+}
+
+.providerConnectionAdd {
+  place-items: center;
+  width: 56px;
+  min-height: 48px;
+  color: var(--desktop-text-muted);
+}
+
+.providerConnectionAdd svg {
+  width: 16px;
+  height: 16px;
+}
+
+.providerConnectionAdd:hover {
+  border-color: var(--desktop-border-strong);
+  background: var(--desktop-hover-surface);
+  color: var(--desktop-text-primary);
+}
+
+.providerConnectionAdd-empty {
+  grid-template-columns: 24px auto;
+  justify-content: start;
+  min-height: 44px;
+  font-weight: var(--desktop-font-bold);
+}
+
+.providerConnectionMain {
+  display: grid;
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  text-align: left;
+}
+
+.providerConnectionMain strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.providerConnectionMain strong {
+  color: var(--desktop-text-primary);
+  font-size: var(--desktop-text-caption);
+  font-weight: var(--desktop-font-bold);
+}
+
+.providerConnectionRemove {
+  top: -6px;
+  right: -6px;
+}
+
+.providerConnectionItem:hover .providerConnectionRemove,
+.providerConnectionItem:focus-within .providerConnectionRemove {
+  opacity: 1;
+  pointer-events: auto;
+  transform: scale(1);
+}
+
+.requiredLabel {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+}
+
+.requiredMark {
+  color: var(--desktop-danger);
+  font-weight: var(--desktop-font-semibold);
+}
+
+.providerStatus {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--desktop-text-muted);
+  font-size: var(--desktop-text-caption);
+  font-weight: var(--desktop-font-bold);
+}
+
+.providerStatus span:not(.dot) + span:not(.dot)::before {
+  content: "·";
+  margin-right: 8px;
+  color: var(--desktop-text-soft);
+}
+
+.providerStatus-creating .dot {
+  background: var(--desktop-text-warning);
+}
+
+.providerSectionTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--desktop-text-primary);
+  font-size: var(--desktop-text-caption);
+  font-weight: var(--desktop-font-bold);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.modelActions {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+}
+
+.textAction {
+  width: auto;
+  min-width: 58px;
+  height: 24px;
+  border-color: var(--desktop-border-accent);
+  background: var(--desktop-state-accent-bg);
+  color: var(--desktop-text-accent);
+  padding: 0 8px;
+  font-size: var(--desktop-text-meta);
+  white-space: nowrap;
+}
+
+.textAction:hover:not(:disabled) {
+  border-color: var(--desktop-border-accent);
+  background: var(--desktop-state-accent-bg-strong);
+  color: var(--desktop-text-accent);
+}
+
+.textAction:disabled {
+  border-color: var(--desktop-state-disabled-border);
+  background: var(--desktop-state-disabled-bg);
+  color: var(--desktop-text-soft);
+}
+
+.providerSplit {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.providerReadOnly {
+  opacity: 0.72;
+}
+
+:root.theme-light .providerReadOnly {
+  opacity: 1;
+}
+
+.advancedProvider {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--desktop-surface-code);
+  padding: 8px;
+}
+
+.advancedProvider summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--desktop-text-secondary);
+  font-size: var(--desktop-text-caption);
+  font-weight: var(--desktop-font-bold);
+  list-style: none;
+}
+
+.advancedProvider summary small {
+  color: var(--desktop-text-soft);
+  font-size: var(--desktop-text-meta);
+  font-weight: var(--desktop-font-semibold);
+}
+
+.advancedProvider summary::-webkit-details-marker {
+  display: none;
+}
+
+.advancedProvider[open] {
+  display: grid;
+  gap: 7px;
+}
+
+.advancedProvider[open] summary {
+  margin-bottom: 2px;
+}
+
+@media (max-width: 1180px) {
+  .providerSplit {
+    grid-template-columns: 1fr;
+  }
+}
+
+.providerPanel .toggleRow {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  color: var(--desktop-text-secondary);
+  font-size: var(--desktop-text-caption);
+  font-weight: var(--desktop-font-bold);
+}
+
+.providerPanel .toggleRow span {
+  display: grid;
+  gap: 2px;
+}
+
+.providerPanel .toggleRow small {
+  color: var(--desktop-text-soft);
+  font-size: var(--desktop-text-meta);
+  font-weight: var(--desktop-font-regular);
+  line-height: 1.3;
+}
+
+.queue {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.railHistory {
+  padding-bottom: 10px;
+}
+
+.conversationHistoryGroup {
+  display: grid;
+  gap: 3px;
+}
+
+.conversationHistoryGroup + .conversationHistoryGroup {
+  margin-top: 10px;
+}
+
+.conversationHistoryGroupLabel {
+  color: var(--desktop-text-soft);
+  font-size: var(--desktop-text-meta);
+  font-weight: var(--desktop-font-bold);
+  padding: 2px 4px 3px;
+}
+
+.railTasks {
+  padding-bottom: 10px;
+}
+
+.conversationHistoryItem {
+  position: relative;
+  overflow: hidden;
+  border: 0;
+  border-left: 2px solid transparent;
+  background: transparent;
+  padding: 0;
+}
+
+.conversationHistoryManagement {
+  display: grid;
+  gap: 8px;
+  max-height: min(56vh, 520px);
+  overflow: auto;
+  padding: 2px;
+}
+
+.railSectionActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.railSectionActions em {
+  color: var(--desktop-text-muted);
+  font-size: var(--desktop-type-meta-size);
+  font-style: normal;
+}
+
+.conversationArchiveToggle {
+  margin: 6px 0 2px;
+}
+
+.conversationHistoryItem.active {
+  border-left-color: var(--desktop-state-selected-indicator);
+  background: var(--desktop-state-selected-bg);
+}
+
+.conversationHistoryButton {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  min-height: 30px;
+  padding: 5px 7px;
+  text-align: left;
+}
+
+.conversationHistoryRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  border-radius: var(--radius);
+}
+
+.conversationHistoryActions {
+  display: none;
+  align-items: center;
+  gap: 2px;
+  padding-right: 4px;
+}
+
+.conversationHistoryHead {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+  padding-right: 0;
+}
+
+.conversationHistoryTitle {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.conversationHistoryHead strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--desktop-text-primary);
+  font-size: var(--desktop-text-body);
+  font-weight: var(--desktop-font-regular);
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversationHistoryHead span {
+  justify-self: end;
+  color: var(--desktop-text-soft);
+  font-family: var(--mono);
+  font-size: var(--desktop-text-meta);
+  font-weight: var(--desktop-font-regular);
+  line-height: 1;
+  white-space: nowrap;
+  transition: opacity 120ms ease;
+}
+
+.conversationHistoryDelete {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--desktop-text-soft);
+  cursor: pointer;
+  padding: 0;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.conversationHistoryArchive {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--desktop-text-soft);
+  cursor: pointer;
+  padding: 0;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.conversationHistoryArchive svg {
+  width: 13px;
+  height: 13px;
+}
+
+.conversationHistoryArchive:hover {
+  background: var(--desktop-hover-surface);
+  color: var(--desktop-text-accent);
+}
+
+.conversationHistoryDelete svg {
+  width: 13px;
+  height: 13px;
+}
+
+.conversationHistoryItem:hover .conversationHistoryRow,
+.conversationHistoryItem:focus-within .conversationHistoryRow {
+  background: var(--desktop-hover-surface);
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 8px;
+}
+
+.conversationHistoryItem:hover .conversationHistoryActions,
+.conversationHistoryItem:focus-within .conversationHistoryActions {
+  display: inline-flex;
+}
+
+.conversationHistoryItem:hover .conversationHistoryHead span,
+.conversationHistoryItem:focus-within .conversationHistoryHead span {
+  display: none;
+}
+
+.conversationHistoryItem:hover .conversationHistoryHead,
+.conversationHistoryItem:focus-within .conversationHistoryHead {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.conversationHistoryDelete:hover {
+  background: var(--desktop-hover-surface);
+  color: var(--desktop-danger);
+}
+
+.taskCard,
+.queueCard {
+  border-left: 2px solid transparent;
+  background: transparent;
+}
+
+.taskCard-accent,
+.queueCard.accent {
+  border-left-color: var(--desktop-state-selected-indicator);
+  background: var(--desktop-state-selected-bg);
+}
+
+.taskCard-accent .uiBadge,
+.queueCard.accent .uiBadge {
+  background: transparent;
+  color: var(--desktop-text-accent);
+  padding-right: 0;
+}
+
+.taskQueueItem {
+  border: 0;
+  border-left: 2px solid transparent;
+  background: transparent;
+  padding: 0;
+  overflow: hidden;
+}
+
+.taskQueueItem.active {
+  border-color: var(--desktop-state-selected-border);
+  border-left-color: var(--desktop-state-selected-indicator);
+  background: var(--desktop-state-selected-bg);
+}
+
+.taskQueueButton {
+  width: 100%;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  padding: 7px 8px 7px 10px;
+  text-align: left;
+  transition:
+    background-color 120ms ease,
+    opacity 120ms ease;
+}
+
+.taskQueueButton:hover:not(:disabled) {
+  background: var(--desktop-hover-surface);
+}
+
+.taskQueueButton:active:not(:disabled) {
+  background: var(--desktop-active-surface);
+}
+
+.taskQueueButton p {
+  margin: 4px 0 0;
+  color: var(--desktop-text-muted);
+  font-size: 10px;
+}
+
+.taskRailDetail {
+  margin: 0 8px 8px 34px;
+  border-top: 1px solid var(--line-subtle);
+  padding-top: 8px;
+}
+
+.taskRailDetail > p {
+  margin: 0;
+  color: var(--desktop-text-secondary);
+  font-size: var(--desktop-text-caption);
+  line-height: 1.45;
+}
+
+.taskRailGoal {
+  display: block;
+  color: var(--desktop-text-muted);
+  font-size: var(--desktop-text-meta);
+  line-height: 1.4;
+}
+
+.taskRailDetail > ol {
+  display: grid;
+  gap: 4px;
+  margin: 7px 0 0;
+  padding-left: 16px;
+  color: var(--desktop-text-secondary);
+  font-size: var(--desktop-text-caption);
+  line-height: 1.4;
+}
+
+.taskRailMeta,
+.taskRailActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.taskRailMeta {
+  margin-top: 7px;
+  color: var(--desktop-text-tertiary);
+  font-size: var(--desktop-text-meta);
+}
+
+.taskRailActions {
+  margin-top: 8px;
+}
+
+.taskRailActions .uiButton:last-child {
+  margin-left: auto;
+}
+
+.taskActions {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid var(--line);
+  padding: 6px 8px;
+}
+
+.taskCardHead,
+.queueHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.taskCardHead strong,
+.queueHead strong {
+  overflow-wrap: anywhere;
+  font-size: var(--desktop-text-body);
+  font-weight: var(--desktop-font-medium);
+}
+
+.taskCardProgress,
+.progress {
+  height: 3px;
+  margin-top: 7px;
+  border-radius: var(--radius-full);
+  background: var(--desktop-surface-panel-soft);
+  overflow: hidden;
+}
+
+.taskCardProgress span,
+.progress span {
+  display: block;
+  height: 100%;
+  background: var(--desktop-text-accent-muted);
+}
+
+.taskCard p,
+.queueCard p,
+.memoryRow p,
+.contextItem p {
+  margin: 4px 0 0;
+  color: var(--desktop-type-meta-color);
+  font-size: var(--desktop-type-meta-size);
+  font-weight: var(--desktop-type-meta-weight);
+  line-height: 1.35;
+}
+
+.contextPack {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.contextItem {
+  display: grid;
+}
+
+.contextItem strong {
+  display: block;
+  color: var(--desktop-type-label-color);
+  font-size: var(--desktop-type-label-size);
+  font-weight: var(--desktop-type-label-weight);
+}
+
+.contextItem.missing strong {
+  color: var(--desktop-text-secondary);
+}
+
+.contextItem.missing p {
+  color: var(--desktop-text-soft);
+}
+
+.memory {
+  margin-top: 8px;
+}
+
+.memoryRow {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.memoryDot {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  background: var(--desktop-state-accent-bg-strong);
+  color: var(--desktop-text-accent);
+  font-family: var(--mono);
+  font-size: var(--desktop-text-caption);
+  font-weight: var(--desktop-font-bold);
+}
+
+.memoryDot.muted {
+  background: var(--desktop-gray-600);
+  color: var(--desktop-text-secondary);
+}
+
+.memoryRow strong {
+  font-size: var(--desktop-text-body);
+}
+
+.bottombar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-top: 1px solid var(--line);
+  background: var(--desktop-surface-code);
+  color: var(--desktop-text-muted);
+  padding: 0 12px;
+  font-family: var(--mono);
+  font-size: var(--desktop-text-caption);
+  font-weight: var(--desktop-font-medium);
+}
+
+.appToast {
+  position: fixed;
+  right: 18px;
+  bottom: 34px;
+  z-index: 80;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(360px, calc(100vw - 36px));
+  border: 1px solid var(--desktop-state-success-border);
+  border-radius: var(--radius);
+  background: var(--desktop-state-success-bg);
+  color: var(--desktop-text-success);
+  padding: 9px 11px;
+  font-size: var(--desktop-text-caption);
+  font-weight: var(--desktop-font-bold);
+  box-shadow: var(--shadow-md);
+}
+
+.appToast-running {
+  border-color: var(--desktop-border-accent);
+  background: var(--desktop-state-accent-bg);
+  color: var(--desktop-text-accent);
+}
+
+.appToast-danger {
+  border-color: var(--desktop-state-danger-border);
+  background: var(--desktop-state-danger-bg);
+  color: var(--desktop-text-danger);
+}
+
+.appToastIcon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+.appToast-running .appToastIcon {
+  animation: spin 0.9s linear infinite;
+}
+
+.safe {
+  margin-left: auto;
+  color: var(--desktop-text-accent);
+}
+
+@media (max-width: 1180px) {
+  .workspace {
+    --desktop-layout-sidebar-left: 230px;
+    --desktop-layout-sidebar-right: 292px;
+    grid-template-columns: var(--desktop-layout-sidebar-left) minmax(430px, 1fr) var(--desktop-layout-sidebar-right);
+  }
+
+  .conversationMessage-user {
+    max-width: 86%;
+  }
+
+  .planGrid,
+  .planColumns {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .conversationStarters {
+    grid-template-columns: 1fr;
+  }
+}

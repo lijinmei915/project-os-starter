@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "project-os.doc-structure.v0.1",
+  "schemaVersion": "omnidesk.doc-structure.v0.1",
   "sourceOfTruth": "docs/DOCUMENTATION.md",
   "description": "Machine-readable documentation ownership map. It prevents orphan docs, duplicated responsibilities, and missing required sections.",
   "documents": [
@@ -12,14 +12,14 @@
     },
     {
       "file": "INSTALL.md",
-      "responsibility": "安装方式、profile 边界和接入命令",
-      "ssotFor": ["Project OS 安装"],
+      "responsibility": "OmniDesk Desktop 的本地依赖、安装、启动与验证",
+      "ssotFor": ["OmniDesk Desktop 怎么安装和启动"],
       "requiredSections": [],
       "forbiddenOverlap": ["当前项目状态", "长期产品路线"]
     },
     {
       "file": "AGENTS.md",
-      "responsibility": "AI 行为边界、路由摘要、运行命令和禁止行为",
+      "responsibility": "AI 行为边界、状态规则、验证门槛和禁止行为",
       "ssotFor": ["AI 应该怎么行动"],
       "requiredSections": ["Quick Start For Agents", "Commands", "Working Boundaries", "Documentation Governance"],
       "forbiddenOverlap": ["产品介绍", "详细变更历史", "当前交接流水"]
@@ -54,9 +54,9 @@
     },
     {
       "file": "docs/BACKEND.md",
-      "responsibility": "后端技术选择、API、数据存储、安全和后端约定",
-      "ssotFor": ["后端技术边界"],
-      "requiredSections": ["1. 技术栈选型", "2. 架构与 API", "3. 数据库与存储"],
+      "responsibility": "OmniDesk 本地 Rust Runtime 的服务边界、持久化、Provider、工具执行和安全约束",
+      "ssotFor": ["本地 Runtime 技术边界"],
+      "requiredSections": ["定位与技术栈", "调用与事件边界", "Runtime 模块", "状态与安全"],
       "forbiddenOverlap": ["前端组件规范", "产品路线"]
     },
     {
@@ -68,8 +68,8 @@
     },
     {
       "file": "docs/DECISIONS.md",
-      "responsibility": "架构和产品治理决策记录",
-      "ssotFor": ["为什么做过某个架构决定"],
+      "responsibility": "架构和产品治理决策的历史记录",
+      "ssotFor": ["为什么曾做过某个架构决定"],
       "requiredSections": ["决策列表"],
       "forbiddenOverlap": ["完整变更流水", "当前交接摘要"]
     },
@@ -103,9 +103,9 @@
     },
     {
       "file": "docs/FRONTEND.md",
-      "responsibility": "前端技术选择、状态管理、样式组件和前端约定",
+      "responsibility": "OmniDesk React Workbench 的技术栈、领域组织、状态边界和样式约定",
       "ssotFor": ["前端技术边界"],
-      "requiredSections": ["1. 技术栈选型", "2. 状态管理", "3. 样式与组件库"],
+      "requiredSections": ["技术栈", "运行边界", "状态与领域组织", "组件与样式约定"],
       "forbiddenOverlap": ["后端 API 细节", "产品路线"]
     },
     {

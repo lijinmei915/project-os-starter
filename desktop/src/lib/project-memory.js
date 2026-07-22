@@ -1,4 +1,5 @@
-const MEMORY_VERSION = "project-os.memory.v0.1";
+const MEMORY_VERSION = "omnidesk.memory.v0.1";
+const LEGACY_MEMORY_VERSION = "project-os.memory.v0.1";
 const MEMORY_KINDS = new Set(["constraint", "decision", "lesson", "preference", "result"]);
 const CONFIRMED_KINDS = new Set(["constraint", "decision", "preference"]);
 
@@ -16,9 +17,10 @@ export function emptyProjectMemory(projectId = "") {
 
 export function normalizeProjectMemory(memory = {}, projectId = "") {
   const items = Array.isArray(memory.items) ? memory.items : [];
-  return {
+  const normalized = {
     ...emptyProjectMemory(memory.projectId || projectId),
     ...memory,
+    schemaVersion: MEMORY_VERSION,
     audit: Array.isArray(memory.audit) ? memory.audit.filter((event) => event?.id && event?.type && event?.at).slice(-240) : [],
     items: items.filter((item) => MEMORY_KINDS.has(item?.kind) && text(item.content)).map((item) => ({
       confidence: Number.isFinite(item.confidence) ? Math.max(0, Math.min(1, item.confidence)) : 0.6,
@@ -35,6 +37,12 @@ export function normalizeProjectMemory(memory = {}, projectId = "") {
       conflictsWith: Array.isArray(item.conflictsWith) ? item.conflictsWith.filter(Boolean).map((id) => text(id, 120)) : [],
     })),
   };
+  if (memory.schemaVersion === LEGACY_MEMORY_VERSION) {
+    normalized.schemaMigration = { from: LEGACY_MEMORY_VERSION, mode: "read-projection" };
+  } else {
+    delete normalized.schemaMigration;
+  }
+  return normalized;
 }
 
 function conflictKey(content) {

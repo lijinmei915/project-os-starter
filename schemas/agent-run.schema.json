@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://project-os.local/schemas/agent-run.schema.json",
+  "$id": "https://omnidesk.local/schemas/agent-run.schema.json",
   "title": "OmniDesk Agent Run",
   "type": "object",
   "required": ["schemaVersion", "id", "requestId", "conversationId", "taskId", "projectId", "executorId", "status", "step", "maxSteps", "attempt", "revision", "createdAt", "updatedAt"],

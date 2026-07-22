@@ -39,6 +39,7 @@ function store(overrides = {}) {
 
 test("builds a serializable four-slot project overview view model", () => {
   const viewModel = buildProjectOverviewViewModel(store());
+  assert.equal(viewModel.schemaVersion, "omnidesk.project-overview-view-model.v0.1");
   assert.equal(viewModel.slots.length, 4);
   assert.doesNotThrow(() => JSON.stringify(viewModel));
   assert.deepEqual(viewModel.slots.map((slot) => slot.id), [
@@ -61,7 +62,7 @@ test("selects header labels and propagates fact state without runtime dependenci
 test("prefers the current registry display name over a stale snapshot identity", () => {
   const header = selectProjectHeader(store({
     snapshot: {
-      projectName: "project-os-starter",
+      projectName: "omnidesk-starter",
       projects: [{ id: "omnidesk", isCurrent: true, name: "OmniDesk" }],
     },
   }));

@@ -44,8 +44,8 @@ export function useWorkspaceSnapshotRefresh({ isTauri, refreshSnapshot, showToas
         if (!cancelled) showToast(`治理状态刷新失败：${err instanceof Error ? err.message : String(err)}`, "danger");
       }
     };
-    window.addEventListener("project-os:snapshot-refresh-requested", refresh);
-    return () => { cancelled = true; window.removeEventListener("project-os:snapshot-refresh-requested", refresh); };
+    window.addEventListener("omnidesk:snapshot-refresh-requested", refresh);
+    return () => { cancelled = true; window.removeEventListener("omnidesk:snapshot-refresh-requested", refresh); };
   }, [refreshSnapshot, showToast, workspacePath]);
 
   useEffect(() => {

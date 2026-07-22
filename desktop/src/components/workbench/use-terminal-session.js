@@ -242,7 +242,7 @@ export function useTerminalSession({ isTauri, terminalClient }) {
   }, [activeTerminalSessionId, isTauri, terminalChunksBySession, terminalSessions, terminalTextBySession, terminalClient]);
 
   const appendContextToTerminal = useCallback(async (lines) => {
-    window.dispatchEvent(new Event("project-os:open-terminal"));
+    window.dispatchEvent(new Event("omnidesk:open-terminal"));
     if (isTauri) return writeTerminalData(formatTerminalContextForInput(lines), { trackInput: false });
     const context = formatTerminalContext(lines);
     setTerminalTextBySession((current) => ({ ...current, [activeTerminalSessionId]: `${current[activeTerminalSessionId] || ""}${context}`.slice(-resourceBudget.terminalTextLimit) }));

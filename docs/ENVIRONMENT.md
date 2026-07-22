@@ -54,7 +54,8 @@ Provider profile、模型健康缓存和隔离密钥均由 Desktop Runtime 管�
 
 | 变量 | 用途 |
 |---|---|
-| `PROJECT_OS_ALLOW_EMPTY_PROVIDER_KEYS` | 纯本地密钥扫描时允许未配置 Provider Key |
+| `OMNIDESK_ALLOW_EMPTY_PROVIDER_KEYS` | 纯本地密钥扫描时允许未配置 Provider Key |
+| `OMNIDESK_EMBEDDED_BROWSER` | 仅本地嵌入式 WebView 调试时关闭 Vite HMR 注入 |
 | `TAURI_WEBDRIVER_PORT` | 原生 WebDriver smoke 的测试端口 |
 | `OMNIDESK_WEBDRIVER_WORKSPACE_ROOT` | 原生 smoke 使用的隔离工作区，仅测试构建设置 |
 | `OMNIDESK_AGENT_EVAL_*` | 仅受保护 Agent Eval workflow 使用的 Provider 环境变量 |
@@ -62,10 +63,10 @@ Provider profile、模型健康缓存和隔离密钥均由 Desktop Runtime 管�
 本仓库可使用 `.env.local` 保存本地开发密钥，但该文件必须保持忽略。提交前运行：
 
 ```bash
-PROJECT_OS_ALLOW_EMPTY_PROVIDER_KEYS=1 bash scripts/check-secrets.sh .
+OMNIDESK_ALLOW_EMPTY_PROVIDER_KEYS=1 bash scripts/check-secrets.sh .
 ```
 
-`PROJECT_OS_ALLOW_EMPTY_PROVIDER_KEYS` 只用于纯本地扫描时抑制空 Provider Key 警告，不会为运行时注入密钥。
+`OMNIDESK_ALLOW_EMPTY_PROVIDER_KEYS` 只用于纯本地扫描时抑制空 Provider Key 警告，不会为运行时注入密钥。旧变量仅在本地兼容读取，不再写入示例或 CI。
 
 ## 状态迁移
 

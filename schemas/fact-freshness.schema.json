@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://project-os.local/schemas/fact-freshness.schema.json",
-  "title": "Project Fact Freshness",
+  "$id": "https://omnidesk.local/schemas/fact-freshness.schema.json",
+  "title": "OmniDesk Fact Freshness",
   "type": "object",
   "required": ["schemaVersion", "updatedAt", "fingerprints"],
   "properties": {
-    "schemaVersion": { "const": "project-os.fact-freshness.v0.1" },
+    "schemaVersion": { "const": "omnidesk.fact-freshness.v0.1" },
     "updatedAt": { "type": "string" },
     "fingerprints": {
       "type": "object",

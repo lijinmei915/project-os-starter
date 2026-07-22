@@ -7,11 +7,14 @@ const PROJECT_GOALS_PATH: &str = ".omnidesk/data/project-goals.json";
 const GOAL_VALIDATION_PATH: &str = ".omnidesk/data/goal-validation.json";
 const GOAL_VALIDATION_REPORT_PATH: &str = ".omnidesk/evidence/goal-validation-report.json";
 const GOAL_SIGNOFF_HISTORY_PATH: &str = ".omnidesk/evidence/goal-signoff-history.json";
+const GOALS_SCHEMA_VERSION: &str = "omnidesk.goals.v0.1";
+const LEGACY_GOALS_SCHEMA_VERSION: &str = "project-os.goals.v0.1";
+const GOAL_SIGNOFF_HISTORY_SCHEMA_VERSION: &str = "omnidesk.goal-signoff-history.v0.1";
 
 fn load_or_seed(repository: &Repository, project_name: &str) -> Value {
-    repository.read_json(GOALS_PATH).unwrap_or_else(|| {
+    let mut goals = project_goals_schema(repository.read_json(GOALS_PATH).unwrap_or_else(|| {
         json!({
-            "schemaVersion": "project-os.goals.v0.1",
+            "schemaVersion": GOALS_SCHEMA_VERSION,
             "activeGoalId": "current-goal",
             "goals": [{
                 "id": "current-goal",
@@ -22,7 +25,25 @@ fn load_or_seed(repository: &Repository, project_name: &str) -> Value {
                 "taskIds": []
             }]
         })
-    })
+    }));
+    if let Some(object) = goals.as_object_mut() {
+        object.remove("schemaMigration");
+    }
+    goals
+}
+
+fn project_goals_schema(mut goals: Value) -> Value {
+    if goals.get("schemaVersion").and_then(Value::as_str) != Some(LEGACY_GOALS_SCHEMA_VERSION) {
+        return goals;
+    }
+    let Some(object) = goals.as_object_mut() else { return goals; };
+    object.insert("schemaVersion".to_string(), Value::String(GOALS_SCHEMA_VERSION.to_string()));
+    object.insert("schemaMigration".to_string(), json!({
+        "from": LEGACY_GOALS_SCHEMA_VERSION,
+        "mode": "read-projection",
+        "to": GOALS_SCHEMA_VERSION,
+    }));
+    goals
 }
 
 fn compact_title(title: &str) -> String {
@@ -605,8 +626,9 @@ pub fn sign_off_validation(root: &Path, goal_id: &str, timestamp: &str) -> Resul
                 goal.insert("status".to_string(), Value::String("signed-off".to_string()));
             }
         }
-        let mut history = repository.read_json(GOAL_SIGNOFF_HISTORY_PATH).unwrap_or_else(|| json!({ "schemaVersion": "project-os.goal-signoff-history.v0.1", "entries": [] }));
+        let mut history = repository.read_json(GOAL_SIGNOFF_HISTORY_PATH).unwrap_or_else(|| json!({ "schemaVersion": GOAL_SIGNOFF_HISTORY_SCHEMA_VERSION, "entries": [] }));
         if let Some(object) = history.as_object_mut() {
+            object.insert("schemaVersion".to_string(), Value::String(GOAL_SIGNOFF_HISTORY_SCHEMA_VERSION.to_string()));
             object.insert("updatedAt".to_string(), Value::String(timestamp.to_string()));
             let entries = object.entry("entries".to_string()).or_insert_with(|| Value::Array(Vec::new()));
             if let Some(entries) = entries.as_array_mut() {
@@ -1013,5 +1035,16 @@ mod tests {
                 .count(),
             1
         );
+    }
+
+    #[test]
+    fn projects_legacy_goal_schema_without_rewriting_history() {
+        let projected = project_goals_schema(json!({
+            "schemaVersion": "project-os.goals.v0.1",
+            "goals": []
+        }));
+        assert_eq!(projected["schemaVersion"], GOALS_SCHEMA_VERSION);
+        assert_eq!(projected["schemaMigration"]["from"], LEGACY_GOALS_SCHEMA_VERSION);
+        assert_eq!(projected["schemaMigration"]["mode"], "read-projection");
     }
 }

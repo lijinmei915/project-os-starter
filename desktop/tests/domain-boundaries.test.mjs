@@ -4,9 +4,17 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const source = (relativePath) => fs.readFileSync(path.join(desktopRoot, relativePath), "utf8");
-const componentSource = (workbench, start, end) => workbench.slice(workbench.indexOf(`function ${start}`), workbench.indexOf(`function ${end}`));
+const desktopRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+);
+const source = (relativePath) =>
+  fs.readFileSync(path.join(desktopRoot, relativePath), "utf8");
+const componentSource = (workbench, start, end) =>
+  workbench.slice(
+    workbench.indexOf(`function ${start}`),
+    workbench.indexOf(`function ${end}`),
+  );
 
 test("keeps the Workbench shell away from direct runtime commands and the retired task workspace", () => {
   const workbench = source("src/main.jsx");
@@ -14,7 +22,14 @@ test("keeps the Workbench shell away from direct runtime commands and the retire
   assert.equal(workbench.includes("invokeTauriCommand"), false);
   assert.equal(workbench.includes("TaskWorkspace"), false);
   assert.equal(workbench.includes("open-task-workspace"), false);
-  for (const hook of ["useWorkspaceSession", "useConversationSession", "useTaskSession", "useExecutionSession", "useProviderSession", "useTerminalSession"]) {
+  for (const hook of [
+    "useWorkspaceSession",
+    "useConversationSession",
+    "useTaskSession",
+    "useExecutionSession",
+    "useProviderSession",
+    "useTerminalSession",
+  ]) {
     assert.match(workbench, new RegExp(`import \\{ ${hook} \\}`));
   }
 });
@@ -23,18 +38,62 @@ test("keeps the task detail surface outside the Workbench shell", () => {
   const workbench = source("src/main.jsx");
   const activeTask = source("src/components/workbench/active-task.jsx");
   assert.equal(workbench.includes("function ActiveTask"), false);
-  assert.match(workbench, /import \{ ActiveTask \} from "\.\/components\/workbench\/active-task"/);
+  assert.match(
+    workbench,
+    /import \{ ActiveTask \} from "\.\/components\/workbench\/active-task"/,
+  );
   assert.match(activeTask, /export function ActiveTask/);
   assert.equal(activeTask.includes("runtime-api"), false);
   assert.equal(activeTask.includes("desktop-task-client"), false);
 });
 
-test("keeps task-context navigation injected instead of dispatching UI events", () => {
-  const context = source("src/components/workbench/task-conversation-context.jsx");
-  const lifecycle = source("src/components/workbench/use-task-conversation-event.js");
+test("keeps current project progress rendering outside the Workbench shell", () => {
   const workbench = source("src/main.jsx");
-  assert.equal(context.includes("project-os:open-task-conversation"), false);
-  assert.equal(workbench.includes("project-os:open-task-conversation"), false);
+  const progress = source(
+    "src/components/workbench/current-progress-panel.jsx",
+  );
+  assert.match(workbench, /<CurrentProgressPanel/);
+  assert.equal(workbench.includes("function CurrentProgressSlot"), false);
+  assert.equal(workbench.includes("function CurrentProgressPanel"), false);
+  assert.match(progress, /export function CurrentProgressPanel/);
+  assert.match(progress, /buildProjectFactStore/);
+  assert.match(progress, /compileCurrentProgressSlots/);
+  assert.equal(progress.includes("runtime-api"), false);
+});
+
+test("keeps project runbook rendering outside the Workbench shell", () => {
+  const workbench = source("src/main.jsx");
+  const runbook = source("src/components/workbench/runbook-panel.jsx");
+  assert.match(workbench, /<RunbookPanel/);
+  assert.equal(workbench.includes("function RunbookPanel"), false);
+  assert.equal(workbench.includes("function RunbookSlot"), false);
+  assert.match(runbook, /export function RunbookPanel/);
+  assert.match(runbook, /onCopyCommand/);
+  assert.match(runbook, /onOpenSource/);
+  assert.equal(runbook.includes("runtime-api"), false);
+});
+
+test("keeps project risk rendering outside the Workbench shell", () => {
+  const workbench = source("src/main.jsx");
+  const riskBoundary = source(
+    "src/components/workbench/risk-boundary-panel.jsx",
+  );
+  assert.match(workbench, /<RiskBoundaryPanel/);
+  assert.equal(workbench.includes("function RiskBoundaryPanel"), false);
+  assert.match(riskBoundary, /export function RiskBoundaryPanel/);
+  assert.equal(riskBoundary.includes("runtime-api"), false);
+});
+
+test("keeps task-context navigation injected instead of dispatching UI events", () => {
+  const context = source(
+    "src/components/workbench/task-conversation-context.jsx",
+  );
+  const lifecycle = source(
+    "src/components/workbench/use-task-conversation-event.js",
+  );
+  const workbench = source("src/main.jsx");
+  assert.equal(context.includes("omnidesk:open-task-conversation"), false);
+  assert.equal(workbench.includes("omnidesk:open-task-conversation"), false);
   assert.match(context, /onPreviousTask/);
   assert.match(context, /onNextTask/);
   assert.match(lifecycle, /return \{ openTaskConversationWorkspace \}/);
@@ -42,8 +101,12 @@ test("keeps task-context navigation injected instead of dispatching UI events", 
 
 test("keeps conversation rendering outside the Workbench request container", () => {
   const workbench = source("src/main.jsx");
-  const canvas = source("src/components/workbench/agent-workspace-conversation-canvas.jsx");
-  const transcript = source("src/components/workbench/conversation-transcript.jsx");
+  const canvas = source(
+    "src/components/workbench/agent-workspace-conversation-canvas.jsx",
+  );
+  const transcript = source(
+    "src/components/workbench/conversation-transcript.jsx",
+  );
   assert.match(workbench, /<AgentWorkspaceConversationCanvas/);
   assert.equal(workbench.includes("function shouldShowAgentTimeline"), false);
   assert.match(canvas, /<ConversationTranscript/);
@@ -54,7 +117,9 @@ test("keeps conversation rendering outside the Workbench request container", () 
 
 test("keeps the AgentWorkspace conversation canvas outside its workspace container", () => {
   const workbench = source("src/main.jsx");
-  const canvas = source("src/components/workbench/agent-workspace-conversation-canvas.jsx");
+  const canvas = source(
+    "src/components/workbench/agent-workspace-conversation-canvas.jsx",
+  );
   const workspace = componentSource(workbench, "AgentWorkspace", "statusLabel");
   assert.match(workbench, /<AgentWorkspaceConversationCanvas/);
   assert.equal(workspace.includes('className="conversationStart"'), false);
@@ -66,16 +131,23 @@ test("keeps the AgentWorkspace conversation canvas outside its workspace contain
 
 test("keeps conversation turn actions in a conversation hook", () => {
   const workbench = source("src/main.jsx");
-  const actions = source("src/components/workbench/use-conversation-turn-actions.js");
+  const actions = source(
+    "src/components/workbench/use-conversation-turn-actions.js",
+  );
   assert.match(workbench, /useConversationTurnActions/);
-  assert.equal(workbench.includes("const handleConversationTurnAction = async"), false);
+  assert.equal(
+    workbench.includes("const handleConversationTurnAction = async"),
+    false,
+  );
   assert.match(actions, /export function useConversationTurnActions/);
   assert.equal(actions.includes("runtime-api"), false);
 });
 
 test("keeps AgentTopic task-board state and derived rows in a task hook", () => {
   const workbench = source("src/main.jsx");
-  const taskBoard = source("src/components/workbench/use-agent-topic-task-board.js");
+  const taskBoard = source(
+    "src/components/workbench/use-agent-topic-task-board.js",
+  );
   assert.match(workbench, /useAgentTopicTaskBoard/);
   assert.equal(workbench.includes("buildTaskBoardViewModel"), false);
   assert.match(taskBoard, /useTaskBoardState/);
@@ -87,8 +159,14 @@ test("keeps AgentTopic task mutations behind injected Task and Workspace actions
   const workbench = source("src/main.jsx");
   const controller = source("src/lib/task-board-action-controller.js");
   const goalActions = source("src/lib/agent-topic-goal-actions.js");
-  const taskActions = source("src/components/workbench/use-agent-topic-task-actions.js");
-  const topic = componentSource(workbench, "AgentTopicPanel", "EngineeringFileTab");
+  const taskActions = source(
+    "src/components/workbench/use-agent-topic-task-actions.js",
+  );
+  const topic = componentSource(
+    workbench,
+    "AgentTopicPanel",
+    "EngineeringFileTab",
+  );
   assert.match(workbench, /useAgentTopicTaskActions/);
   assert.match(taskActions, /createTaskBoardActionController/);
   assert.match(taskActions, /createAgentTopicGoalActions/);
@@ -102,8 +180,12 @@ test("keeps AgentTopic task mutations behind injected Task and Workspace actions
 
 test("keeps the AgentTopic task workbench outside its topic container", () => {
   const workbench = source("src/main.jsx");
-  const taskBoard = source("src/components/workbench/agent-topic-task-board.jsx");
-  const content = source("src/components/workbench/agent-topic-panel-content.jsx");
+  const taskBoard = source(
+    "src/components/workbench/agent-topic-task-board.jsx",
+  );
+  const content = source(
+    "src/components/workbench/agent-topic-panel-content.jsx",
+  );
   assert.match(workbench, /<AgentTopicPanelContent/);
   assert.match(content, /<AgentTopicTaskBoard/);
   assert.equal(workbench.includes('className="taskBoardToolbar"'), false);
@@ -146,20 +228,32 @@ test("keeps AgentTopic Agent configuration descriptions out of the task containe
 
 test("keeps AgentTopic summary rendering outside the task action container", () => {
   const workbench = source("src/main.jsx");
-  const summary = source("src/components/workbench/agent-topic-capability-summary.jsx");
-  const content = source("src/components/workbench/agent-topic-panel-content.jsx");
+  const summary = source(
+    "src/components/workbench/agent-topic-capability-summary.jsx",
+  );
+  const content = source(
+    "src/components/workbench/agent-topic-panel-content.jsx",
+  );
   assert.match(workbench, /<AgentTopicPanelContent/);
   assert.match(content, /<AgentTopicCapabilitySummary/);
-  assert.equal(workbench.includes("className=\"agentConfigCapability\""), false);
+  assert.equal(workbench.includes('className="agentConfigCapability"'), false);
   assert.match(summary, /export function AgentTopicCapabilitySummary/);
   assert.equal(summary.includes("runtime-api"), false);
 });
 
 test("keeps controlled execution command rendering outside the AgentTopic container", () => {
   const workbench = source("src/main.jsx");
-  const commands = source("src/components/workbench/controlled-commands-panel.jsx");
-  const content = source("src/components/workbench/agent-topic-panel-content.jsx");
-  const topic = componentSource(workbench, "AgentTopicPanel", "EngineeringFileTab");
+  const commands = source(
+    "src/components/workbench/controlled-commands-panel.jsx",
+  );
+  const content = source(
+    "src/components/workbench/agent-topic-panel-content.jsx",
+  );
+  const topic = componentSource(
+    workbench,
+    "AgentTopicPanel",
+    "EngineeringFileTab",
+  );
   assert.match(content, /<ControlledCommandsPanel/);
   assert.match(workbench, /<AgentTopicPanelContent/);
   assert.equal(topic.includes("agentControlledCommands"), false);
@@ -169,9 +263,15 @@ test("keeps controlled execution command rendering outside the AgentTopic contai
 
 test("keeps AgentTopic task dialogs outside the task action container", () => {
   const workbench = source("src/main.jsx");
-  const taskBoard = source("src/components/workbench/agent-topic-task-board.jsx");
-  const dialogs = source("src/components/workbench/agent-topic-task-dialogs.jsx");
-  const content = source("src/components/workbench/agent-topic-panel-content.jsx");
+  const taskBoard = source(
+    "src/components/workbench/agent-topic-task-board.jsx",
+  );
+  const dialogs = source(
+    "src/components/workbench/agent-topic-task-dialogs.jsx",
+  );
+  const content = source(
+    "src/components/workbench/agent-topic-panel-content.jsx",
+  );
   assert.match(workbench, /<AgentTopicPanelContent/);
   assert.match(content, /<AgentTopicTaskBoard/);
   assert.match(taskBoard, /<AgentTopicTaskDialogs/);
@@ -185,7 +285,9 @@ test("keeps AgentTopic task dialogs outside the task action container", () => {
 test("keeps AgentTopic task detail and result rendering outside the task action container", () => {
   const workbench = source("src/main.jsx");
   const detail = source("src/components/workbench/agent-topic-task-detail.jsx");
-  const content = source("src/components/workbench/agent-topic-panel-content.jsx");
+  const content = source(
+    "src/components/workbench/agent-topic-panel-content.jsx",
+  );
   assert.match(workbench, /<AgentTopicPanelContent/);
   assert.match(content, /<AgentTopicCurrentTaskDetail/);
   assert.match(content, /<AgentTopicExecutionResults/);
@@ -199,7 +301,9 @@ test("keeps AgentTopic task detail and result rendering outside the task action 
 test("keeps AgentTopic Workspace goal mutations behind injected actions", () => {
   const workbench = source("src/main.jsx");
   const actions = source("src/lib/agent-topic-goal-actions.js");
-  const taskActions = source("src/components/workbench/use-agent-topic-task-actions.js");
+  const taskActions = source(
+    "src/components/workbench/use-agent-topic-task-actions.js",
+  );
   assert.match(workbench, /useAgentTopicTaskActions/);
   assert.match(taskActions, /createAgentTopicGoalActions/);
   assert.equal(workbench.includes("const archiveGoal = async"), false);
@@ -232,7 +336,10 @@ test("keeps the Provider form surface outside App while preserving the Provider 
   const workbench = source("src/main.jsx");
   const providerPanel = source("src/components/workbench/provider-panel.jsx");
   assert.equal(workbench.includes("function ProviderPanel"), false);
-  assert.match(workbench, /import \{ ProviderPanel \} from "\.\/components\/workbench\/provider-panel"/);
+  assert.match(
+    workbench,
+    /import \{ ProviderPanel \} from "\.\/components\/workbench\/provider-panel"/,
+  );
   assert.match(providerPanel, /export function ProviderPanel/);
   assert.match(providerPanel, /providerClient\.probeProviderModels/);
   assert.match(providerPanel, /providerClient\.testProviderModel/);
@@ -250,7 +357,9 @@ test("keeps Provider persistence feedback outside App", () => {
 
 test("keeps App model probing and health polling in a Provider hook", () => {
   const workbench = source("src/main.jsx");
-  const actions = source("src/components/workbench/use-composer-model-actions.js");
+  const actions = source(
+    "src/components/workbench/use-composer-model-actions.js",
+  );
   assert.match(workbench, /useComposerModelActions/);
   assert.equal(workbench.includes("const loadComposerModels = async"), false);
   assert.match(actions, /export function useComposerModelActions/);
@@ -268,7 +377,9 @@ test("keeps AgentWorkspace navigation as an injected Workspace boundary", () => 
 
 test("keeps AgentWorkspace navigation and terminal drafts in a Workspace hook", () => {
   const workbench = source("src/main.jsx");
-  const navigation = source("src/components/workbench/use-agent-workspace-navigation.js");
+  const navigation = source(
+    "src/components/workbench/use-agent-workspace-navigation.js",
+  );
   const workspace = componentSource(workbench, "AgentWorkspace", "statusLabel");
   assert.match(workbench, /useAgentWorkspaceNavigation/);
   assert.equal(workspace.includes("const prepareTerminalCommand ="), false);
@@ -292,7 +403,10 @@ test("keeps App file selection behind an injected Workspace controller", () => {
   const workbench = source("src/main.jsx");
   const actions = source("src/lib/workspace-file-actions.js");
   assert.match(workbench, /createWorkspaceFileActions/);
-  assert.equal(workbench.includes("const selectEngineeringFile = async"), false);
+  assert.equal(
+    workbench.includes("const selectEngineeringFile = async"),
+    false,
+  );
   assert.match(actions, /export function createWorkspaceFileActions/);
   assert.equal(actions.includes("runtime-api"), false);
 });
@@ -301,14 +415,22 @@ test("keeps conversation Patch Apply orchestration outside AgentWorkspace", () =
   const workbench = source("src/main.jsx");
   const patchApply = source("src/lib/conversation-patch-apply.js");
   assert.match(workbench, /applyPendingConversationPatch/);
-  assert.equal(workbench.includes("const executePendingPatchApply = async"), false);
-  assert.match(patchApply, /export async function applyPendingConversationPatch/);
+  assert.equal(
+    workbench.includes("const executePendingPatchApply = async"),
+    false,
+  );
+  assert.match(
+    patchApply,
+    /export async function applyPendingConversationPatch/,
+  );
   assert.equal(patchApply.includes("runtime-api"), false);
 });
 
 test("keeps AgentWorkspace request state and cancellation in a Conversation hook", () => {
   const workbench = source("src/main.jsx");
-  const requestState = source("src/components/workbench/use-conversation-request-state.js");
+  const requestState = source(
+    "src/components/workbench/use-conversation-request-state.js",
+  );
   assert.match(workbench, /useConversationRequestState/);
   assert.equal(workbench.includes("const stopCurrentResponse = ()"), false);
   assert.match(requestState, /export function useConversationRequestState/);
@@ -317,7 +439,9 @@ test("keeps AgentWorkspace request state and cancellation in a Conversation hook
 
 test("keeps Conversation submission orchestration behind an injected hook", () => {
   const workbench = source("src/main.jsx");
-  const submission = source("src/components/workbench/use-conversation-submission.js");
+  const submission = source(
+    "src/components/workbench/use-conversation-submission.js",
+  );
   assert.match(workbench, /useConversationSubmission/);
   assert.equal(workbench.includes("const submitTask = async"), false);
   assert.match(submission, /export function useConversationSubmission/);
@@ -329,9 +453,14 @@ test("keeps Conversation submission orchestration behind an injected hook", () =
 
 test("keeps App conversation navigation and persistence behind a Conversation hook", () => {
   const workbench = source("src/main.jsx");
-  const navigation = source("src/components/workbench/use-conversation-navigation.js");
+  const navigation = source(
+    "src/components/workbench/use-conversation-navigation.js",
+  );
   assert.match(workbench, /useConversationNavigation/);
-  assert.equal(workbench.includes("const openTaskConversation = (taskId)"), false);
+  assert.equal(
+    workbench.includes("const openTaskConversation = (taskId)"),
+    false,
+  );
   assert.equal(workbench.includes("const selectConversation = (id)"), false);
   assert.equal(workbench.includes("const deleteConversation = (id)"), false);
   assert.match(navigation, /export function useConversationNavigation/);
@@ -341,7 +470,9 @@ test("keeps App conversation navigation and persistence behind a Conversation ho
 
 test("keeps goal and task context projection behind the Workspace context hook", () => {
   const workbench = source("src/main.jsx");
-  const contextActions = source("src/components/workbench/use-workspace-context-actions.js");
+  const contextActions = source(
+    "src/components/workbench/use-workspace-context-actions.js",
+  );
   assert.match(workbench, /useWorkspaceContextActions/);
   assert.equal(workbench.includes("const resolveGoalTodoTask ="), false);
   assert.equal(workbench.includes("const sendGoalToChat ="), false);
@@ -376,7 +507,9 @@ test("keeps Patch, Apply, verification, and handoff lifecycles behind Execution 
 
 test("keeps terminal check lifecycle behind the Terminal/Execution hook", () => {
   const workbench = source("src/main.jsx");
-  const terminalCheck = source("src/components/workbench/use-terminal-check-action.js");
+  const terminalCheck = source(
+    "src/components/workbench/use-terminal-check-action.js",
+  );
   assert.match(workbench, /useTerminalCheckAction/);
   assert.equal(workbench.includes("const runTerminalCheck = async"), false);
   assert.match(terminalCheck, /export function useTerminalCheckAction/);
@@ -385,10 +518,15 @@ test("keeps terminal check lifecycle behind the Terminal/Execution hook", () => 
 
 test("keeps governance task generation behind the Workspace task hook", () => {
   const workbench = source("src/main.jsx");
-  const governance = source("src/components/workbench/use-governance-task-actions.js");
+  const governance = source(
+    "src/components/workbench/use-governance-task-actions.js",
+  );
   assert.match(workbench, /useGovernanceTaskActions/);
   assert.equal(workbench.includes("const createGovernanceTask = async"), false);
-  assert.equal(workbench.includes("const createDesignGovernanceTask = async"), false);
+  assert.equal(
+    workbench.includes("const createDesignGovernanceTask = async"),
+    false,
+  );
   assert.match(governance, /export function useGovernanceTaskActions/);
   assert.equal(governance.includes("runtime-api"), false);
   assert.equal(workbench.includes("legacyCreateGovernanceTask"), false);
@@ -397,7 +535,9 @@ test("keeps governance task generation behind the Workspace task hook", () => {
 
 test("keeps Task persistence and state projection behind the Task hook", () => {
   const workbench = source("src/main.jsx");
-  const persistence = source("src/components/workbench/use-task-persistence.js");
+  const persistence = source(
+    "src/components/workbench/use-task-persistence.js",
+  );
   assert.match(workbench, /useTaskPersistence/);
   assert.equal(workbench.includes("const setAndPersistTask = async"), false);
   assert.match(persistence, /export function useTaskPersistence/);
@@ -410,7 +550,10 @@ test("keeps registered conversation actions outside App", () => {
   const controller = source("src/lib/conversation-action-controller.js");
   assert.match(workbench, /createConversationActionController/);
   assert.equal(workbench.includes("const runChatAction = async"), false);
-  assert.match(controller, /export function createConversationActionController/);
+  assert.match(
+    controller,
+    /export function createConversationActionController/,
+  );
   assert.equal(controller.includes("runtime-api"), false);
 });
 
@@ -451,7 +594,9 @@ test("keeps App terminal lifecycle behind an injected Terminal hook", () => {
 
 test("keeps TerminalDock rendering and xterm interaction outside AgentWorkspace", () => {
   const workbench = source("src/main.jsx");
-  const tabs = source("src/components/workbench/agent-workspace-auxiliary-tabs.jsx");
+  const tabs = source(
+    "src/components/workbench/agent-workspace-auxiliary-tabs.jsx",
+  );
   const terminalDock = source("src/components/workbench/terminal-dock.jsx");
   assert.match(workbench, /<AgentWorkspaceAuxiliaryTabs/);
   assert.match(tabs, /<TerminalDock/);
@@ -466,7 +611,9 @@ test("keeps TerminalDock rendering and xterm interaction outside AgentWorkspace"
 
 test("keeps AgentWorkspace auxiliary tab branching outside its workspace container", () => {
   const workbench = source("src/main.jsx");
-  const tabs = source("src/components/workbench/agent-workspace-auxiliary-tabs.jsx");
+  const tabs = source(
+    "src/components/workbench/agent-workspace-auxiliary-tabs.jsx",
+  );
   const workspace = componentSource(workbench, "AgentWorkspace", "statusLabel");
   assert.match(workbench, /<AgentWorkspaceAuxiliaryTabs/);
   assert.equal(workspace.includes('tab.kind === "terminal"'), false);
@@ -478,11 +625,16 @@ test("keeps AgentWorkspace auxiliary tab branching outside its workspace contain
 
 test("keeps App workspace refresh lifecycle behind an injected Workspace hook", () => {
   const workbench = source("src/main.jsx");
-  const refresh = source("src/components/workbench/use-workspace-snapshot-refresh.js");
+  const refresh = source(
+    "src/components/workbench/use-workspace-snapshot-refresh.js",
+  );
   assert.match(workbench, /useWorkspaceSnapshotRefresh\(\{/);
   assert.equal(workbench.includes("workspace://files-changed"), false);
   assert.equal(workbench.includes("const startWatcher = async"), false);
-  assert.equal(workbench.includes("project-os:snapshot-refresh-requested"), false);
+  assert.equal(
+    workbench.includes("omnidesk:snapshot-refresh-requested"),
+    false,
+  );
   assert.match(refresh, /export function useWorkspaceSnapshotRefresh/);
   assert.equal(refresh.includes("runtime-api"), false);
 });
@@ -490,10 +642,23 @@ test("keeps App workspace refresh lifecycle behind an injected Workspace hook", 
 test("keeps persisted Conversation and Task loading behind the Workspace data sync hook", () => {
   const workbench = source("src/main.jsx");
   const sync = source("src/components/workbench/use-workspace-data-sync.js");
-  assert.match(workbench, /import \{ useWorkspaceDataSync \} from "\.\/components\/workbench\/use-workspace-data-sync"/);
+  assert.match(
+    workbench,
+    /import \{ useWorkspaceDataSync \} from "\.\/components\/workbench\/use-workspace-data-sync"/,
+  );
   assert.match(workbench, /useWorkspaceDataSync\(\{/);
-  assert.equal(workbench.includes("listDesktopConversations()\n      .then((records) => {\n        if (!cancelled) setConversations"), false);
-  assert.equal(workbench.includes("listDesktopTasks()\n      .then((records) => {\n        if (cancelled || !Array.isArray(records)) return"), false);
+  assert.equal(
+    workbench.includes(
+      "listDesktopConversations()\n      .then((records) => {\n        if (!cancelled) setConversations",
+    ),
+    false,
+  );
+  assert.equal(
+    workbench.includes(
+      "listDesktopTasks()\n      .then((records) => {\n        if (cancelled || !Array.isArray(records)) return",
+    ),
+    false,
+  );
   assert.match(sync, /export function useWorkspaceDataSync/);
   assert.match(sync, /listDesktopConversations\(\)/);
   assert.match(sync, /listDesktopTasks\(\)/);
@@ -506,11 +671,23 @@ test("keeps persisted Conversation and Task loading behind the Workspace data sy
 test("keeps Provider bootstrap and health projection behind the Provider data sync hook", () => {
   const workbench = source("src/main.jsx");
   const sync = source("src/components/workbench/use-provider-data-sync.js");
-  assert.match(workbench, /import \{ useProviderDataSync \} from "\.\/components\/workbench\/use-provider-data-sync"/);
+  assert.match(
+    workbench,
+    /import \{ useProviderDataSync \} from "\.\/components\/workbench\/use-provider-data-sync"/,
+  );
   assert.match(workbench, /useProviderDataSync\(\{/);
-  assert.equal(workbench.includes("providerClient.getProviderStatus(fallbackProvider)"), false);
-  assert.equal(workbench.includes("providerClient.getModelCatalog(fallbackModelCatalog)"), false);
-  assert.equal(workbench.includes("providerClient.getModelHealth().catch"), false);
+  assert.equal(
+    workbench.includes("providerClient.getProviderStatus(fallbackProvider)"),
+    false,
+  );
+  assert.equal(
+    workbench.includes("providerClient.getModelCatalog(fallbackModelCatalog)"),
+    false,
+  );
+  assert.equal(
+    workbench.includes("providerClient.getModelHealth().catch"),
+    false,
+  );
   assert.match(sync, /export function useProviderDataSync/);
   assert.match(sync, /getProviderStatus\(fallbackProvider\)/);
   assert.match(sync, /getModelCatalog\(fallbackModelCatalog\)/);
@@ -521,9 +698,14 @@ test("keeps Provider bootstrap and health projection behind the Provider data sy
 
 test("keeps AgentWorkspace conversation reset lifecycle in a Conversation hook", () => {
   const workbench = source("src/main.jsx");
-  const reset = source("src/components/workbench/use-conversation-surface-reset.js");
+  const reset = source(
+    "src/components/workbench/use-conversation-surface-reset.js",
+  );
   const workspace = componentSource(workbench, "AgentWorkspace", "statusLabel");
-  assert.match(workbench, /import \{ useConversationSurfaceReset \} from "\.\/components\/workbench\/use-conversation-surface-reset"/);
+  assert.match(
+    workbench,
+    /import \{ useConversationSurfaceReset \} from "\.\/components\/workbench\/use-conversation-surface-reset"/,
+  );
   assert.match(workspace, /useConversationSurfaceReset\(\{/);
   assert.equal(workspace.includes("resetConversationRequest();"), false);
   assert.equal(workspace.includes("resetWorkspaceTabs();"), false);
@@ -536,10 +718,18 @@ test("keeps AgentWorkspace conversation reset lifecycle in a Conversation hook",
 
 test("keeps project-switch transient reset orchestration in the Workspace lifecycle hook", () => {
   const workbench = source("src/main.jsx");
-  const reset = source("src/components/workbench/use-workspace-ephemeral-reset.js");
-  assert.match(workbench, /import \{ useWorkspaceEphemeralReset \} from "\.\/components\/workbench\/use-workspace-ephemeral-reset"/);
+  const reset = source(
+    "src/components/workbench/use-workspace-ephemeral-reset.js",
+  );
+  assert.match(
+    workbench,
+    /import \{ useWorkspaceEphemeralReset \} from "\.\/components\/workbench\/use-workspace-ephemeral-reset"/,
+  );
   assert.match(workbench, /useWorkspaceEphemeralReset\(\{/);
-  assert.equal(workbench.includes("setActiveConversationId(`conv-${Date.now()}`)"), false);
+  assert.equal(
+    workbench.includes("setActiveConversationId(`conv-${Date.now()}`)"),
+    false,
+  );
   assert.equal(workbench.includes("resetTerminalSessionState();"), false);
   assert.match(reset, /export function useWorkspaceEphemeralReset/);
   assert.match(reset, /setActiveConversationId\(`conv-\$\{Date\.now\(\)\}`\)/);
@@ -552,8 +742,12 @@ test("keeps project-switch transient reset orchestration in the Workspace lifecy
 test("keeps the Workspace project file tree outside the ProjectSidebar container", () => {
   const workbench = source("src/main.jsx");
   const tree = source("src/components/workbench/project-file-tree.jsx");
-  const sidebar = componentSource(workbench, "ProjectSidebar", "createTaskFromPlan");
-  assert.match(workbench, /import \{ ProjectFileTree \} from "\.\/components\/workbench\/project-file-tree"/);
+  const sidebar = source("src/components/workbench/project-sidebar.jsx");
+  assert.match(
+    workbench,
+    /import \{ ProjectSidebar \} from "\.\/components\/workbench\/project-sidebar"/,
+  );
+  assert.match(workbench, /<ProjectSidebar/);
   assert.match(sidebar, /<ProjectFileTree/);
   assert.equal(sidebar.includes("const visibleRows ="), false);
   assert.equal(sidebar.includes("const isFolderOpen ="), false);
@@ -565,9 +759,13 @@ test("keeps the Workspace project file tree outside the ProjectSidebar container
 
 test("keeps ProjectSidebar transient dialog state in a Workspace hook", () => {
   const workbench = source("src/main.jsx");
-  const sidebar = componentSource(workbench, "ProjectSidebar", "createTaskFromPlan");
+  const sidebar = source("src/components/workbench/project-sidebar.jsx");
   const state = source("src/components/workbench/use-project-sidebar-state.js");
-  assert.match(workbench, /import \{ useProjectSidebarState \} from "\.\/components\/workbench\/use-project-sidebar-state"/);
+  assert.equal(workbench.includes("function ProjectSidebar"), false);
+  assert.match(
+    sidebar,
+    /import \{ useProjectSidebarState \} from "\.\/use-project-sidebar-state"/,
+  );
   assert.match(sidebar, /useProjectSidebarState\(\{/);
   assert.equal(sidebar.includes("useState(null)"), false);
   assert.equal(sidebar.includes("setCapabilityLoadingId"), false);
@@ -580,9 +778,18 @@ test("keeps ProjectSidebar transient dialog state in a Workspace hook", () => {
 test("keeps Workbench sidebar sizing and pointer resize in a layout hook", () => {
   const workbench = source("src/main.jsx");
   const layout = source("src/components/workbench/use-sidebar-layout.js");
-  assert.match(workbench, /import \{ useSidebarLayout \} from "\.\/components\/workbench\/use-sidebar-layout"/);
-  assert.match(workbench, /const \{ beginSidebarResize, leftWidth, rightWidth \} = useSidebarLayout\(\)/);
-  assert.equal(workbench.includes("document.body.classList.add(\"isResizingSidebar\")"), false);
+  assert.match(
+    workbench,
+    /import \{ useSidebarLayout \} from "\.\/components\/workbench\/use-sidebar-layout"/,
+  );
+  assert.match(
+    workbench,
+    /const \{ beginSidebarResize, leftWidth, rightWidth \} = useSidebarLayout\(\)/,
+  );
+  assert.equal(
+    workbench.includes('document.body.classList.add("isResizingSidebar")'),
+    false,
+  );
   assert.match(layout, /export function useSidebarLayout/);
   assert.match(layout, /pointermove/);
   assert.match(layout, /pointerup/);
@@ -591,9 +798,15 @@ test("keeps Workbench sidebar sizing and pointer resize in a layout hook", () =>
 
 test("keeps Workspace capability enablement dialog outside ProjectSidebar", () => {
   const workbench = source("src/main.jsx");
-  const sidebar = componentSource(workbench, "ProjectSidebar", "createTaskFromPlan");
-  const dialog = source("src/components/workbench/project-capability-dialog.jsx");
-  assert.match(workbench, /import \{ ProjectCapabilityDialog \} from "\.\/components\/workbench\/project-capability-dialog"/);
+  const sidebar = source("src/components/workbench/project-sidebar.jsx");
+  const dialog = source(
+    "src/components/workbench/project-capability-dialog.jsx",
+  );
+  assert.match(workbench, /<ProjectSidebar/);
+  assert.match(
+    sidebar,
+    /import \{ ProjectCapabilityDialog \} from "\.\/project-capability-dialog"/,
+  );
   assert.match(sidebar, /<ProjectCapabilityDialog/);
   assert.equal(sidebar.includes("workspaceCapabilityList"), false);
   assert.equal(sidebar.includes("recommendedModuleIds"), false);
@@ -605,25 +818,71 @@ test("keeps Workspace capability enablement dialog outside ProjectSidebar", () =
 
 test("keeps ProjectSidebar status and capability derivation in a pure Workspace view-model", () => {
   const workbench = source("src/main.jsx");
-  const sidebar = componentSource(workbench, "ProjectSidebar", "createTaskFromPlan");
+  const sidebar = source("src/components/workbench/project-sidebar.jsx");
   const viewModel = source("src/lib/project-sidebar-view-model.js");
-  assert.match(workbench, /discoverableProjectCapabilities/);
-  assert.match(workbench, /projectRuntimeStatus/);
+  assert.match(workbench, /<ProjectSidebar/);
+  assert.match(sidebar, /discoverableProjectCapabilities/);
+  assert.match(sidebar, /projectRuntimeStatus/);
   assert.equal(sidebar.includes("const relatedTasks ="), false);
-  assert.equal(sidebar.includes("const discoverableCapabilities = (snapshot"), false);
+  assert.equal(
+    sidebar.includes("const discoverableCapabilities = (snapshot"),
+    false,
+  );
   assert.match(viewModel, /export function projectRuntimeStatus/);
   assert.match(viewModel, /export function discoverableProjectCapabilities/);
   assert.equal(viewModel.includes("runtime-api"), false);
 });
 
+test("keeps ProjectSidebar access-mode labels in a pure presentation module", () => {
+  const workbench = source("src/main.jsx");
+  const sidebar = source("src/components/workbench/project-sidebar.jsx");
+  const dialogs = source("src/components/workbench/project-access-dialogs.jsx");
+  const presentation = source("src/lib/project-access-presentation.js");
+  assert.match(workbench, /<ProjectSidebar/);
+  assert.match(sidebar, /ProjectAccessDialogs/);
+  assert.match(dialogs, /projectAccessChoices/);
+  assert.equal(workbench.includes("每次确认后修改工程文件并运行验证。"), false);
+  assert.match(presentation, /export const projectAccessChoices/);
+  assert.match(presentation, /export function projectAccessPresentation/);
+  assert.equal(presentation.includes("runtime-api"), false);
+});
+
+test("keeps ProjectSidebar access dialogs in an injected Workspace surface", () => {
+  const workbench = source("src/main.jsx");
+  const sidebar = source("src/components/workbench/project-sidebar.jsx");
+  const dialogs = source("src/components/workbench/project-access-dialogs.jsx");
+  assert.match(
+    workbench,
+    /import \{ ProjectSidebar \} from "\.\/components\/workbench\/project-sidebar"/,
+  );
+  assert.match(sidebar, /<ProjectAccessDialogs/);
+  assert.match(dialogs, /export function ProjectAccessDialogs/);
+  assert.match(dialogs, /projectAccessPresentation/);
+  assert.equal(dialogs.includes("runtime-api"), false);
+});
+
+test("keeps ProjectSidebar project rows in an injected Workspace surface", () => {
+  const workbench = source("src/main.jsx");
+  const sidebar = source("src/components/workbench/project-sidebar.jsx");
+  const list = source("src/components/workbench/project-list.jsx");
+  assert.match(workbench, /<ProjectSidebar/);
+  assert.match(sidebar, /<ProjectList/);
+  assert.match(list, /export function ProjectList/);
+  assert.match(list, /data-copy-project-path/);
+  assert.equal(list.includes("runtime-api"), false);
+});
+
 test("keeps ProjectSidebar clipboard delegation in an injected Workspace hook", () => {
   const workbench = source("src/main.jsx");
-  const sidebar = componentSource(workbench, "ProjectSidebar", "createTaskFromPlan");
+  const sidebar = source("src/components/workbench/project-sidebar.jsx");
   const clipboard = source("src/components/workbench/use-project-path-copy.js");
-  assert.match(workbench, /import \{ useProjectPathCopy \} from "\.\/components\/workbench\/use-project-path-copy"/);
+  assert.match(
+    sidebar,
+    /import \{ useProjectPathCopy \} from "\.\/use-project-path-copy"/,
+  );
   assert.match(sidebar, /useProjectPathCopy\(\{/);
-  assert.equal(sidebar.includes("document.addEventListener(\"click\""), false);
-  assert.equal(sidebar.includes("document.execCommand(\"copy\")"), false);
+  assert.equal(sidebar.includes('document.addEventListener("click"'), false);
+  assert.equal(sidebar.includes('document.execCommand("copy")'), false);
   assert.match(clipboard, /export function useProjectPathCopy/);
   assert.match(clipboard, /data-copy-project-path/);
   assert.match(clipboard, /copyTextToSystemClipboard/);
@@ -646,7 +905,9 @@ test("keeps AgentWorkspace Conversation and Task derivation in a pure view-model
 
 test("keeps App Workspace goal lifecycle behind an injected Workspace hook", () => {
   const workbench = source("src/main.jsx");
-  const goals = source("src/components/workbench/use-workspace-goal-actions.js");
+  const goals = source(
+    "src/components/workbench/use-workspace-goal-actions.js",
+  );
   assert.match(workbench, /useWorkspaceGoalActions\(\{/);
   assert.equal(workbench.includes("const validateGoal = async"), false);
   assert.equal(workbench.includes("const confirmDecomposition = async"), false);
@@ -658,21 +919,37 @@ test("keeps App Workspace goal lifecycle behind an injected Workspace hook", () 
 
 test("keeps engineering previews and Hermes status behind injected Workspace and Execution actions", () => {
   const workbench = source("src/main.jsx");
-  const engineeringFile = componentSource(workbench, "EngineeringFileTab", "RightRail");
-  const agentConfig = source("src/components/workbench/agent-config-surface-panel.jsx");
+  const engineeringFile = componentSource(
+    workbench,
+    "EngineeringFileTab",
+    "RightRail",
+  );
+  const agentConfig = source(
+    "src/components/workbench/agent-config-surface-panel.jsx",
+  );
   assert.match(engineeringFile, /onReadEngineeringFile/);
   assert.match(engineeringFile, /onGetHermesExecutorStatus/);
   assert.equal(engineeringFile.includes("workspaceFileClient"), false);
   assert.equal(agentConfig.includes("executionClient"), false);
   assert.equal(agentConfig.includes("runtime-api"), false);
-  assert.match(workbench, /onReadEngineeringFile=\{workspaceFileClient\.readEngineeringFile\}/);
-  assert.match(workbench, /onGetHermesExecutorStatus=\{executionClient\.getHermesExecutorStatus\}/);
+  assert.match(
+    workbench,
+    /onReadEngineeringFile=\{workspaceFileClient\.readEngineeringFile\}/,
+  );
+  assert.match(
+    workbench,
+    /onGetHermesExecutorStatus=\{executionClient\.getHermesExecutorStatus\}/,
+  );
 });
 
 test("keeps EngineeringFileTab topic routing in a pure Workspace view-model", () => {
   const workbench = source("src/main.jsx");
   const routing = source("src/lib/engineering-topic-surface.js");
-  const engineeringFile = componentSource(workbench, "EngineeringFileTab", "RightRail");
+  const engineeringFile = componentSource(
+    workbench,
+    "EngineeringFileTab",
+    "RightRail",
+  );
   assert.match(workbench, /resolveEngineeringTopicSurface/);
   assert.equal(engineeringFile.includes("const isCurrentGoalTopic ="), false);
   assert.match(routing, /export function resolveEngineeringTopicSurface/);
@@ -685,8 +962,14 @@ test("keeps reusable Workspace file preview rendering outside topic surfaces", (
   const frame = source("src/components/workbench/engineering-topic-frame.jsx");
   assert.match(workbench, /<ReadonlyFilePreview file=\{governanceFile\}/);
   assert.match(workbench, /<ReadonlyFilePreview file=\{previewFile\}/);
-  assert.match(frame, /<ReadonlyFilePreview description="关联工程文件只读预览" file=\{relatedFilePreview\}/);
-  assert.match(workbench, /<ReadonlyFilePreview description=\{selectedEngineeringFile\.description\} file=\{selectedEngineeringFile\}/);
+  assert.match(
+    frame,
+    /<ReadonlyFilePreview description="关联工程文件只读预览" file=\{relatedFilePreview\}/,
+  );
+  assert.match(
+    workbench,
+    /<ReadonlyFilePreview description=\{selectedEngineeringFile\.description\} file=\{selectedEngineeringFile\}/,
+  );
   assert.match(preview, /export function ReadonlyFilePreview/);
   assert.equal(preview.includes("runtime-api"), false);
   assert.equal(preview.includes("workspaceFileClient"), false);
@@ -695,14 +978,32 @@ test("keeps reusable Workspace file preview rendering outside topic surfaces", (
 test("keeps EngineeringFileTab topic frame outside surface composition", () => {
   const workbench = source("src/main.jsx");
   const frame = source("src/components/workbench/engineering-topic-frame.jsx");
-  const composer = source("src/components/workbench/engineering-topic-surface-composer.jsx");
-  const engineeringFile = componentSource(workbench, "EngineeringFileTab", "RightRail");
-  assert.match(workbench, /import \{ EngineeringTopicFrame \} from "\.\/components\/workbench\/engineering-topic-frame"/);
-  assert.match(workbench, /import \{ EngineeringTopicSurfaceComposer \} from "\.\/components\/workbench\/engineering-topic-surface-composer"/);
+  const composer = source(
+    "src/components/workbench/engineering-topic-surface-composer.jsx",
+  );
+  const engineeringFile = componentSource(
+    workbench,
+    "EngineeringFileTab",
+    "RightRail",
+  );
+  assert.match(
+    workbench,
+    /import \{ EngineeringTopicFrame \} from "\.\/components\/workbench\/engineering-topic-frame"/,
+  );
+  assert.match(
+    workbench,
+    /import \{ EngineeringTopicSurfaceComposer \} from "\.\/components\/workbench\/engineering-topic-surface-composer"/,
+  );
   assert.match(engineeringFile, /<EngineeringTopicFrame/);
   assert.match(engineeringFile, /<EngineeringTopicSurfaceComposer/);
-  assert.equal(engineeringFile.includes("const topicBody = isOverviewTopic"), false);
-  assert.equal(engineeringFile.includes('className="topicGovernanceMeta"'), false);
+  assert.equal(
+    engineeringFile.includes("const topicBody = isOverviewTopic"),
+    false,
+  );
+  assert.equal(
+    engineeringFile.includes('className="topicGovernanceMeta"'),
+    false,
+  );
   assert.match(frame, /export function EngineeringTopicFrame/);
   assert.match(composer, /export function EngineeringTopicSurfaceComposer/);
   assert.equal(frame.includes("runtime-api"), false);
@@ -713,10 +1014,15 @@ test("keeps EngineeringFileTab topic frame outside surface composition", () => {
 
 test("keeps static Workspace memory and asset surfaces outside EngineeringFileTab", () => {
   const workbench = source("src/main.jsx");
-  const surfaces = source("src/components/workbench/workspace-static-surfaces.jsx");
+  const surfaces = source(
+    "src/components/workbench/workspace-static-surfaces.jsx",
+  );
   assert.match(workbench, /AssetSurfacePanel/);
   assert.match(workbench, /MemorySurfacePanel/);
-  assert.match(workbench, /from "\.\/components\/workbench\/workspace-static-surfaces"/);
+  assert.match(
+    workbench,
+    /from "\.\/components\/workbench\/workspace-static-surfaces"/,
+  );
   assert.equal(workbench.includes("function MemorySurfacePanel"), false);
   assert.equal(workbench.includes("function AssetSurfacePanel"), false);
   assert.match(surfaces, /export function MemorySurfacePanel/);
@@ -727,9 +1033,18 @@ test("keeps static Workspace memory and asset surfaces outside EngineeringFileTa
 
 test("keeps static Workspace governance surfaces outside EngineeringFileTab", () => {
   const workbench = source("src/main.jsx");
-  const surfaces = source("src/components/workbench/workspace-static-surfaces.jsx");
+  const surfaces = source(
+    "src/components/workbench/workspace-static-surfaces.jsx",
+  );
   assert.match(workbench, /GovernanceSurfacePanel/);
-  for (const panel of ["CollaborationBoundaryPanel", "ExecutionPermissionsPanel", "DocumentationRulesPanel", "SystemArchitecturePanel", "DataContractsPanel", "CodeStructurePanel"]) {
+  for (const panel of [
+    "CollaborationBoundaryPanel",
+    "ExecutionPermissionsPanel",
+    "DocumentationRulesPanel",
+    "SystemArchitecturePanel",
+    "DataContractsPanel",
+    "CodeStructurePanel",
+  ]) {
     assert.equal(workbench.includes(`function ${panel}`), false);
   }
   assert.match(surfaces, /export function GovernanceSurfacePanel/);
@@ -739,18 +1054,43 @@ test("keeps static Workspace governance surfaces outside EngineeringFileTab", ()
 
 test("keeps every domain client behind the shared runtime adapter", () => {
   const expectedCommands = {
-    "src/lib/desktop-task-client.js": ["save_desktop_task", "delete_desktop_task"],
-    "src/lib/desktop-conversation-client.js": ["save_desktop_conversation", "chat_with_model"],
-    "src/lib/execution-client.js": ["generate_readonly_plan", "apply_patch_draft", "run_guarded_check"],
-    "src/lib/provider-client.js": ["save_provider_config", "test_provider_model_with_cache"],
-    "src/lib/terminal-client.js": ["start_terminal_session", "write_terminal_session", "open_native_terminal"],
+    "src/lib/desktop-task-client.js": [
+      "save_desktop_task",
+      "delete_desktop_task",
+    ],
+    "src/lib/desktop-conversation-client.js": [
+      "save_desktop_conversation",
+      "chat_with_model",
+    ],
+    "src/lib/execution-client.js": [
+      "generate_readonly_plan",
+      "apply_patch_draft",
+      "run_guarded_check",
+    ],
+    "src/lib/provider-client.js": [
+      "save_provider_config",
+      "test_provider_model_with_cache",
+    ],
+    "src/lib/terminal-client.js": [
+      "start_terminal_session",
+      "write_terminal_session",
+      "open_native_terminal",
+    ],
     "src/lib/workspace-goal-client.js": ["create_goal", "switch_active_goal"],
-    "src/lib/workspace-registry-client.js": ["add_registry_project", "switch_registry_project"],
+    "src/lib/workspace-registry-client.js": [
+      "add_registry_project",
+      "switch_registry_project",
+    ],
   };
   for (const [file, commands] of Object.entries(expectedCommands)) {
     const client = source(file);
-    assert.match(client, /invokeRuntimeCommand|invokeTauriCommand|invokeWorkspaceOperation/, `${file} must use the shared runtime adapter`);
-    for (const command of commands) assert.match(client, new RegExp(command), `${file} must own ${command}`);
+    assert.match(
+      client,
+      /invokeRuntimeCommand|invokeTauriCommand|invokeWorkspaceOperation/,
+      `${file} must use the shared runtime adapter`,
+    );
+    for (const command of commands)
+      assert.match(client, new RegExp(command), `${file} must own ${command}`);
   }
 });
 
@@ -759,7 +1099,10 @@ test("keeps the App three-column shell outside the lifecycle container", () => {
   const shell = source("src/components/workbench/app-shell.jsx");
   const surface = source("src/components/workbench/app-workbench-surface.jsx");
   const app = componentSource(workbench, "App", "ActionFeedbackToast");
-  assert.match(workbench, /import \{ AppWorkbenchSurface \} from "\.\/components\/workbench\/app-workbench-surface"/);
+  assert.match(
+    workbench,
+    /import \{ AppWorkbenchSurface \} from "\.\/components\/workbench\/app-workbench-surface"/,
+  );
   assert.match(app, /<AppWorkbenchSurface/);
   assert.equal(app.includes('className="shell"'), false);
   assert.equal(app.includes("<TooltipProvider"), false);
@@ -774,20 +1117,40 @@ test("keeps the App three-column shell outside the lifecycle container", () => {
 test("keeps request progress in the conversation surface instead of duplicate global feedback", () => {
   const composer = source("src/components/workbench/chat-composer.jsx");
   const workbench = source("src/main.jsx");
-  const requestState = source("src/components/workbench/use-conversation-request-state.js");
-  const transcript = source("src/components/workbench/conversation-transcript.jsx");
-  assert.match(composer, /\{modelLoading \? <span className="chatComposerSpinner"/);
-  assert.equal(composer.includes("sending || modelLoading ? <span className=\"chatComposerSpinner\""), false);
+  const requestState = source(
+    "src/components/workbench/use-conversation-request-state.js",
+  );
+  const transcript = source(
+    "src/components/workbench/conversation-transcript.jsx",
+  );
+  assert.match(
+    composer,
+    /\{modelLoading \? <span className="chatComposerSpinner"/,
+  );
+  assert.equal(
+    composer.includes(
+      'sending || modelLoading ? <span className="chatComposerSpinner"',
+    ),
+    false,
+  );
   assert.match(workbench, /if \(feedback\.status === "running"\) return null;/);
-  assert.match(requestState, /setStreamingReply\(\(current\) => `\$\{current\}\$\{text\}`\)/);
+  assert.match(
+    requestState,
+    /setStreamingReply\(\(current\) => `\$\{current\}\$\{text\}`\)/,
+  );
   assert.match(transcript, /conversationMessage-streaming/);
 });
 
 test("keeps RightRail shared display primitives outside the root Workbench module", () => {
   const workbench = source("src/main.jsx");
-  const components = source("src/components/workbench/right-rail-components.jsx");
+  const components = source(
+    "src/components/workbench/right-rail-components.jsx",
+  );
   const presentation = source("src/lib/task-presentation.js");
-  assert.match(workbench, /import \{ GoalStatusIcon, GoalTaskItem, ProjectProfileItem, RailDisclosure \} from/);
+  assert.match(
+    workbench,
+    /import \{ GoalStatusIcon, GoalTaskItem, ProjectProfileItem, RailDisclosure \} from/,
+  );
   assert.equal(workbench.includes("function RailDisclosure"), false);
   assert.equal(workbench.includes("function GoalTaskItem"), false);
   assert.match(components, /export function RailDisclosure/);
@@ -799,12 +1162,24 @@ test("keeps RightRail shared display primitives outside the root Workbench modul
 
 test("keeps App Workspace capability and Provider record actions in dedicated hooks", () => {
   const workbench = source("src/main.jsx");
-  const capabilities = source("src/components/workbench/use-workspace-capability-actions.js");
-  const providerRecord = source("src/components/workbench/use-provider-test-record.js");
+  const capabilities = source(
+    "src/components/workbench/use-workspace-capability-actions.js",
+  );
+  const providerRecord = source(
+    "src/components/workbench/use-provider-test-record.js",
+  );
   assert.match(workbench, /useWorkspaceCapabilityActions\(\{/);
   assert.match(workbench, /useProviderTestRecord\(\{/);
-  assert.equal(workbench.includes("await workspaceCapabilityClient.updateProjectCapability"), false);
-  assert.equal(workbench.includes("setComposerModelTests\(\(current\) =>"), false);
+  assert.equal(
+    workbench.includes(
+      "await workspaceCapabilityClient.updateProjectCapability",
+    ),
+    false,
+  );
+  assert.equal(
+    workbench.includes("setComposerModelTests\(\(current\) =>"),
+    false,
+  );
   assert.match(capabilities, /export function useWorkspaceCapabilityActions/);
   assert.match(providerRecord, /export function useProviderTestRecord/);
   assert.equal(capabilities.includes("runtime-api"), false);
@@ -813,7 +1188,9 @@ test("keeps App Workspace capability and Provider record actions in dedicated ho
 
 test("keeps AgentWorkspace input and assistant action forwarding in a Conversation hook", () => {
   const workbench = source("src/main.jsx");
-  const actions = source("src/components/workbench/use-agent-workspace-input-actions.js");
+  const actions = source(
+    "src/components/workbench/use-agent-workspace-input-actions.js",
+  );
   assert.match(workbench, /import \{ useAgentWorkspaceInputActions \} from/);
   assert.match(workbench, /useAgentWorkspaceInputActions\(\{/);
   assert.equal(workbench.includes("event.clipboardData?.files"), false);
@@ -826,10 +1203,18 @@ test("keeps AgentWorkspace input and assistant action forwarding in a Conversati
 
 test("keeps Provider composer model derivation outside App", () => {
   const workbench = source("src/main.jsx");
-  const viewModel = source("src/components/workbench/use-provider-composer-view-model.js");
+  const viewModel = source(
+    "src/components/workbench/use-provider-composer-view-model.js",
+  );
   assert.match(workbench, /useProviderComposerViewModel\(\{/);
-  assert.equal(workbench.includes("const composerModelOptions = composerModels.length"), false);
-  assert.equal(workbench.includes("Object.fromEntries(\n    composerModelOptions.map"), false);
+  assert.equal(
+    workbench.includes("const composerModelOptions = composerModels.length"),
+    false,
+  );
+  assert.equal(
+    workbench.includes("Object.fromEntries(\n    composerModelOptions.map"),
+    false,
+  );
   assert.match(viewModel, /export function useProviderComposerViewModel/);
   assert.match(viewModel, /composerModelAvailability/);
   assert.match(viewModel, /currentProviderHealth/);
@@ -840,8 +1225,16 @@ test("keeps active Task projection inside the Task session boundary", () => {
   const workbench = source("src/main.jsx");
   const session = source("src/components/workbench/use-task-session.js");
   assert.match(workbench, /activeTaskId,\n    activeTask,/);
-  assert.match(workbench, /<AgentWorkspace\n          snapshot=\{snapshot\}\n          activeTaskId=\{activeTaskId\}/);
-  assert.equal(workbench.includes("const activeTask = tasks.find((task) => task.id === activeTaskId)"), false);
+  assert.match(
+    workbench,
+    /<AgentWorkspace\n          snapshot=\{snapshot\}\n          activeTaskId=\{activeTaskId\}/,
+  );
+  assert.equal(
+    workbench.includes(
+      "const activeTask = tasks.find((task) => task.id === activeTaskId)",
+    ),
+    false,
+  );
   assert.match(session, /const activeTask = tasks\.find/);
   assert.match(session, /activeTask,/);
 });
@@ -850,7 +1243,10 @@ test("injects goal creation into the AgentWorkspace task board boundary", () => 
   const workbench = source("src/main.jsx");
   const workspace = componentSource(workbench, "AgentWorkspace", "statusLabel");
   assert.match(workspace, /onCreateGoal,/);
-  assert.match(workbench, /onCreateTask=\{createManualTask\}\n          onCreateGoal=\{createGoal\}/);
+  assert.match(
+    workbench,
+    /onCreateTask=\{createManualTask\}\n          onCreateGoal=\{createGoal\}/,
+  );
 });
 
 test("keeps AgentWorkspace runtime selection injected from the App adapter boundary", () => {
@@ -862,7 +1258,9 @@ test("keeps AgentWorkspace runtime selection injected from the App adapter bound
 });
 
 test("routes every submitted attachment cleanup through the Conversation resource boundary", () => {
-  const submission = source("src/components/workbench/use-conversation-submission.js");
+  const submission = source(
+    "src/components/workbench/use-conversation-submission.js",
+  );
   const workbench = source("src/main.jsx");
   assert.match(submission, /clearAttachments/);
   assert.equal(submission.includes("setAttachments([])"), false);
@@ -883,7 +1281,9 @@ test("keeps terminal and attachment retention budgets in one resource module", (
 test("collects bounded performance samples at startup, route, conversation, and terminal boundaries", () => {
   const workbench = source("src/main.jsx");
   const tabs = source("src/components/workbench/use-workspace-tabs.js");
-  const persistence = source("src/components/workbench/use-conversation-persistence.js");
+  const persistence = source(
+    "src/components/workbench/use-conversation-persistence.js",
+  );
   const terminal = source("src/components/workbench/use-terminal-session.js");
   const patchActions = source("src/components/workbench/use-patch-actions.js");
   const executionActions = source("src/lib/execution-action-controller.js");
@@ -891,11 +1291,107 @@ test("collects bounded performance samples at startup, route, conversation, and 
   assert.match(workbench, /exposeDesktopPerformanceBaseline\(\)/);
   assert.match(workbench, /recordWorkbenchReady\(\)/);
   assert.match(tabs, /measureDesktopPerformance\("workspace-route"\)/);
-  assert.match(persistence, /measureDesktopPerformance\("conversation-update"\)/);
+  assert.match(
+    persistence,
+    /measureDesktopPerformance\("conversation-update"\)/,
+  );
   assert.match(terminal, /measureDesktopPerformance\("terminal-output"\)/);
   assert.match(patchActions, /measureDesktopPerformance\("patch-draft"/);
   assert.match(patchActions, /measureDesktopPerformance\("patch-apply"/);
   assert.match(executionActions, /measureDesktopPerformance\("guarded-check"/);
   assert.match(recorder, /maxSamples: 60/);
   assert.doesNotMatch(recorder, /text:|attachments:|content:/);
+});
+
+test("keeps the style entrypoint as an ordered domain composition", () => {
+  const entrypoint = source("src/styles.css");
+  const theme = source("src/styles/theme.css");
+  const workspace = source("src/styles/workspace.css");
+  const conversation = source("src/styles/conversation.css");
+  const terminal = source("src/styles/terminal.css");
+  const providerRail = source("src/styles/provider-rail.css");
+  assert.deepEqual(entrypoint.trim().split("\n"), [
+    '@import "./styles/base.css";',
+    '@import "./styles/theme.css";',
+    '@import "./styles/workspace.css";',
+    '@import "./styles/conversation.css";',
+    '@import "./styles/terminal.css";',
+    '@import "./styles/provider-rail.css";',
+  ]);
+  assert.match(theme, /--desktop-gray-950/);
+  assert.match(workspace, /\.workspace \{/);
+  assert.match(conversation, /\.conversation \{/);
+  assert.match(terminal, /\.terminalDock \{/);
+  assert.match(terminal, /\.goalStack \{/);
+  assert.match(providerRail, /\.providerPanel \{/);
+});
+
+test("keeps pure chat routing outside the Tauri command assembly", () => {
+  const app = source("src-tauri/src/runtime/app.rs");
+  const routing = source("src-tauri/src/runtime/chat_routing.rs");
+  assert.match(app, /use crate::runtime::chat_routing/);
+  assert.doesNotMatch(app, /fn is_task_like_message\(/);
+  assert.match(routing, /pub fn should_create_plan_for_message/);
+  assert.match(routing, /#\[cfg\(test\)\]/);
+});
+
+test("keeps read-only planning outside the Tauri command assembly", () => {
+  const app = source("src-tauri/src/runtime/app.rs");
+  const planning = source("src-tauri/src/runtime/planning.rs");
+  assert.match(app, /use crate::runtime::planning/);
+  assert.doesNotMatch(app, /struct PlanContext/);
+  assert.doesNotMatch(app, /fn build_local_readonly_plan\(/);
+  assert.doesNotMatch(app, /fn generate_provider_plan\(/);
+  assert.match(planning, /pub fn build_local_readonly_plan/);
+  assert.match(planning, /pub async fn generate_provider_plan/);
+  assert.match(planning, /#\[cfg\(test\)\]/);
+});
+
+test("keeps local chat content outside the Tauri command assembly", () => {
+  const app = source("src-tauri/src/runtime/app.rs");
+  const content = source("src-tauri/src/runtime/chat_content.rs");
+  assert.match(app, /use crate::runtime::chat_content/);
+  assert.doesNotMatch(app, /struct DialogueContextInput/);
+  assert.doesNotMatch(app, /fn chat_router_prompt\(/);
+  assert.doesNotMatch(app, /fn local_chat_result\(/);
+  assert.match(content, /pub fn chat_router_prompt/);
+  assert.match(content, /pub fn local_chat_result/);
+  assert.match(content, /#\[cfg\(test\)\]/);
+});
+
+test("keeps chat evidence projection outside the Tauri command assembly", () => {
+  const app = source("src-tauri/src/runtime/app.rs");
+  const content = source("src-tauri/src/runtime/chat_content.rs");
+  assert.doesNotMatch(app, /fn chat_project_evidence\(/);
+  assert.doesNotMatch(app, /fn chat_references_for_message\(/);
+  assert.doesNotMatch(app, /fn compact_json_items\(/);
+  assert.match(content, /pub fn project_evidence/);
+  assert.match(content, /pub fn references_for_message/);
+});
+
+test("keeps Workspace registry persistence outside the Tauri command assembly", () => {
+  const app = source("src-tauri/src/runtime/app.rs");
+  const workspace = source("src-tauri/src/runtime/workspace.rs");
+  assert.doesNotMatch(app, /fn load_or_seed_registry\(/);
+  assert.doesNotMatch(app, /fn save_registry\(/);
+  assert.doesNotMatch(app, /fn current_registry_project\(/);
+  assert.doesNotMatch(app, /fn normalize_project_path\(/);
+  assert.doesNotMatch(app, /fn project_id_from_path\(/);
+  assert.doesNotMatch(app, /fn registry_projects\(/);
+  assert.doesNotMatch(app, /fn project_task_summary\(/);
+  assert.doesNotMatch(app, /fn project_health\(/);
+  assert.match(workspace, /pub fn load_or_seed_registry/);
+  assert.match(workspace, /pub fn save_registry/);
+  assert.match(workspace, /pub fn current_registry_project/);
+  assert.match(workspace, /pub fn normalize_project_path/);
+  assert.match(workspace, /pub fn project_id_from_path/);
+  assert.match(workspace, /pub fn registry_project_summaries/);
+});
+
+test("keeps Workspace facts projection outside the Tauri command assembly", () => {
+  const app = source("src-tauri/src/runtime/app.rs");
+  const workspace = source("src-tauri/src/runtime/workspace.rs");
+  assert.doesNotMatch(app, /fn build_workspace_facts_preview\(/);
+  assert.match(workspace, /pub fn build_workspace_facts_preview/);
+  assert.match(app, /workspace::build_workspace_facts_preview/);
 });

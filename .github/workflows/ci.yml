@@ -74,6 +74,8 @@ jobs:
           bash scripts/check-frontmatter.sh .
           bash scripts/check-doc-structure.sh .
           bash scripts/check-secrets.sh .
+          node scripts/audit-repository-files.mjs --check
+          node scripts/audit-schema-contracts.mjs --check
 
       - name: Ensure tracked files are unchanged
         run: git diff --exit-code

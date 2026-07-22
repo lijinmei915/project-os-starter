@@ -46,7 +46,7 @@ test("routes patch drafts through the Preview read-only endpoint", async () => {
   try {
     const task = { id: "task-1", plan: { candidateChanges: [] } };
     assert.deepEqual(await invokePreviewCommand("generate_patch_draft", { input: { task } }), { diff: "PATCH_DRAFT_PENDING", files: [] });
-    assert.equal(request.url, "/__project-os/generate-patch-draft");
+    assert.equal(request.url, "/__omnidesk/generate-patch-draft");
   } finally { globalThis.fetch = originalFetch; }
 });
 

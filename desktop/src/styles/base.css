@@ -1,0 +1,18 @@
+* { box-sizing: border-box; }
+
+html, body, #root {
+  width: 100%; height: 100%; margin: 0; overflow: hidden;
+  background: var(--bg); color: var(--text); font-family: var(--sans);
+  -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; letter-spacing: 0;
+}
+
+body { min-width: 1024px; }
+
+.appError { display: grid; place-items: center; width: 100%; height: 100%; background: var(--desktop-surface-page); padding: var(--space-24); }
+.appErrorPanel { display: grid; gap: var(--space-12); width: min(420px, 100%); }
+.appErrorPanel strong { color: var(--desktop-type-title-color); font-size: var(--desktop-type-title-size); font-weight: var(--desktop-type-title-weight); }
+.appErrorPanel p { margin: 0; color: var(--desktop-type-body-secondary-color); font-size: var(--desktop-type-body-size); font-weight: var(--desktop-type-body-weight); line-height: 1.5; }
+
+button, input, select, textarea { font: inherit; }
+button { cursor: default; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: none; box-shadow: var(--desktop-focus-ring); }

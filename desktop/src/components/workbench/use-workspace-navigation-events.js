@@ -14,11 +14,11 @@ export function useWorkspaceNavigationEvents({ setActiveWorkspaceTab }) {
   useEffect(() => {
     const onOpenConversation = () => setActiveWorkspaceTab("plan");
     const onOpenTerminal = () => setActiveWorkspaceTab("terminal");
-    window.addEventListener("project-os:open-conversation", onOpenConversation);
-    window.addEventListener("project-os:open-terminal", onOpenTerminal);
+    window.addEventListener("omnidesk:open-conversation", onOpenConversation);
+    window.addEventListener("omnidesk:open-terminal", onOpenTerminal);
     return () => {
-      window.removeEventListener("project-os:open-conversation", onOpenConversation);
-      window.removeEventListener("project-os:open-terminal", onOpenTerminal);
+      window.removeEventListener("omnidesk:open-conversation", onOpenConversation);
+      window.removeEventListener("omnidesk:open-terminal", onOpenTerminal);
     };
   }, [setActiveWorkspaceTab]);
 }

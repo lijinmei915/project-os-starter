@@ -2,7 +2,7 @@ import { invokeRuntimeCommand, invokeTauriCommand, isTauriRuntime } from "./runt
 
 export async function listDesktopTasks() {
   if (isTauriRuntime()) return invokeTauriCommand("list_desktop_tasks");
-  const response = await fetch("/__project-os/desktop-tasks");
+  const response = await fetch("/__omnidesk/desktop-tasks");
   if (!response.ok) return [];
   return response.json();
 }

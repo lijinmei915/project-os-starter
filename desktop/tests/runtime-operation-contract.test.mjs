@@ -7,7 +7,7 @@ import { previewOperation, runtimeOperations } from "../src/lib/runtime-operatio
 test("declares Preview policy with transport metadata for every shared operation", () => {
   for (const [id, operation] of Object.entries(runtimeOperations)) {
     assert.match(id, /^[a-z_]+$/);
-    assert.match(operation.endpoint, /^\/__project-os\//);
+    assert.match(operation.endpoint, /^\/__omnidesk\//);
     assert.equal(typeof operation.error, "string");
     assert.ok(["allow", "deny"].includes(operation.preview));
   }

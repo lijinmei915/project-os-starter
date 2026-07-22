@@ -67,7 +67,7 @@ OmniDesk 以 `desktop/` 的 Tauri + React 工作台为唯一用户界面。设�
 
 - Radix primitives / Slot 等无头能力
 - shadcn-style 本地组件拷贝与改造
-- Project OS Desktop token layer 作为视觉 SSOT
+- OmniDesk Desktop token layer 作为视觉 SSOT
 
 规则：
 
@@ -96,7 +96,7 @@ OmniDesk 以 `desktop/` 的 Tauri + React 工作台为唯一用户界面。设�
 
 ## 一句话原则
 
-Project OS 的设计规范目标不是写一份大而全 UI 手册，而是让 AI 在真正生成 UI 前知道：
+OmniDesk 的设计规范目标不是写一份大而全 UI 手册，而是让 AI 在真正生成 UI 前知道：
 
 - 该走 `design-system`
 - 该复用 token

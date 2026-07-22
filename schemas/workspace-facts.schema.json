@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://project-os.local/schemas/workspace-facts.schema.json",
+  "$id": "https://omnidesk.local/schemas/workspace-facts.schema.json",
   "title": "Workspace Facts",
   "description": "Workspace-level facts inferred from a local project without modifying user project files.",
   "type": "object",
   "required": ["schemaVersion", "project", "mode", "status", "healthScore", "governanceLevel", "summary", "evidence", "governanceDomains", "recommendations", "findings", "recommendation"],
   "properties": {
     "schemaVersion": {
-      "const": "project-os.workspace-facts.v0.1"
+      "const": "omnidesk.workspace-facts.v0.1"
     },
     "generatedAt": {
       "type": "string",

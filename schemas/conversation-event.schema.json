@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://project-os.local/schemas/conversation-event.schema.json",
+  "$id": "https://omnidesk.local/schemas/conversation-event.schema.json",
   "title": "OmniDesk Conversation Event",
   "type": "object",
   "required": ["schemaVersion", "id", "type", "phase", "status", "actor", "requestId", "timestamp", "payload"],

@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://project-os.local/schemas/project-overview-view-model.schema.json",
+  "$id": "https://omnidesk.local/schemas/project-overview-view-model.schema.json",
   "title": "Project Overview View Model",
   "type": "object",
   "required": ["schemaVersion", "projectId", "observedAt", "slots"],
   "properties": {
-    "schemaVersion": { "const": "project-os.project-overview-view-model.v0.1" },
+    "schemaVersion": { "const": "omnidesk.project-overview-view-model.v0.1" },
     "projectId": { "type": "string", "minLength": 1 },
     "observedAt": { "type": "string" },
     "slots": {

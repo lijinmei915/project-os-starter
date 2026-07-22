@@ -16,7 +16,7 @@ test("reads conversations from the preview endpoint", async () => {
   };
   try {
     assert.deepEqual(await listDesktopConversations(), [{ id: "conv-1" }]);
-    assert.equal(request.url, "/__project-os/desktop-conversations");
+    assert.equal(request.url, "/__omnidesk/desktop-conversations");
     assert.equal(request.options, undefined);
   } finally {
     globalThis.fetch = originalFetch;

@@ -3,6 +3,8 @@ use serde_json::Value;
 use std::path::Path;
 
 const CONVERSATION_DIRECTORY: &str = ".omnidesk/data/conversations";
+const CONVERSATION_SCHEMA_VERSION: &str = "omnidesk.desktop-conversation.v0.1";
+const LEGACY_CONVERSATION_SCHEMA_VERSION: &str = "project-os.desktop-conversation.v0.1";
 
 fn safe_file_stem(id: &str) -> String {
     id.chars()
@@ -27,7 +29,7 @@ pub fn list(root: &Path) -> Result<Vec<Value>, String> {
     let mut conversations = Repository::new(root)
         .list_json_records(CONVERSATION_DIRECTORY)?
         .into_iter()
-        .map(|(_, conversation)| conversation)
+        .map(|(_, conversation)| project_conversation_schema(conversation))
         .collect::<Vec<_>>();
     conversations.sort_by(|a, b| {
         b.get("updatedAt")
@@ -37,6 +39,30 @@ pub fn list(root: &Path) -> Result<Vec<Value>, String> {
     });
     conversations.truncate(50);
     Ok(conversations)
+}
+
+fn project_conversation_schema(mut conversation: Value) -> Value {
+    if conversation.get("schemaVersion").and_then(Value::as_str)
+        != Some(LEGACY_CONVERSATION_SCHEMA_VERSION)
+    {
+        return conversation;
+    }
+    let Some(object) = conversation.as_object_mut() else {
+        return conversation;
+    };
+    object.insert(
+        "schemaVersion".to_string(),
+        Value::String(CONVERSATION_SCHEMA_VERSION.to_string()),
+    );
+    object.insert(
+        "schemaMigration".to_string(),
+        serde_json::json!({
+            "from": LEGACY_CONVERSATION_SCHEMA_VERSION,
+            "mode": "read-projection",
+            "to": CONVERSATION_SCHEMA_VERSION,
+        }),
+    );
+    conversation
 }
 
 pub fn save(
@@ -57,8 +83,9 @@ pub fn save(
         .ok_or_else(|| "对话记录必须是 JSON object".to_string())?;
     object.insert(
         "schemaVersion".to_string(),
-        Value::String("project-os.desktop-conversation.v0.1".to_string()),
+        Value::String(CONVERSATION_SCHEMA_VERSION.to_string()),
     );
+    object.remove("schemaMigration");
     object.insert(
         "updatedAt".to_string(),
         Value::String(timestamp.to_string()),
@@ -114,5 +141,33 @@ mod tests {
         assert_eq!(list(&root).unwrap()[0]["projectPath"], "/project");
         delete(&root, "conversation/1").unwrap();
         assert!(list(&root).unwrap().is_empty());
+    }
+
+    #[test]
+    fn projects_legacy_conversation_schema_without_rewriting_history() {
+        let projected = project_conversation_schema(json!({
+            "id": "legacy-conversation",
+            "schemaVersion": "project-os.desktop-conversation.v0.1"
+        }));
+        assert_eq!(projected["schemaVersion"], CONVERSATION_SCHEMA_VERSION);
+        assert_eq!(projected["schemaMigration"]["from"], LEGACY_CONVERSATION_SCHEMA_VERSION);
+        assert_eq!(projected["schemaMigration"]["mode"], "read-projection");
+    }
+
+    #[test]
+    fn saving_a_projected_conversation_persists_only_the_current_schema() {
+        let root = std::env::temp_dir().join(format!(
+            "omnidesk-conversation-migration-{}",
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        let projected = project_conversation_schema(json!({
+            "id": "legacy-conversation",
+            "schemaVersion": LEGACY_CONVERSATION_SCHEMA_VERSION,
+        }));
+        save(&root, "/project", projected, "now").unwrap();
+        let saved = Repository::new(&root).read_json(&relative_path("legacy-conversation")).unwrap();
+        assert_eq!(saved["schemaVersion"], CONVERSATION_SCHEMA_VERSION);
+        assert!(saved.get("schemaMigration").is_none());
+        std::fs::remove_dir_all(root).unwrap();
     }
 }

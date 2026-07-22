@@ -2,7 +2,7 @@ import { invokeRuntimeCommand, invokeTauriCommand, isTauriRuntime } from "./runt
 
 export function getProviderStatus(fallbackProvider) {
   if (isTauriRuntime()) return invokeTauriCommand("get_provider_status");
-  return loadPreviewJson("/__project-os/provider-status", fallbackProvider);
+  return loadPreviewJson("/__omnidesk/provider-status", fallbackProvider);
 }
 
 export function getModelCatalog(fallbackModelCatalog) {
@@ -10,7 +10,7 @@ export function getModelCatalog(fallbackModelCatalog) {
   return loadPreviewJson("/.omnidesk/data/model-catalog.json", fallbackModelCatalog);
 }
 
-export function getModelHealth(fallbackModelHealth = { schemaVersion: "project-os.model-health.v0.1", entries: [] }) {
+export function getModelHealth(fallbackModelHealth = { schemaVersion: "omnidesk.model-health.v0.1", entries: [] }) {
   if (isTauriRuntime()) return invokeTauriCommand("get_model_health");
   return loadPreviewJson("/.omnidesk/cache/model-health.json", fallbackModelHealth);
 }

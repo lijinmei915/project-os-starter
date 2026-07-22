@@ -1,11 +1,11 @@
 {
-  "schemaVersion": "knowledge-registry.v0.1",
-  "generatedAt": "2026-07-20T02:41:40Z",
+  "schemaVersion": "omnidesk.knowledge-registry.v0.1",
+  "generatedAt": "2026-07-21T00:00:00Z",
   "entries": [
     {
       "id": "AGENTS.md",
-      "teaches": "AI 在本项目中的行为边界、路由契约、文档更新规则和禁止操作",
-      "useWhen": "AI 首次进入项目、需要确认自己能做什么不能做什么、或处理路由分流时",
+      "teaches": "AI 在 OmniDesk Runtime 中的行为边界、状态规则、验证门槛和禁止操作",
+      "useWhen": "AI 首次进入项目、修改 Desktop Runtime 或需要确认自己能做什么不能做什么时",
       "layer": "governance",
       "type": "spec",
       "stale": false
@@ -20,16 +20,16 @@
     },
     {
       "id": "INSTALL.md",
-      "teaches": "Project OS 的安装方式、profile 选择、升级路径和安装后的使用方法",
-      "useWhen": "用户要把 Project OS 安装到新项目或已有项目、或需要升级版本时",
+      "teaches": "OmniDesk Desktop 的本地依赖、启动方式和安装验证",
+      "useWhen": "维护者需要在新机器启动 OmniDesk 或排查本地安装问题时",
       "layer": "entry",
       "type": "guide",
       "stale": false
     },
     {
       "id": "PRODUCT.md",
-      "teaches": "产品的定位、核心价值主张和目标用户画像",
-      "useWhen": "AI 需要理解产品是什么、为谁服务、核心价值在哪时",
+      "teaches": "OmniDesk 的产品定位、目标用户、核心价值与体验边界",
+      "useWhen": "AI 需要判断某项功能是否服务 OmniDesk 用户、产品价值或体验取舍时",
       "layer": "knowledge",
       "type": "spec",
       "stale": false
@@ -60,8 +60,8 @@
     },
     {
       "id": "docs/BACKEND.md",
-      "teaches": "后端技术栈选型、架构模式、API 契约和部署策略",
-      "useWhen": "AI 需要写后端代码、选数据库、定义 API 接口或配置部署时",
+      "teaches": "OmniDesk 本地 Rust Runtime 的服务边界、持久化、Provider、工具执行与安全约束",
+      "useWhen": "AI 要修改 Tauri command、Rust Runtime、Provider、状态事务、Patch、终端或受控检查时",
       "layer": "knowledge",
       "type": "spec",
       "stale": false
@@ -76,8 +76,8 @@
     },
     {
       "id": "docs/DECISIONS.md",
-      "teaches": "历史关键决策的原因、被放弃的备选方案和决策影响",
-      "useWhen": "AI 需要理解某个架构选择的背景、或面临类似决策需要参考先例时",
+      "teaches": "历史关键决策的原因、被放弃的备选方案和已归档的影响；现行规则不以此为准",
+      "useWhen": "AI 需要理解某个架构选择的背景或参考先例；现行规则以 AGENTS.md、PROJECT.md 和 DOCUMENTATION.md 为准",
       "layer": "knowledge",
       "type": "log",
       "stale": false
@@ -86,6 +86,22 @@
       "id": "docs/DESIGN_STANDARDS.md",
       "teaches": "设计 token 体系、布局规则、组件库策略和视觉边界",
       "useWhen": "AI 要调整 UI 样式、选颜色/字号/间距、或判断设计方案是否合规时",
+      "layer": "knowledge",
+      "type": "spec",
+      "stale": false
+    },
+    {
+      "id": "docs/design/layout.md",
+      "teaches": "OmniDesk Desktop Workbench 的布局层级、密度、响应式和状态呈现规则",
+      "useWhen": "AI 要调整 Desktop Workbench、对话、终端、项目列表或响应式布局时",
+      "layer": "knowledge",
+      "type": "spec",
+      "stale": false
+    },
+    {
+      "id": "docs/design/tokens.md",
+      "teaches": "OmniDesk Desktop CSS token 的层级、命名、状态语义和使用边界",
+      "useWhen": "AI 要新增或调整 OmniDesk Desktop 的颜色、字号、间距、圆角、工具栏或状态样式时",
       "layer": "knowledge",
       "type": "spec",
       "stale": false
@@ -108,8 +124,8 @@
     },
     {
       "id": "docs/FRONTEND.md",
-      "teaches": "前端技术栈选型、组件规范、状态管理、路由策略和构建工具",
-      "useWhen": "AI 要写前端代码、选组件库、调整路由或排查构建问题时",
+      "teaches": "OmniDesk React Workbench 的技术栈、领域组织、状态边界和样式约定",
+      "useWhen": "AI 要修改 OmniDesk 前端、组件、领域 hook、Runtime client 或样式时",
       "layer": "knowledge",
       "type": "spec",
       "stale": false

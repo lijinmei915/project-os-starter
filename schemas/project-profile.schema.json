@@ -1,14 +1,14 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "project-profile.schema.json",
-  "title": "Project OS Profile",
+  "$id": "https://omnidesk.local/schemas/project-profile.schema.json",
+  "title": "OmniDesk Project Profile",
   "description": "Large, structured project profile for natural conversation-driven governance. UI should reveal only useful slices, while agents can use the full profile as background context.",
   "type": "object",
   "required": ["schemaVersion", "fields"],
   "properties": {
     "schemaVersion": {
       "type": "string",
-      "const": "project-os.project-profile.v0.1"
+      "const": "omnidesk.project-profile.v0.1"
     },
     "projectId": {
       "type": "string"

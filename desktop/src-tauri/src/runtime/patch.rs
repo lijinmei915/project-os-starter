@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::fs;
 use std::path::{Component, Path};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -62,12 +63,190 @@ pub fn draft_ineligibility_reason(plan: &Value, files: &[String]) -> Option<Stri
     None
 }
 
-fn is_patch_context_path(path: &str) -> bool {
-    !path.starts_with('/')
-        && !path.contains("..")
-        && !path.starts_with(".env")
-        && !path.contains("/.env")
-        && !path.contains(".omnidesk/desktop-provider")
+pub fn is_context_path(path: &str) -> bool {
+    if path.starts_with('/')
+        || path.contains("..")
+        || path.starts_with(".env")
+        || path.contains("/.env")
+        || path == ".omnidesk"
+        || path.starts_with(".omnidesk/")
+    {
+        return false;
+    }
+    matches!(
+        Path::new(path).extension().and_then(|value| value.to_str()),
+        Some("js" | "jsx" | "ts" | "tsx" | "css" | "rs" | "md" | "json" | "toml")
+    )
+}
+
+#[allow(dead_code)] // The standalone patch-normalizer does not read project plans.
+pub fn plan_context_files(plan: &Value, root: &Path) -> Vec<String> {
+    let mut files = plan
+        .get("filesToRead")
+        .or_else(|| plan.get("files_to_read"))
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+        .filter(|path| is_context_path(path))
+        .filter(|path| root.join(path).is_file())
+        .map(ToString::to_string)
+        .collect::<Vec<_>>();
+    files.sort();
+    files.dedup();
+    files.truncate(8);
+    files
+}
+
+#[allow(dead_code)] // The standalone patch-normalizer receives already-bounded context.
+pub fn read_context_files(root: &Path, files: &[String]) -> Result<Vec<(String, String)>, String> {
+    let mut contexts = Vec::new();
+    for relative in files {
+        if !is_context_path(relative) {
+            return Err(format!("Patch 上下文路径不安全：{relative}"));
+        }
+        let content = fs::read_to_string(root.join(relative))
+            .map_err(|err| format!("读取 {relative} 失败: {err}"))?;
+        contexts.push((
+            relative.clone(),
+            content.chars().take(12_000).collect::<String>(),
+        ));
+    }
+    Ok(contexts)
+}
+
+#[allow(dead_code)] // The standalone patch-normalizer does not create UI drafts.
+pub fn local_placeholder_draft(
+    title: &str,
+    files: &[String],
+    contexts: &[(String, String)],
+    failure_reason: &str,
+) -> PatchDraft {
+    let file_list = if files.is_empty() {
+        "暂无可安全读取的候选文件".to_string()
+    } else {
+        files.join(", ")
+    };
+    PatchDraft {
+        summary: format!("已为「{title}」准备 patch 草案入口；需要模型生成具体 diff。"),
+        diff: format!(
+            "--- /dev/null\n+++ PATCH_DRAFT_PENDING\n@@\n+任务：{title}\n+候选文件：{file_list}\n+当前步骤只生成审阅草案，不写入文件。\n"
+        ),
+        files: files.to_vec(),
+        allowed_files: files.to_vec(),
+        context_files: contexts.iter().map(|(path, _)| path.clone()).collect(),
+        draft_attempt: 1,
+        failure_reason: failure_reason.to_string(),
+        not_applicable: false,
+        guardrails: vec![
+            "只生成 diff 草案，不写入文件。".to_string(),
+            "不读取 .env 或 provider key 配置。".to_string(),
+            "Apply 前必须经过用户确认。".to_string(),
+        ],
+        trace: vec![
+            format!("PATCH_CONTEXT_FILES: {}", contexts.len()),
+            "PATCH_MODE: local placeholder".to_string(),
+        ],
+    }
+}
+
+#[allow(dead_code)] // The standalone patch-normalizer does not create UI drafts.
+pub fn not_applicable_draft(title: &str, files: &[String], reason: &str) -> PatchDraft {
+    PatchDraft {
+        summary: format!("「{title}」暂不生成文件改动：{reason}"),
+        diff: String::new(),
+        files: files.to_vec(),
+        allowed_files: files.to_vec(),
+        context_files: Vec::new(),
+        draft_attempt: 0,
+        failure_reason: reason.to_string(),
+        not_applicable: true,
+        guardrails: vec![
+            "该任务当前不具备可应用的工程改动，不会调用模型生成占位 diff。".to_string(),
+            "先运行检查或调整计划后，才可能生成受控 Patch。".to_string(),
+        ],
+        trace: vec!["PATCH_SEMANTIC_GATE: not-applicable".to_string()],
+    }
+}
+
+#[allow(dead_code)] // Provider prompting belongs to the desktop runtime, not the normalizer CLI.
+pub fn provider_draft_prompt(
+    title: &str,
+    plan: &Value,
+    contexts: &[(String, String)],
+    retry_reason: Option<&str>,
+) -> String {
+    let context_text = contexts
+        .iter()
+        .map(|(path, content)| format!("--- FILE: {path} ---\n{content}"))
+        .collect::<Vec<_>>()
+        .join("\n\n");
+    format!(
+        r#"Generate a safe unified diff draft for this local coding task.
+
+Return strict JSON with this exact shape:
+{{
+  "summary": "Chinese one-sentence summary",
+  "diff": "unified diff text only",
+  "files": ["relative/path"],
+  "allowedFiles": ["relative/path"],
+  "contextFiles": ["relative/path"],
+  "guardrails": ["string"],
+  "trace": ["string"]
+}}
+
+Rules:
+- Return a unified diff draft, but do not claim it has been applied.
+- Only modify files included in FILE CONTEXT.
+- If the context is insufficient, return a small placeholder diff and explain the missing context in summary.
+- Do not include secrets, API keys, or .env content.
+- Prefer small, reviewable changes.
+- Every changed file requires a complete --- a/path / +++ b/path header and at least one context line.
+- Do not create, delete, or rename files.
+
+Task title: {title}
+Plan JSON:
+{}
+
+FILE CONTEXT:
+{context_text}
+
+{}
+"#,
+        serde_json::to_string_pretty(plan).unwrap_or_else(|_| "{}".to_string()),
+        retry_reason.map(|reason| format!("REGENERATION REASON (fix it without expanding scope): {reason}")).unwrap_or_default()
+    )
+}
+
+#[allow(dead_code)] // Hermes prompting belongs to the desktop runtime, not the normalizer CLI.
+pub fn hermes_draft_prompt(title: &str, plan: &Value, contexts: &[(String, String)]) -> String {
+    let context_text = contexts
+        .iter()
+        .map(|(path, content)| format!("--- FILE: {path} ---\n{content}"))
+        .collect::<Vec<_>>()
+        .join("\n\n");
+    format!(
+        r#"You are a read-only patch-draft generator inside OmniDesk.
+
+Return exactly one unified diff and no markdown fence or explanation.
+
+Hard boundaries:
+- Do not write, delete, rename, or create files.
+- Do not run commands, open a terminal, call external tools, browse, or make network requests.
+- Use only the supplied FILE CONTEXT. Do not read any other project file.
+- Modify only files listed in FILE CONTEXT. Never output .env, credentials, provider config, or secret values.
+- If no safe diff is possible, return no diff. OmniDesk will treat that as a failed draft.
+
+Task title: {title}
+Plan JSON:
+{}
+
+FILE CONTEXT:
+{context_text}"#,
+        serde_json::to_string_pretty(plan).unwrap_or_else(|_| "{}".to_string())
+    )
 }
 
 pub fn normalize_hermes_unified_diff(
@@ -161,7 +340,7 @@ pub fn files_from_unified_diff(diff: &str) -> Vec<String> {
         .filter_map(|line| line.strip_prefix("+++ "))
         .filter_map(|path| {
             let path = path.trim().trim_start_matches("b/");
-            (path != "/dev/null" && is_patch_context_path(path)).then(|| path.to_string())
+            (path != "/dev/null" && is_context_path(path)).then(|| path.to_string())
         })
         .collect::<Vec<_>>();
     files.sort();
@@ -182,7 +361,7 @@ fn hermes_diff_header_paths(diff: &str) -> Result<Vec<String>, String> {
             .get(index + 1)
             .ok_or_else(|| "Hermes diff 缺少 +++ 文件头".to_string())?;
         let new = unified_diff_header_path(new_line, "+++ ", "b/")?;
-        if old != new || !is_patch_context_path(&new) {
+        if old != new || !is_context_path(&new) {
             return Err("Hermes diff 包含不安全或不一致的文件头".to_string());
         }
         files.push(new);
@@ -403,8 +582,13 @@ fn parse_unified_hunk_range(value: &str, prefix: char) -> Result<(usize, usize),
 
 #[cfg(test)]
 mod tests {
-    use super::{draft_ineligibility_reason, normalize_hermes_unified_diff};
+    use super::{
+        draft_ineligibility_reason, is_context_path, local_placeholder_draft,
+        normalize_hermes_unified_diff, plan_context_files, read_context_files,
+    };
     use serde_json::json;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn rejects_validation_only_or_unscoped_draft_plans() {
@@ -413,6 +597,36 @@ mod tests {
         let change = json!({ "candidateChanges": ["调整状态提示"] });
         assert!(draft_ineligibility_reason(&change, &[]).is_some());
         assert_eq!(draft_ineligibility_reason(&change, &["src/app.ts".to_string()]), None);
+    }
+
+    #[test]
+    fn context_files_are_scoped_to_safe_existing_project_sources() {
+        let root = std::env::temp_dir().join(format!(
+            "omnidesk-patch-context-{}",
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        fs::create_dir_all(root.join("src")).unwrap();
+        fs::create_dir_all(root.join(".omnidesk/data")).unwrap();
+        fs::write(root.join("src/app.rs"), "fn main() {}\n").unwrap();
+        fs::write(root.join(".env.local"), "SECRET=value\n").unwrap();
+        fs::write(root.join(".omnidesk/data/state.json"), "{}\n").unwrap();
+        let plan = json!({
+            "filesToRead": [
+                "src/app.rs", "src/app.rs", ".env.local", ".omnidesk/data/state.json",
+                "../outside.rs", "missing.rs"
+            ]
+        });
+
+        let files = plan_context_files(&plan, &root);
+        assert_eq!(files, vec!["src/app.rs"]);
+        let contexts = read_context_files(&root, &files).unwrap();
+        assert_eq!(contexts, vec![("src/app.rs".to_string(), "fn main() {}\n".to_string())]);
+        assert!(!is_context_path(".omnidesk/data/state.json"));
+        assert!(read_context_files(&root, &[".env.local".to_string()]).is_err());
+        let draft = local_placeholder_draft("update app", &files, &contexts, "provider unavailable");
+        assert!(draft.diff.contains("PATCH_DRAFT_PENDING"));
+        assert_eq!(draft.allowed_files, vec!["src/app.rs"]);
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

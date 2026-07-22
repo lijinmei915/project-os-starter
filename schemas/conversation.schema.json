@@ -1,18 +1,18 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://project-os.local/schemas/conversation.schema.json",
-  "title": "Project OS Conversation",
+  "$id": "https://omnidesk.local/schemas/conversation.schema.json",
+  "title": "OmniDesk Conversation",
   "type": "object",
   "required": ["schemaVersion", "id", "runtimeState", "summary", "turns"],
   "properties": {
-    "schemaVersion": { "const": "project-os.conversation.v0.3" },
+    "schemaVersion": { "const": "omnidesk.conversation.v0.3" },
     "id": { "type": "string", "minLength": 1 },
     "runtimeState": { "enum": ["idle", "thinking", "awaiting-confirmation", "executing", "completed", "failed", "cancelled"] },
     "summary": {
       "type": "object",
       "required": ["version", "coveredTurnCount", "currentTopic", "conclusions", "constraints", "decisions", "executionResults", "unresolvedQuestions"],
       "properties": {
-        "version": { "const": "project-os.turn-summary.v0.1" },
+        "version": { "const": "omnidesk.turn-summary.v0.1" },
         "coveredTurnCount": { "type": "integer", "minimum": 0 },
         "coveredThroughTurnId": { "type": "string" },
         "currentTopic": { "type": "string" },

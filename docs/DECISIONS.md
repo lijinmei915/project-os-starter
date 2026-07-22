@@ -1,18 +1,24 @@
 ---
 layer: knowledge
 type: log
-last_verified: 2026-07-20
-teaches: "历史关键决策的原因、被放弃的备选方案和决策影响"
-use_when: "AI 需要理解某个架构选择的背景、或面临类似决策需要参考先例时"
+last_verified: 2026-07-21
+teaches: "历史关键决策的原因、被放弃的备选方案和已归档的影响"
+use_when: "AI 需要理解某个架构选择的背景或参考先例；现行规则以 AGENTS.md、PROJECT.md 和 DOCUMENTATION.md 为准"
 ---
 
-# 架构决策记录
+# 历史架构决策记录
 
 > 用途：记录重要决策、放弃项、原因和影响，回答“为什么这么定”。
 > 什么时候更新：出现正式架构、产品、协作规则或分发策略决策时。
 > 不要写什么：当前状态流水、小修记录、临时 TODO、当前交接事项。
 > 记录重要的技术决策和原因，防止重复踩坑。
 > 格式：决定 / 放弃 / 原因 / 影响。
+
+## 读取规则
+
+- 本文是历史决策档案，不是当前产品状态、运行规则或执行入口。
+- 现行行为以 `AGENTS.md`、`PROJECT.md`、`docs/DOCUMENTATION.md` 和对应 Runtime 模块为准；历史记录与它们冲突时，必须服从现行 SSOT。
+- `Legacy Project OS` 下的 D001-D018 保留为可追溯证据，不能恢复旧 CLI、Shell governance、安装器、模板分发、评分报告或跨工具 routing。
 
 ---
 
@@ -24,20 +30,22 @@ use_when: "AI 需要理解某个架构选择的背景、或面临类似决策需
 
 **决定**: OmniDesk 只保留一个产品内核：`desktop/` 内的 React Workbench 与 Tauri Local Agent Runtime。早期 Project OS CLI、安装器、评分报告、模板和跨工具 adapter 全部冻结，只在状态迁移和依赖断开期间承担兼容作用；新能力不得继续落入旧工具链。
 
-**放弃**: 不再同时维护“OmniDesk 桌面产品”和“Project OS 分发产品”两条产品主线；不直接删除 `.project-os/` 或整目录改名；不让 Desktop 永久依赖旧 CLI 和 Shell 治理算法。
+**放弃**: 不再同时维护“OmniDesk 桌面产品”和“Project OS 分发产品”两条产品主线；不让 Desktop 依赖旧 CLI 和 Shell 治理算法。
 
 **原因**:
 - 当前用户价值、权限边界、对话、任务、Patch、检查、终端和证据全部由 Desktop Runtime 承担。
 - 两套产品叙述共用状态、文档、CI 和测试，会持续误导 AI 路由并扩大维护面。
-- `.project-os/` 已包含真实用户任务、目标、对话和 Provider 元数据，直接删除或改名会造成数据丢失。
+- 当时 `.project-os/` 包含用户状态；后续已完成幂等迁移、差异归档和物理退役，历史证据位于 `.omnidesk/evidence/legacy-retirement/`。
 
 **影响**:
-- `PROJECT.md`、`.project-os/state.json` 和 `docs/ARCHITECTURE.md` 统一描述 OmniDesk Desktop Runtime。
-- 目标状态根为 `.omnidesk/`，按 `data/runtime/cache/evidence` 分区，并通过幂等迁移兼容 `.project-os/`。
-- `cli/`、旧 scripts、templates、adapters 和 routing skill 只有在 Desktop、CI、测试及文档引用全部断开后才能删除。
+- `PROJECT.md` 与 `docs/ARCHITECTURE.md` 描述 OmniDesk Desktop Runtime；`.omnidesk/` 是唯一运行状态根，按 `data/runtime/cache/evidence` 分区。
+- `.project-os -> .omnidesk` 的幂等迁移和差异归档已完成；Runtime 不回退读取 legacy 路径。
+- 旧 CLI、scripts、templates、adapters 和 routing skill 已退出生产链路；任何残留文件只能按文件账本的兼容/退役决策处理。
 - 长任务恢复、Provider、Hermes、Patch、检查和 Eval 后续只在 Desktop Runtime 内演进。
 
 ### Legacy Project OS
+
+> 以下 D001-D018 是已归档的 Project OS 时代决策。它们解释仓库历史，但不授权新增、恢复或依赖任何旧工具链能力。
 
 #### D018 — Shell 统一入口只是过渡形态，长期迁到原生 CLI
 
@@ -337,6 +345,8 @@ use_when: "AI 需要理解某个架构选择的背景、或面临类似决策需
 
 ---
 
-## 待记录
+## 归档说明
+
+新的现行决策仅记录会影响 OmniDesk Desktop Runtime 长期边界的取舍，并且必须引用当前 SSOT 和验证证据。
 
 暂无新的架构决策待补。

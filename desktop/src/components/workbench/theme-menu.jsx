@@ -11,7 +11,8 @@ import {
 } from "../ui/dropdown-menu";
 import { Tooltip } from "../ui/tooltip";
 
-const storageKey = "project-os-desktop-theme";
+const storageKey = "omnidesk-desktop-theme";
+const legacyStorageKey = "project-os-desktop-theme";
 
 const themePresets = [
   { id: "mint", label: "Mint", h: 160, s: "80%", l: "47%" },
@@ -38,7 +39,9 @@ function normalizeTheme(theme) {
 
 function readStoredTheme() {
   try {
-    return normalizeTheme(JSON.parse(window.localStorage.getItem(storageKey)) || defaultTheme);
+    const stored = window.localStorage.getItem(storageKey)
+      ?? window.localStorage.getItem(legacyStorageKey);
+    return normalizeTheme(JSON.parse(stored) || defaultTheme);
   } catch {
     return defaultTheme;
   }

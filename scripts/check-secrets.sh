@@ -39,13 +39,13 @@ if [ -f ".env.local" ]; then
   key_line="$(grep -E '^DEEPSEEK_API_KEY=' ".env.local" | tail -1 || true)"
   key_value="${key_line#DEEPSEEK_API_KEY=}"
   if [ -z "$key_line" ]; then
-    if [ "${PROJECT_OS_ALLOW_EMPTY_PROVIDER_KEYS:-0}" = "1" ]; then
+    if [ "${OMNIDESK_ALLOW_EMPTY_PROVIDER_KEYS:-${PROJECT_OS_ALLOW_EMPTY_PROVIDER_KEYS:-0}}" = "1" ]; then
       echo "OK: DEEPSEEK_API_KEY missing; pure local scan mode enabled"
     else
       warn ".env.local exists but DEEPSEEK_API_KEY is missing"
     fi
   elif [ -z "$key_value" ]; then
-    if [ "${PROJECT_OS_ALLOW_EMPTY_PROVIDER_KEYS:-0}" = "1" ]; then
+    if [ "${OMNIDESK_ALLOW_EMPTY_PROVIDER_KEYS:-${PROJECT_OS_ALLOW_EMPTY_PROVIDER_KEYS:-0}}" = "1" ]; then
       echo "OK: DEEPSEEK_API_KEY empty; pure local scan mode enabled"
     else
       warn "DEEPSEEK_API_KEY is empty in .env.local"
@@ -54,7 +54,7 @@ if [ -f ".env.local" ]; then
     echo "OK: DEEPSEEK_API_KEY is set locally"
   fi
 else
-  if [ "${PROJECT_OS_ALLOW_EMPTY_PROVIDER_KEYS:-0}" = "1" ]; then
+  if [ "${OMNIDESK_ALLOW_EMPTY_PROVIDER_KEYS:-${PROJECT_OS_ALLOW_EMPTY_PROVIDER_KEYS:-0}}" = "1" ]; then
     echo "OK: .env.local not found; pure local scan mode enabled"
   else
     warn ".env.local not found; copy .env.example to .env.local when you need provider keys"

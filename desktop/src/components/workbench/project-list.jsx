@@ -1,0 +1,10 @@
+import React from "react";
+import { MoreVertical } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "../ui/dropdown-menu";
+
+export function ProjectList({ onActivitySeen, onOpenFolder, onRelocate, onRemove, onRename, onSelect, onSettings, projects = [], projectStatus }) {
+  return <div className="projectList" aria-label="已接入项目">{projects.map((project) => {
+    const status = projectStatus(project);
+    return <div className="projectRowWrap" key={project.id}><button className={`projectRow${project.isCurrent ? " active" : ""}`} type="button" onClick={() => { onActivitySeen?.(project.id); onSelect(project.id); }} aria-label={`切换到项目 ${project.name}`} aria-current={project.isCurrent ? "true" : undefined}><span className={`projectStatusDot${status.tone ? ` projectStatusDot-${status.tone}` : " projectStatusDot-empty"}`} title={status.tone ? status.label : undefined} aria-label={status.tone ? status.label : undefined} aria-hidden={status.tone ? undefined : true} /><span className="projectRowText"><strong title={project.name}>{project.name}</strong><span title={project.path}>{project.path}</span></span></button><div className="projectRowActions" role="group" aria-label={`${project.name} 项目操作`}><DropdownMenu><DropdownMenuTrigger asChild><button className="projectMenuButton" type="button" aria-label={`项目菜单：${project.name}`}><MoreVertical strokeWidth={2.25} aria-hidden="true" /></button></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuItem onSelect={() => onOpenFolder(project.id)}>查看本地文件</DropdownMenuItem><button className="uiDropdownItem" type="button" data-copy-project-path={project.path}>复制路径</button><DropdownMenuItem onSelect={() => onRelocate(project.id)}>重新定位路径</DropdownMenuItem><DropdownMenuItem onSelect={() => onRename(project)}>修改显示名称</DropdownMenuItem><DropdownMenuItem onSelect={() => onSettings(project)}>接入权限</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem className="dangerMenuItem" onSelect={() => onRemove(project.id)}>从工作台移除</DropdownMenuItem></DropdownMenuContent></DropdownMenu></div></div>;
+  })}</div>;
+}

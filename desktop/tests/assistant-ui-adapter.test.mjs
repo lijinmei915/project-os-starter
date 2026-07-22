@@ -54,7 +54,7 @@ test("keeps the OmniDesk composer while assistant-ui renders messages", () => {
   assert.doesNotMatch(component, /ComposerPrimitive/);
   assert.match(workbench, /activeWorkspaceTab === "plan" \? \(/);
   assert.match(workbench, /<ChatDock/);
-  const styles = fs.readFileSync(path.join(desktopRoot, "src/styles.css"), "utf8");
+  const styles = fs.readFileSync(path.join(desktopRoot, "src/styles/conversation.css"), "utf8");
   assert.match(styles, /\.assistantUiConversationViewport \.conversationMessage-user\s*\{\s*align-self: flex-end;/);
   assert.match(styles, /\.assistantUiConversationViewport \.conversationMessage-assistant\s*\{\s*align-self: flex-start;/);
 });

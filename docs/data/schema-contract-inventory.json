@@ -1,0 +1,256 @@
+{
+  "schemaVersion": "omnidesk.schema-contract-inventory.v1",
+  "generatedAt": "2026-07-22T03:21:33.620Z",
+  "sourceOfTruth": "schemas/*.json plus git grep consumer evidence",
+  "totals": {
+    "contracts": 14,
+    "active": 14,
+    "candidates": 0
+  },
+  "contracts": [
+    {
+      "path": "schemas/agent-run.schema.json",
+      "id": "https://omnidesk.local/schemas/agent-run.schema.json",
+      "title": "OmniDesk Agent Run",
+      "schemaVersion": "omnidesk.agent-run.v0.1",
+      "pathConsumers": [],
+      "versionConsumers": [
+        "desktop/src-tauri/src/runtime/agent_runs.rs",
+        "desktop/src/agent-runtime/contract.js"
+      ],
+      "runtimeConsumers": [
+        "desktop/src-tauri/src/runtime/agent_runs.rs",
+        "desktop/src/agent-runtime/contract.js"
+      ],
+      "status": "active-contract",
+      "migrationRule": "先增加 OmniDesk 版本读取/写入迁移与回归，再退役旧版本。"
+    },
+    {
+      "path": "schemas/conversation-event.schema.json",
+      "id": "https://omnidesk.local/schemas/conversation-event.schema.json",
+      "title": "OmniDesk Conversation Event",
+      "schemaVersion": "omnidesk.conversation-event.v0.1",
+      "pathConsumers": [
+        "schemas/conversation.schema.json"
+      ],
+      "versionConsumers": [
+        "HANDOFF.md",
+        "desktop/src/conversation-runtime/event-contract.js"
+      ],
+      "runtimeConsumers": [
+        "desktop/src/conversation-runtime/event-contract.js"
+      ],
+      "status": "active-contract",
+      "migrationRule": "先增加 OmniDesk 版本读取/写入迁移与回归，再退役旧版本。"
+    },
+    {
+      "path": "schemas/conversation.schema.json",
+      "id": "https://omnidesk.local/schemas/conversation.schema.json",
+      "title": "OmniDesk Conversation",
+      "schemaVersion": "omnidesk.conversation.v0.3",
+      "pathConsumers": [],
+      "versionConsumers": [
+        "desktop/src/conversation-runtime/schema.js",
+        "desktop/tests/conversation-runtime.test.mjs"
+      ],
+      "runtimeConsumers": [
+        "desktop/src/conversation-runtime/schema.js",
+        "desktop/tests/conversation-runtime.test.mjs"
+      ],
+      "status": "active-contract",
+      "migrationRule": "先增加 OmniDesk 版本读取/写入迁移与回归，再退役旧版本。"
+    },
+    {
+      "path": "schemas/fact-freshness.schema.json",
+      "id": "https://omnidesk.local/schemas/fact-freshness.schema.json",
+      "title": "OmniDesk Fact Freshness",
+      "schemaVersion": "omnidesk.fact-freshness.v0.1",
+      "pathConsumers": [],
+      "versionConsumers": [
+        "desktop/src-tauri/src/runtime/workspace.rs"
+      ],
+      "runtimeConsumers": [
+        "desktop/src-tauri/src/runtime/workspace.rs"
+      ],
+      "status": "active-contract",
+      "migrationRule": "先增加 OmniDesk 版本读取/写入迁移与回归，再退役旧版本。"
+    },
+    {
+      "path": "schemas/project-capabilities.schema.json",
+      "id": "https://omnidesk.local/schemas/project-capabilities.schema.json",
+      "title": "OmniDesk Project Capabilities",
+      "schemaVersion": "omnidesk.project-capabilities.v0.1",
+      "pathConsumers": [
+        "HANDOFF.md"
+      ],
+      "versionConsumers": [
+        "desktop/src-tauri/src/runtime/workspace.rs",
+        "desktop/vite.config.js"
+      ],
+      "runtimeConsumers": [
+        "desktop/src-tauri/src/runtime/workspace.rs"
+      ],
+      "status": "active-contract",
+      "migrationRule": "先增加 OmniDesk 版本读取/写入迁移与回归，再退役旧版本。"
+    },
+    {
+      "path": "schemas/project-fact-store.schema.json",
+      "id": "https://omnidesk.local/schemas/project-fact-store.schema.json",
+      "title": "OmniDesk Project Fact Store",
+      "schemaVersion": "omnidesk.project-fact-store.v0.1",
+      "pathConsumers": [
+        "desktop/tests/fact-store.test.mjs"
+      ],
+      "versionConsumers": [
+        "desktop/src/fact-store.js"
+      ],
+      "runtimeConsumers": [
+        "desktop/tests/fact-store.test.mjs",
+        "desktop/src/fact-store.js"
+      ],
+      "status": "active-contract",
+      "migrationRule": "先增加 OmniDesk 版本读取/写入迁移与回归，再退役旧版本。"
+    },
+    {
+      "path": "schemas/project-fact.schema.json",
+      "id": "https://omnidesk.local/schemas/project-fact.schema.json",
+      "title": "OmniDesk Project Fact",
+      "schemaVersion": "",
+      "pathConsumers": [
+        "desktop/tests/fact-store.test.mjs",
+        "schemas/project-fact-store.schema.json"
+      ],
+      "versionConsumers": [],
+      "runtimeConsumers": [
+        "desktop/tests/fact-store.test.mjs"
+      ],
+      "status": "active-contract",
+      "migrationRule": "先增加 OmniDesk 版本读取/写入迁移与回归，再退役旧版本。"
+    },
+    {
+      "path": "schemas/project-overview-contract.v0.1.json",
+      "id": "",
+      "title": "",
+      "schemaVersion": "omnidesk.project-overview-contract.v0.1",
+      "pathConsumers": [
+        "HANDOFF.md",
+        "desktop/src/main.jsx",
+        "desktop/tests/fact-slot-acceptance.test.mjs",
+        "desktop/tests/project-overview-contract.test.mjs",
+        "desktop/tests/slot-runtime.test.mjs"
+      ],
+      "versionConsumers": [],
+      "runtimeConsumers": [
+        "desktop/src/main.jsx",
+        "desktop/tests/fact-slot-acceptance.test.mjs",
+        "desktop/tests/project-overview-contract.test.mjs",
+        "desktop/tests/slot-runtime.test.mjs"
+      ],
+      "status": "active-contract",
+      "migrationRule": "先增加 OmniDesk 版本读取/写入迁移与回归，再退役旧版本。"
+    },
+    {
+      "path": "schemas/project-overview-view-model.schema.json",
+      "id": "https://omnidesk.local/schemas/project-overview-view-model.schema.json",
+      "title": "Project Overview View Model",
+      "schemaVersion": "omnidesk.project-overview-view-model.v0.1",
+      "pathConsumers": [],
+      "versionConsumers": [
+        "desktop/src/project-overview-selectors.js",
+        "desktop/tests/project-overview-selectors.test.mjs"
+      ],
+      "runtimeConsumers": [
+        "desktop/src/project-overview-selectors.js",
+        "desktop/tests/project-overview-selectors.test.mjs"
+      ],
+      "status": "active-contract",
+      "migrationRule": "先增加 OmniDesk 版本读取/写入迁移与回归，再退役旧版本。"
+    },
+    {
+      "path": "schemas/project-profile.schema.json",
+      "id": "https://omnidesk.local/schemas/project-profile.schema.json",
+      "title": "OmniDesk Project Profile",
+      "schemaVersion": "omnidesk.project-profile.v0.1",
+      "pathConsumers": [],
+      "versionConsumers": [
+        "desktop/src-tauri/src/runtime/workspace.rs"
+      ],
+      "runtimeConsumers": [
+        "desktop/src-tauri/src/runtime/workspace.rs"
+      ],
+      "status": "active-contract",
+      "migrationRule": "先增加 OmniDesk 版本读取/写入迁移与回归，再退役旧版本。"
+    },
+    {
+      "path": "schemas/project-progress-contract.v0.1.json",
+      "id": "",
+      "title": "",
+      "schemaVersion": "omnidesk.project-progress-contract.v0.1",
+      "pathConsumers": [
+        "desktop/tests/fact-slot-acceptance.test.mjs",
+        "desktop/tests/project-overview-contract.test.mjs"
+      ],
+      "versionConsumers": [
+        "desktop/tests/project-overview-contract.test.mjs"
+      ],
+      "runtimeConsumers": [
+        "desktop/tests/fact-slot-acceptance.test.mjs",
+        "desktop/tests/project-overview-contract.test.mjs"
+      ],
+      "status": "active-contract",
+      "migrationRule": "先增加 OmniDesk 版本读取/写入迁移与回归，再退役旧版本。"
+    },
+    {
+      "path": "schemas/project-runbook-contract.v0.1.json",
+      "id": "",
+      "title": "",
+      "schemaVersion": "omnidesk.project-runbook-contract.v0.1",
+      "pathConsumers": [
+        "desktop/tests/fact-slot-acceptance.test.mjs",
+        "desktop/tests/project-overview-contract.test.mjs"
+      ],
+      "versionConsumers": [
+        "desktop/tests/project-overview-contract.test.mjs"
+      ],
+      "runtimeConsumers": [
+        "desktop/tests/fact-slot-acceptance.test.mjs",
+        "desktop/tests/project-overview-contract.test.mjs"
+      ],
+      "status": "active-contract",
+      "migrationRule": "先增加 OmniDesk 版本读取/写入迁移与回归，再退役旧版本。"
+    },
+    {
+      "path": "schemas/project-state.schema.json",
+      "id": "https://omnidesk.local/schemas/project-state.schema.json",
+      "title": "OmniDesk Project State",
+      "schemaVersion": "",
+      "pathConsumers": [
+        "desktop/src/components/workbench/workspace-static-surfaces.jsx"
+      ],
+      "versionConsumers": [],
+      "runtimeConsumers": [
+        "desktop/src/components/workbench/workspace-static-surfaces.jsx"
+      ],
+      "status": "active-contract",
+      "migrationRule": "先增加 OmniDesk 版本读取/写入迁移与回归，再退役旧版本。"
+    },
+    {
+      "path": "schemas/workspace-facts.schema.json",
+      "id": "https://omnidesk.local/schemas/workspace-facts.schema.json",
+      "title": "Workspace Facts",
+      "schemaVersion": "omnidesk.workspace-facts.v0.1",
+      "pathConsumers": [
+        "HANDOFF.md",
+        "desktop/src-tauri/src/runtime/workspace.rs"
+      ],
+      "versionConsumers": [
+        "desktop/src-tauri/src/runtime/workspace.rs"
+      ],
+      "runtimeConsumers": [
+        "desktop/src-tauri/src/runtime/workspace.rs"
+      ],
+      "status": "active-contract",
+      "migrationRule": "先增加 OmniDesk 版本读取/写入迁移与回归，再退役旧版本。"
+    }
+  ]
+}

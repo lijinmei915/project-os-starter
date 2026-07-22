@@ -40,7 +40,7 @@ export function createConversationActionController({
         }
         if (nextAction.kind === "task") return Boolean(selectTask(nextAction.target) ?? true);
         if (nextAction.kind === "terminal") {
-          window.dispatchEvent(new Event("project-os:open-terminal"));
+          window.dispatchEvent(new Event("omnidesk:open-terminal"));
           return true;
         }
         const topic = topicPayloadFromOutline(nextAction.target);

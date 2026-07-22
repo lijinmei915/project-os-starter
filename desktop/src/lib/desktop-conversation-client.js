@@ -3,7 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 
 export async function listDesktopConversations() {
   if (isTauriRuntime()) return invokeTauriCommand("list_desktop_conversations");
-  const response = await fetch("/__project-os/desktop-conversations");
+  const response = await fetch("/__omnidesk/desktop-conversations");
   if (!response.ok) return [];
   return response.json();
 }

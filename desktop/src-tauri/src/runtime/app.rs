@@ -1,20 +1,57 @@
 use crate::runtime::agent_runs::PersistedAgentRun;
+use crate::runtime::chat_content::{
+    chat_router_prompt, local_chat_result, project_evidence, references_for_message, ChatTurnInput,
+    ChatWithModelResult, DialogueContextInput,
+};
+use crate::runtime::chat_routing::should_create_plan_for_message;
+use crate::runtime::chat_runtime::{emit_conversation_event, RuntimeRequestState};
+use crate::runtime::chat_stream::{consume_openai_sse_deltas, streaming_reply_prefix};
+use crate::runtime::execution::{
+    build_run_summary_markdown, guarded_check_spec, run_git_apply, trim_runner_output,
+};
+use crate::runtime::hermes_protocol::{
+    acp_program as hermes_acp_program, custom_provider_key_env as hermes_custom_provider_key_env,
+    executor_status as hermes_executor_status,
+    extract_structured_envelope as extract_structured_hermes_envelope,
+    wait_for_response as hermes_wait_for_response, write_request as hermes_write_request,
+};
 use crate::runtime::patch::PatchDraft;
+use crate::runtime::planning::{
+    build_local_readonly_plan, generate_provider_plan, PlanAttachment, PlanContext, ReadonlyPlan,
+};
 use crate::runtime::provider::{
+    chat_completion_content, get_models, health_entry as provider_health_entry,
+    health_is_fresh as provider_health_is_fresh, isolate_duplicate_provider_secrets, listed_models,
+    ordered_profile_candidates, post_chat_completion, provider_profile_id, provider_profile_name,
+    require_success as require_provider_success, trim_for_trace, upsert_provider_profile,
     ModelCatalog, ModelHealthCache, ModelHealthEntry, ProviderConfig, ProviderProfile,
+    PROVIDER_SCHEMA_VERSION,
+};
+use crate::runtime::terminal::{
+    default_cols as default_terminal_cols, default_rows as default_terminal_rows,
+    default_session_id as default_terminal_session_id,
+    terminate_session as terminate_terminal_session, TerminalSession, TerminalState,
+};
+use crate::runtime::theme::{DesktopThemeConfig, load_or_seed as load_or_seed_desktop_theme, normalize as normalize_desktop_theme, save as save_desktop_theme_file};
+use crate::runtime::workspace::{
+    build_project_profile, runbook_commands, ProjectProfile, TreeEntry,
+    RegistryProjectRecord, current_registry_project,
+    default_project_access_mode, load_or_seed_registry, normalize_project_access_mode,
+    normalize_project_path, project_id_from_path, registry_project_summaries, save_registry,
+    RegistryProjectSummary,
 };
 use base64::Engine;
 use futures_util::StreamExt;
 use notify::{
     Config as NotifyConfig, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher,
 };
-use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
+use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fs;
 use std::io::{BufRead, BufReader, Read, Write};
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -22,23 +59,9 @@ use tauri::{AppHandle, Emitter, State};
 use tokio_util::sync::CancellationToken;
 
 const STATE_PATH: &str = ".omnidesk/data/state.json";
-const PROFILE_PATH: &str = ".omnidesk/data/project-profile.json";
 const GOALS_PATH: &str = ".omnidesk/data/goals.json";
-const BACKLOG_PATH: &str = ".omnidesk/data/task-backlog.json";
-const GOAL_VALIDATION_REPORT_PATH: &str = ".omnidesk/evidence/goal-validation-report.json";
-const REGISTRY_PATH: &str = ".omnidesk/data/desktop-registry.json";
 const RUN_SUMMARY_PATH: &str = ".omnidesk/evidence/desktop-summary.md";
 const PROVIDER_PATH: &str = ".omnidesk/data/desktop-provider.json";
-const THEME_PATH: &str = ".omnidesk/data/desktop-theme.json";
-const WORKSPACE_FACTS_PATH: &str = ".omnidesk/cache/workspace-facts.json";
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct TreeItem {
-    label: String,
-    depth: usize,
-    kind: String,
-}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -58,76 +81,6 @@ struct MemoryItem {
     title: String,
     body: String,
     muted: bool,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ProjectProfile {
-    overview: String,
-    phase_summary: String,
-    architecture_summary: String,
-    check_commands: String,
-    collaboration_rules: String,
-    intro: String,
-    long_term_goal: String,
-    target_users: String,
-    use_cases: String,
-    user_preferences: String,
-    missing_fields: Vec<String>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct RegistryProject {
-    id: String,
-    name: String,
-    path: String,
-    phase: String,
-    access_mode: String,
-    is_current: bool,
-    health: String,
-    status_label: String,
-    task_count: usize,
-    active_task_count: usize,
-    failed_task_count: usize,
-    completed_task_count: usize,
-    latest_activity_at: String,
-    latest_activity_title: String,
-}
-
-#[derive(Default)]
-struct ProjectTaskSummary {
-    task_count: usize,
-    active_task_count: usize,
-    failed_task_count: usize,
-    completed_task_count: usize,
-    latest_activity_at: String,
-    latest_activity_title: String,
-}
-
-#[derive(Deserialize, Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct RegistryFileProject {
-    id: String,
-    name: String,
-    path: String,
-    phase: String,
-    #[serde(default)]
-    name_locked: bool,
-    #[serde(default = "default_project_access_mode")]
-    access_mode: String,
-}
-
-fn default_project_access_mode() -> String {
-    "browse".to_string()
-}
-
-fn normalize_project_access_mode(value: &str) -> String {
-    match value.trim() {
-        "governed" => "governed".to_string(),
-        "controlled" => "controlled".to_string(),
-        _ => "browse".to_string(),
-    }
 }
 
 #[derive(Deserialize)]
@@ -150,14 +103,6 @@ struct PreviewProjectInput {
     path: String,
 }
 
-#[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct RegistryFile {
-    schema_version: String,
-    current_project_id: String,
-    projects: Vec<RegistryFileProject>,
-}
-
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct WorkspaceSnapshot {
@@ -170,8 +115,8 @@ struct WorkspaceSnapshot {
     docs_count: usize,
     recommendation_count: usize,
     run_count: usize,
-    projects: Vec<RegistryProject>,
-    tree: Vec<TreeItem>,
+    projects: Vec<RegistryProjectSummary>,
+    tree: Vec<TreeEntry>,
     queue: Vec<QueueItem>,
     memory: Vec<MemoryItem>,
     project_profile: ProjectProfile,
@@ -188,69 +133,6 @@ struct WorkspaceSnapshot {
     trace: Vec<String>,
 }
 
-#[derive(Default)]
-struct TerminalState {
-    generation: Mutex<u64>,
-    sessions: Mutex<HashMap<String, TerminalSession>>,
-}
-
-/// In-flight request ownership only. Conversations and task records stay persistent.
-#[derive(Default)]
-struct RuntimeRequestState {
-    requests: Mutex<HashMap<String, CancellationToken>>,
-}
-
-fn emit_runtime_conversation_event(
-    app: &AppHandle,
-    request_id: &str,
-    event_type: &str,
-    phase: &str,
-    status: &str,
-    payload: Value,
-) {
-    if request_id.is_empty() {
-        return;
-    }
-    let _ = app.emit(
-        "runtime://conversation-event",
-        json!({
-            "schemaVersion": "omnidesk.conversation-event.v0.1",
-            "id": format!("{}:{}:{}", request_id, event_type, current_timestamp_string()),
-            "type": event_type,
-            "phase": phase,
-            "status": status,
-            "actor": "assistant",
-            "requestId": request_id,
-            "timestamp": current_timestamp_string(),
-            "payload": payload,
-        }),
-    );
-}
-
-impl RuntimeRequestState {
-    fn start(&self, request_id: &str) -> CancellationToken {
-        let token = CancellationToken::new();
-        self.requests
-            .lock()
-            .unwrap()
-            .insert(request_id.to_string(), token.clone());
-        token
-    }
-
-    fn finish(&self, request_id: &str) {
-        self.requests.lock().unwrap().remove(request_id);
-    }
-
-    fn cancel(&self, request_id: &str) -> bool {
-        if let Some(token) = self.requests.lock().unwrap().get(request_id).cloned() {
-            token.cancel();
-            true
-        } else {
-            false
-        }
-    }
-}
-
 struct WorkspaceWatcherState {
     watcher: Mutex<Option<RecommendedWatcher>>,
     root: Mutex<String>,
@@ -263,52 +145,6 @@ impl Default for WorkspaceWatcherState {
             root: Mutex::new(String::new()),
         }
     }
-}
-
-struct TerminalSession {
-    child: Box<dyn Child + Send>,
-    master: Box<dyn MasterPty + Send>,
-    writer: Box<dyn Write + Send>,
-}
-
-// portable-pty creates an isolated Unix session for each terminal. Killing
-// only its shell leaves foreground tools (such as Codex) and their children
-// alive, so closing a tab must terminate the PTY's whole foreground group.
-fn terminate_terminal_session(session: &mut TerminalSession) {
-    #[cfg(unix)]
-    if let Some(group_leader) = session.master.process_group_leader() {
-        if group_leader > 0 {
-            // A negative PID targets the process group, which is isolated by
-            // portable-pty's setsid call when the terminal was created.
-            unsafe {
-                libc::kill(-group_leader, libc::SIGKILL);
-            }
-        }
-    }
-    let _ = session.child.kill();
-}
-
-#[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ReadonlyPlan {
-    task: String,
-    project_name: String,
-    mode: String,
-    summary: String,
-    steps: Vec<String>,
-    files_to_read: Vec<String>,
-    candidate_changes: Vec<String>,
-    checks: Vec<String>,
-    guardrails: Vec<String>,
-    trace: Vec<String>,
-}
-
-#[derive(Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct PlanAttachment {
-    name: String,
-    mime_type: String,
-    data_url: String,
 }
 
 #[derive(Deserialize)]
@@ -344,30 +180,6 @@ struct ChatWithModelInput {
     project_memory: Vec<Value>,
     #[serde(default)]
     request_id: String,
-}
-
-#[derive(Deserialize, Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct ChatTurnInput {
-    role: String,
-    text: String,
-}
-
-#[derive(Default, Deserialize, Serialize, Clone)]
-#[serde(default, rename_all = "camelCase")]
-struct DialogueContextInput {
-    current_topic: String,
-    expected_next_action: String,
-    last_intent: String,
-    pending_question: String,
-    previous_conclusion: String,
-    user_delegation: String,
-    task_id: String,
-    task_title: String,
-    task_status: String,
-    task_goal: String,
-    task_summary: String,
-    task_next_action: String,
 }
 
 #[derive(Deserialize)]
@@ -464,25 +276,6 @@ struct ProviderProfileStatus {
     has_api_key: bool,
 }
 
-#[derive(Deserialize, Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct DesktopThemeAccent {
-    id: String,
-    label: String,
-    h: u16,
-    s: String,
-    l: String,
-}
-
-#[derive(Deserialize, Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct DesktopThemeConfig {
-    schema_version: String,
-    mode: String,
-    accent: DesktopThemeAccent,
-    #[serde(default)]
-    accents: Vec<DesktopThemeAccent>,
-}
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -708,16 +501,6 @@ struct GuardedCheckResult {
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
-struct HermesExecutorStatus {
-    id: String,
-    protocol: String,
-    status: String,
-    version: String,
-    message: String,
-}
-
-#[derive(Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
 struct TerminalSessionResult {
     session_id: String,
     cwd: String,
@@ -739,18 +522,6 @@ struct TerminalOutputEvent {
 struct WorkspaceFilesChangedEvent {
     path: String,
     root: String,
-}
-
-fn default_terminal_session_id() -> String {
-    "main".to_string()
-}
-
-fn default_terminal_cols() -> u16 {
-    100
-}
-
-fn default_terminal_rows() -> u16 {
-    28
 }
 
 #[derive(Deserialize)]
@@ -818,57 +589,6 @@ struct ProviderModelTestResult {
     message: String,
 }
 
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ChatWithModelResult {
-    reply: String,
-    should_create_plan: bool,
-    intent: String,
-    #[serde(default)]
-    provider_status: String,
-    #[serde(default)]
-    provider_model: String,
-    #[serde(default)]
-    provider_error: String,
-    #[serde(default)]
-    references: Vec<MessageReference>,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct MessageReference {
-    kind: String,
-    label: String,
-    target: String,
-    #[serde(default)]
-    detail: String,
-}
-
-#[derive(Deserialize)]
-struct ModelsListResponse {
-    data: Vec<ModelItem>,
-}
-
-#[derive(Deserialize)]
-struct ModelItem {
-    id: String,
-}
-
-#[derive(Deserialize)]
-struct ChatCompletionsResponse {
-    choices: Vec<ChatChoice>,
-}
-
-#[derive(Deserialize)]
-struct ChatChoice {
-    message: ChatResponseMessage,
-}
-
-#[derive(Deserialize)]
-struct ChatResponseMessage {
-    content: String,
-}
-
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct UpdateProjectCapabilityInput {
@@ -919,7 +639,9 @@ fn archive_legacy_state_for_retirement(
     let app_root = find_workspace_root()?;
     let mut registry = load_or_seed_registry(&app_root)?;
     let project = current_registry_project(&mut registry, &app_root)?;
-    crate::runtime::state_namespace::archive_legacy_retirement_differences(&PathBuf::from(project.path))
+    crate::runtime::state_namespace::archive_legacy_retirement_differences(&PathBuf::from(
+        project.path,
+    ))
 }
 
 #[tauri::command]
@@ -932,7 +654,9 @@ fn cleanup_legacy_state_for_retirement(
     let app_root = find_workspace_root()?;
     let mut registry = load_or_seed_registry(&app_root)?;
     let project = current_registry_project(&mut registry, &app_root)?;
-    crate::runtime::state_namespace::cleanup_legacy_state_for_retirement(&PathBuf::from(project.path))
+    crate::runtime::state_namespace::cleanup_legacy_state_for_retirement(&PathBuf::from(
+        project.path,
+    ))
 }
 
 #[tauri::command]
@@ -951,12 +675,11 @@ fn get_workspace_snapshot() -> Result<WorkspaceSnapshot, String> {
     let workspace_facts = projection.workspace_facts;
     let project_capabilities = crate::runtime::workspace::detected_capabilities(&root);
     let fact_freshness = crate::runtime::workspace::fact_freshness(&root);
-    let state_retirement = serde_json::to_value(
-        crate::runtime::state_namespace::legacy_retirement_readiness(&root)?,
-    )
-    .map_err(|error| error.to_string())?;
+    let state_retirement =
+        serde_json::to_value(crate::runtime::state_namespace::legacy_retirement_readiness(&root)?)
+            .map_err(|error| error.to_string())?;
     let run_count = count_run_records(&root);
-    let (file_count, docs_count) = count_workspace_files(&root);
+    let (file_count, docs_count) = crate::runtime::workspace::count_visible_files(&root);
 
     let project_name = current_project.name.clone();
     let goals = projection.goals.unwrap_or_else(|| {
@@ -1010,14 +733,14 @@ fn get_workspace_snapshot() -> Result<WorkspaceSnapshot, String> {
         docs_count,
         recommendation_count,
         run_count,
-        projects: registry_projects(&registry),
-        tree: build_tree_preview(&root),
+        projects: registry_project_summaries(&registry),
+        tree: crate::runtime::workspace::build_tree_preview(&root),
         queue,
         memory: vec![
             MemoryItem {
                 marker: "Δ".to_string(),
                 title: "已学习方向".to_string(),
-                body: "用户希望 Project OS 成为长期使用的本地 AI 桌面工作台。".to_string(),
+                body: "用户希望 OmniDesk 成为长期使用的本地 AI 工程工作台。".to_string(),
                 muted: false,
             },
             MemoryItem {
@@ -1058,20 +781,18 @@ fn refresh_workspace_facts_preview() -> Result<Value, String> {
     let mut registry = load_or_seed_registry(&app_root)?;
     let current_project = current_registry_project(&mut registry, &app_root)?;
     let root = PathBuf::from(&current_project.path);
-    let report = build_workspace_facts_preview(&root, &current_project.name);
+    let report = crate::runtime::workspace::build_workspace_facts_preview(&root, &current_project.name);
     crate::runtime::workspace::record_fact_freshness(&root, &current_timestamp_string())?;
     Ok(report)
 }
 
 fn should_ignore_watch_path(path: &Path) -> bool {
-    let in_runtime_state = path
-        .components()
-        .any(|component| {
-            matches!(
-                component.as_os_str().to_string_lossy().as_ref(),
-                ".project-os" | ".omnidesk"
-            )
-        });
+    let in_runtime_state = path.components().any(|component| {
+        matches!(
+            component.as_os_str().to_string_lossy().as_ref(),
+            ".project-os" | ".omnidesk"
+        )
+    });
     let fact_file = path
         .file_name()
         .and_then(|value| value.to_str())
@@ -1251,7 +972,7 @@ fn goal_stack_from_validation(
     };
 
     json!({
-        "schemaVersion": "project-os.goals.v0.1",
+        "schemaVersion": "omnidesk.goals.v0.1",
         "activeGoalId": goal_id,
         "goals": [{
             "id": goal_id,
@@ -1281,8 +1002,7 @@ fn sync_task_goal_index(
     crate::runtime::repository::Repository::new(root).transaction(
         "sync-task-goal-index",
         &[crate::runtime::repository::JsonMutation::upsert(
-            GOALS_PATH,
-            goals,
+            GOALS_PATH, goals,
         )],
     )?;
     Ok(())
@@ -1468,7 +1188,7 @@ fn add_registry_project(input: AddRegistryProjectInput) -> Result<WorkspaceSnaps
         .to_string();
     let id = project_id_from_path(&project_path);
 
-    let matches_project = |project: &RegistryFileProject| {
+    let matches_project = |project: &RegistryProjectRecord| {
         project.id == id
             || PathBuf::from(&project.path)
                 .canonicalize()
@@ -1488,7 +1208,7 @@ fn add_registry_project(input: AddRegistryProjectInput) -> Result<WorkspaceSnaps
         project.phase = phase;
         project.access_mode = normalize_project_access_mode(&input.access_mode);
     } else {
-        registry.projects.push(RegistryFileProject {
+        registry.projects.push(RegistryProjectRecord {
             id: id.clone(),
             name,
             path: project_path,
@@ -1749,7 +1469,7 @@ fn read_engineering_file(
     if relative.is_empty() {
         return Err("请选择一个工程文件".to_string());
     }
-    if !is_safe_engineering_preview_path(relative) {
+    if !crate::runtime::workspace::is_safe_text_preview_path(relative) {
         return Err("这个文件暂不支持预览：只能查看项目内的普通文本文件。".to_string());
     }
 
@@ -1795,7 +1515,7 @@ fn read_engineering_file(
         path: relative.to_string(),
         name,
         content,
-        language: preview_language(relative),
+        language: crate::runtime::workspace::preview_language(relative),
         truncated,
         size: metadata.len(),
     })
@@ -1829,166 +1549,6 @@ fn execute_agent_read_tool(input: ExecuteAgentReadToolInput) -> Result<Value, St
         "git_status" => crate::runtime::agent_tools::git_status(&root),
         _ => Err("Native Core 只接受已登记的只读 Agent Tool".to_string()),
     }
-}
-
-fn compact_json_items(value: Option<&Value>, key: &str, limit: usize) -> Vec<String> {
-    value
-        .and_then(|item| item.get(key))
-        .and_then(Value::as_array)
-        .map(|items| {
-            items
-                .iter()
-                .filter_map(|item| item.as_str().map(str::trim).filter(|text| !text.is_empty()))
-                .take(limit)
-                .map(String::from)
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-fn chat_project_evidence(root: &Path, state: Option<&Value>) -> (Value, Vec<MessageReference>) {
-    let project_status = state.and_then(|value| value.get("status")).or(state);
-    let goals = read_json(root.join(GOALS_PATH));
-    let active_goal_id = goals
-        .as_ref()
-        .and_then(|value| value.get("activeGoalId"))
-        .and_then(Value::as_str)
-        .unwrap_or("");
-    let active_goal = goals
-        .as_ref()
-        .and_then(|value| value.get("goals"))
-        .and_then(Value::as_array)
-        .and_then(|items| {
-            items
-                .iter()
-                .find(|item| item.get("id").and_then(Value::as_str) == Some(active_goal_id))
-        });
-
-    let mut task_items = Vec::new();
-    if let Ok(entries) = fs::read_dir(crate::runtime::tasks::directory(root)) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.extension().and_then(|value| value.to_str()) != Some("json")
-                || path.file_name().and_then(|value| value.to_str()) == Some("manifest.json")
-            {
-                continue;
-            }
-            if let Some(task) = read_json(path) {
-                let status = task
-                    .get("status")
-                    .and_then(Value::as_str)
-                    .unwrap_or("planned");
-                if status != "done" {
-                    task_items.push(json!({
-                        "id": task.get("id").and_then(Value::as_str).unwrap_or(""),
-                        "title": task.get("title").and_then(Value::as_str).unwrap_or("未命名任务"),
-                        "status": status,
-                        "updatedAt": task.get("updatedAt").and_then(Value::as_str).unwrap_or("")
-                    }));
-                }
-            }
-        }
-    }
-    task_items.sort_by(|a, b| {
-        b.get("updatedAt")
-            .and_then(Value::as_str)
-            .unwrap_or("")
-            .cmp(a.get("updatedAt").and_then(Value::as_str).unwrap_or(""))
-    });
-    task_items.truncate(8);
-
-    let mut changed_files = git_changed_files(root).into_iter().collect::<Vec<_>>();
-    changed_files.sort();
-    changed_files.truncate(12);
-    let validation = read_json(root.join(GOAL_VALIDATION_REPORT_PATH));
-    let validation_status = validation
-        .as_ref()
-        .and_then(|value| value.get("status"))
-        .and_then(Value::as_str)
-        .unwrap_or("not-run");
-
-    let mut references = Vec::new();
-    for (path, label) in [
-        ("PROJECT.md", "项目状态"),
-        ("HANDOFF.md", "当前交接"),
-        (BACKLOG_PATH, "任务清单"),
-        (GOAL_VALIDATION_REPORT_PATH, "验收报告"),
-    ] {
-        if root.join(path).is_file() {
-            references.push(MessageReference {
-                kind: "file".to_string(),
-                label: label.to_string(),
-                target: path.to_string(),
-                detail: String::new(),
-            });
-        }
-    }
-    if let Some(task) = task_items.first() {
-        if let (Some(id), Some(title)) = (
-            task.get("id").and_then(Value::as_str),
-            task.get("title").and_then(Value::as_str),
-        ) {
-            references.push(MessageReference {
-                kind: "task".to_string(),
-                label: title.to_string(),
-                target: id.to_string(),
-                detail: task
-                    .get("status")
-                    .and_then(Value::as_str)
-                    .unwrap_or("")
-                    .to_string(),
-            });
-        }
-    }
-
-    let evidence = json!({
-        "phase": state.and_then(|value| value.get("phase")).and_then(Value::as_str).unwrap_or("unknown"),
-        "stage": state.and_then(|value| value.get("stage")).and_then(Value::as_str).unwrap_or("unknown"),
-        "doing": compact_json_items(project_status, "doing", 6),
-        "blocked": compact_json_items(project_status, "blocked", 6),
-        "activeGoal": active_goal.map(|goal| json!({
-            "id": goal.get("id").and_then(Value::as_str).unwrap_or(""),
-            "title": goal.get("shortTitle").and_then(Value::as_str)
-                .or_else(|| goal.get("title").and_then(Value::as_str)).unwrap_or(""),
-            "status": goal.get("status").and_then(Value::as_str).unwrap_or("")
-        })),
-        "activeTasks": task_items,
-        "changedFiles": changed_files,
-        "validationStatus": validation_status
-    });
-    (evidence, references)
-}
-
-fn chat_references_for_message(
-    message: &str,
-    context_state: &DialogueContextInput,
-    references: Vec<MessageReference>,
-) -> Vec<MessageReference> {
-    if is_greeting_message(message) {
-        return Vec::new();
-    }
-    let topic = format!("{} {}", context_state.current_topic, message);
-    let preferred_labels: &[&str] = if topic.contains("风险") || topic.contains("验收") {
-        &["当前交接", "任务清单", "验收报告"]
-    } else if topic.contains("状态") || topic.contains("进度") || topic.contains("下一步") {
-        &["项目状态", "当前交接", "任务清单"]
-    } else if context_state.expected_next_action == "apply-fix" {
-        &["任务清单", "当前交接"]
-    } else {
-        &["项目状态", "当前交接"]
-    };
-    let mut selected = references
-        .iter()
-        .filter(|reference| preferred_labels.contains(&reference.label.as_str()))
-        .cloned()
-        .collect::<Vec<_>>();
-    if topic.contains("任务") || context_state.expected_next_action == "apply-fix" {
-        if let Some(task) = references.iter().find(|reference| reference.kind == "task") {
-            selected.push(task.clone());
-        }
-    }
-    selected.truncate(4);
-    selected
 }
 
 #[tauri::command]
@@ -2031,40 +1591,38 @@ async fn chat_with_model(
         .and_then(Value::as_str)
         .unwrap_or("未读取到阶段信息")
         .to_string();
-    let (project_evidence, all_evidence_references) = chat_project_evidence(&root, state.as_ref());
+    let (project_evidence, all_evidence_references) = project_evidence(&root, state.as_ref());
     let evidence_references =
-        chat_references_for_message(&message, &input.context_state, all_evidence_references);
+        references_for_message(&message, &input.context_state, all_evidence_references);
 
     if configured_provider.enabled {
-        let (provider, provider_switch_note) = match prepare_provider_for_request(
-            &app_root,
-            &configured_provider,
-            &HashSet::new(),
-        )
-        .await
-        {
-            Ok(result) => result,
-            Err(err) => {
-                let mut fallback = local_chat_result(
-                    &message,
-                    !attachments.is_empty(),
-                    &input.context_state,
-                    &project_evidence,
-                );
-                fallback.provider_status = crate::runtime::provider::classify_failure(&err).to_string();
-                fallback.provider_model = configured_provider.model.clone();
-                fallback.provider_error = err;
-                fallback.references = evidence_references;
-                return Ok(fallback);
-            }
-        };
+        let (provider, provider_switch_note) =
+            match prepare_provider_for_request(&app_root, &configured_provider, &HashSet::new())
+                .await
+            {
+                Ok(result) => result,
+                Err(err) => {
+                    let mut fallback = local_chat_result(
+                        &message,
+                        !attachments.is_empty(),
+                        &input.context_state,
+                        &project_evidence,
+                    );
+                    fallback.provider_status =
+                        crate::runtime::provider::classify_failure(&err).to_string();
+                    fallback.provider_model = configured_provider.model.clone();
+                    fallback.provider_error = err;
+                    fallback.references = evidence_references;
+                    return Ok(fallback);
+                }
+            };
         let request_id = input.request_id.trim().to_string();
         let token = if request_id.is_empty() {
             None
         } else {
             Some(runtime_requests.start(&request_id))
         };
-        emit_runtime_conversation_event(
+        emit_conversation_event(
             &app,
             &request_id,
             "model.started",
@@ -2114,7 +1672,7 @@ async fn chat_with_model(
         }
         match provider_result {
             Ok(mut result) => {
-                emit_runtime_conversation_event(
+                emit_conversation_event(
                     &app,
                     &request_id,
                     "request.completed",
@@ -2140,7 +1698,7 @@ async fn chat_with_model(
                 return Ok(result);
             }
             Err(err) if err == "请求已取消" => {
-                emit_runtime_conversation_event(
+                emit_conversation_event(
                     &app,
                     &request_id,
                     "request.cancelled",
@@ -2152,7 +1710,7 @@ async fn chat_with_model(
             }
             Err(err) => {
                 record_provider_failure(&app_root, &provider, &err)?;
-                emit_runtime_conversation_event(
+                emit_conversation_event(
                     &app,
                     &request_id,
                     "request.failed",
@@ -2166,7 +1724,8 @@ async fn chat_with_model(
                     &input.context_state,
                     &project_evidence,
                 );
-                fallback.provider_status = crate::runtime::provider::classify_failure(&err).to_string();
+                fallback.provider_status =
+                    crate::runtime::provider::classify_failure(&err).to_string();
                 fallback.provider_model = provider.model.clone();
                 fallback.provider_error = err;
                 fallback.references = evidence_references;
@@ -2243,20 +1802,18 @@ async fn generate_readonly_plan(
     };
 
     if configured_provider.enabled {
-        let (provider, provider_switch_note) = match prepare_provider_for_request(
-            &app_root,
-            &configured_provider,
-            &HashSet::new(),
-        )
-        .await
-        {
-            Ok(result) => result,
-            Err(err) => {
-                let mut plan = build_local_readonly_plan(fallback_context);
-                plan.trace.push(format!("PROVIDER_PRECHECK_FAILED: {}", err));
-                return Ok(plan);
-            }
-        };
+        let (provider, provider_switch_note) =
+            match prepare_provider_for_request(&app_root, &configured_provider, &HashSet::new())
+                .await
+            {
+                Ok(result) => result,
+                Err(err) => {
+                    let mut plan = build_local_readonly_plan(fallback_context);
+                    plan.trace
+                        .push(format!("PROVIDER_PRECHECK_FAILED: {}", err));
+                    return Ok(plan);
+                }
+            };
         fallback_context.provider = provider;
         let request_id = input.request_id.trim().to_string();
         let token = if request_id.is_empty() {
@@ -2278,7 +1835,8 @@ async fn generate_readonly_plan(
         match provider_result {
             Ok(mut plan) => {
                 if !provider_switch_note.is_empty() {
-                    plan.trace.push(format!("PROVIDER_SWITCH: {}", provider_switch_note));
+                    plan.trace
+                        .push(format!("PROVIDER_SWITCH: {}", provider_switch_note));
                 }
                 return Ok(plan);
             }
@@ -2400,8 +1958,7 @@ fn run_goal_validation(input: GoalValidationInput) -> Result<WorkspaceSnapshot, 
     if goal_id.is_empty() {
         return Err("验收必须绑定当前目标。".to_string());
     }
-    let goals = read_json(root.join(GOALS_PATH))
-        .ok_or_else(|| "未找到目标列表".to_string())?;
+    let goals = read_json(root.join(GOALS_PATH)).ok_or_else(|| "未找到目标列表".to_string())?;
     let goal = goals
         .get("goals")
         .and_then(Value::as_array)
@@ -2453,7 +2010,7 @@ fn run_goal_validation(input: GoalValidationInput) -> Result<WorkspaceSnapshot, 
     });
     let now = current_timestamp_string();
     let report = json!({
-        "schemaVersion": "project-os.goal-validation-report.v0.1",
+        "schemaVersion": "omnidesk.goal-validation-report.v0.1",
         "generatedAt": now,
         "goalId": goal_id,
         "goalTitle": goal_title,
@@ -2537,33 +2094,39 @@ async fn generate_patch_draft(
     let plan = task
         .get("plan")
         .ok_or_else(|| "任务缺少 plan，无法生成 patch 草案".to_string())?;
-    let files = extract_plan_files(plan, &root);
+    let files = crate::runtime::patch::plan_context_files(plan, &root);
     if let Some(reason) = crate::runtime::patch::draft_ineligibility_reason(plan, &files) {
         if !request_id.is_empty() {
             runtime_requests.finish(&request_id);
         }
-        return Ok(build_not_applicable_patch_draft(&title, &files, &reason));
+        return Ok(crate::runtime::patch::not_applicable_draft(
+            &title, &files, &reason,
+        ));
     }
-    let contexts = read_patch_context_files(&root, &files)?;
+    let contexts = crate::runtime::patch::read_context_files(&root, &files)?;
 
     if configured_provider.enabled {
-        let (provider, provider_switch_note) = match prepare_provider_for_request(
-            &app_root,
-            &configured_provider,
-            &HashSet::new(),
-        )
-        .await
-        {
-            Ok(result) => result,
-            Err(err) => {
-                if !request_id.is_empty() {
-                    runtime_requests.finish(&request_id);
+        let (provider, provider_switch_note) =
+            match prepare_provider_for_request(&app_root, &configured_provider, &HashSet::new())
+                .await
+            {
+                Ok(result) => result,
+                Err(err) => {
+                    if !request_id.is_empty() {
+                        runtime_requests.finish(&request_id);
+                    }
+                    let mut draft = crate::runtime::patch::local_placeholder_draft(
+                        &title,
+                        &files,
+                        &contexts,
+                        &format!("Provider precheck: {}", err),
+                    );
+                    draft
+                        .trace
+                        .push(format!("PROVIDER_PRECHECK_FAILED: {}", err));
+                    return Ok(draft);
                 }
-                let mut draft = build_local_patch_draft(&title, &files, &contexts, &format!("Provider precheck: {}", err));
-                draft.trace.push(format!("PROVIDER_PRECHECK_FAILED: {}", err));
-                return Ok(draft);
-            }
-        };
+            };
         let hermes_result = if let Some(token) = token.clone() {
             let cancellation = token.clone();
             tokio::select! {
@@ -2571,13 +2134,17 @@ async fn generate_patch_draft(
                 result = generate_hermes_structured_patch_draft(&provider, &root, &title, plan, &contexts, None, Some(token)) => result,
             }
         } else {
-            generate_hermes_structured_patch_draft(&provider, &root, &title, plan, &contexts, None, None)
-                .await
+            generate_hermes_structured_patch_draft(
+                &provider, &root, &title, plan, &contexts, None, None,
+            )
+            .await
         };
         let hermes_error = match hermes_result {
             Ok(mut draft) => {
                 if !provider_switch_note.is_empty() {
-                    draft.trace.push(format!("PROVIDER_SWITCH: {}", provider_switch_note));
+                    draft
+                        .trace
+                        .push(format!("PROVIDER_SWITCH: {}", provider_switch_note));
                 }
                 if !request_id.is_empty() {
                     runtime_requests.finish(&request_id);
@@ -2593,18 +2160,34 @@ async fn generate_patch_draft(
             Err(err) => {
                 // A malformed or stale hunk gets one bounded regeneration attempt
                 // with the rejection reason. The allowed file set remains fixed.
-                match generate_hermes_structured_patch_draft(&provider, &root, &title, plan, &contexts, Some(&err), None).await {
+                match generate_hermes_structured_patch_draft(
+                    &provider,
+                    &root,
+                    &title,
+                    plan,
+                    &contexts,
+                    Some(&err),
+                    None,
+                )
+                .await
+                {
                     Ok(mut draft) => {
-                        draft.trace.push("DRAFT_RETRY: Hermes accepted the regenerated draft".to_string());
+                        draft
+                            .trace
+                            .push("DRAFT_RETRY: Hermes accepted the regenerated draft".to_string());
                         if !provider_switch_note.is_empty() {
-                            draft.trace.push(format!("PROVIDER_SWITCH: {}", provider_switch_note));
+                            draft
+                                .trace
+                                .push(format!("PROVIDER_SWITCH: {}", provider_switch_note));
                         }
-                        if !request_id.is_empty() { runtime_requests.finish(&request_id); }
+                        if !request_id.is_empty() {
+                            runtime_requests.finish(&request_id);
+                        }
                         return Ok(draft);
                     }
                     Err(retry_err) => format!("{}；重试失败：{}", err, retry_err),
                 }
-            },
+            }
         };
         let provider_result = if let Some(token) = token {
             tokio::select! {
@@ -2612,7 +2195,15 @@ async fn generate_patch_draft(
                 result = generate_provider_patch_draft(&provider, &root, &title, plan, &contexts, Some(&hermes_error)) => result,
             }
         } else {
-            generate_provider_patch_draft(&provider, &root, &title, plan, &contexts, Some(&hermes_error)).await
+            generate_provider_patch_draft(
+                &provider,
+                &root,
+                &title,
+                plan,
+                &contexts,
+                Some(&hermes_error),
+            )
+            .await
         };
         if !request_id.is_empty() {
             runtime_requests.finish(&request_id);
@@ -2620,7 +2211,9 @@ async fn generate_patch_draft(
         match provider_result {
             Ok(mut draft) => {
                 if !provider_switch_note.is_empty() {
-                    draft.trace.push(format!("PROVIDER_SWITCH: {}", provider_switch_note));
+                    draft
+                        .trace
+                        .push(format!("PROVIDER_SWITCH: {}", provider_switch_note));
                 }
                 draft.trace.push(format!(
                     "HERMES_FALLBACK: {}",
@@ -2631,7 +2224,12 @@ async fn generate_patch_draft(
             Err(err) if err == "请求已取消" => return Err(err),
             Err(err) => {
                 record_provider_failure(&app_root, &provider, &err)?;
-                let mut draft = build_local_patch_draft(&title, &files, &contexts, &format!("Hermes: {}; Provider: {}", hermes_error, err));
+                let mut draft = crate::runtime::patch::local_placeholder_draft(
+                    &title,
+                    &files,
+                    &contexts,
+                    &format!("Hermes: {}; Provider: {}", hermes_error, err),
+                );
                 draft.trace.push(format!(
                     "HERMES_FALLBACK: {}",
                     trim_for_trace(&hermes_error)
@@ -2645,7 +2243,12 @@ async fn generate_patch_draft(
     if !request_id.is_empty() {
         runtime_requests.finish(&request_id);
     }
-    Ok(build_local_patch_draft(&title, &files, &contexts, "未配置可用模型；这是不可应用的占位草稿。"))
+    Ok(crate::runtime::patch::local_placeholder_draft(
+        &title,
+        &files,
+        &contexts,
+        "未配置可用模型；这是不可应用的占位草稿。",
+    ))
 }
 
 #[tauri::command]
@@ -2685,7 +2288,13 @@ fn apply_patch_draft(input: ApplyPatchDraftInput) -> Result<ApplyPatchResult, St
     let allowed_files = draft
         .get("allowedFiles")
         .and_then(Value::as_array)
-        .map(|items| items.iter().filter_map(Value::as_str).map(ToString::to_string).collect::<Vec<_>>())
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+        })
         .unwrap_or_default();
     crate::runtime::patch::validate_unified_diff_authorized(diff, &allowed_files)?;
 
@@ -2755,7 +2364,7 @@ fn write_run_summary(input: WriteRunSummaryInput) -> Result<RunSummaryResult, St
     let current_project = current_registry_project(&mut registry, &app_root)?;
     let root = PathBuf::from(&current_project.path);
     let task = input.task;
-    let summary = build_run_summary_markdown(&task);
+    let summary = build_run_summary_markdown(&task, &current_timestamp_string());
     crate::runtime::execution::append_run_summary(&root, &summary)?;
 
     Ok(RunSummaryResult {
@@ -2805,226 +2414,6 @@ fn merge_run_summary_to_handoff(
     })
 }
 
-struct PlanContext {
-    task: String,
-    attachments: Vec<PlanAttachment>,
-    project_name: String,
-    stage: String,
-    root: PathBuf,
-    provider: ProviderConfig,
-}
-
-fn build_local_readonly_plan(context: PlanContext) -> ReadonlyPlan {
-    let mut files_to_read = vec![
-        "AGENTS.md".to_string(),
-        "PROJECT.md".to_string(),
-        "HANDOFF.md".to_string(),
-    ];
-    for path in [
-        "docs/ARCHITECTURE.md",
-        "docs/PRODUCT_PLAN.md",
-    ] {
-        if context.root.join(path).exists() {
-            files_to_read.push(path.to_string());
-        }
-    }
-
-    let lower_task = context.task.to_lowercase();
-    let mut candidate_changes = vec!["先不改文件；只形成计划和确认点。".to_string()];
-    let mut checks = vec!["npm --prefix desktop test".to_string()];
-
-    if lower_task.contains("ui")
-        || lower_task.contains("页面")
-        || lower_task.contains("组件")
-        || lower_task.contains("桌面")
-    {
-        candidate_changes
-            .push("可能涉及 desktop/src/main.jsx 和 desktop/src/styles.css。".to_string());
-        checks.push("npm --prefix desktop run web:build".to_string());
-    }
-
-    if lower_task.contains("rust")
-        || lower_task.contains("tauri")
-        || lower_task.contains("core")
-        || lower_task.contains("命令")
-        || lower_task.contains("本地")
-    {
-        candidate_changes
-            .push("可能涉及 desktop/src-tauri/src/main.rs 和 Tauri capability。".to_string());
-        checks.push("cargo check --manifest-path desktop/src-tauri/Cargo.toml".to_string());
-    }
-
-    checks.sort();
-    checks.dedup();
-    files_to_read.sort();
-    files_to_read.dedup();
-    candidate_changes.sort();
-    candidate_changes.dedup();
-
-    let attachment_count = context.attachments.len();
-    let attachment_names = context
-        .attachments
-        .iter()
-        .map(|attachment| attachment.name.clone())
-        .collect::<Vec<_>>();
-    let mut steps = vec![
-        "读取入口规则和当前交接，确认任务边界。".to_string(),
-        "读取项目状态、推荐结果和相关实现文件，形成最小改动范围。".to_string(),
-        "列出候选改动、风险点和需要用户确认的执行步骤。".to_string(),
-        "用户确认后，再进入受控执行、diff review 和检查。".to_string(),
-    ];
-    if attachment_count > 0 {
-        steps.insert(
-            0,
-            format!(
-                "结合用户附带截图确认问题位置：{}",
-                attachment_names.join("、")
-            ),
-        );
-    }
-    let mut trace = vec![
-        format!("ROOT: {}", context.root.display()),
-        format!("PROJECT: {}", context.project_name),
-        format!(
-            "PROVIDER: {} / {} ({})",
-            context.provider.provider,
-            context.provider.model,
-            if context.provider.enabled {
-                "configured"
-            } else {
-                "disabled"
-            }
-        ),
-        "PLANNER: local heuristic planner; external model call not enabled yet".to_string(),
-    ];
-    if attachment_count > 0 {
-        trace.push(format!("IMAGE_ATTACHMENTS: {}", attachment_count));
-    }
-
-    ReadonlyPlan {
-        task: context.task.clone(),
-        project_name: context.project_name.clone(),
-        mode: "plan".to_string(),
-        summary: format!(
-            "我会先围绕「{}」理清范围，再给出最小下一步。当前项目为 {}，阶段为 {}。{}",
-            context.task,
-            context.project_name,
-            context.stage,
-            if attachment_count > 0 {
-                "已收到图片附件，支持视觉的模型会结合截图判断。"
-            } else {
-                ""
-            }
-        ),
-        steps,
-        files_to_read,
-        candidate_changes,
-        checks,
-        guardrails: vec![
-            "不自动写文件。".to_string(),
-            "不自动运行命令。".to_string(),
-            "模型 API key 不进入前端。".to_string(),
-            "继续动手前需要用户确认改动范围。".to_string(),
-        ],
-        trace,
-    }
-}
-
-async fn generate_provider_plan(context: &PlanContext) -> Result<ReadonlyPlan, String> {
-    let api_key = read_secret_from_env_or_dotenv(&context.root, &context.provider.api_key_env)
-        .ok_or_else(|| {
-            format!(
-                "环境变量或 .env.local 中未设置 {}",
-                context.provider.api_key_env
-            )
-        })?;
-    if api_key.trim().is_empty() {
-        return Err(format!("环境变量 {} 为空", context.provider.api_key_env));
-    }
-
-    let endpoint = chat_completions_endpoint(&context.provider.api_base);
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(45))
-        .build()
-        .map_err(|err| err.to_string())?;
-
-    let prompt = provider_prompt(context);
-    let user_content = if context.attachments.is_empty() {
-        Value::String(prompt)
-    } else {
-        let mut parts = vec![json!({
-            "type": "text",
-            "text": prompt
-        })];
-        for attachment in &context.attachments {
-            parts.push(json!({
-                "type": "image_url",
-                "image_url": {
-                    "url": attachment.data_url,
-                    "detail": "auto"
-                }
-            }));
-        }
-        Value::Array(parts)
-    };
-    let response = client
-        .post(endpoint)
-        .bearer_auth(api_key)
-        .json(&json!({
-            "model": context.provider.model,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": "You are OmniDesk Local Agent Core. Return only strict JSON matching the requested schema. Do not include markdown."
-                },
-                {
-                    "role": "user",
-                    "content": user_content
-                }
-            ],
-            "temperature": 0.2
-        }))
-        .send()
-        .await
-        .map_err(|err| err.to_string())?;
-
-    let status = response.status();
-    if !status.is_success() {
-        let body = response.text().await.unwrap_or_default();
-        return Err(format!(
-            "provider HTTP {}: {}",
-            status,
-            trim_for_trace(&body)
-        ));
-    }
-
-    let chat: ChatCompletionsResponse = response.json().await.map_err(|err| err.to_string())?;
-    let content = chat
-        .choices
-        .first()
-        .map(|choice| choice.message.content.trim())
-        .filter(|content| !content.is_empty())
-        .ok_or_else(|| "provider 返回空内容".to_string())?;
-    let mut plan: ReadonlyPlan =
-        serde_json::from_str(content).map_err(|err| format!("provider JSON 解析失败: {}", err))?;
-
-    plan.mode = "plan".to_string();
-    plan.task = context.task.clone();
-    plan.project_name = context.project_name.clone();
-    plan.guardrails
-        .push("真实 provider 已调用，但仍只生成计划，不执行写入。".to_string());
-    plan.trace.push(format!(
-        "PROVIDER_CALL: {} / {}",
-        context.provider.provider, context.provider.model
-    ));
-    if !context.attachments.is_empty() {
-        plan.trace
-            .push(format!("VISION_ATTACHMENTS: {}", context.attachments.len()));
-    }
-    plan.trace.push(format!("ROOT: {}", context.root.display()));
-    Ok(plan)
-}
-
 async fn generate_provider_patch_draft(
     provider: &ProviderConfig,
     root: &Path,
@@ -3039,16 +2428,11 @@ async fn generate_provider_patch_draft(
         return Err(format!("环境变量 {} 为空", provider.api_key_env));
     }
 
-    let endpoint = chat_completions_endpoint(&provider.api_base);
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(60))
-        .build()
-        .map_err(|err| err.to_string())?;
-    let prompt = patch_draft_prompt(title, plan, contexts, retry_reason);
-    let response = client
-        .post(endpoint)
-        .bearer_auth(api_key)
-        .json(&json!({
+    let prompt = crate::runtime::patch::provider_draft_prompt(title, plan, contexts, retry_reason);
+    let response = post_chat_completion(
+        provider,
+        &api_key,
+        &json!({
             "model": provider.model,
             "messages": [
                 {
@@ -3061,29 +2445,13 @@ async fn generate_provider_patch_draft(
                 }
             ],
             "temperature": 0.15
-        }))
-        .send()
-        .await
-        .map_err(|err| err.to_string())?;
-
-    let status = response.status();
-    if !status.is_success() {
-        let body = response.text().await.unwrap_or_default();
-        return Err(format!(
-            "provider HTTP {}: {}",
-            status,
-            trim_for_trace(&body)
-        ));
-    }
-
-    let chat: ChatCompletionsResponse = response.json().await.map_err(|err| err.to_string())?;
-    let content = chat
-        .choices
-        .first()
-        .map(|choice| choice.message.content.trim())
-        .filter(|content| !content.is_empty())
-        .ok_or_else(|| "provider 返回空内容".to_string())?;
-    let mut draft: PatchDraft = serde_json::from_str(content)
+        }),
+        Duration::from_secs(60),
+    )
+    .await?;
+    let content =
+        chat_completion_content(require_provider_success(response, "provider").await?).await?;
+    let mut draft: PatchDraft = serde_json::from_str(&content)
         .map_err(|err| format!("patch draft JSON 解析失败: {}", err))?;
     draft.diff = crate::runtime::patch::normalize_hermes_unified_diff(&draft.diff, contexts)?;
     draft.files = crate::runtime::patch::files_from_unified_diff(&draft.diff);
@@ -3102,7 +2470,6 @@ async fn generate_provider_patch_draft(
 }
 
 const HERMES_ACP_TIMEOUT: Duration = Duration::from_secs(75);
-const HERMES_ACP_MAX_LINE_BYTES: usize = 1024 * 1024;
 
 #[allow(dead_code)]
 async fn generate_hermes_patch_draft(
@@ -3122,7 +2489,7 @@ async fn generate_hermes_patch_draft(
     let root = root.to_path_buf();
     let api_base = provider.api_base.clone();
     let api_key_env = provider.api_key_env.clone();
-    let prompt = hermes_patch_draft_prompt(title, plan, contexts);
+    let prompt = crate::runtime::patch::hermes_draft_prompt(title, plan, contexts);
     let context_files = contexts.to_vec();
     tauri::async_runtime::spawn_blocking(move || {
         run_hermes_acp_prompt(
@@ -3215,59 +2582,6 @@ async fn generate_hermes_structured_patch_draft(
             format!("HERMES_STEPS: {}", result.step),
         ],
     })
-}
-
-fn hermes_acp_program() -> Option<PathBuf> {
-    let mut candidates = Vec::new();
-    if let Ok(home) = std::env::var("HOME") {
-        candidates.push(PathBuf::from(home).join(".local/bin/hermes-acp"));
-    }
-    candidates.push(PathBuf::from("hermes-acp"));
-    candidates
-        .into_iter()
-        .find(|candidate| candidate.components().count() == 1 || candidate.is_file())
-}
-
-fn hermes_custom_provider_key_env(api_base: &str) -> Option<String> {
-    let authority = api_base
-        .trim()
-        .split_once("://")
-        .map(|(_, value)| value)
-        .unwrap_or(api_base)
-        .split('/')
-        .next()
-        .unwrap_or("")
-        .split('@')
-        .last()
-        .unwrap_or("")
-        .split(':')
-        .next()
-        .unwrap_or("");
-    let mut labels = authority
-        .split('.')
-        .filter(|label| !label.is_empty())
-        .collect::<Vec<_>>();
-    while matches!(labels.first(), Some(&"api" | &"www")) {
-        labels.remove(0);
-    }
-    let vendor = *labels.get(labels.len().checked_sub(2)?)?;
-    let normalized = vendor
-        .chars()
-        .map(|ch| {
-            if ch.is_ascii_alphanumeric() {
-                ch.to_ascii_uppercase()
-            } else {
-                '_'
-            }
-        })
-        .collect::<String>();
-    if normalized.is_empty()
-        || !normalized.starts_with(|ch: char| ch.is_ascii_alphabetic())
-        || matches!(normalized.as_str(), "OPENAI" | "OPENROUTER" | "OLLAMA")
-    {
-        return None;
-    }
-    Some(format!("{}_API_KEY", normalized))
 }
 
 #[allow(dead_code)]
@@ -3427,18 +2741,6 @@ fn run_hermes_acp_prompt(
             "HERMES_ACP: initialized/session/new/session/prompt".to_string(),
         ],
     })
-}
-
-fn extract_structured_hermes_envelope(output: &str) -> Result<Value, String> {
-    let normalized = output.replace("```json", "").replace("```", "");
-    let start = normalized
-        .find('{')
-        .ok_or_else(|| "Hermes 未返回结构化 JSON envelope".to_string())?;
-    let end = normalized
-        .rfind('}')
-        .ok_or_else(|| "Hermes JSON envelope 不完整".to_string())?;
-    serde_json::from_str::<Value>(&normalized[start..=end])
-        .map_err(|err| format!("Hermes envelope JSON 解析失败: {err}"))
 }
 
 fn hermes_read_tool_observation(
@@ -3629,7 +2931,11 @@ fn run_hermes_acp_structured_loop(
             let observation = hermes_read_tool_observation(root, name, &args)
                 .map_err(|err| format!("Hermes 读取工具失败：{err}"))?;
             if name == "read_file" {
-                if let Some(path) = args.get("path").and_then(Value::as_str).filter(|path| is_patch_context_path(path)) {
+                if let Some(path) = args
+                    .get("path")
+                    .and_then(Value::as_str)
+                    .filter(|path| crate::runtime::patch::is_context_path(path))
+                {
                     authorized_patch_files.insert(path.to_string());
                 }
             }
@@ -3705,7 +3011,12 @@ fn execute_approved_agent_tool(input: ExecuteApprovedAgentToolInput) -> Result<V
         .cloned()
         .unwrap_or_else(|| json!({}));
     let timestamp = current_timestamp_string();
-    run.status = if name == "apply_patch" { "applying" } else { "verifying" }.to_string();
+    run.status = if name == "apply_patch" {
+        "applying"
+    } else {
+        "verifying"
+    }
+    .to_string();
     run.revision += 1;
     run.updated_at = timestamp.clone();
     run.summary = format!("正在执行已批准工具：{name}");
@@ -3723,7 +3034,13 @@ fn execute_approved_agent_tool(input: ExecuteApprovedAgentToolInput) -> Result<V
     run.checkpoint.allowed_files = arguments
         .get("allowedFiles")
         .and_then(Value::as_array)
-        .map(|items| items.iter().filter_map(Value::as_str).map(ToString::to_string).collect())
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(ToString::to_string)
+                .collect()
+        })
         .unwrap_or_default();
     let execution_phase = run.status.clone();
     crate::runtime::agent_runs::append_evidence(
@@ -3736,46 +3053,54 @@ fn execute_approved_agent_tool(input: ExecuteApprovedAgentToolInput) -> Result<V
     crate::runtime::agent_runs::persist(&app_root, &run)?;
     let result = (|| -> Result<Value, String> {
         match name {
-        "apply_patch" => {
-            if normalize_project_access_mode(
-                &current_registry_project(&mut load_or_seed_registry(&app_root)?, &app_root)?
-                    .access_mode,
-            ) != "controlled"
-            {
-                return Err("当前项目未授权受控修改。".to_string());
-            }
-            let diff = arguments
-                .get("diff")
-                .and_then(Value::as_str)
-                .ok_or_else(|| "审批 Patch 缺少 diff。".to_string())?;
-            let allowed_files = arguments
-                .get("allowedFiles")
-                .and_then(Value::as_array)
-                .map(|items| items.iter().filter_map(Value::as_str).map(ToString::to_string).collect::<Vec<_>>())
-                .unwrap_or_default();
-            crate::runtime::patch::validate_unified_diff_authorized(diff, &allowed_files)?;
-            Ok(serde_json::to_value(apply_patch_draft(ApplyPatchDraftInput {
+            "apply_patch" => {
+                if normalize_project_access_mode(
+                    &current_registry_project(&mut load_or_seed_registry(&app_root)?, &app_root)?
+                        .access_mode,
+                ) != "controlled"
+                {
+                    return Err("当前项目未授权受控修改。".to_string());
+                }
+                let diff = arguments
+                    .get("diff")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| "审批 Patch 缺少 diff。".to_string())?;
+                let allowed_files = arguments
+                    .get("allowedFiles")
+                    .and_then(Value::as_array)
+                    .map(|items| {
+                        items
+                            .iter()
+                            .filter_map(Value::as_str)
+                            .map(ToString::to_string)
+                            .collect::<Vec<_>>()
+                    })
+                    .unwrap_or_default();
+                crate::runtime::patch::validate_unified_diff_authorized(diff, &allowed_files)?;
+                Ok(serde_json::to_value(apply_patch_draft(ApplyPatchDraftInput {
                 task: json!({ "patchDraft": { "diff": diff, "allowedFiles": allowed_files } }),
             })?)
             .map_err(|err| err.to_string())?)
-        }
-        "run_check" => {
-            if normalize_project_access_mode(
-                &current_registry_project(&mut load_or_seed_registry(&app_root)?, &app_root)?
-                    .access_mode,
-            ) != "controlled"
-            {
-                return Err("当前项目未授权执行检查。".to_string());
             }
-            let check_id = arguments
-                .get("checkId")
-                .and_then(Value::as_str)
-                .ok_or_else(|| "审批检查缺少 checkId。".to_string())?;
-            Ok(serde_json::to_value(run_guarded_check(RunGuardedCheckInput {
-                check_id: check_id.to_string(),
-            })?)
-            .map_err(|err| err.to_string())?)
-        }
+            "run_check" => {
+                if normalize_project_access_mode(
+                    &current_registry_project(&mut load_or_seed_registry(&app_root)?, &app_root)?
+                        .access_mode,
+                ) != "controlled"
+                {
+                    return Err("当前项目未授权执行检查。".to_string());
+                }
+                let check_id = arguments
+                    .get("checkId")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| "审批检查缺少 checkId。".to_string())?;
+                Ok(
+                    serde_json::to_value(run_guarded_check(RunGuardedCheckInput {
+                        check_id: check_id.to_string(),
+                    })?)
+                    .map_err(|err| err.to_string())?,
+                )
+            }
             _ => return Err(format!("不允许执行审批工具：{name}")),
         }
     })();
@@ -3803,11 +3128,19 @@ fn execute_approved_agent_tool(input: ExecuteApprovedAgentToolInput) -> Result<V
             return Err(error);
         }
     };
-    let check_failed = name == "run_check" && result.get("success").and_then(Value::as_bool) == Some(false);
+    let check_failed =
+        name == "run_check" && result.get("success").and_then(Value::as_bool) == Some(false);
     if name == "run_check" {
         if let Some(check_id) = arguments.get("checkId").and_then(Value::as_str) {
-            if !run.checkpoint.completed_check_ids.iter().any(|id| id == check_id) {
-                run.checkpoint.completed_check_ids.push(check_id.to_string());
+            if !run
+                .checkpoint
+                .completed_check_ids
+                .iter()
+                .any(|id| id == check_id)
+            {
+                run.checkpoint
+                    .completed_check_ids
+                    .push(check_id.to_string());
             }
         }
     }
@@ -3820,7 +3153,10 @@ fn execute_approved_agent_tool(input: ExecuteApprovedAgentToolInput) -> Result<V
             run.checkpoint.remaining_repair_budget -= 1;
             run.repair_attempt += 1;
             run.checkpoint.next_action = "resume-repair-draft".to_string();
-            run.summary = format!("检查未通过，剩余 {} 轮受控修复。", run.checkpoint.remaining_repair_budget);
+            run.summary = format!(
+                "检查未通过，剩余 {} 轮受控修复。",
+                run.checkpoint.remaining_repair_budget
+            );
         } else {
             run.checkpoint.next_action = "resume-model".to_string();
             run.summary = format!("已执行审批工具：{name}；等待模型根据结果继续。");
@@ -3855,8 +3191,16 @@ async fn continue_agent_run(
 ) -> Result<HermesAgentLoopResult, String> {
     let app_root = find_workspace_root()?;
     let run = crate::runtime::agent_runs::load(&app_root, &input.id)?;
-    if run.status != "queued" || !matches!(run.checkpoint.next_action.as_str(), "resume-model" | "resume-repair-draft" | "resume-stage") {
-        return Err(format!("当前恢复点为 {}，不能继续模型阶段。", run.checkpoint.next_action));
+    if run.status != "queued"
+        || !matches!(
+            run.checkpoint.next_action.as_str(),
+            "resume-model" | "resume-repair-draft" | "resume-stage"
+        )
+    {
+        return Err(format!(
+            "当前恢复点为 {}，不能继续模型阶段。",
+            run.checkpoint.next_action
+        ));
     }
     run_hermes_agent(
         RunHermesAgentInput {
@@ -3995,17 +3339,29 @@ async fn run_hermes_agent(
     finished_run.checkpoint.last_confirmation = finished_run.approval.clone();
     finished_run.checkpoint.next_action = if finished_run.status == "awaiting-approval" {
         "resume-approval".to_string()
-    } else if matches!(finished_run.status.as_str(), "failed" | "cancelled" | "succeeded") {
+    } else if matches!(
+        finished_run.status.as_str(),
+        "failed" | "cancelled" | "succeeded"
+    ) {
         "none".to_string()
     } else {
         "resume-stage".to_string()
     };
-    let evidence_phase = if finished_run.status == "awaiting-approval" { "approval" } else { "result" };
-    let evidence_details = result.as_ref().map(|value| json!({
-        "step": value.step,
-        "trace": value.trace,
-        "observations": value.observations,
-    })).unwrap_or_else(|error| json!({ "error": error.to_string() }));
+    let evidence_phase = if finished_run.status == "awaiting-approval" {
+        "approval"
+    } else {
+        "result"
+    };
+    let evidence_details = result
+        .as_ref()
+        .map(|value| {
+            json!({
+                "step": value.step,
+                "trace": value.trace,
+                "observations": value.observations,
+            })
+        })
+        .unwrap_or_else(|error| json!({ "error": error.to_string() }));
     let finished_summary = finished_run.summary.clone();
     let finished_evidence_at = finished_run.updated_at.clone();
     crate::runtime::agent_runs::append_evidence(
@@ -4020,83 +3376,6 @@ async fn run_hermes_agent(
         runtime_requests.finish(&request_id);
     }
     result
-}
-
-fn hermes_write_request(
-    stdin: &mut impl Write,
-    id: u64,
-    method: &str,
-    params: Value,
-) -> Result<(), String> {
-    let message = json!({ "jsonrpc": "2.0", "id": id, "method": method, "params": params });
-    serde_json::to_writer(&mut *stdin, &message).map_err(|err| err.to_string())?;
-    stdin.write_all(b"\n").map_err(|err| err.to_string())?;
-    stdin.flush().map_err(|err| err.to_string())
-}
-
-fn hermes_wait_for_response(
-    receiver: &mpsc::Receiver<Result<String, String>>,
-    stdin: &mut impl Write,
-    expected_id: u64,
-    deadline: Instant,
-    agent_text: &mut String,
-    cancellation: Option<&CancellationToken>,
-) -> Result<Value, String> {
-    loop {
-        if cancellation.is_some_and(CancellationToken::is_cancelled) {
-            return Err("请求已取消".to_string());
-        }
-        let remaining = deadline
-            .checked_duration_since(Instant::now())
-            .ok_or_else(|| "Hermes ACP 请求超时".to_string())?;
-        let wait = remaining.min(Duration::from_millis(200));
-        let line = match receiver.recv_timeout(wait) {
-            Ok(line) => line?,
-            Err(mpsc::RecvTimeoutError::Timeout) => continue,
-            Err(mpsc::RecvTimeoutError::Disconnected) => {
-                return Err("Hermes ACP 请求超时或连接已关闭".to_string())
-            }
-        };
-        if line.len() > HERMES_ACP_MAX_LINE_BYTES {
-            return Err("Hermes ACP 返回行超出安全上限".to_string());
-        }
-        let message: Value = serde_json::from_str(&line)
-            .map_err(|err| format!("Hermes ACP 返回无效 JSON-RPC: {err}"))?;
-        if let Some(id) = message.get("id").and_then(Value::as_u64) {
-            if message.get("method").is_some() {
-                let rejection = hermes_rejection_response(id);
-                serde_json::to_writer(&mut *stdin, &rejection).map_err(|err| err.to_string())?;
-                stdin.write_all(b"\n").map_err(|err| err.to_string())?;
-                stdin.flush().map_err(|err| err.to_string())?;
-                continue;
-            }
-            if id == expected_id {
-                if let Some(error) = message.get("error") {
-                    return Err(format!(
-                        "Hermes ACP RPC 错误: {}",
-                        trim_for_trace(&error.to_string())
-                    ));
-                }
-                return Ok(message);
-            }
-        }
-        if message.get("method").and_then(Value::as_str) == Some("session/update") {
-            if let Some(text) = message
-                .pointer("/params/update/content/text")
-                .and_then(Value::as_str)
-            {
-                agent_text.push_str(text);
-            }
-        }
-    }
-}
-
-fn hermes_rejection_response(id: u64) -> Value {
-    json!({
-        "jsonrpc": "2.0",
-        "id": id,
-        "result": { "outcome": { "outcome": "cancelled" } }
-    })
 }
 
 async fn generate_provider_chat(
@@ -4120,11 +3399,6 @@ async fn generate_provider_chat(
         return Err(format!("环境变量 {} 为空", provider.api_key_env));
     }
 
-    let endpoint = chat_completions_endpoint(&provider.api_base);
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(45))
-        .build()
-        .map_err(|err| err.to_string())?;
     let router_prompt = chat_router_prompt(
         project_name,
         stage,
@@ -4155,10 +3429,10 @@ async fn generate_provider_chat(
         }
         Value::Array(parts)
     };
-    let response = client
-        .post(endpoint)
-        .bearer_auth(api_key)
-        .json(&json!({
+    let response = post_chat_completion(
+        provider,
+        &api_key,
+        &json!({
             "model": provider.model,
             "messages": [
                 {
@@ -4172,20 +3446,11 @@ async fn generate_provider_chat(
             ],
             "temperature": 0.45,
             "stream": true
-        }))
-        .send()
-        .await
-        .map_err(|err| err.to_string())?;
-
-    let status = response.status();
-    if !status.is_success() {
-        let body = response.text().await.unwrap_or_default();
-        return Err(format!(
-            "provider HTTP {}: {}",
-            status,
-            trim_for_trace(&body)
-        ));
-    }
+        }),
+        Duration::from_secs(45),
+    )
+    .await?;
+    let response = require_provider_success(response, "provider").await?;
 
     let is_sse = response
         .headers()
@@ -4194,12 +3459,7 @@ async fn generate_provider_chat(
         .map(|value| value.contains("text/event-stream"))
         .unwrap_or(false);
     let content = if !is_sse {
-        let chat: ChatCompletionsResponse = response.json().await.map_err(|err| err.to_string())?;
-        chat.choices
-            .first()
-            .map(|choice| choice.message.content.trim().to_string())
-            .filter(|content| !content.is_empty())
-            .ok_or_else(|| "provider 返回空内容".to_string())?
+        chat_completion_content(response).await?
     } else {
         let mut content = String::new();
         let mut pending = String::new();
@@ -4213,7 +3473,7 @@ async fn generate_provider_chat(
                 let reply = streaming_reply_prefix(&content);
                 let reply_delta = reply.chars().skip(emitted_reply_chars).collect::<String>();
                 emitted_reply_chars += reply_delta.chars().count();
-                emit_runtime_conversation_event(
+                emit_conversation_event(
                     app,
                     request_id,
                     "model.delta",
@@ -4243,649 +3503,6 @@ async fn generate_provider_chat(
         .to_string();
     }
     Ok(result)
-}
-
-/// Consumes only complete SSE lines so transport chunk boundaries cannot corrupt model JSON.
-fn consume_openai_sse_deltas(pending: &mut String, chunk: &str) -> Vec<String> {
-    pending.push_str(chunk);
-    let mut deltas = Vec::new();
-    while let Some(index) = pending.find('\n') {
-        let line = pending[..index].trim().to_string();
-        pending.drain(..=index);
-        let Some(data) = line.strip_prefix("data:") else {
-            continue;
-        };
-        let data = data.trim();
-        if data == "[DONE]" {
-            continue;
-        }
-        let event: Value = match serde_json::from_str(data) {
-            Ok(event) => event,
-            Err(_) => continue,
-        };
-        let delta = event
-            .pointer("/choices/0/delta/content")
-            .and_then(Value::as_str)
-            .unwrap_or("");
-        if !delta.is_empty() {
-            deltas.push(delta.to_string());
-        }
-    }
-    deltas
-}
-
-/// Extracts the visible `reply` string from an incomplete model JSON envelope.
-/// The model still has to return valid JSON before its final result is accepted.
-fn streaming_reply_prefix(content: &str) -> String {
-    let Some(key_index) = content.find("\"reply\"") else {
-        return String::new();
-    };
-    let Some((_, value)) = content[key_index + "\"reply\"".len()..].split_once(':') else {
-        return String::new();
-    };
-    let Some(value) = value.trim_start().strip_prefix('"') else {
-        return String::new();
-    };
-
-    let mut reply = String::new();
-    let mut escaped = false;
-    for character in value.chars() {
-        if escaped {
-            match character {
-                'n' => reply.push('\n'),
-                'r' => reply.push('\r'),
-                't' => reply.push('\t'),
-                '"' => reply.push('"'),
-                '\\' => reply.push('\\'),
-                other => reply.push(other),
-            }
-            escaped = false;
-        } else if character == '\\' {
-            escaped = true;
-        } else if character == '"' {
-            break;
-        } else {
-            reply.push(character);
-        }
-    }
-    reply
-}
-
-fn chat_router_prompt(
-    project_name: &str,
-    stage: &str,
-    current_model: &str,
-    message: &str,
-    attachments: &[PlanAttachment],
-    recent_turns: &[ChatTurnInput],
-    context_state: &DialogueContextInput,
-    summary: &Value,
-    project_memory: &[Value],
-    project_evidence: &Value,
-) -> String {
-    let attachment_note = if attachments.is_empty() {
-        "No image attachments.".to_string()
-    } else {
-        format!(
-            "Image attachments: {}.",
-            attachments
-                .iter()
-                .map(|attachment| attachment.name.clone())
-                .collect::<Vec<_>>()
-                .join(", ")
-        )
-    };
-    let history = recent_turns
-        .iter()
-        .take(8)
-        .map(|turn| format!("{}: {}", turn.role, trim_for_trace(&turn.text)))
-        .collect::<Vec<_>>()
-        .join("\n");
-    let context_json = serde_json::to_string(context_state).unwrap_or_else(|_| "{}".to_string());
-    let summary_json = serde_json::to_string(summary).unwrap_or_else(|_| "{}".to_string());
-    let memory_json = serde_json::to_string(project_memory).unwrap_or_else(|_| "[]".to_string());
-    let evidence_json =
-        serde_json::to_string_pretty(project_evidence).unwrap_or_else(|_| "{}".to_string());
-    format!(
-        r#"Current project: {project_name}
-Current stage: {stage}
-Current configured model: {current_model}
-{attachment_note}
-
-Dialogue context state:
-{context_json}
-
-Earlier conversation summary:
-{summary_json}
-
-Confirmed project memory (may guide collaboration constraints; do not treat it as live file evidence):
-{memory_json}
-
-Recent conversation:
-{history}
-
-Verified local project evidence:
-{evidence_json}
-
-User message:
-{message}
-
-Decide whether this is normal conversation or a concrete project task.
-
-Return strict JSON only:
-{{
-  "reply": "Chinese, natural, concise assistant reply shown in chat",
-  "shouldCreatePlan": false,
-  "intent": "chat | question | inspect | task"
-}}
-
-Rules:
-- Treat short follow-ups such as "那怎么办", "你判断", "直接告诉我", and "直接修" as continuations of currentTopic and previousConclusion. Do not ask the user to repeat the subject when contextState identifies it.
-- For project questions, answer from verified local project evidence. State the conclusion first, then cite concrete evidence in the prose, then give the smallest useful next action.
-- If evidence is insufficient for a claim, label it as an inference instead of presenting it as fact.
-- Greetings, small talk, broad questions, or "what is X" shouldCreatePlan=false.
-- Questions that ask "why", "how", "what risks", "what happened", "is this ok", or "look at this" shouldCreatePlan=false and should receive a natural answer.
-- Set shouldCreatePlan=true when the user clearly asks OmniDesk to solve, handle, organize, clean up, make a plan, create a task, apply a patch, run commands/checks, or implement/fix code.
-- Phrases like "帮我处理", "处理一下", "看看解决", "整理一下", "制定方案", "侧边栏这么多待办你看看解决呢" are action requests even if they contain question-like words.
-- If the user asks what model you are, mention the current configured model exactly.
-- If shouldCreatePlan=true, reply should briefly acknowledge that you will create a plan.
-- If shouldCreatePlan=false, do not suggest generating a plan, clicking buttons, or asking for confirmation unless the user's request is ambiguous.
-- Do not tell the user to inspect another page instead of answering when the evidence above already supports an answer.
-- Do not invent completed work.
-- Do not mention internal JSON or routing.
-"#
-    )
-}
-
-fn local_chat_result(
-    message: &str,
-    has_attachments: bool,
-    context_state: &DialogueContextInput,
-    project_evidence: &Value,
-) -> ChatWithModelResult {
-    let should_create_plan = should_create_plan_for_message(message, has_attachments);
-    let topic = if context_state.current_topic.trim().is_empty() {
-        message
-    } else {
-        context_state.current_topic.as_str()
-    };
-    let risk_question = message.contains("风险") || topic.contains("风险");
-    let active_task_count = project_evidence
-        .get("activeTasks")
-        .and_then(Value::as_array)
-        .map(Vec::len)
-        .unwrap_or(0);
-    let changed_file_count = project_evidence
-        .get("changedFiles")
-        .and_then(Value::as_array)
-        .map(Vec::len)
-        .unwrap_or(0);
-    let validation_status = project_evidence
-        .get("validationStatus")
-        .and_then(Value::as_str)
-        .unwrap_or("not-run");
-    let current_focus = project_evidence
-        .get("activeTasks")
-        .and_then(Value::as_array)
-        .and_then(|tasks| tasks.first())
-        .and_then(|task| task.get("title"))
-        .and_then(Value::as_str)
-        .unwrap_or("当前最高优先级任务");
-    ChatWithModelResult {
-        reply: if should_create_plan {
-            "可以，我整理成一个可执行计划。".to_string()
-        } else if is_greeting_message(message) {
-            "你好，我在。".to_string()
-        } else if context_state.expected_next_action == "recommend-next" {
-            format!(
-                "建议按这个顺序处理：先推进「{}」；然后运行目标验收并处理失败项；最后审阅剩余 Git 变更，确认是否可以交付。",
-                current_focus
-            )
-        } else if context_state.expected_next_action == "decide-next" {
-            format!(
-                "我判断先推进「{}」。它是当前最直接的阻塞点，完成后立即运行目标验收，再决定是否处理其他风险。",
-                current_focus
-            )
-        } else if is_question_like_message(message) || !context_state.current_topic.is_empty() {
-            if risk_question {
-                format!(
-                    "当前可确认的风险有三项：还有 {} 个活跃或待确认任务；Git 工作区有 {} 个变更文件；目标验收状态为 {}。建议先处理失败或进行中的任务，再运行目标验收，最后确认剩余 Git 变更是否属于本轮交付。",
-                    active_task_count, changed_file_count, validation_status
-                )
-            } else {
-                format!(
-                    "继续回答「{}」：{}",
-                    topic,
-                    if context_state.previous_conclusion.is_empty() {
-                        "当前本地证据还不足以给出更具体结论。"
-                    } else {
-                        context_state.previous_conclusion.as_str()
-                    }
-                )
-            }
-        } else {
-            "可以，继续说。".to_string()
-        },
-        should_create_plan,
-        intent: if should_create_plan { "task" } else { "chat" }.to_string(),
-        provider_status: "local".to_string(),
-        provider_model: String::new(),
-        provider_error: String::new(),
-        references: Vec::new(),
-    }
-}
-
-fn is_greeting_message(message: &str) -> bool {
-    let normalized = message
-        .trim()
-        .trim_matches(|ch: char| {
-            ch.is_ascii_punctuation() || ch.is_whitespace() || "。！？!，,".contains(ch)
-        })
-        .to_lowercase();
-    matches!(
-        normalized.as_str(),
-        "hi" | "hello" | "hey" | "你好" | "您好" | "哈喽" | "嗨" | "在吗" | "在么"
-    )
-}
-
-fn should_create_plan_for_message(message: &str, has_attachments: bool) -> bool {
-    if is_task_like_message(message) {
-        return true;
-    }
-    if is_question_like_message(message) {
-        return false;
-    }
-    has_attachments
-}
-
-fn is_question_like_message(message: &str) -> bool {
-    let text = message.trim().to_lowercase();
-    [
-        "为什么",
-        "怎么",
-        "哪些",
-        "还有哪些",
-        "是什么",
-        "吗",
-        "呢",
-        "咋回事",
-        "看一下",
-        "看看",
-        "风险",
-        "问题在哪",
-        "自然吗",
-        "正常吗",
-        "why",
-        "how",
-        "what",
-        "which",
-        "risk",
-        "risks",
-    ]
-    .iter()
-    .any(|keyword| text.contains(keyword))
-}
-
-fn is_task_like_message(message: &str) -> bool {
-    let text = message.trim().to_lowercase();
-    [
-        "帮我改",
-        "帮我修",
-        "帮我优化",
-        "帮我生成",
-        "帮我创建",
-        "帮我新增",
-        "帮我删除",
-        "帮我执行",
-        "帮我跑",
-        "开始执行",
-        "生成计划",
-        "创建任务",
-        "改代码",
-        "修复",
-        "实现",
-        "接入",
-        "配置",
-        "做成",
-        "设计",
-        "重构",
-        "提交",
-        "推送",
-        "帮我处理",
-        "处理一下",
-        "解决一下",
-        "看看解决",
-        "看下解决",
-        "整理一下",
-        "梳理一下",
-        "制定方案",
-        "出个方案",
-        "给个方案",
-        "整理待办",
-        "处理方案",
-        "commit",
-        "push",
-        "build",
-        "apply patch",
-    ]
-    .iter()
-    .any(|keyword| text.contains(keyword))
-}
-
-fn extract_plan_files(plan: &Value, root: &Path) -> Vec<String> {
-    let mut files = plan
-        .get("filesToRead")
-        .or_else(|| plan.get("files_to_read"))
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-        .filter_map(Value::as_str)
-        .map(str::trim)
-        .filter(|path| !path.is_empty())
-        .filter(|path| is_patch_context_path(path))
-        .filter(|path| root.join(path).is_file())
-        .map(ToString::to_string)
-        .collect::<Vec<_>>();
-
-    files.sort();
-    files.dedup();
-    files.truncate(8);
-    files
-}
-
-fn is_patch_context_path(path: &str) -> bool {
-    if path.starts_with('/')
-        || path.contains("..")
-        || path.starts_with(".env")
-        || path.contains("/.env")
-        || path == ".omnidesk"
-        || path.starts_with(".omnidesk/")
-        || path.contains(".omnidesk/desktop-provider")
-    {
-        return false;
-    }
-    matches!(
-        Path::new(path).extension().and_then(|value| value.to_str()),
-        Some("js" | "jsx" | "ts" | "tsx" | "css" | "rs" | "md" | "json" | "toml")
-    )
-}
-
-fn is_safe_engineering_preview_path(path: &str) -> bool {
-    let relative = Path::new(path);
-    if relative.is_absolute()
-        || path.starts_with(".env")
-        || path.contains("/.env")
-        || path == ".omnidesk"
-        || path.starts_with(".omnidesk/")
-        || path.contains(".omnidesk/desktop-provider")
-    {
-        return false;
-    }
-    if relative.components().any(|component| {
-        matches!(
-            component,
-            Component::ParentDir | Component::RootDir | Component::Prefix(_)
-        )
-    }) {
-        return false;
-    }
-    matches!(
-        relative.extension().and_then(|value| value.to_str()),
-        Some(
-            "md" | "mdx"
-                | "txt"
-                | "json"
-                | "jsonc"
-                | "yaml"
-                | "yml"
-                | "toml"
-                | "js"
-                | "jsx"
-                | "ts"
-                | "tsx"
-                | "css"
-                | "scss"
-                | "html"
-                | "rs"
-                | "sh"
-                | "py"
-                | "sql"
-        )
-    )
-}
-
-fn preview_language(path: &str) -> String {
-    match Path::new(path).extension().and_then(|value| value.to_str()) {
-        Some("md" | "mdx") => "markdown",
-        Some("json" | "jsonc") => "json",
-        Some("yaml" | "yml") => "yaml",
-        Some("toml") => "toml",
-        Some("js" | "jsx") => "javascript",
-        Some("ts" | "tsx") => "typescript",
-        Some("css" | "scss") => "css",
-        Some("html") => "html",
-        Some("rs") => "rust",
-        Some("sh") => "shell",
-        Some("py") => "python",
-        Some("sql") => "sql",
-        _ => "text",
-    }
-    .to_string()
-}
-
-fn read_patch_context_files(
-    root: &Path,
-    files: &[String],
-) -> Result<Vec<(String, String)>, String> {
-    let mut contexts = Vec::new();
-    for relative in files {
-        let path = root.join(relative);
-        let content =
-            fs::read_to_string(&path).map_err(|err| format!("读取 {} 失败: {}", relative, err))?;
-        let trimmed = content.chars().take(12000).collect::<String>();
-        contexts.push((relative.clone(), trimmed));
-    }
-    Ok(contexts)
-}
-
-fn build_local_patch_draft(
-    title: &str,
-    files: &[String],
-    contexts: &[(String, String)],
-    failure_reason: &str,
-) -> PatchDraft {
-    let file_list = if files.is_empty() {
-        "暂无可安全读取的候选文件".to_string()
-    } else {
-        files.join(", ")
-    };
-    PatchDraft {
-        summary: format!("已为「{}」准备 patch 草案入口；需要模型生成具体 diff。", title),
-        diff: format!(
-            "--- /dev/null\n+++ PATCH_DRAFT_PENDING\n@@\n+任务：{}\n+候选文件：{}\n+当前步骤只生成审阅草案，不写入文件。\n",
-            title, file_list
-        ),
-        files: files.to_vec(),
-        allowed_files: files.to_vec(),
-        context_files: contexts.iter().map(|(path, _)| path.clone()).collect(),
-        draft_attempt: 1,
-        failure_reason: failure_reason.to_string(),
-        not_applicable: false,
-        guardrails: vec![
-            "只生成 diff 草案，不写入文件。".to_string(),
-            "不读取 .env 或 provider key 配置。".to_string(),
-            "Apply 前必须经过用户确认。".to_string(),
-        ],
-        trace: vec![
-            format!("PATCH_CONTEXT_FILES: {}", contexts.len()),
-            "PATCH_MODE: local placeholder".to_string(),
-        ],
-    }
-}
-
-fn build_not_applicable_patch_draft(title: &str, files: &[String], reason: &str) -> PatchDraft {
-    PatchDraft {
-        summary: format!("「{}」暂不生成文件改动：{}", title, reason),
-        diff: String::new(),
-        files: files.to_vec(),
-        allowed_files: files.to_vec(),
-        context_files: Vec::new(),
-        draft_attempt: 0,
-        failure_reason: reason.to_string(),
-        not_applicable: true,
-        guardrails: vec![
-            "该任务当前不具备可应用的工程改动，不会调用模型生成占位 diff。".to_string(),
-            "先运行检查或调整计划后，才可能生成受控 Patch。".to_string(),
-        ],
-        trace: vec!["PATCH_SEMANTIC_GATE: not-applicable".to_string()],
-    }
-}
-
-fn patch_draft_prompt(
-    title: &str,
-    plan: &Value,
-    contexts: &[(String, String)],
-    retry_reason: Option<&str>,
-) -> String {
-    let context_text = contexts
-        .iter()
-        .map(|(path, content)| format!("--- FILE: {} ---\n{}", path, content))
-        .collect::<Vec<_>>()
-        .join("\n\n");
-    format!(
-        r#"Generate a safe unified diff draft for this local coding task.
-
-Return strict JSON with this exact shape:
-{{
-  "summary": "Chinese one-sentence summary",
-  "diff": "unified diff text only",
-  "files": ["relative/path"],
-  "allowedFiles": ["relative/path"],
-  "contextFiles": ["relative/path"],
-  "guardrails": ["string"],
-  "trace": ["string"]
-}}
-
-Rules:
-- Return a unified diff draft, but do not claim it has been applied.
-- Only modify files included in FILE CONTEXT.
-- If the context is insufficient, return a small placeholder diff and explain the missing context in summary.
-- Do not include secrets, API keys, or .env content.
-- Prefer small, reviewable changes.
-- Every changed file requires a complete --- a/path / +++ b/path header and at least one context line.
-- Do not create, delete, or rename files.
-
-Task title: {}
-Plan JSON:
-{}
-
-FILE CONTEXT:
-{}
-
-{} 
-"#,
-        title,
-        serde_json::to_string_pretty(plan).unwrap_or_else(|_| "{}".to_string()),
-        context_text,
-        retry_reason.map(|reason| format!("REGENERATION REASON (fix it without expanding scope): {reason}")).unwrap_or_default()
-    )
-}
-
-#[allow(dead_code)]
-fn hermes_patch_draft_prompt(title: &str, plan: &Value, contexts: &[(String, String)]) -> String {
-    let context_text = contexts
-        .iter()
-        .map(|(path, content)| format!("--- FILE: {} ---\n{}", path, content))
-        .collect::<Vec<_>>()
-        .join("\n\n");
-    format!(
-        r#"You are a read-only patch-draft generator inside OmniDesk.
-
-Return exactly one unified diff and no markdown fence or explanation.
-
-Hard boundaries:
-- Do not write, delete, rename, or create files.
-- Do not run commands, open a terminal, call external tools, browse, or make network requests.
-- Use only the supplied FILE CONTEXT. Do not read any other project file.
-- Modify only files listed in FILE CONTEXT. Never output .env, credentials, provider config, or secret values.
-- If no safe diff is possible, return no diff. OmniDesk will treat that as a failed draft.
-
-Task title: {}
-Plan JSON:
-{}
-
-FILE CONTEXT:
-{}"#,
-        title,
-        serde_json::to_string_pretty(plan).unwrap_or_else(|_| "{}".to_string()),
-        context_text
-    )
-}
-
-fn chat_completions_endpoint(api_base: &str) -> String {
-    let base = api_base.trim_end_matches('/');
-    if base.ends_with("/chat/completions") {
-        base.to_string()
-    } else {
-        format!("{}/chat/completions", base)
-    }
-}
-
-fn models_endpoint(api_base: &str) -> String {
-    let base = api_base.trim_end_matches('/');
-    if base.ends_with("/models") {
-        base.to_string()
-    } else if base.ends_with("/chat/completions") {
-        format!("{}/models", base.trim_end_matches("/chat/completions"))
-    } else {
-        format!("{}/models", base)
-    }
-}
-
-fn provider_prompt(context: &PlanContext) -> String {
-    format!(
-        r#"Generate a readonly execution plan for this local desktop AI workbench task.
-
-Return strict JSON with this exact shape:
-{{
-  "task": "string",
-  "projectName": "string",
-  "mode": "readonly-plan",
-  "summary": "string",
-  "steps": ["string"],
-  "filesToRead": ["string"],
-  "candidateChanges": ["string"],
-  "checks": ["string"],
-  "guardrails": ["string"],
-  "trace": ["string"]
-}}
-
-Constraints:
-- Do not propose automatic file writes.
-- Do not propose arbitrary shell commands.
-- Prefer OmniDesk checks: npm --prefix desktop test, npm --prefix desktop run web:build, cargo check --manifest-path desktop/src-tauri/Cargo.toml.
-- Keep the plan concise and actionable.
-- Use Chinese for user-facing plan text.
-
-Project: {}
-Stage: {}
-Root: {}
-Task: {}
-"#,
-        context.project_name,
-        context.stage,
-        context.root.display(),
-        context.task
-    )
-}
-
-fn trim_for_trace(value: &str) -> String {
-    let trimmed = value.trim();
-    if trimmed.chars().count() > 240 {
-        format!("{}...", trimmed.chars().take(240).collect::<String>())
-    } else {
-        trimmed.to_string()
-    }
 }
 
 #[tauri::command]
@@ -4970,7 +3587,7 @@ fn save_provider_config(input: ProviderConfigInput) -> Result<ProviderStatus, St
     upsert_provider_profile(&mut existing.profiles, profile);
 
     let config = ProviderConfig {
-        schema_version: "project-os.desktop-provider.v0.1".to_string(),
+        schema_version: PROVIDER_SCHEMA_VERSION.to_string(),
         provider: provider.to_string(),
         model: model.to_string(),
         api_base: api_base.to_string(),
@@ -5093,41 +3710,9 @@ async fn probe_provider_models(
             .ok_or_else(|| format!("环境变量或 .env.local 中未设置 {}", api_key_env))?
     };
 
-    let endpoint = models_endpoint(api_base);
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(30))
-        .build()
-        .map_err(|err| err.to_string())?;
-    let response = client
-        .get(endpoint)
-        .bearer_auth(api_key)
-        .send()
-        .await
-        .map_err(|err| err.to_string())?;
-
-    let status = response.status();
-    if !status.is_success() {
-        let body = response.text().await.unwrap_or_default();
-        return Err(format!(
-            "模型列表请求失败 HTTP {}: {}",
-            status,
-            trim_for_trace(&body)
-        ));
-    }
-
-    let payload: ModelsListResponse = response.json().await.map_err(|err| err.to_string())?;
-    let mut models = payload
-        .data
-        .into_iter()
-        .map(|item| item.id.trim().to_string())
-        .filter(|id| !id.is_empty())
-        .collect::<Vec<_>>();
-    models.sort();
-    models.dedup();
-
-    if models.is_empty() {
-        return Err("接口返回成功，但没有拿到模型列表".to_string());
-    }
+    let response = get_models(api_base, &api_key, Duration::from_secs(30)).await?;
+    let models =
+        listed_models(require_provider_success(response, "模型列表请求失败").await?).await?;
 
     Ok(ProviderModelsProbeResult {
         models,
@@ -5156,7 +3741,7 @@ async fn test_provider_model(
     }
 
     let provider = ProviderConfig {
-        schema_version: "project-os.desktop-provider.v0.1".to_string(),
+        schema_version: PROVIDER_SCHEMA_VERSION.to_string(),
         provider: "openai-compatible".to_string(),
         model: model.to_string(),
         api_base: api_base.to_string(),
@@ -5180,15 +3765,10 @@ async fn test_provider_config(
             .ok_or_else(|| format!("环境变量或 .env.local 中未设置 {}", provider.api_key_env))?
     };
 
-    let endpoint = chat_completions_endpoint(&provider.api_base);
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(45))
-        .build()
-        .map_err(|err| err.to_string())?;
-    let response = client
-        .post(endpoint)
-        .bearer_auth(api_key)
-        .json(&json!({
+    let response = post_chat_completion(
+        provider,
+        &api_key,
+        &json!({
             "model": provider.model,
             "messages": [
                 {
@@ -5197,33 +3777,25 @@ async fn test_provider_config(
                 }
             ],
             "temperature": 0
-        }))
-        .send()
-        .await
-        .map_err(|err| err.to_string())?;
-
-    let status = response.status();
-    if !status.is_success() {
-        let body = response.text().await.unwrap_or_default();
-        return Err(format!(
-            "模型测试失败 HTTP {}: {}",
-            status,
-            trim_for_trace(&body)
-        ));
-    }
-
-    let chat: ChatCompletionsResponse = response.json().await.map_err(|err| err.to_string())?;
-    let content = chat
-        .choices
-        .first()
-        .map(|choice| choice.message.content.trim())
-        .filter(|content| !content.is_empty())
-        .ok_or_else(|| "模型返回为空".to_string())?;
+        }),
+        Duration::from_secs(45),
+    )
+    .await?;
+    let content =
+        chat_completion_content(require_provider_success(response, "模型测试失败").await?)
+            .await
+            .map_err(|error| {
+                if error == "provider 返回空内容" {
+                    "模型返回为空".to_string()
+                } else {
+                    error
+                }
+            })?;
 
     Ok(ProviderModelTestResult {
         model: provider.model.clone(),
         success: true,
-        message: format!("{} 可用：{}", provider.model, trim_for_trace(content)),
+        message: format!("{} 可用：{}", provider.model, trim_for_trace(&content)),
     })
 }
 
@@ -5267,36 +3839,11 @@ async fn test_provider_model_with_cache(
     }
 }
 
-fn provider_for_profile(config: &ProviderConfig, profile: &ProviderProfile) -> ProviderConfig {
-    ProviderConfig {
-        schema_version: config.schema_version.clone(),
-        provider: profile.provider.clone(),
-        model: profile.model.clone(),
-        api_base: profile.api_base.clone(),
-        api_key_env: profile.api_key_env.clone(),
-        enabled: config.enabled,
-        active_profile_id: profile.id.clone(),
-        profiles: config.profiles.clone(),
-    }
-}
-
-fn model_health_is_fresh(entry: &ModelHealthEntry) -> bool {
-    let Ok(checked_at) = entry.checked_at.parse::<u64>() else {
-        return false;
-    };
-    let now = current_unix_timestamp().parse::<u64>().unwrap_or(0);
-    now >= checked_at && now - checked_at <= 60
-}
-
-fn health_entry_for<'a>(health: &'a ModelHealthCache, provider: &ProviderConfig) -> Option<&'a ModelHealthEntry> {
-    health.entries.iter().find(|entry| {
-        entry.api_base == provider.api_base
-            && entry.api_key_env == provider.api_key_env
-            && entry.model == provider.model
-    })
-}
-
-fn record_provider_failure(app_root: &Path, provider: &ProviderConfig, message: &str) -> Result<(), String> {
+fn record_provider_failure(
+    app_root: &Path,
+    provider: &ProviderConfig,
+    message: &str,
+) -> Result<(), String> {
     crate::runtime::provider::record_health(
         app_root,
         ModelHealthEntry {
@@ -5323,14 +3870,7 @@ async fn prepare_provider_for_request(
     excluded_profile_ids: &HashSet<String>,
 ) -> Result<(ProviderConfig, String), String> {
     let health = load_or_seed_model_health(app_root)?;
-    let mut candidates = vec![(configured.active_profile_id.clone(), configured.clone())];
-    candidates.extend(
-        configured
-            .profiles
-            .iter()
-            .filter(|profile| profile.id != configured.active_profile_id)
-            .map(|profile| (profile.id.clone(), provider_for_profile(configured, profile))),
-    );
+    let candidates = ordered_profile_candidates(configured);
     let mut failures = Vec::new();
     for (profile_id, candidate) in candidates {
         if excluded_profile_ids.contains(&profile_id) {
@@ -5349,8 +3889,9 @@ async fn prepare_provider_for_request(
             failures.push(format!("{}（认证失败）", label));
             continue;
         }
-        if let Some(entry) = health_entry_for(&health, &candidate) {
-            if model_health_is_fresh(entry) {
+        if let Some(entry) = provider_health_entry(&health, &candidate) {
+            if provider_health_is_fresh(entry, current_unix_timestamp().parse::<u64>().unwrap_or(0))
+            {
                 if entry.status == "available" {
                     let switch_note = if profile_id != configured.active_profile_id {
                         format!("已自动切换到可用连接「{}」。", label)
@@ -5401,7 +3942,11 @@ async fn prepare_provider_for_request(
     }
     Err(format!(
         "没有可用模型连接：{}",
-        if failures.is_empty() { "未找到可用 profile".to_string() } else { failures.join("；") }
+        if failures.is_empty() {
+            "未找到可用 profile".to_string()
+        } else {
+            failures.join("；")
+        }
     ))
 }
 
@@ -5451,80 +3996,8 @@ fn run_guarded_check(input: RunGuardedCheckInput) -> Result<GuardedCheckResult, 
 }
 
 #[tauri::command]
-fn get_hermes_executor_status() -> HermesExecutorStatus {
-    let candidate_paths = |program: &str| {
-        let mut paths = Vec::new();
-        if let Ok(home) = std::env::var("HOME") {
-            paths.push(PathBuf::from(home).join(".local/bin").join(program));
-        }
-        paths.push(PathBuf::from(program));
-        paths
-    };
-
-    for program in candidate_paths("hermes-acp") {
-        match Command::new(&program).arg("--check").output() {
-            Ok(output) if output.status.success() => {
-                let version_output = Command::new(&program).arg("--version").output().ok();
-                let version = version_output
-                    .map(|value| {
-                        trim_runner_output(&format!(
-                            "{}{}",
-                            String::from_utf8_lossy(&value.stdout),
-                            String::from_utf8_lossy(&value.stderr)
-                        ))
-                    })
-                    .unwrap_or_default();
-                return HermesExecutorStatus {
-                    id: "hermes".to_string(),
-                    protocol: "acp".to_string(),
-                    status: "ready".to_string(),
-                    version,
-                    message: "Hermes ACP 通道检查通过；模型凭据仍需通过实际请求验证。".to_string(),
-                };
-            }
-            Ok(output) => {
-                let detail = trim_runner_output(&format!(
-                    "{}{}",
-                    String::from_utf8_lossy(&output.stdout),
-                    String::from_utf8_lossy(&output.stderr)
-                ));
-                return HermesExecutorStatus {
-                    id: "hermes".to_string(),
-                    protocol: "acp".to_string(),
-                    status: "unavailable".to_string(),
-                    version: String::new(),
-                    message: format!("检测到 Hermes ACP，但健康检查未通过：{}", detail),
-                };
-            }
-            Err(_) => continue,
-        }
-    }
-
-    for program in candidate_paths("hermes") {
-        let output = Command::new(&program).arg("--version").output();
-        if let Ok(output) = output {
-            let version = trim_runner_output(&format!(
-                "{}{}",
-                String::from_utf8_lossy(&output.stdout),
-                String::from_utf8_lossy(&output.stderr)
-            ));
-            return HermesExecutorStatus {
-                id: "hermes".to_string(),
-                protocol: "cli".to_string(),
-                status: "cli-only".to_string(),
-                version,
-                message: "已检测到 Hermes CLI；ACP 健康检查通过前不能接入受控执行。".to_string(),
-            };
-        }
-    }
-    HermesExecutorStatus {
-        id: "hermes".to_string(),
-        protocol: "acp".to_string(),
-        status: "not-installed".to_string(),
-        version: String::new(),
-        message: "未检测到 Hermes。安装并完成模型配置后，OmniDesk 才能将它作为可选执行器使用。"
-            .to_string(),
-    }
+fn get_hermes_executor_status() -> crate::runtime::hermes_protocol::ExecutorStatus {
+    hermes_executor_status()
 }
 
 #[tauri::command]
@@ -5809,7 +4282,8 @@ fn record_native_terminal_trace(stage: String) -> Result<(), String> {
 
 #[cfg(feature = "webdriver")]
 #[tauri::command]
-fn seed_native_agent_run_for_recovery() -> Result<crate::runtime::agent_runs::PersistedAgentRun, String> {
+fn seed_native_agent_run_for_recovery(
+) -> Result<crate::runtime::agent_runs::PersistedAgentRun, String> {
     let app_root = find_workspace_root()?;
     let mut registry = load_or_seed_registry(&app_root)?;
     let project = current_registry_project(&mut registry, &app_root)?;
@@ -5860,168 +4334,10 @@ fn seed_native_agent_run_for_recovery() -> Result<crate::runtime::agent_runs::Pe
 
 #[cfg(feature = "webdriver")]
 #[tauri::command]
-fn read_native_agent_run_for_recovery() -> Result<crate::runtime::agent_runs::PersistedAgentRun, String> {
+fn read_native_agent_run_for_recovery(
+) -> Result<crate::runtime::agent_runs::PersistedAgentRun, String> {
     let app_root = find_workspace_root()?;
     crate::runtime::agent_runs::load(&app_root, "native-recovery-run")
-}
-
-struct GuardedCheckSpec {
-    id: &'static str,
-    label: &'static str,
-    command: &'static str,
-    program: String,
-    args: Vec<String>,
-    required_paths: Vec<&'static str>,
-}
-
-fn guarded_check_spec(id: &str) -> Option<GuardedCheckSpec> {
-    match id {
-        "runtime" => Some(GuardedCheckSpec {
-            id: "runtime",
-            label: "Desktop Tests",
-            command: "npm --prefix desktop test",
-            program: "npm".to_string(),
-            args: vec![
-                "--prefix".to_string(),
-                "desktop".to_string(),
-                "test".to_string(),
-            ],
-            required_paths: vec!["desktop/package.json"],
-        }),
-        "web-build" => Some(GuardedCheckSpec {
-            id: "web-build",
-            label: "Web Build",
-            command: "cd desktop && npm run web:build",
-            program: "npm".to_string(),
-            args: vec![
-                "--prefix".to_string(),
-                "desktop".to_string(),
-                "run".to_string(),
-                "web:build".to_string(),
-            ],
-            required_paths: vec!["desktop/package.json"],
-        }),
-        "cargo-check" => Some(GuardedCheckSpec {
-            id: "cargo-check",
-            label: "Cargo",
-            command: "cd desktop/src-tauri && cargo check",
-            program: "cargo".to_string(),
-            args: vec![
-                "check".to_string(),
-                "--manifest-path".to_string(),
-                "desktop/src-tauri/Cargo.toml".to_string(),
-            ],
-            required_paths: vec!["desktop/src-tauri/Cargo.toml"],
-        }),
-        _ => None,
-    }
-}
-
-fn trim_runner_output(value: &str) -> String {
-    let trimmed = value.trim();
-    let mut result: String = trimmed.chars().take(6000).collect();
-    if trimmed.chars().count() > 6000 {
-        result.push_str("\n...output trimmed...");
-    }
-    result
-}
-
-fn run_git_apply(
-    root: &Path,
-    diff: &str,
-    check_only: bool,
-) -> Result<std::process::Output, String> {
-    let mut args = vec!["apply"];
-    if check_only {
-        args.push("--check");
-    }
-
-    let mut child = Command::new("git")
-        .args(args)
-        .current_dir(root)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|err| err.to_string())?;
-
-    if let Some(stdin) = child.stdin.as_mut() {
-        stdin
-            .write_all(diff.as_bytes())
-            .map_err(|err| err.to_string())?;
-    }
-
-    child.wait_with_output().map_err(|err| err.to_string())
-}
-
-fn build_run_summary_markdown(task: &Value) -> String {
-    let title = task
-        .get("title")
-        .and_then(Value::as_str)
-        .unwrap_or("未命名任务");
-    let status = task
-        .get("status")
-        .and_then(Value::as_str)
-        .unwrap_or("unknown");
-    let finished_at = current_timestamp_string();
-    let files = task
-        .pointer("/patchDraft/files")
-        .and_then(Value::as_array)
-        .map(|items| {
-            items
-                .iter()
-                .filter_map(Value::as_str)
-                .map(|item| format!("- `{}`", item))
-                .collect::<Vec<_>>()
-                .join("\n")
-        })
-        .filter(|value| !value.is_empty())
-        .unwrap_or_else(|| "- 未记录文件".to_string());
-    let runs = task
-        .get("runs")
-        .and_then(Value::as_array)
-        .map(|items| {
-            items
-                .iter()
-                .map(|run| {
-                    let label = run.get("label").and_then(Value::as_str).unwrap_or("Check");
-                    let success = run.get("success").and_then(Value::as_bool).unwrap_or(false);
-                    format!("- {}: {}", label, if success { "passed" } else { "failed" })
-                })
-                .collect::<Vec<_>>()
-                .join("\n")
-        })
-        .filter(|value| !value.is_empty())
-        .unwrap_or_else(|| "- 未运行验证".to_string());
-    let apply_message = task
-        .pointer("/applyResult/message")
-        .and_then(Value::as_str)
-        .unwrap_or("未应用 patch");
-    let verification = task
-        .get("verificationSummary")
-        .and_then(Value::as_str)
-        .unwrap_or("未生成验证摘要");
-
-    format!(
-        r#"
-
-## {}
-
-- 时间：{}
-- 状态：{}
-- Apply：{}
-- 验证：{}
-
-### 文件
-
-{}
-
-### 检查
-
-{}
-"#,
-        title, finished_at, status, apply_message, verification, files, runs
-    )
 }
 
 fn find_workspace_root() -> Result<PathBuf, String> {
@@ -6074,1180 +4390,9 @@ fn runtime_state_path(root: &Path, relative_path: &str) -> Option<PathBuf> {
     crate::runtime::state_namespace::state_path_for_read(root, relative_path).ok()
 }
 
-fn read_text(root: &Path, relative: &str) -> String {
-    fs::read_to_string(root.join(relative)).unwrap_or_default()
-}
-
-fn clean_markdown_line(line: &str) -> String {
-    line.trim()
-        .trim_start_matches(['-', '*', '>', ' '])
-        .trim()
-        .trim_matches('`')
-        .trim()
-        .to_string()
-}
-
-fn markdown_section(content: &str, headings: &[&str]) -> String {
-    let mut collecting = false;
-    let mut lines: Vec<String> = Vec::new();
-
-    for line in content.lines() {
-        let trimmed = line.trim();
-        let is_heading = trimmed.starts_with('#');
-        if is_heading {
-            let title = trimmed.trim_start_matches('#').trim();
-            if collecting {
-                break;
-            }
-            collecting = headings.iter().any(|heading| title.contains(heading));
-            continue;
-        }
-        if collecting {
-            let cleaned = clean_markdown_line(trimmed);
-            if !cleaned.is_empty() {
-                lines.push(cleaned);
-            }
-            if lines.len() >= 3 {
-                break;
-            }
-        }
-    }
-
-    lines.join(" ")
-}
-
-fn first_non_empty(values: Vec<String>) -> String {
-    values
-        .into_iter()
-        .map(|value| value.trim().to_string())
-        .find(|value| !value.is_empty())
-        .unwrap_or_default()
-}
-
-fn profile_field_value(profile: &Option<Value>, key: &str) -> String {
-    profile
-        .as_ref()
-        .and_then(|json| json.pointer(&format!("/fields/{}/value", key.replace('.', "/"))))
-        .or_else(|| {
-            profile
-                .as_ref()
-                .and_then(|json| json.get("fields"))
-                .and_then(|fields| fields.get(key))
-                .and_then(|field| field.get("value"))
-        })
-        .map(value_to_profile_text)
-        .unwrap_or_default()
-}
-
-fn json_string_value(json: &Option<Value>, pointer: &str) -> String {
-    json.as_ref()
-        .and_then(|value| value.pointer(pointer))
-        .and_then(Value::as_str)
-        .unwrap_or_default()
-        .trim()
-        .to_string()
-}
-
-fn value_to_profile_text(value: &Value) -> String {
-    match value {
-        Value::String(text) => text.trim().to_string(),
-        Value::Array(items) => items
-            .iter()
-            .map(value_to_profile_text)
-            .filter(|text| !text.is_empty())
-            .collect::<Vec<_>>()
-            .join("、"),
-        Value::Object(_) => serde_json::to_string(value).unwrap_or_default(),
-        _ => String::new(),
-    }
-}
-
-fn project_checks_from_agents(agents_md: &str) -> String {
-    let commands = markdown_section(agents_md, &["Commands"]);
-    let checks = commands
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .windows(2)
-        .filter_map(|window| {
-            if window[0] == "bash" {
-                Some(format!("bash {}", window[1].trim_matches('`')))
-            } else {
-                None
-            }
-        })
-        .take(4)
-        .collect::<Vec<_>>();
-    if checks.is_empty() {
-        return String::new();
-    }
-    checks.join("、")
-}
-
-fn project_intro_from_project_md(project_md: &str, project_name: &str) -> String {
-    let section = markdown_section(
-        project_md,
-        &["项目简介", "项目介绍", "概览", "Overview", "Summary"],
-    );
-    if !section.is_empty() {
-        return section;
-    }
-
-    project_md
-        .lines()
-        .map(clean_markdown_line)
-        .find(|line| {
-            !line.is_empty()
-                && !line.starts_with('#')
-                && !line.contains("什么时候更新")
-                && !line.contains("不要写什么")
-                && !line.contains(project_name)
-        })
-        .unwrap_or_default()
-}
-
-fn build_project_profile(root: &Path, project_name: &str) -> ProjectProfile {
-    let project_md = read_text(root, "PROJECT.md");
-    let product_plan = read_text(root, "docs/PRODUCT_PLAN.md");
-    let handoff = read_text(root, "HANDOFF.md");
-    let agents_md = read_text(root, "AGENTS.md");
-    let state_json = read_json(root.join(STATE_PATH));
-    let profile_json = read_json(root.join(PROFILE_PATH));
-
-    let intro = first_non_empty(vec![
-        profile_field_value(&profile_json, "identity.summary"),
-        profile_field_value(&profile_json, "identity.uniqueDescription"),
-        json_string_value(&state_json, "/description"),
-        project_intro_from_project_md(&project_md, project_name),
-        markdown_section(
-            &product_plan,
-            &["项目简介", "产品简介", "Project", "Overview"],
-        ),
-    ]);
-    let phase_summary = first_non_empty(vec![
-        profile_field_value(&profile_json, "identity.lifecycle"),
-        json_string_value(&state_json, "/stage"),
-        json_string_value(&state_json, "/phase"),
-        markdown_section(&project_md, &["当前阶段", "当前进度"]),
-    ]);
-    let architecture_summary = first_non_empty(vec![
-        profile_field_value(&profile_json, "engineering.architecture"),
-        format!(
-            "{} / {} / {}",
-            json_string_value(&state_json, "/architecture/desktop"),
-            json_string_value(&state_json, "/architecture/entry"),
-            json_string_value(&state_json, "/architecture/rules")
-        )
-        .trim_matches([' ', '/'])
-        .trim()
-        .to_string(),
-        markdown_section(&project_md, &["当前架构", "技术架构", "Architecture"]),
-    ]);
-    let check_commands = first_non_empty(vec![
-        profile_field_value(&profile_json, "engineering.testing"),
-        project_checks_from_agents(&agents_md),
-        markdown_section(&project_md, &["当前验证", "验证", "检查"]),
-    ]);
-    let collaboration_rules = first_non_empty(vec![
-        profile_field_value(&profile_json, "governance.permissions"),
-        profile_field_value(&profile_json, "user.communicationStyle"),
-        markdown_section(&agents_md, &["协作规则", "Working Boundaries"]),
-        markdown_section(&handoff, &["风险与注意"]),
-    ]);
-    let long_term_goal = first_non_empty(vec![
-        profile_field_value(&profile_json, "product.longTermGoal"),
-        markdown_section(&product_plan, &["长期目标", "目标", "愿景", "Vision"]),
-        markdown_section(&project_md, &["目标", "当前目标", "项目目标"]),
-    ]);
-    let target_users = first_non_empty(vec![
-        profile_field_value(&profile_json, "product.targetUsers"),
-        markdown_section(&product_plan, &["目标用户", "用户画像", "用户", "Audience"]),
-        markdown_section(&project_md, &["目标用户", "用户画像"]),
-    ]);
-    let use_cases = first_non_empty(vec![
-        profile_field_value(&profile_json, "product.useCases"),
-        markdown_section(&product_plan, &["使用场景", "场景", "Use Cases"]),
-        markdown_section(&project_md, &["使用场景", "场景"]),
-    ]);
-    let user_preferences = first_non_empty(vec![
-        profile_field_value(&profile_json, "user.globalPreferences"),
-        profile_field_value(&profile_json, "user.communicationStyle"),
-        markdown_section(&handoff, &["用户偏好", "偏好", "User Preferences"]),
-        markdown_section(&project_md, &["用户偏好", "偏好"]),
-    ]);
-    let mut missing_fields = Vec::new();
-    for (label, value) in [
-        ("项目概览", &intro),
-        ("当前阶段", &phase_summary),
-        ("技术架构", &architecture_summary),
-        ("检查命令", &check_commands),
-        ("协作规则", &collaboration_rules),
-    ] {
-        if value.trim().is_empty() {
-            missing_fields.push(label.to_string());
-        }
-    }
-
-    ProjectProfile {
-        overview: intro.clone(),
-        phase_summary,
-        architecture_summary,
-        check_commands,
-        collaboration_rules,
-        intro,
-        long_term_goal,
-        target_users,
-        use_cases,
-        user_preferences,
-        missing_fields,
-    }
-}
-
-fn package_scripts_summary(root: &Path) -> String {
-    let package_paths = ["package.json", "desktop/package.json"];
-    let mut scripts = Vec::new();
-    for relative in package_paths {
-        let Some(package_json) = read_json(root.join(relative)) else {
-            continue;
-        };
-        if let Some(script_map) = package_json.get("scripts").and_then(Value::as_object) {
-            for key in ["dev", "web:dev", "web:build", "build", "test", "lint"] {
-                if let Some(value) = script_map.get(key).and_then(Value::as_str) {
-                    scripts.push(format!("{}: {}", key, value));
-                }
-            }
-        }
-    }
-    scripts.join("；")
-}
-
-fn runbook_commands(root: &Path) -> Value {
-    let mut commands = Vec::new();
-    for relative in ["package.json", "desktop/package.json"] {
-        let Some(package_json) = read_json(root.join(relative)) else {
-            continue;
-        };
-        let Some(script_map) = package_json.get("scripts").and_then(Value::as_object) else {
-            continue;
-        };
-        for key in ["dev", "web:dev", "web:build", "build", "test", "lint"] {
-            if !script_map.contains_key(key) {
-                continue;
-            }
-            let command = if relative == "package.json" {
-                format!("npm run {}", key)
-            } else {
-                format!("npm --prefix desktop run {}", key)
-            };
-            let (label, kind) = match key {
-                "dev" | "web:dev" => (
-                    if key == "web:dev" {
-                        "Web 开发预览"
-                    } else {
-                        "开发启动"
-                    },
-                    "start",
-                ),
-                "build" | "web:build" => (
-                    if key == "web:build" {
-                        "Web 构建"
-                    } else {
-                        "项目构建"
-                    },
-                    "check",
-                ),
-                "test" => ("测试", "check"),
-                "lint" => ("代码检查", "check"),
-                _ => (key, "check"),
-            };
-            commands.push(json!({ "id": format!("{}:{}", relative, key), "label": label, "command": command, "kind": kind, "source": relative }));
-        }
-    }
-    if root.join("desktop/src-tauri/Cargo.toml").exists() {
-        commands.push(json!({ "id": "desktop:cargo-check", "label": "桌面壳检查", "command": "cargo check --manifest-path desktop/src-tauri/Cargo.toml", "kind": "check", "source": "desktop/src-tauri/Cargo.toml" }));
-    }
-    json!(commands)
-}
-
-fn package_identity(root: &Path) -> (String, String) {
-    for relative in ["package.json", "desktop/package.json"] {
-        let Some(package_json) = read_json(root.join(relative)) else {
-            continue;
-        };
-        let name = package_json
-            .get("name")
-            .and_then(Value::as_str)
-            .unwrap_or_default()
-            .trim()
-            .to_string();
-        let version = package_json
-            .get("version")
-            .and_then(Value::as_str)
-            .unwrap_or_default()
-            .trim()
-            .to_string();
-        if !name.is_empty() || !version.is_empty() {
-            return (name, version);
-        }
-    }
-    (String::new(), String::new())
-}
-
-fn dependency_summary(root: &Path) -> Vec<String> {
-    let mut dependencies = Vec::new();
-    for relative in ["package.json", "desktop/package.json"] {
-        let Some(package_json) = read_json(root.join(relative)) else {
-            continue;
-        };
-        for key in ["dependencies", "devDependencies"] {
-            if let Some(items) = package_json.get(key).and_then(Value::as_object) {
-                dependencies.extend(items.keys().cloned());
-            }
-        }
-    }
-    if root.join("desktop/src-tauri/Cargo.toml").exists() || root.join("Cargo.toml").exists() {
-        dependencies.push("Rust crates".to_string());
-    }
-    dependencies.sort();
-    dependencies.dedup();
-    dependencies.truncate(10);
-    dependencies
-}
-
-fn project_directory_summary(root: &Path) -> Vec<String> {
-    let candidates = [
-        "src",
-        "desktop",
-        "cli",
-        "assets",
-        "docs",
-        "schemas",
-        "scripts",
-        "tests",
-        "templates",
-    ];
-    candidates
-        .iter()
-        .filter(|name| root.join(name).exists())
-        .map(|name| (*name).to_string())
-        .collect()
-}
-
-fn project_created_at(root: &Path) -> String {
-    Command::new("git")
-        .arg("-C")
-        .arg(root)
-        .args(["log", "--reverse", "--format=%cs"])
-        .output()
-        .ok()
-        .filter(|output| output.status.success())
-        .and_then(|output| String::from_utf8(output.stdout).ok())
-        .and_then(|text| text.lines().next().map(str::trim).map(str::to_string))
-        .unwrap_or_default()
-}
-
-fn detected_stack(root: &Path) -> Vec<String> {
-    let mut stack = Vec::new();
-    if root.join("desktop/src-tauri/Cargo.toml").exists()
-        || root.join("src-tauri/Cargo.toml").exists()
-    {
-        stack.push("Tauri".to_string());
-        stack.push("Rust".to_string());
-    }
-    for relative in ["package.json", "desktop/package.json"] {
-        let Some(package_json) = read_json(root.join(relative)) else {
-            continue;
-        };
-        let deps = ["dependencies", "devDependencies"]
-            .iter()
-            .filter_map(|key| package_json.get(key).and_then(Value::as_object))
-            .flat_map(|deps| deps.keys().cloned())
-            .collect::<Vec<_>>();
-        if deps
-            .iter()
-            .any(|name| name == "react" || name == "react-dom")
-        {
-            stack.push("React".to_string());
-        }
-        if deps
-            .iter()
-            .any(|name| name == "vite" || name == "@vitejs/plugin-react")
-        {
-            stack.push("Vite".to_string());
-        }
-    }
-    if runtime_state_exists(root, ".omnidesk") {
-        stack.push("OmniDesk".to_string());
-    }
-    stack.sort();
-    stack.dedup();
-    stack
-}
-
-fn git_status_summary(root: &Path) -> String {
-    let Ok(output) = Command::new("git")
-        .arg("-C")
-        .arg(root)
-        .arg("status")
-        .arg("--short")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .output()
-    else {
-        return "未读取到 git 状态。".to_string();
-    };
-    if !output.status.success() {
-        return "当前目录可能不是 git 仓库。".to_string();
-    }
-    let text = String::from_utf8_lossy(&output.stdout);
-    let count = text.lines().filter(|line| !line.trim().is_empty()).count();
-    if count == 0 {
-        "git 工作区干净。".to_string()
-    } else {
-        format!("git 工作区有 {} 个变更项。", count)
-    }
-}
-
-fn should_skip_governance_dir(name: &str) -> bool {
-    matches!(
-        name,
-        ".project-os"
-            | ".omnidesk"
-            | "node_modules"
-            | "target"
-            | "dist"
-            | "build"
-            | ".git"
-            | ".next"
-            | ".nuxt"
-            | ".vite"
-            | ".turbo"
-            | ".cache"
-            | "coverage"
-    )
-}
-
-fn is_governance_text_file(path: &Path) -> bool {
-    let file_name = path
-        .file_name()
-        .and_then(|value| value.to_str())
-        .unwrap_or("");
-    if file_name.starts_with(".env") || file_name.ends_with(".lock") {
-        return false;
-    }
-    matches!(
-        path.extension().and_then(|value| value.to_str()),
-        Some(
-            "md" | "mdx"
-                | "txt"
-                | "json"
-                | "jsonc"
-                | "yaml"
-                | "yml"
-                | "toml"
-                | "js"
-                | "jsx"
-                | "ts"
-                | "tsx"
-                | "css"
-                | "scss"
-                | "html"
-                | "rs"
-                | "sh"
-                | "py"
-                | "sql"
-        )
-    )
-}
-
-fn collect_governance_files(root: &Path) -> Vec<String> {
-    const MAX_FILES: usize = 360;
-    const MAX_DEPTH: usize = 5;
-    let mut files = Vec::new();
-    let mut stack = vec![(root.to_path_buf(), 0usize)];
-
-    while let Some((dir, depth)) = stack.pop() {
-        if files.len() >= MAX_FILES || depth > MAX_DEPTH {
-            continue;
-        }
-        let Ok(entries) = fs::read_dir(&dir) else {
-            continue;
-        };
-        for entry in entries.flatten() {
-            let path = entry.path();
-            let name = entry.file_name().to_string_lossy().to_string();
-            if path.is_dir() {
-                if should_skip_governance_dir(&name) {
-                    continue;
-                }
-                stack.push((path, depth + 1));
-                continue;
-            }
-            if !is_governance_text_file(&path) {
-                continue;
-            }
-            let Ok(relative) = path.strip_prefix(root) else {
-                continue;
-            };
-            let relative = relative.to_string_lossy().replace('\\', "/");
-            files.push(relative);
-            if files.len() >= MAX_FILES {
-                break;
-            }
-        }
-    }
-
-    files.sort();
-    files
-}
-
-fn push_domain_file(
-    domains: &mut HashMap<&'static str, Vec<String>>,
-    domain: &'static str,
-    file: &str,
-) {
-    domains.entry(domain).or_default().push(file.to_string());
-}
-
-fn classify_governance_file(file: &str, domains: &mut HashMap<&'static str, Vec<String>>) {
-    let lower = file.to_lowercase();
-    if matches!(file, "PROJECT.md" | "README.md" | "HANDOFF.md")
-        || lower.contains("project-profile")
-        || lower.ends_with("state.json")
-    {
-        push_domain_file(domains, "project-identity", file);
-    }
-    if file == "HANDOFF.md" || lower.contains("goals") || lower.contains("/runs/") {
-        push_domain_file(domains, "current-progress", file);
-    }
-    if lower.ends_with("package.json")
-        || lower.contains("runbook")
-        || lower.contains("readme")
-    {
-        push_domain_file(domains, "runbook", file);
-    }
-    if file == "AGENTS.md"
-        || lower.contains("routing")
-        || lower.contains("security")
-        || lower.contains("lesson")
-        || lower.contains("risk")
-    {
-        push_domain_file(domains, "risk-boundary", file);
-    }
-    if lower.starts_with(".omnidesk/") {
-        push_domain_file(domains, "local-state", file);
-    }
-    if lower.starts_with("docs/")
-        || lower.contains("architecture")
-        || lower.contains("design")
-        || lower.contains("code_structure")
-        || lower.starts_with("schemas/")
-    {
-        push_domain_file(domains, "design-implementation", file);
-    }
-    if lower.starts_with("desktop/src") || lower.starts_with("desktop/src-tauri") {
-        push_domain_file(domains, "engineering-assets", file);
-    }
-}
-
-fn domain_files(
-    domains: &HashMap<&'static str, Vec<String>>,
-    id: &'static str,
-    fallback: Vec<&str>,
-) -> Vec<String> {
-    let mut seen = HashSet::new();
-    let mut files = domains
-        .get(id)
-        .cloned()
-        .unwrap_or_default()
-        .into_iter()
-        .filter(|file| seen.insert(file.clone()))
-        .collect::<Vec<_>>();
-    if files.is_empty() {
-        files = fallback.into_iter().map(String::from).collect();
-    }
-    files.truncate(12);
-    files
-}
-
-fn git_changed_files(root: &Path) -> HashSet<String> {
-    let Ok(output) = Command::new("git")
-        .arg("-C")
-        .arg(root)
-        .arg("status")
-        .arg("--porcelain")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .output()
-    else {
-        return HashSet::new();
-    };
-    if !output.status.success() {
-        return HashSet::new();
-    }
-    String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .filter_map(|line| {
-            let path = line.get(3..)?.trim();
-            let path = path.split(" -> ").last().unwrap_or(path);
-            if path.is_empty() {
-                None
-            } else {
-                Some(path.to_string())
-            }
-        })
-        .collect()
-}
-
-fn governance_file_status(root: &Path, changed: &HashSet<String>, file: &str) -> &'static str {
-    if file.contains('*') || file.ends_with('/') {
-        return "ignored";
-    }
-    if file.starts_with(".omnidesk/evidence/") {
-        return "generated";
-    }
-    if file.starts_with(".omnidesk/") {
-        return if runtime_state_exists(root, file) {
-            "found"
-        } else {
-            "missing"
-        };
-    }
-    if changed.contains(file) {
-        return "changed";
-    }
-    if root.join(file).exists() {
-        return "found";
-    }
-    "missing"
-}
-
-fn governance_file_statuses(
-    root: &Path,
-    changed: &HashSet<String>,
-    files: &[String],
-) -> Vec<Value> {
-    files
-        .iter()
-        .map(|file| {
-            let status = governance_file_status(root, changed, file);
-            json!({
-                "path": file,
-                "status": status,
-                "previewable": status != "ignored" && root.join(file).is_file()
-            })
-        })
-        .collect()
-}
-
-fn governance_status_summary(file_statuses: &[Value]) -> Value {
-    let mut counts: HashMap<&str, usize> = HashMap::new();
-    for item in file_statuses {
-        let status = item
-            .get("status")
-            .and_then(Value::as_str)
-            .unwrap_or("found");
-        *counts.entry(status).or_insert(0) += 1;
-    }
-    json!({
-        "found": counts.get("found").copied().unwrap_or(0),
-        "missing": counts.get("missing").copied().unwrap_or(0),
-        "changed": counts.get("changed").copied().unwrap_or(0),
-        "stale": counts.get("stale").copied().unwrap_or(0),
-        "generated": counts.get("generated").copied().unwrap_or(0),
-        "ignored": counts.get("ignored").copied().unwrap_or(0)
-    })
-}
-
-fn governance_domain_json(
-    root: &Path,
-    changed: &HashSet<String>,
-    classified: &HashMap<&'static str, Vec<String>>,
-    id: &'static str,
-    title: &'static str,
-    description: &'static str,
-    fallback: Vec<&str>,
-    updates_when: &'static str,
-) -> Value {
-    let files = domain_files(classified, id, fallback);
-    let file_statuses = governance_file_statuses(root, changed, &files);
-    let status_summary = governance_status_summary(&file_statuses);
-    json!({
-        "id": id,
-        "title": title,
-        "description": description,
-        "files": files,
-        "fileStatuses": file_statuses,
-        "statusSummary": status_summary,
-        "updatesWhen": updates_when
-    })
-}
-
-fn governance_domains_from_files(root: &Path) -> Vec<Value> {
-    let files = collect_governance_files(root);
-    let mut classified: HashMap<&'static str, Vec<String>> = HashMap::new();
-    for file in &files {
-        classify_governance_file(file, &mut classified);
-    }
-    let changed = git_changed_files(root);
-
-    vec![
-        governance_domain_json(
-            root,
-            &changed,
-            &classified,
-            "project-identity",
-            "项目概览",
-            "项目身份、定位、类型和生命周期。",
-            vec![
-                "PROJECT.md",
-                "README.md",
-                PROFILE_PATH,
-                STATE_PATH,
-            ],
-            "项目定位、类型、阶段或工作区状态变化时自动刷新。",
-        ),
-        governance_domain_json(
-            root,
-            &changed,
-            &classified,
-            "current-progress",
-            "当前进度",
-            "最近完成、当前推进和下一步。",
-            vec![
-                "HANDOFF.md",
-                "PROJECT.md",
-                GOALS_PATH,
-                STATE_PATH,
-            ],
-            "目标任务、交接记录或 git 状态变化时自动刷新。",
-        ),
-        governance_domain_json(
-            root,
-            &changed,
-            &classified,
-            "runbook",
-            "启动方式",
-            "启动、构建、验证和常用脚本。",
-            vec![
-                "package.json",
-                "desktop/package.json",
-                "docs/RUNBOOK.md",
-                "desktop/README.md",
-            ],
-            "package scripts、运行说明或桌面端配置变化时自动刷新。",
-        ),
-        governance_domain_json(
-            root,
-            &changed,
-            &classified,
-            "risk-boundary",
-            "风险边界",
-            "不可随意改动的约束、风险和协作边界。",
-            vec![
-                "HANDOFF.md",
-                "PROJECT.md",
-                PROFILE_PATH,
-            ],
-            "协作规则、风险说明或项目档案变化时自动刷新。",
-        ),
-        governance_domain_json(
-            root,
-            &changed,
-            &classified,
-            "local-state",
-            "本地状态",
-            "Git、本地工作区、运行状态和 Project OS 状态。",
-            vec![
-                STATE_PATH,
-                ".omnidesk/evidence/",
-                REGISTRY_PATH,
-            ],
-            "文件变更、git 状态或 Project OS 运行状态变化时自动刷新。",
-        ),
-        governance_domain_json(
-            root,
-            &changed,
-            &classified,
-            "design-implementation",
-            "设计实现",
-            "架构、界面规范、数据契约和实现结构。",
-            vec![
-                "docs/ARCHITECTURE.md",
-                "docs/DESIGN_STANDARDS.md",
-                "schemas/*",
-                "desktop/src/*",
-            ],
-            "架构、设计 token、schema 或源码入口变化时自动刷新。",
-        ),
-        governance_domain_json(
-            root,
-            &changed,
-            &classified,
-            "engineering-assets",
-            "工程资产",
-            "源码、脚本、模板和适配器。",
-            vec![
-                "desktop/src/*",
-                "desktop/src-tauri/*",
-            ],
-            "桌面源码或 Runtime 文件变化时自动刷新。",
-        ),
-    ]
-}
-
-fn score_from_checks(checks: &[bool]) -> i32 {
-    if checks.is_empty() {
-        return 0;
-    }
-    let passed = checks.iter().filter(|value| **value).count() as f32;
-    ((passed / checks.len() as f32) * 100.0).round() as i32
-}
-
-fn health_status(score: i32) -> &'static str {
-    if score >= 85 {
-        "healthy"
-    } else if score >= 70 {
-        "good"
-    } else if score >= 50 {
-        "watch"
-    } else {
-        "risk"
-    }
-}
-
-fn build_health_score(
-    root: &Path,
-    profile: &ProjectProfile,
-    overview: &str,
-    scripts: &str,
-    risk_boundary: &str,
-    governance_domains: &[Value],
-) -> Value {
-    let project_identity = score_from_checks(&[
-        !overview.trim().is_empty(),
-        !profile.phase_summary.trim().is_empty(),
-        !profile.architecture_summary.trim().is_empty(),
-        runtime_state_exists(root, PROFILE_PATH),
-    ]);
-    let governed_file_count = governance_domains
-        .iter()
-        .filter_map(|domain| domain.get("files").and_then(Value::as_array))
-        .map(|files| files.len())
-        .sum::<usize>();
-    let engineering_files = score_from_checks(&[
-        governed_file_count >= 8,
-        root.join("PROJECT.md").exists() || root.join("README.md").exists(),
-        root.join("HANDOFF.md").exists(),
-        runtime_state_exists(root, STATE_PATH),
-    ]);
-    let run_validation = score_from_checks(&[
-        !scripts.trim().is_empty(),
-        scripts.contains("dev"),
-        scripts.contains("build") || !profile.check_commands.trim().is_empty(),
-        scripts.contains("test")
-            || scripts.contains("lint")
-            || !profile.check_commands.trim().is_empty(),
-    ]);
-    let risk_boundary_score = score_from_checks(&[
-        !risk_boundary.trim().is_empty(),
-        !profile.collaboration_rules.trim().is_empty(),
-        root.join("AGENTS.md").exists(),
-        root.join("HANDOFF.md").exists(),
-    ]);
-    let continuous_governance = score_from_checks(&[
-        runtime_state_exists(root, ".omnidesk"),
-        runtime_state_exists(root, ".omnidesk/evidence"),
-        runtime_state_exists(root, WORKSPACE_FACTS_PATH),
-        root.join(".github/workflows").exists() || root.join(".gitlab-ci.yml").exists(),
-    ]);
-    let dimensions = vec![
-        (
-            "projectIdentity",
-            "项目身份",
-            project_identity,
-            "项目名、定位、生命周期和项目档案完整度。",
-        ),
-        (
-            "engineeringFiles",
-            "工程文件",
-            engineering_files,
-            "关键文件识别和治理域覆盖情况。",
-        ),
-        (
-            "runValidation",
-            "启动验证",
-            run_validation,
-            "启动、构建、测试或检查命令识别情况。",
-        ),
-        (
-            "riskBoundary",
-            "风险边界",
-            risk_boundary_score,
-            "风险说明、权限边界和协作规则完整度。",
-        ),
-        (
-            "continuousGovernance",
-            "持续治理",
-            continuous_governance,
-            "本地状态、运行记录和 CI/定期扫描入口。",
-        ),
-    ];
-    let total = (dimensions
-        .iter()
-        .map(|(_, _, score, _)| *score)
-        .sum::<i32>() as f32
-        / dimensions.len() as f32)
-        .round() as i32;
-
-    json!({
-        "score": total,
-        "status": health_status(total),
-        "label": format!("{} / 100", total),
-        "summary": if total >= 85 {
-            "项目治理基础扎实，可以推进持续治理。"
-        } else if total >= 70 {
-            "项目已具备治理基础，建议补齐关键短板。"
-        } else if total >= 50 {
-            "项目已有部分治理信号，需要继续补齐事实源。"
-        } else {
-            "项目治理信号较弱，建议从只读体检和基础档案开始。"
-        },
-        "dimensions": dimensions.into_iter().map(|(id, label, score, reason)| json!({
-            "id": id,
-            "label": label,
-            "score": score,
-            "status": health_status(score),
-            "reason": reason
-        })).collect::<Vec<_>>()
-    })
-}
-
-fn build_workspace_facts_preview(root: &Path, project_name: &str) -> Value {
-    let state_json = read_json(root.join(STATE_PATH));
-    let profile = build_project_profile(root, project_name);
-    let project_md = read_text(root, "PROJECT.md");
-    let handoff = read_text(root, "HANDOFF.md");
-    let runbook = read_text(root, "docs/RUNBOOK.md");
-    let stack = detected_stack(root);
-    let (package_name, package_version) = package_identity(root);
-    let dependencies = dependency_summary(root);
-    let directories = project_directory_summary(root);
-    let created_at = project_created_at(root);
-    let scripts = package_scripts_summary(root);
-    let git_status = git_status_summary(root);
-    let governance_domains = governance_domains_from_files(root);
-    let overview = first_non_empty(vec![
-        profile.overview.clone(),
-        json_string_value(&state_json, "/description"),
-        project_intro_from_project_md(&project_md, project_name),
-    ]);
-    let current_progress = first_non_empty(vec![
-        markdown_section(&handoff, &["最近完成", "当前验证", "下一步建议"]),
-        markdown_section(&project_md, &["当前进度", "下一步重点"]),
-        git_status.clone(),
-    ]);
-    let runbook_summary = first_non_empty(vec![
-        scripts.clone(),
-        markdown_section(&runbook, &["启动", "运行", "Commands"]),
-        profile.check_commands.clone(),
-    ]);
-    let risk_boundary = first_non_empty(vec![
-        markdown_section(&handoff, &["风险与注意", "风险"]),
-        profile_field_value(
-            &read_json(root.join(PROFILE_PATH)),
-            "memory.risks",
-        ),
-        "老项目默认只读扫描，用户确认前不修改工程文件。".to_string(),
-    ]);
-    let local_state = format!(
-        "{} {}",
-        git_status,
-        if runtime_state_exists(root, ".omnidesk") {
-            "已发现 OmniDesk 工作区状态。"
-        } else {
-            "未发现 OmniDesk 工作区状态。"
-        }
-    );
-    let health_score = build_health_score(
-        root,
-        &profile,
-        &overview,
-        &scripts,
-        &risk_boundary,
-        &governance_domains,
-    );
-    let now = Command::new("date")
-        .arg("+%Y-%m-%dT%H:%M:%S%z")
-        .output()
-        .ok()
-        .and_then(|output| String::from_utf8(output.stdout).ok())
-        .map(|text| text.trim().to_string())
-        .unwrap_or_else(|| "unknown".to_string());
-
-    json!({
-        "schemaVersion": "project-os.workspace-facts.v0.1",
-        "generatedAt": now,
-        "mode": if runtime_state_exists(root, ".omnidesk") { "existing-project" } else { "temporary-readonly" },
-        "status": "connected",
-        "healthScore": health_score,
-        "governanceLevel": {
-            "current": "L1",
-            "name": "治理索引",
-            "description": "项目已零侵入接入，工程文件会被自动扫描、归类和只读预览。",
-            "next": "L2",
-            "nextName": "建议修复",
-            "levels": [
-                { "id": "L0", "name": "只读体检", "description": "扫描、识别、健康检查，不改工程文件。" },
-                { "id": "L1", "name": "治理索引", "description": "建立项目档案、治理域、工程文件索引和上下文记忆。" },
-                { "id": "L2", "name": "建议修复", "description": "生成问题解释、修复建议和变更提案草稿。" },
-                { "id": "L3", "name": "受控修复", "description": "用户确认后自动改文件、运行检查并沉淀记录。" },
-                { "id": "L4", "name": "持续治理", "description": "接入 CI 或定期任务，持续扫描、提醒和复审豁免。" }
-            ]
-        },
-        "project": {
-            "name": project_name,
-            "id": if package_name.is_empty() { project_name } else { &package_name },
-            "path": root.display().to_string(),
-            "kind": profile_field_value(&read_json(root.join(PROFILE_PATH)), "identity.type"),
-            "version": package_version,
-            "createdAt": created_at,
-            "detectedStack": stack,
-            "dependencies": dependencies,
-            "directories": directories,
-            "coreCapabilities": profile_field_value(&read_json(root.join(PROFILE_PATH)), "product.coreValue"),
-            "owner": profile_field_value(&read_json(root.join(PROFILE_PATH)), "project.owner"),
-            "milestone": json_string_value(&state_json, "/stage"),
-            "lifecycle": json_string_value(&state_json, "/phase"),
-            "description": overview
-        },
-        "summary": {
-            "overview": {
-                "status": if overview.is_empty() { "missing" } else { "confirmed" },
-                "title": "项目概览",
-                "body": if overview.is_empty() { "尚未识别到项目概览。".to_string() } else { overview.clone() },
-                "sources": ["PROJECT.md", STATE_PATH, PROFILE_PATH],
-                "confidence": 0.82
-            },
-            "currentProgress": {
-                "status": if current_progress.is_empty() { "missing" } else { "inferred" },
-                "title": "当前进度",
-                "body": if current_progress.is_empty() { "尚未识别到当前进度。".to_string() } else { current_progress.clone() },
-                "sources": ["HANDOFF.md", "PROJECT.md", "git status"],
-                "confidence": 0.72
-            },
-            "runbook": {
-                "status": if runbook_summary.is_empty() { "missing" } else { "confirmed" },
-                "title": "启动方式",
-                "body": if runbook_summary.is_empty() { "尚未识别到启动方式。".to_string() } else { runbook_summary.clone() },
-                "sources": ["package.json", "desktop/package.json", "docs/RUNBOOK.md"],
-                "confidence": 0.78
-            },
-            "riskBoundary": {
-                "status": if risk_boundary.is_empty() { "missing" } else { "inferred" },
-                "title": "风险边界",
-                "body": if risk_boundary.is_empty() { "尚未识别到风险边界。".to_string() } else { risk_boundary.clone() },
-                "sources": ["HANDOFF.md", PROFILE_PATH],
-                "confidence": 0.68
-            },
-            "localState": {
-                "status": "confirmed",
-                "title": "本地状态",
-                "body": local_state,
-                "sources": ["git status", ".omnidesk/"],
-                "confidence": 0.82
-            }
-        },
-        "evidence": [
-            { "source": "PROJECT.md", "kind": "project-status", "status": if root.join("PROJECT.md").exists() { "found" } else { "missing" }, "note": "项目状态展示层。" },
-            { "source": "HANDOFF.md", "kind": "handoff", "status": if root.join("HANDOFF.md").exists() { "found" } else { "missing" }, "note": "当前交接和风险来源。" },
-            { "source": "desktop/package.json", "kind": "run-config", "status": if root.join("desktop/package.json").exists() { "found" } else { "missing" }, "note": "桌面端启动脚本来源。" },
-            { "source": STATE_PATH, "kind": "project-state", "status": if runtime_state_exists(root, STATE_PATH) { "found" } else { "missing" }, "note": "机器可读项目状态。" },
-            { "source": PROFILE_PATH, "kind": "project-profile", "status": if runtime_state_exists(root, PROFILE_PATH) { "found" } else { "missing" }, "note": "结构化项目档案。" }
-        ],
-        "governanceDomains": governance_domains,
-        "recommendations": [
-            {
-                "id": "rec-health-score",
-                "domain": "项目概览",
-                "title": "补齐项目健康评分",
-                "problem": "当前已建立治理索引，但缺少统一健康分，用户还难以判断项目整体治理水平。",
-                "impact": "后续无法稳定比较新老项目，也难以跟踪治理改善效果。",
-                "action": "基于文档完整度、启动方式、风险边界、本地状态和验证记录生成健康分。",
-                "severity": "medium",
-                "files": ["schemas/workspace-facts.schema.json", WORKSPACE_FACTS_PATH],
-                "canPromoteToL3": false
-            },
-            {
-                "id": "rec-file-status",
-                "domain": "工程资产",
-                "title": "为治理文件增加状态",
-                "problem": "工程文件已经纳入治理域，但还没有区分已识别、缺失、过期和本地变更。",
-                "impact": "用户能看到文件列表，但无法快速判断哪些文件需要处理。",
-                "action": "为每个治理文件补充 status、lastSeen、changeKind 和 sourceType。",
-                "severity": "medium",
-                "files": ["desktop/src-tauri/src/main.rs", "desktop/src/main.jsx"],
-                "canPromoteToL3": false
-            },
-            {
-                "id": "rec-ci-governance",
-                "domain": "验证交付",
-                "title": "设计持续治理入口",
-                "problem": "当前联动更新只发生在本地工作台，尚未和 CI 或定期扫描形成闭环。",
-                "impact": "项目离开本地工作台后，治理状态可能无法持续更新。",
-                "action": "增加 CI/定时扫描适配入口，先生成建议和检查清单，不直接修改流水线。",
-                "severity": "low",
-                "files": ["docs/RUNBOOK.md", "desktop/package.json"],
-                "canPromoteToL3": false
-            },
-            {
-                "id": "rec-controlled-fix-entry",
-                "domain": "受控修复",
-                "title": "准备 L3 受控修复入口",
-                "problem": "L2 建议可以解释问题，但还没有把建议转成可审核的变更提案。",
-                "impact": "用户仍需要手动判断哪些建议可以进入自动修复。",
-                "action": "为建议增加生成 patch draft 的入口，只有用户确认后才进入 L3。",
-                "severity": "low",
-                "files": ["desktop/src/main.jsx", "desktop/src-tauri/src/main.rs"],
-                "canPromoteToL3": true
-            }
-        ],
-        "findings": {
-            "confirmed": [],
-            "missing": profile.missing_fields.iter().map(|field| json!({
-                "title": format!("{}待补齐", field),
-                "body": "该字段尚未从当前事实源中稳定识别。",
-                "severity": "low",
-                "sources": [PROFILE_PATH]
-            })).collect::<Vec<_>>(),
-            "risks": [
-                {
-                    "title": "默认不修改工程文件",
-                    "body": "工程文件自动纳入治理索引，但当前只做预览和归类，不在这里直接编辑或改写原工程文件。",
-                    "severity": "info",
-                    "sources": ["OmniDesk workspace"]
-                }
-            ]
-        },
-        "recommendation": {
-            "action": "auto-managed",
-            "confidence": 0.74,
-            "reason": "当前项目处于 L1 治理索引，可继续升级到 L2 建议修复。",
-            "nextSteps": ["自动维护治理索引", "在工程文件区预览来源", "生成 L2 修复建议草稿"]
-        }
-    })
-}
-
 fn provider_config_path(app_root: &Path) -> PathBuf {
-    crate::runtime::state_namespace::state_path_for_read(
-        app_root,
-        PROVIDER_PATH,
-    )
-    .unwrap_or_else(|_| app_root.join(PROVIDER_PATH))
-}
-
-fn desktop_theme_path(app_root: &Path) -> PathBuf {
-    crate::runtime::state_namespace::state_path_for_read(app_root, THEME_PATH)
-        .unwrap_or_else(|_| app_root.join(THEME_PATH))
+    crate::runtime::state_namespace::state_path_for_read(app_root, PROVIDER_PATH)
+        .unwrap_or_else(|_| app_root.join(PROVIDER_PATH))
 }
 
 fn write_file_atomic(path: &Path, content: &[u8]) -> Result<(), String> {
@@ -7255,18 +4400,13 @@ fn write_file_atomic(path: &Path, content: &[u8]) -> Result<(), String> {
 }
 
 fn current_timestamp_string() -> String {
-    let output = Command::new("date")
+    Command::new("date")
         .arg("-u")
         .arg("+%Y-%m-%dT%H:%M:%SZ")
-        .output();
-    output
+        .output()
         .ok()
         .and_then(|output| {
-            if output.status.success() {
-                Some(String::from_utf8_lossy(&output.stdout).trim().to_string())
-            } else {
-                None
-            }
+            output.status.success().then(|| String::from_utf8_lossy(&output.stdout).trim().to_string())
         })
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| "unknown".to_string())
@@ -7274,108 +4414,6 @@ fn current_timestamp_string() -> String {
 
 fn load_or_seed_model_catalog(app_root: &Path) -> Result<ModelCatalog, String> {
     crate::runtime::provider::load_or_seed_catalog(app_root)
-}
-
-fn default_desktop_theme() -> DesktopThemeConfig {
-    let accent = DesktopThemeAccent {
-        id: "mint".to_string(),
-        label: "Mint".to_string(),
-        h: 160,
-        s: "80%".to_string(),
-        l: "47%".to_string(),
-    };
-    DesktopThemeConfig {
-        schema_version: "project-os.desktop-theme.v0.1".to_string(),
-        mode: "dark".to_string(),
-        accent,
-        accents: Vec::new(),
-    }
-}
-
-fn load_or_seed_desktop_theme(app_root: &Path) -> Result<DesktopThemeConfig, String> {
-    let path = desktop_theme_path(app_root);
-    if path.exists() {
-        let content = fs::read_to_string(&path).map_err(|err| err.to_string())?;
-        let config: DesktopThemeConfig =
-            serde_json::from_str(&content).map_err(|err| err.to_string())?;
-        let normalized = normalize_desktop_theme(config);
-        save_desktop_theme_file(app_root, &normalized)?;
-        return Ok(normalized);
-    }
-
-    let config = default_desktop_theme();
-    save_desktop_theme_file(app_root, &config)?;
-    Ok(config)
-}
-
-fn save_desktop_theme_file(app_root: &Path, config: &DesktopThemeConfig) -> Result<(), String> {
-    crate::runtime::repository::Repository::new(app_root).transaction(
-        "save-desktop-theme",
-        &[crate::runtime::repository::JsonMutation::upsert(
-            THEME_PATH,
-            serde_json::to_value(config).map_err(|err| err.to_string())?,
-        )],
-    )?;
-    Ok(())
-}
-
-fn normalize_desktop_theme(mut config: DesktopThemeConfig) -> DesktopThemeConfig {
-    config.schema_version = "project-os.desktop-theme.v0.1".to_string();
-    if config.mode != "light" {
-        config.mode = "dark".to_string();
-    }
-    if config.accent.id.trim().is_empty() {
-        config.accent.id = "custom".to_string();
-    }
-    if config.accent.label.trim().is_empty() {
-        config.accent.label = config.accent.id.clone();
-    }
-    if config.accent.h > 360 {
-        config.accent.h = 160;
-    }
-    if !config.accent.s.ends_with('%') {
-        config.accent.s = "80%".to_string();
-    }
-    if !config.accent.l.ends_with('%') {
-        config.accent.l = "47%".to_string();
-    }
-    config.accents = config
-        .accents
-        .into_iter()
-        .map(normalize_desktop_theme_accent)
-        .filter(|accent| !accent.id.trim().is_empty())
-        .fold(Vec::<DesktopThemeAccent>::new(), |mut acc, accent| {
-            if !acc.iter().any(|item| item.id == accent.id) {
-                acc.push(accent);
-            }
-            acc
-        });
-    if config.accent.id.starts_with("custom-")
-        && !config
-            .accents
-            .iter()
-            .any(|item| item.id == config.accent.id)
-    {
-        config.accents.push(config.accent.clone());
-    }
-    config
-}
-
-fn normalize_desktop_theme_accent(mut accent: DesktopThemeAccent) -> DesktopThemeAccent {
-    accent.id = accent.id.trim().to_string();
-    if accent.label.trim().is_empty() {
-        accent.label = accent.id.clone();
-    }
-    if accent.h > 360 {
-        accent.h = 160;
-    }
-    if !accent.s.ends_with('%') {
-        accent.s = "80%".to_string();
-    }
-    if !accent.l.ends_with('%') {
-        accent.l = "47%".to_string();
-    }
-    accent
 }
 
 fn load_or_seed_provider_config(app_root: &Path) -> Result<ProviderConfig, String> {
@@ -7403,156 +4441,12 @@ fn sync_hermes_runtime_config(config: &ProviderConfig) -> Result<(), String> {
     }
     let current =
         fs::read_to_string(&path).map_err(|err| format!("读取 Hermes 配置失败: {err}"))?;
-    let next = render_hermes_runtime_config(&current, config)?;
+    let next = crate::runtime::provider::render_hermes_runtime_config(&current, config)?;
     if next != current {
         write_file_atomic(&path, next.as_bytes())
             .map_err(|err| format!("同步 Hermes 配置失败: {err}"))?;
     }
     Ok(())
-}
-
-fn render_hermes_runtime_config(current: &str, config: &ProviderConfig) -> Result<String, String> {
-    // Hermes resolves custom-endpoint credentials through its named provider
-    // registry. The registry entry holds only `key_env`, never the key itself.
-    let provider = serde_json::to_string("omnidesk-gateway").map_err(|err| err.to_string())?;
-    let base_url = serde_json::to_string(config.api_base.trim()).map_err(|err| err.to_string())?;
-    let api_mode = serde_json::to_string("chat_completions").map_err(|err| err.to_string())?;
-    let model = serde_json::to_string(config.model.trim()).map_err(|err| err.to_string())?;
-    let key_env =
-        serde_json::to_string(config.api_key_env.trim()).map_err(|err| err.to_string())?;
-    let runtime_fields = vec![
-        format!("  provider: {provider}"),
-        format!("  base_url: {base_url}"),
-        format!("  api_mode: {api_mode}"),
-        format!("  default: {model}"),
-        format!("  key_env: {key_env}"),
-    ];
-    let mut lines = current.lines().map(ToString::to_string).collect::<Vec<_>>();
-    let section_start = lines.iter().position(|line| line.trim() == "model:");
-    match section_start {
-        Some(start) => {
-            let end = lines
-                .iter()
-                .enumerate()
-                .skip(start + 1)
-                .find_map(|(index, line)| {
-                    let trimmed = line.trim();
-                    (!trimmed.is_empty()
-                        && !line.chars().next().is_some_and(char::is_whitespace)
-                        && !trimmed.starts_with('#'))
-                    .then_some(index)
-                })
-                .unwrap_or(lines.len());
-            let mut preserved = lines[start + 1..end]
-                .iter()
-                .filter(|line| {
-                    let key = line.trim_start();
-                    ![
-                        "provider:",
-                        "base_url:",
-                        "api_mode:",
-                        "default:",
-                        "key_env:",
-                        "api_key_env:",
-                    ]
-                    .iter()
-                    .any(|prefix| key.starts_with(prefix))
-                })
-                .cloned()
-                .collect::<Vec<_>>();
-            lines.splice(
-                start + 1..end,
-                runtime_fields.into_iter().chain(preserved.drain(..)),
-            );
-        }
-        None => {
-            let mut section = vec!["model:".to_string()];
-            section.extend(runtime_fields);
-            section.push(String::new());
-            section.extend(lines);
-            lines = section;
-        }
-    }
-    upsert_hermes_gateway_provider(&mut lines, &base_url, &model, &api_mode, &key_env);
-    Ok(format!("{}\n", lines.join("\n").trim_end()))
-}
-
-fn upsert_hermes_gateway_provider(
-    lines: &mut Vec<String>,
-    base_url: &str,
-    model: &str,
-    api_mode: &str,
-    key_env: &str,
-) {
-    let provider_fields = vec![
-        format!("    base_url: {base_url}"),
-        format!("    default_model: {model}"),
-        format!("    api_mode: {api_mode}"),
-        format!("    key_env: {key_env}"),
-    ];
-    let providers_start = match lines.iter().position(|line| line.trim() == "providers:") {
-        Some(index) => index,
-        None => {
-            if !lines.is_empty() && !lines.last().is_some_and(|line| line.trim().is_empty()) {
-                lines.push(String::new());
-            }
-            lines.push("providers:".to_string());
-            lines.push("  omnidesk-gateway:".to_string());
-            lines.extend(provider_fields);
-            return;
-        }
-    };
-    let providers_end = lines
-        .iter()
-        .enumerate()
-        .skip(providers_start + 1)
-        .find_map(|(index, line)| {
-            let trimmed = line.trim();
-            (!trimmed.is_empty()
-                && !trimmed.starts_with('#')
-                && !line.chars().next().is_some_and(char::is_whitespace))
-            .then_some(index)
-        })
-        .unwrap_or(lines.len());
-    let gateway_start = (providers_start + 1..providers_end).find(|index| {
-        let line = &lines[*index];
-        line.starts_with("  ") && !line.starts_with("   ") && line.trim() == "omnidesk-gateway:"
-    });
-    let Some(gateway_start) = gateway_start else {
-        let mut entry = vec!["  omnidesk-gateway:".to_string()];
-        entry.extend(provider_fields);
-        lines.splice(providers_end..providers_end, entry);
-        return;
-    };
-    let gateway_end = (gateway_start + 1..providers_end)
-        .find(|index| {
-            let line = &lines[*index];
-            !line.trim().is_empty()
-                && !line.trim().starts_with('#')
-                && line.starts_with("  ")
-                && !line.starts_with("   ")
-        })
-        .unwrap_or(providers_end);
-    let mut preserved = lines[gateway_start + 1..gateway_end]
-        .iter()
-        .filter(|line| {
-            let key = line.trim_start();
-            ![
-                "base_url:",
-                "default_model:",
-                "api_mode:",
-                "key_env:",
-                "api_key_env:",
-            ]
-            .iter()
-            .any(|prefix| key.starts_with(prefix))
-        })
-        .cloned()
-        .collect::<Vec<_>>();
-    lines.splice(
-        gateway_start + 1..gateway_end,
-        provider_fields.into_iter().chain(preserved.drain(..)),
-    );
 }
 
 fn load_or_seed_model_health(app_root: &Path) -> Result<ModelHealthCache, String> {
@@ -7622,106 +4516,6 @@ fn provider_status_source(app_root: &Path) -> (String, String) {
     (app_root.to_string_lossy().to_string(), revision)
 }
 
-fn isolated_provider_key_env(base: &str, profile_id: &str) -> String {
-    let suffix = profile_id
-        .chars()
-        .map(|ch| {
-            if ch.is_ascii_alphanumeric() {
-                ch.to_ascii_uppercase()
-            } else {
-                '_'
-            }
-        })
-        .collect::<String>()
-        .trim_matches('_')
-        .to_string();
-    let base = base.trim().trim_end_matches('_');
-    format!(
-        "{}_{}",
-        if base.is_empty() {
-            "OMNIDESK_API_KEY"
-        } else {
-            base
-        },
-        if suffix.is_empty() {
-            "PROFILE"
-        } else {
-            suffix.as_str()
-        }
-    )
-}
-
-fn isolate_duplicate_provider_secrets(
-    app_root: &Path,
-    config: &mut ProviderConfig,
-) -> Result<bool, String> {
-    let mut used = std::collections::HashSet::new();
-    let mut changed = false;
-    for profile in &mut config.profiles {
-        if used.insert(profile.api_key_env.clone()) {
-            continue;
-        }
-        let previous_env = profile.api_key_env.clone();
-        let mut next_env = isolated_provider_key_env(&previous_env, &profile.id);
-        let mut index = 2;
-        while used.contains(&next_env) {
-            next_env = format!(
-                "{}_{}",
-                isolated_provider_key_env(&previous_env, &profile.id),
-                index
-            );
-            index += 1;
-        }
-        crate::runtime::provider::migrate_secret(app_root, &previous_env, &next_env)?;
-        if config.active_profile_id == profile.id {
-            config.api_key_env = next_env.clone();
-        }
-        profile.api_key_env = next_env.clone();
-        used.insert(next_env);
-        changed = true;
-    }
-    Ok(changed)
-}
-
-fn upsert_provider_profile(profiles: &mut Vec<ProviderProfile>, profile: ProviderProfile) {
-    if let Some(existing) = profiles.iter_mut().find(|item| item.id == profile.id) {
-        *existing = profile;
-    } else {
-        profiles.push(profile);
-    }
-}
-
-fn provider_profile_id(api_key_env: &str) -> String {
-    api_key_env
-        .trim()
-        .to_lowercase()
-        .trim_end_matches("_api_key")
-        .replace('_', "-")
-}
-
-fn provider_profile_name(api_key_env: &str, model: &str) -> String {
-    let name = api_key_env
-        .trim()
-        .trim_end_matches("_API_KEY")
-        .replace('_', " ");
-    if name.is_empty() {
-        model.to_string()
-    } else {
-        name.split_whitespace()
-            .map(|part| {
-                let mut chars = part.chars();
-                match chars.next() {
-                    Some(first) => {
-                        format!("{}{}", first.to_uppercase(), chars.as_str().to_lowercase())
-                    }
-                    None => String::new(),
-                }
-            })
-            .collect::<Vec<_>>()
-            .join(" ")
-    }
-}
-
 fn read_secret_from_env_or_dotenv(root: &Path, key: &str) -> Option<String> {
     crate::runtime::provider::read_secret(root, key)
 }
@@ -7732,172 +4526,6 @@ fn write_dotenv_value(root: &Path, key: &str, value: &str) -> Result<(), String>
 
 fn remove_dotenv_value(root: &Path, key: &str) -> Result<(), String> {
     crate::runtime::provider::remove_secret(root, key)
-}
-
-fn registry_path(app_root: &Path) -> PathBuf {
-    crate::runtime::state_namespace::state_path_for_read(
-        app_root,
-        REGISTRY_PATH,
-    )
-    .unwrap_or_else(|_| app_root.join(REGISTRY_PATH))
-}
-
-fn load_or_seed_registry(app_root: &Path) -> Result<RegistryFile, String> {
-    let path = registry_path(app_root);
-    if path.exists() {
-        let content = fs::read_to_string(&path).map_err(|err| err.to_string())?;
-        let registry: RegistryFile =
-            serde_json::from_str(&content).map_err(|err| err.to_string())?;
-        if !registry.projects.is_empty() {
-            return Ok(registry);
-        }
-    }
-
-    let state = read_json(app_root.join(STATE_PATH));
-    let name = state
-        .as_ref()
-        .and_then(|json| json.get("name"))
-        .and_then(Value::as_str)
-        .or_else(|| app_root.file_name().and_then(|name| name.to_str()))
-        .unwrap_or("workspace")
-        .to_string();
-    let phase = state
-        .as_ref()
-        .and_then(|json| json.get("phase"))
-        .and_then(Value::as_str)
-        .unwrap_or("unknown")
-        .to_string();
-    let current_path = app_root.display().to_string();
-    let registry = RegistryFile {
-        schema_version: "project-os.desktop-registry.v0.1".to_string(),
-        current_project_id: "current".to_string(),
-        projects: vec![RegistryFileProject {
-            id: "current".to_string(),
-            name,
-            path: current_path,
-            phase,
-            name_locked: false,
-            access_mode: default_project_access_mode(),
-        }],
-    };
-    save_registry(app_root, &registry)?;
-    Ok(registry)
-}
-
-fn save_registry(app_root: &Path, registry: &RegistryFile) -> Result<(), String> {
-    crate::runtime::repository::Repository::new(app_root).transaction(
-        "save-registry",
-        &[crate::runtime::repository::JsonMutation::upsert(
-            REGISTRY_PATH,
-            serde_json::to_value(registry).map_err(|err| err.to_string())?,
-        )],
-    )?;
-    Ok(())
-}
-
-fn current_registry_project(
-    registry: &mut RegistryFile,
-    app_root: &Path,
-) -> Result<RegistryFileProject, String> {
-    if let Some(project) = registry
-        .projects
-        .iter()
-        .find(|project| project.id == registry.current_project_id)
-    {
-        return Ok(project.clone());
-    }
-
-    let fallback = registry
-        .projects
-        .first()
-        .cloned()
-        .ok_or_else(|| "registry 中没有项目".to_string())?;
-    registry.current_project_id = fallback.id.clone();
-    save_registry(app_root, registry)?;
-    Ok(fallback)
-}
-
-fn registry_projects(registry: &RegistryFile) -> Vec<RegistryProject> {
-    registry
-        .projects
-        .iter()
-        .map(|project| {
-            let (health, status_label) = project_health(project);
-            let summary = project_task_summary(&PathBuf::from(&project.path));
-            RegistryProject {
-                id: project.id.clone(),
-                name: project.name.clone(),
-                path: project.path.clone(),
-                phase: project.phase.clone(),
-                access_mode: normalize_project_access_mode(&project.access_mode),
-                is_current: project.id == registry.current_project_id,
-                health,
-                status_label,
-                task_count: summary.task_count,
-                active_task_count: summary.active_task_count,
-                failed_task_count: summary.failed_task_count,
-                completed_task_count: summary.completed_task_count,
-                latest_activity_at: summary.latest_activity_at,
-                latest_activity_title: summary.latest_activity_title,
-            }
-        })
-        .collect()
-}
-
-fn project_task_summary(root: &Path) -> ProjectTaskSummary {
-    let task_dir = crate::runtime::tasks::directory(root);
-    let Ok(entries) = fs::read_dir(task_dir) else {
-        return ProjectTaskSummary::default();
-    };
-    let mut summary = ProjectTaskSummary::default();
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.extension().and_then(|value| value.to_str()) != Some("json")
-            || path.file_name().and_then(|value| value.to_str()) == Some("manifest.json")
-        {
-            continue;
-        }
-        let Some(task) = read_json(path) else {
-            continue;
-        };
-        summary.task_count += 1;
-        match task.get("status").and_then(Value::as_str).unwrap_or("") {
-            "done" => summary.completed_task_count += 1,
-            "failed" => summary.failed_task_count += 1,
-            _ => summary.active_task_count += 1,
-        }
-        let activity_at = task
-            .get("updatedAt")
-            .and_then(Value::as_str)
-            .or_else(|| task.get("createdAt").and_then(Value::as_str))
-            .unwrap_or("");
-        if activity_at > summary.latest_activity_at.as_str() {
-            summary.latest_activity_at = activity_at.to_string();
-            summary.latest_activity_title = task
-                .get("title")
-                .and_then(Value::as_str)
-                .unwrap_or("任务更新")
-                .to_string();
-        }
-    }
-    summary
-}
-
-fn project_health(project: &RegistryFileProject) -> (String, String) {
-    let root = PathBuf::from(&project.path);
-    if !root.exists() || !root.is_dir() {
-        return ("missing".to_string(), "路径失效".to_string());
-    }
-    let has_state = runtime_state_exists(&root, STATE_PATH);
-    let has_project = root.join("PROJECT.md").is_file();
-    let has_handoff = root.join("HANDOFF.md").is_file();
-    if has_state && has_project && has_handoff {
-        return ("ready".to_string(), "已接入 · OmniDesk".to_string());
-    }
-    if has_state || has_project || has_handoff || root.join("AGENTS.md").is_file() {
-        return ("partial".to_string(), "缺少关键文件".to_string());
-    }
-    ("external".to_string(), "未初始化 · 普通项目".to_string())
 }
 
 #[tauri::command]
@@ -7931,35 +4559,6 @@ fn copy_text_to_clipboard(text: String) -> Result<(), String> {
     }
 }
 
-fn normalize_project_path(path: &str) -> Result<PathBuf, String> {
-    let trimmed = path.trim();
-    if trimmed.is_empty() {
-        return Err("请输入项目路径".to_string());
-    }
-
-    let expanded = if trimmed == "~" {
-        std::env::var("HOME")
-            .map(PathBuf::from)
-            .map_err(|err| err.to_string())?
-    } else if let Some(rest) = trimmed.strip_prefix("~/") {
-        std::env::var("HOME")
-            .map(|home| PathBuf::from(home).join(rest))
-            .map_err(|err| err.to_string())?
-    } else {
-        PathBuf::from(trimmed)
-    };
-
-    expanded.canonicalize().map_err(|err| err.to_string())
-}
-
-fn project_id_from_path(path: &str) -> String {
-    let mut id = String::from("project");
-    for byte in path.as_bytes() {
-        id.push_str(&format!("{:02x}", byte));
-    }
-    id
-}
-
 fn count_run_records(root: &Path) -> usize {
     let Some(runs_dir) = runtime_state_path(root, ".omnidesk/evidence/runs") else {
         return 0;
@@ -7971,97 +4570,6 @@ fn count_run_records(root: &Path) -> usize {
         .filter_map(Result::ok)
         .filter(|entry| entry.path().extension().and_then(|ext| ext.to_str()) == Some("json"))
         .count()
-}
-
-fn count_workspace_files(root: &Path) -> (usize, usize) {
-    let mut file_count = 0;
-    let mut docs_count = 0;
-    walk_counts(root, 0, &mut file_count, &mut docs_count);
-    (file_count, docs_count)
-}
-
-fn walk_counts(path: &Path, depth: usize, file_count: &mut usize, docs_count: &mut usize) {
-    if depth > 6 || is_ignored_path(path) {
-        return;
-    }
-
-    let Ok(entries) = fs::read_dir(path) else {
-        return;
-    };
-
-    for entry in entries.flatten() {
-        let child = entry.path();
-        if is_ignored_path(&child) {
-            continue;
-        }
-        if child.is_dir() {
-            walk_counts(&child, depth + 1, file_count, docs_count);
-        } else {
-            *file_count += 1;
-            if child.extension().and_then(|ext| ext.to_str()) == Some("md") {
-                *docs_count += 1;
-            }
-        }
-    }
-}
-
-fn build_tree_preview(root: &Path) -> Vec<TreeItem> {
-    let mut tree = vec![TreeItem {
-        label: root
-            .file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or("workspace")
-            .to_string(),
-        depth: 0,
-        kind: "folder".to_string(),
-    }];
-    append_tree_preview(root, 1, &mut tree);
-    tree
-}
-
-fn append_tree_preview(path: &Path, depth: usize, tree: &mut Vec<TreeItem>) {
-    const MAX_TREE_ITEMS: usize = 180;
-    const MAX_TREE_DEPTH: usize = 4;
-
-    if depth > MAX_TREE_DEPTH || tree.len() >= MAX_TREE_ITEMS {
-        return;
-    }
-
-    let Ok(entries) = fs::read_dir(path) else {
-        return;
-    };
-
-    let mut entries = entries
-        .flatten()
-        .filter(|entry| !is_ignored_path(&entry.path()))
-        .collect::<Vec<_>>();
-
-    entries.sort_by(|a, b| {
-        let a_is_dir = a.path().is_dir();
-        let b_is_dir = b.path().is_dir();
-        b_is_dir
-            .cmp(&a_is_dir)
-            .then_with(|| a.file_name().cmp(&b.file_name()))
-    });
-
-    for entry in entries {
-        if tree.len() >= MAX_TREE_ITEMS {
-            break;
-        }
-        let child = entry.path();
-        let is_dir = child.is_dir();
-        let Some(label) = child.file_name().and_then(|name| name.to_str()) else {
-            continue;
-        };
-        tree.push(TreeItem {
-            label: label.to_string(),
-            depth,
-            kind: if is_dir { "folder" } else { "file" }.to_string(),
-        });
-        if is_dir {
-            append_tree_preview(&child, depth + 1, tree);
-        }
-    }
 }
 
 fn recommendation_queue(recommendations: &Option<Value>) -> Vec<QueueItem> {
@@ -8095,7 +4603,7 @@ fn recommendation_queue(recommendations: &Option<Value>) -> Vec<QueueItem> {
                         .get("reason")
                         .or_else(|| item.get("body"))
                         .and_then(Value::as_str)
-                        .unwrap_or("来自 Project OS 推荐引擎。")
+                        .unwrap_or("来自 OmniDesk 建议缓存。")
                         .to_string(),
                     tone: "blue".to_string(),
                     goal_id: String::new(),
@@ -8133,7 +4641,7 @@ fn task_backlog_queue(backlog: &Option<Value>) -> Vec<QueueItem> {
                     body: item
                         .get("body")
                         .and_then(Value::as_str)
-                        .unwrap_or("来自 Project OS 任务池。")
+                        .unwrap_or("来自 OmniDesk 任务池。")
                         .to_string(),
                     tone: item
                         .get("tone")
@@ -8149,34 +4657,6 @@ fn task_backlog_queue(backlog: &Option<Value>) -> Vec<QueueItem> {
                 .collect()
         })
         .unwrap_or_default()
-}
-
-fn is_ignored_path(path: &Path) -> bool {
-    path.file_name()
-        .and_then(|name| name.to_str())
-        .map(|name| {
-            matches!(
-                name,
-                ".git"
-                    | ".project-os"
-                    | ".omnidesk"
-                    | "node_modules"
-                    | "target"
-                    | "dist"
-                    | "build"
-                    | "tmp"
-                    | ".cache"
-                    | ".next"
-                    | ".nuxt"
-                    | ".vite"
-                    | ".turbo"
-                    | "coverage"
-                    | ".DS_Store"
-                    | "__pycache__"
-            )
-                || (name.starts_with(".env") && name != ".env.example")
-        })
-        .unwrap_or(false)
 }
 
 #[cfg(test)]
@@ -8204,6 +4684,28 @@ mod task_storage_tests {
     }
 
     #[test]
+    fn legacy_theme_is_projected_without_startup_rewrite() {
+        let root = test_directory("legacy-desktop-records");
+        fs::create_dir_all(root.join(".omnidesk/data")).unwrap();
+        fs::write(
+            root.join(crate::runtime::theme::THEME_PATH),
+            r#"{"schemaVersion":"project-os.desktop-theme.v0.1","mode":"dark","accent":{"id":"mint","label":"Mint","h":160,"s":"80%","l":"47%"}}"#,
+        )
+        .unwrap();
+        let theme = load_or_seed_desktop_theme(&root).unwrap();
+        assert_eq!(theme.schema_version, crate::runtime::theme::SCHEMA_VERSION);
+        assert!(fs::read_to_string(root.join(crate::runtime::theme::THEME_PATH))
+            .unwrap()
+            .contains(crate::runtime::theme::LEGACY_SCHEMA_VERSION));
+
+        save_desktop_theme_file(&root, &theme).unwrap();
+        assert!(fs::read_to_string(root.join(crate::runtime::theme::THEME_PATH))
+            .unwrap()
+            .contains(crate::runtime::theme::SCHEMA_VERSION));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn workspace_tree_hides_runtime_and_generated_assets() {
         let dir = test_directory("tree-asset-policy");
         fs::create_dir_all(dir.join("src")).unwrap();
@@ -8215,7 +4717,7 @@ mod task_storage_tests {
         fs::write(dir.join(".env.local"), "SECRET=local\n").unwrap();
         fs::write(dir.join(".env.example"), "SECRET=\n").unwrap();
 
-        let labels = build_tree_preview(&dir)
+        let labels = crate::runtime::workspace::build_tree_preview(&dir)
             .into_iter()
             .map(|item| item.label)
             .collect::<Vec<_>>();
@@ -8379,7 +4881,7 @@ mod task_storage_tests {
 
     #[test]
     fn hermes_permission_rejection_uses_acp_cancelled_outcome() {
-        let rejection = hermes_rejection_response(42);
+        let rejection = crate::runtime::hermes_protocol::rejection_response(42);
         assert_eq!(rejection.get("id").and_then(Value::as_u64), Some(42));
         assert_eq!(
             rejection
@@ -8459,7 +4961,7 @@ mod task_storage_tests {
             active_profile_id: primary.id.clone(),
             profiles: vec![primary, fallback.clone()],
         };
-        let candidate = provider_for_profile(&config, &fallback);
+        let candidate = crate::runtime::provider::profile_config(&config, &fallback);
         assert_eq!(candidate.active_profile_id, "qy");
         assert_eq!(candidate.api_key_env, "QY_KEY");
         assert_eq!(candidate.model, "gpt-5.5");
@@ -8475,7 +4977,10 @@ mod task_storage_tests {
         let address = listener.local_addr().unwrap();
         let server = std::thread::spawn(move || {
             for (status, body) in [
-                ("403 Forbidden", r#"{"error":{"message":"subscription quota insufficient"}}"#),
+                (
+                    "403 Forbidden",
+                    r#"{"error":{"message":"subscription quota insufficient"}}"#,
+                ),
                 ("200 OK", r#"{"choices":[{"message":{"content":"OK"}}]}"#),
             ] {
                 let (mut stream, _) = listener.accept().unwrap();
@@ -8496,19 +5001,33 @@ mod task_storage_tests {
         crate::runtime::provider::write_secret(&root, "TW_KEY", "test-primary").unwrap();
         crate::runtime::provider::write_secret(&root, "QY_KEY", "test-fallback").unwrap();
         let primary = ProviderProfile {
-            id: "tw".to_string(), name: "TW Gateway".to_string(), note: String::new(), website: String::new(),
-            provider: "openai-compatible".to_string(), model: "primary".to_string(),
-            api_base: format!("http://{}", address), api_key_env: "TW_KEY".to_string(),
+            id: "tw".to_string(),
+            name: "TW Gateway".to_string(),
+            note: String::new(),
+            website: String::new(),
+            provider: "openai-compatible".to_string(),
+            model: "primary".to_string(),
+            api_base: format!("http://{}", address),
+            api_key_env: "TW_KEY".to_string(),
         };
         let fallback = ProviderProfile {
-            id: "qy".to_string(), name: "QY".to_string(), note: String::new(), website: String::new(),
-            provider: "openai-compatible".to_string(), model: "fallback".to_string(),
-            api_base: format!("http://{}", address), api_key_env: "QY_KEY".to_string(),
+            id: "qy".to_string(),
+            name: "QY".to_string(),
+            note: String::new(),
+            website: String::new(),
+            provider: "openai-compatible".to_string(),
+            model: "fallback".to_string(),
+            api_base: format!("http://{}", address),
+            api_key_env: "QY_KEY".to_string(),
         };
         let config = ProviderConfig {
             schema_version: "project-os.desktop-provider.v0.1".to_string(),
-            provider: primary.provider.clone(), model: primary.model.clone(), api_base: primary.api_base.clone(),
-            api_key_env: primary.api_key_env.clone(), enabled: true, active_profile_id: primary.id.clone(),
+            provider: primary.provider.clone(),
+            model: primary.model.clone(),
+            api_base: primary.api_base.clone(),
+            api_key_env: primary.api_key_env.clone(),
+            enabled: true,
+            active_profile_id: primary.id.clone(),
             profiles: vec![primary, fallback],
         };
         let (selected, note) = tauri::async_runtime::block_on(prepare_provider_for_request(
@@ -8523,8 +5042,14 @@ mod task_storage_tests {
         assert_eq!(persisted.active_profile_id, "qy");
         let health = load_or_seed_model_health(&root).unwrap();
         assert_eq!(health.entries.len(), 2);
-        assert!(health.entries.iter().any(|entry| entry.status == "quota-exhausted"));
-        assert!(health.entries.iter().any(|entry| entry.status == "available"));
+        assert!(health
+            .entries
+            .iter()
+            .any(|entry| entry.status == "quota-exhausted"));
+        assert!(health
+            .entries
+            .iter()
+            .any(|entry| entry.status == "available"));
         server.join().unwrap();
         fs::remove_dir_all(root).unwrap();
     }
@@ -8542,7 +5067,8 @@ mod task_storage_tests {
             profiles: Vec::new(),
         };
         let current = "model:\n  provider: custom\n  default: gpt-5.5\n  max_tokens: 4096\ndisplay:\n  tool_progress: all\n";
-        let rendered = render_hermes_runtime_config(current, &config).unwrap();
+        let rendered =
+            crate::runtime::provider::render_hermes_runtime_config(current, &config).unwrap();
         assert!(rendered.contains("default: \"gpt-5.6-terra\""));
         assert!(rendered.contains("provider: \"omnidesk-gateway\""));
         assert!(rendered.contains("base_url: \"https://aihub.firstshare.cn/v1\""));
@@ -8567,7 +5093,8 @@ mod task_storage_tests {
             profiles: Vec::new(),
         };
         let current = "providers:\n  omnidesk-gateway:\n    base_url: \"https://old.example/v1\"\n    default_model: \"old-model\"\n    timeout: 30\n  another-provider:\n    base_url: \"https://other.example/v1\"\n";
-        let rendered = render_hermes_runtime_config(current, &config).unwrap();
+        let rendered =
+            crate::runtime::provider::render_hermes_runtime_config(current, &config).unwrap();
         assert!(rendered.contains("base_url: \"https://aihub.firstshare.cn/v1\""));
         assert!(rendered.contains("default_model: \"gpt-5.6-terra\""));
         assert!(rendered.contains("key_env: \"LLM_GATEWAY_API_KEY\""));
@@ -8586,31 +5113,6 @@ mod task_storage_tests {
         assert!(token.is_cancelled());
         state.finish("request-1");
         assert!(!state.cancel("request-1"));
-    }
-
-    #[test]
-    fn sse_delta_parser_handles_transport_splits_and_completion_marker() {
-        let mut pending = String::new();
-        assert!(consume_openai_sse_deltas(
-            &mut pending,
-            "data: {\"choices\":[{\"delta\":{\"content\":\"hel"
-        )
-        .is_empty());
-        assert_eq!(
-            consume_openai_sse_deltas(&mut pending, "lo\"}}]}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\" world\"}}]}\n\ndata: [DONE]\n\n"),
-            vec!["hello".to_string(), " world".to_string()]
-        );
-        assert!(pending.is_empty());
-    }
-
-    #[test]
-    fn extracts_reply_prefix_from_partial_model_json() {
-        assert_eq!(streaming_reply_prefix(r#"{"reply": "正在生成"#), "正在生成");
-        assert_eq!(
-            streaming_reply_prefix(r#"{"reply": "第一行\n第二行", "intent": "chat"}"#),
-            "第一行\n第二行"
-        );
-        assert_eq!(streaming_reply_prefix(r#"{"intent": "chat"}"#), "");
     }
 
     #[test]

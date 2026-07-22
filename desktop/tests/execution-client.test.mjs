@@ -24,7 +24,7 @@ test("allows only read-only patch drafts in Preview", async () => {
   try {
     await assert.rejects(() => runGuardedCheck("runtime"), /桌面 App/);
     await generatePatchDraft({ id: "task-1" });
-    assert.deepEqual(requests, [["/__project-os/generate-patch-draft", { task: { id: "task-1" } }]]);
+    assert.deepEqual(requests, [["/__omnidesk/generate-patch-draft", { task: { id: "task-1" } }]]);
   } finally {
     globalThis.fetch = originalFetch;
   }

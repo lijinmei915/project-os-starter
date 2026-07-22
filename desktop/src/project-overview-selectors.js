@@ -113,7 +113,7 @@ export const projectOverviewSelectors = Object.freeze({
 
 export function buildProjectOverviewViewModel(store) {
   return Object.freeze({
-    schemaVersion: "project-os.project-overview-view-model.v0.1",
+    schemaVersion: "omnidesk.project-overview-view-model.v0.1",
     projectId: store.projectId,
     observedAt: store.observedAt,
     slots: Object.freeze([

@@ -1,12 +1,145 @@
 use crate::runtime::repository::{JsonMutation, Repository};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
+use std::time::Duration;
 
 const PROVIDER_CONFIG_PATH: &str = ".omnidesk/data/desktop-provider.json";
 const MODEL_CATALOG_PATH: &str = ".omnidesk/data/model-catalog.json";
 const MODEL_HEALTH_PATH: &str = ".omnidesk/cache/model-health.json";
+pub const PROVIDER_SCHEMA_VERSION: &str = "omnidesk.desktop-provider.v0.1";
+const LEGACY_PROVIDER_SCHEMA_VERSION: &str = "project-os.desktop-provider.v0.1";
+
+pub fn chat_completions_endpoint(api_base: &str) -> String {
+    let base = api_base.trim_end_matches('/');
+    if base.ends_with("/chat/completions") {
+        base.to_string()
+    } else {
+        format!("{base}/chat/completions")
+    }
+}
+
+pub fn models_endpoint(api_base: &str) -> String {
+    let base = api_base.trim_end_matches('/');
+    if base.ends_with("/models") {
+        base.to_string()
+    } else if base.ends_with("/chat/completions") {
+        format!("{}/models", base.trim_end_matches("/chat/completions"))
+    } else {
+        format!("{base}/models")
+    }
+}
+
+#[derive(Deserialize)]
+struct ChatCompletionsResponse {
+    choices: Vec<ChatChoice>,
+}
+
+#[derive(Deserialize)]
+struct ChatChoice {
+    message: ChatResponseMessage,
+}
+
+#[derive(Deserialize)]
+struct ChatResponseMessage {
+    content: String,
+}
+
+#[derive(Deserialize)]
+struct ModelsListResponse {
+    data: Vec<ModelItem>,
+}
+
+#[derive(Deserialize)]
+struct ModelItem {
+    id: String,
+}
+
+/// The caller owns credential lookup and request policy. This module owns the
+/// shared OpenAI-compatible transport shape so plan, draft, chat and provider
+/// probes cannot drift into subtly different endpoint/error semantics.
+pub fn http_client(timeout: Duration) -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .timeout(timeout)
+        .build()
+        .map_err(|err| err.to_string())
+}
+
+pub async fn post_chat_completion(
+    provider: &ProviderConfig,
+    api_key: &str,
+    payload: &Value,
+    timeout: Duration,
+) -> Result<reqwest::Response, String> {
+    http_client(timeout)?
+        .post(chat_completions_endpoint(&provider.api_base))
+        .bearer_auth(api_key)
+        .json(payload)
+        .send()
+        .await
+        .map_err(|err| err.to_string())
+}
+
+pub async fn get_models(
+    api_base: &str,
+    api_key: &str,
+    timeout: Duration,
+) -> Result<reqwest::Response, String> {
+    http_client(timeout)?
+        .get(models_endpoint(api_base))
+        .bearer_auth(api_key)
+        .send()
+        .await
+        .map_err(|err| err.to_string())
+}
+
+pub async fn require_success(
+    response: reqwest::Response,
+    operation: &str,
+) -> Result<reqwest::Response, String> {
+    let status = response.status();
+    if status.is_success() {
+        return Ok(response);
+    }
+    let body = response.text().await.unwrap_or_default();
+    Err(format!("{operation} HTTP {status}: {}", trim_for_trace(&body)))
+}
+
+pub async fn chat_completion_content(response: reqwest::Response) -> Result<String, String> {
+    let chat: ChatCompletionsResponse = response.json().await.map_err(|err| err.to_string())?;
+    chat.choices
+        .first()
+        .map(|choice| choice.message.content.trim().to_string())
+        .filter(|content| !content.is_empty())
+        .ok_or_else(|| "provider 返回空内容".to_string())
+}
+
+pub async fn listed_models(response: reqwest::Response) -> Result<Vec<String>, String> {
+    let payload: ModelsListResponse = response.json().await.map_err(|err| err.to_string())?;
+    let mut models = payload
+        .data
+        .into_iter()
+        .map(|item| item.id.trim().to_string())
+        .filter(|id| !id.is_empty())
+        .collect::<Vec<_>>();
+    models.sort();
+    models.dedup();
+    if models.is_empty() {
+        return Err("接口返回成功，但没有拿到模型列表".to_string());
+    }
+    Ok(models)
+}
+
+pub fn trim_for_trace(value: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.chars().count() > 240 {
+        format!("{}...", trimmed.chars().take(240).collect::<String>())
+    } else {
+        trimmed.to_string()
+    }
+}
 
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -116,6 +249,294 @@ pub fn classify_failure(message: &str) -> &'static str {
     }
 }
 
+pub fn isolated_provider_key_env(base: &str, profile_id: &str) -> String {
+    let suffix = profile_id
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() {
+                ch.to_ascii_uppercase()
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>()
+        .trim_matches('_')
+        .to_string();
+    let base = base.trim().trim_end_matches('_');
+    format!(
+        "{}_{}",
+        if base.is_empty() {
+            "OMNIDESK_API_KEY"
+        } else {
+            base
+        },
+        if suffix.is_empty() {
+            "PROFILE"
+        } else {
+            suffix.as_str()
+        }
+    )
+}
+
+pub fn isolate_duplicate_provider_secrets(
+    root: &Path,
+    config: &mut ProviderConfig,
+) -> Result<bool, String> {
+    let mut used = std::collections::HashSet::new();
+    let mut changed = false;
+    for profile in &mut config.profiles {
+        if used.insert(profile.api_key_env.clone()) {
+            continue;
+        }
+        let previous_env = profile.api_key_env.clone();
+        let mut next_env = isolated_provider_key_env(&previous_env, &profile.id);
+        let mut index = 2;
+        while used.contains(&next_env) {
+            next_env = format!(
+                "{}_{}",
+                isolated_provider_key_env(&previous_env, &profile.id),
+                index
+            );
+            index += 1;
+        }
+        migrate_secret(root, &previous_env, &next_env)?;
+        if config.active_profile_id == profile.id {
+            config.api_key_env = next_env.clone();
+        }
+        profile.api_key_env = next_env.clone();
+        used.insert(next_env);
+        changed = true;
+    }
+    Ok(changed)
+}
+
+pub fn upsert_provider_profile(profiles: &mut Vec<ProviderProfile>, profile: ProviderProfile) {
+    if let Some(existing) = profiles.iter_mut().find(|item| item.id == profile.id) {
+        *existing = profile;
+    } else {
+        profiles.push(profile);
+    }
+}
+
+pub fn provider_profile_id(api_key_env: &str) -> String {
+    api_key_env
+        .trim()
+        .to_lowercase()
+        .trim_end_matches("_api_key")
+        .replace('_', "-")
+}
+
+pub fn provider_profile_name(api_key_env: &str, model: &str) -> String {
+    let name = api_key_env
+        .trim()
+        .trim_end_matches("_API_KEY")
+        .replace('_', " ");
+    if name.is_empty() {
+        return model.to_string();
+    }
+    name.split_whitespace()
+        .map(|part| {
+            let mut chars = part.chars();
+            chars
+                .next()
+                .map(|first| format!("{}{}", first.to_uppercase(), chars.as_str().to_lowercase()))
+                .unwrap_or_default()
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+pub fn profile_config(config: &ProviderConfig, profile: &ProviderProfile) -> ProviderConfig {
+    ProviderConfig {
+        schema_version: config.schema_version.clone(),
+        provider: profile.provider.clone(),
+        model: profile.model.clone(),
+        api_base: profile.api_base.clone(),
+        api_key_env: profile.api_key_env.clone(),
+        enabled: config.enabled,
+        active_profile_id: profile.id.clone(),
+        profiles: config.profiles.clone(),
+    }
+}
+
+/// Returns the active profile first so failover keeps the user's selected
+/// connection stable until its health evidence says otherwise.
+pub fn ordered_profile_candidates(config: &ProviderConfig) -> Vec<(String, ProviderConfig)> {
+    let mut candidates = vec![(config.active_profile_id.clone(), config.clone())];
+    candidates.extend(
+        config
+            .profiles
+            .iter()
+            .filter(|profile| profile.id != config.active_profile_id)
+            .map(|profile| (profile.id.clone(), profile_config(config, profile))),
+    );
+    candidates
+}
+
+pub fn health_entry<'a>(
+    health: &'a ModelHealthCache,
+    provider: &ProviderConfig,
+) -> Option<&'a ModelHealthEntry> {
+    health.entries.iter().find(|entry| {
+        entry.api_base == provider.api_base
+            && entry.api_key_env == provider.api_key_env
+            && entry.model == provider.model
+    })
+}
+
+pub fn health_is_fresh(entry: &ModelHealthEntry, now_seconds: u64) -> bool {
+    let Ok(checked_at) = entry.checked_at.parse::<u64>() else {
+        return false;
+    };
+    now_seconds >= checked_at && now_seconds - checked_at <= 60
+}
+
+/// Renders the Hermes gateway stanza without accessing the filesystem or any
+/// secret value. Callers own the explicit user-directory write boundary.
+pub fn render_hermes_runtime_config(
+    current: &str,
+    config: &ProviderConfig,
+) -> Result<String, String> {
+    let provider = serde_json::to_string("omnidesk-gateway").map_err(|err| err.to_string())?;
+    let base_url = serde_json::to_string(config.api_base.trim()).map_err(|err| err.to_string())?;
+    let api_mode = serde_json::to_string("chat_completions").map_err(|err| err.to_string())?;
+    let model = serde_json::to_string(config.model.trim()).map_err(|err| err.to_string())?;
+    let key_env =
+        serde_json::to_string(config.api_key_env.trim()).map_err(|err| err.to_string())?;
+    let fields = vec![
+        format!("  provider: {provider}"),
+        format!("  base_url: {base_url}"),
+        format!("  api_mode: {api_mode}"),
+        format!("  default: {model}"),
+        format!("  key_env: {key_env}"),
+    ];
+    let mut lines = current.lines().map(ToString::to_string).collect::<Vec<_>>();
+    match lines.iter().position(|line| line.trim() == "model:") {
+        Some(start) => {
+            let end = lines
+                .iter()
+                .enumerate()
+                .skip(start + 1)
+                .find_map(|(index, line)| {
+                    let trimmed = line.trim();
+                    (!trimmed.is_empty()
+                        && !line.chars().next().is_some_and(char::is_whitespace)
+                        && !trimmed.starts_with('#'))
+                    .then_some(index)
+                })
+                .unwrap_or(lines.len());
+            let mut preserved = lines[start + 1..end]
+                .iter()
+                .filter(|line| {
+                    let key = line.trim_start();
+                    ![
+                        "provider:",
+                        "base_url:",
+                        "api_mode:",
+                        "default:",
+                        "key_env:",
+                        "api_key_env:",
+                    ]
+                    .iter()
+                    .any(|prefix| key.starts_with(prefix))
+                })
+                .cloned()
+                .collect::<Vec<_>>();
+            lines.splice(
+                start + 1..end,
+                fields.into_iter().chain(preserved.drain(..)),
+            );
+        }
+        None => {
+            let mut section = vec!["model:".to_string()];
+            section.extend(fields);
+            section.push(String::new());
+            section.extend(lines);
+            lines = section;
+        }
+    }
+    upsert_hermes_gateway_provider(&mut lines, &base_url, &model, &api_mode, &key_env);
+    Ok(format!("{}\n", lines.join("\n").trim_end()))
+}
+
+fn upsert_hermes_gateway_provider(
+    lines: &mut Vec<String>,
+    base_url: &str,
+    model: &str,
+    api_mode: &str,
+    key_env: &str,
+) {
+    let fields = vec![
+        format!("    base_url: {base_url}"),
+        format!("    default_model: {model}"),
+        format!("    api_mode: {api_mode}"),
+        format!("    key_env: {key_env}"),
+    ];
+    let providers_start = match lines.iter().position(|line| line.trim() == "providers:") {
+        Some(index) => index,
+        None => {
+            if !lines.is_empty() && !lines.last().is_some_and(|line| line.trim().is_empty()) {
+                lines.push(String::new());
+            }
+            lines.push("providers:".to_string());
+            lines.push("  omnidesk-gateway:".to_string());
+            lines.extend(fields);
+            return;
+        }
+    };
+    let providers_end = lines
+        .iter()
+        .enumerate()
+        .skip(providers_start + 1)
+        .find_map(|(index, line)| {
+            let trimmed = line.trim();
+            (!trimmed.is_empty()
+                && !trimmed.starts_with('#')
+                && !line.chars().next().is_some_and(char::is_whitespace))
+            .then_some(index)
+        })
+        .unwrap_or(lines.len());
+    let gateway_start = (providers_start + 1..providers_end).find(|index| {
+        let line = &lines[*index];
+        line.starts_with("  ") && !line.starts_with("   ") && line.trim() == "omnidesk-gateway:"
+    });
+    let Some(gateway_start) = gateway_start else {
+        let mut entry = vec!["  omnidesk-gateway:".to_string()];
+        entry.extend(fields);
+        lines.splice(providers_end..providers_end, entry);
+        return;
+    };
+    let gateway_end = (gateway_start + 1..providers_end)
+        .find(|index| {
+            let line = &lines[*index];
+            !line.trim().is_empty()
+                && !line.trim().starts_with('#')
+                && line.starts_with("  ")
+                && !line.starts_with("   ")
+        })
+        .unwrap_or(providers_end);
+    let mut preserved = lines[gateway_start + 1..gateway_end]
+        .iter()
+        .filter(|line| {
+            let key = line.trim_start();
+            ![
+                "base_url:",
+                "default_model:",
+                "api_mode:",
+                "key_env:",
+                "api_key_env:",
+            ]
+            .iter()
+            .any(|prefix| key.starts_with(prefix))
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    lines.splice(
+        gateway_start + 1..gateway_end,
+        fields.into_iter().chain(preserved.drain(..)),
+    );
+}
+
 fn profile_id(api_key_env: &str) -> String {
     api_key_env
         .trim()
@@ -147,7 +568,7 @@ pub fn default_config() -> ProviderConfig {
         api_key_env: "DEEPSEEK_API_KEY".to_string(),
     };
     ProviderConfig {
-        schema_version: "project-os.desktop-provider.v0.1".to_string(),
+        schema_version: PROVIDER_SCHEMA_VERSION.to_string(),
         provider: profile.provider.clone(),
         model: profile.model.clone(),
         api_base: profile.api_base.clone(),
@@ -177,8 +598,8 @@ fn normalize_config(config: &mut ProviderConfig) -> bool {
         });
         changed = true;
     }
-    if config.schema_version != "project-os.desktop-provider.v0.1" {
-        config.schema_version = "project-os.desktop-provider.v0.1".to_string();
+    if config.schema_version != PROVIDER_SCHEMA_VERSION {
+        config.schema_version = PROVIDER_SCHEMA_VERSION.to_string();
         changed = true;
     }
     changed
@@ -188,7 +609,8 @@ pub fn load_or_seed_config(root: &Path) -> Result<ProviderConfig, String> {
     if let Some(value) = Repository::new(root).read_json(PROVIDER_CONFIG_PATH) {
         let mut config: ProviderConfig =
             serde_json::from_value(value).map_err(|err| err.to_string())?;
-        if normalize_config(&mut config) {
+        let legacy_schema = config.schema_version == LEGACY_PROVIDER_SCHEMA_VERSION;
+        if normalize_config(&mut config) && !legacy_schema {
             save_config(root, &config)?;
         }
         return Ok(config);
@@ -198,6 +620,8 @@ pub fn load_or_seed_config(root: &Path) -> Result<ProviderConfig, String> {
     Ok(config)
 }
 pub fn save_config(root: &Path, config: &ProviderConfig) -> Result<(), String> {
+    let mut config = config.clone();
+    config.schema_version = PROVIDER_SCHEMA_VERSION.to_string();
     Repository::new(root).transaction(
         "save-provider-config",
         &[JsonMutation::upsert(
@@ -210,7 +634,7 @@ pub fn save_config(root: &Path, config: &ProviderConfig) -> Result<(), String> {
 
 pub fn default_catalog() -> ModelCatalog {
     ModelCatalog {
-        schema_version: "project-os.model-catalog.v0.1".to_string(),
+        schema_version: "omnidesk.model-catalog.v0.1".to_string(),
         providers: vec![
             ModelCatalogProvider {
                 id: "openai".to_string(),
@@ -296,12 +720,12 @@ pub fn load_or_seed_health(root: &Path) -> Result<ModelHealthCache, String> {
     if let Some(value) = Repository::new(root).read_json(MODEL_HEALTH_PATH) {
         let mut cache: ModelHealthCache =
             serde_json::from_value(value).map_err(|err| err.to_string())?;
-        cache.schema_version = "project-os.model-health.v0.1".to_string();
+        cache.schema_version = "omnidesk.model-health.v0.1".to_string();
         save_health(root, &cache)?;
         return Ok(cache);
     }
     let cache = ModelHealthCache {
-        schema_version: "project-os.model-health.v0.1".to_string(),
+        schema_version: "omnidesk.model-health.v0.1".to_string(),
         entries: Vec::new(),
     };
     save_health(root, &cache)?;
@@ -335,10 +759,10 @@ pub fn record_health(root: &Path, entry: ModelHealthEntry) -> Result<(), String>
             .map(|value| serde_json::from_value(value).map_err(|err| err.to_string()))
             .transpose()?
             .unwrap_or(ModelHealthCache {
-                schema_version: "project-os.model-health.v0.1".to_string(),
+                schema_version: "omnidesk.model-health.v0.1".to_string(),
                 entries: Vec::new(),
             });
-        cache.schema_version = "project-os.model-health.v0.1".to_string();
+        cache.schema_version = "omnidesk.model-health.v0.1".to_string();
         upsert_health(&mut cache, entry);
         Ok((
             (),
@@ -490,7 +914,7 @@ mod tests {
                 .as_nanos()
         ));
         let config = load_or_seed_config(&root).unwrap();
-        assert_eq!(config.schema_version, "project-os.desktop-provider.v0.1");
+        assert_eq!(config.schema_version, PROVIDER_SCHEMA_VERSION);
         record_health(
             &root,
             ModelHealthEntry {
@@ -527,10 +951,145 @@ mod tests {
             classify_failure("provider HTTP 403: subscription quota insufficient"),
             "quota-exhausted"
         );
-        assert_eq!(classify_failure("provider HTTP 401: invalid token"), "authentication-failed");
-        assert_eq!(classify_failure("provider HTTP 404: model_not_found"), "model-unavailable");
+        assert_eq!(
+            classify_failure("provider HTTP 401: invalid token"),
+            "authentication-failed"
+        );
+        assert_eq!(
+            classify_failure("provider HTTP 404: model_not_found"),
+            "model-unavailable"
+        );
         assert_eq!(classify_failure("request timed out"), "network-unavailable");
     }
+
+    #[test]
+    fn endpoint_helpers_normalize_provider_roots_and_existing_routes() {
+        assert_eq!(
+            chat_completions_endpoint("https://api.example.test/v1/"),
+            "https://api.example.test/v1/chat/completions"
+        );
+        assert_eq!(
+            chat_completions_endpoint("https://api.example.test/v1/chat/completions"),
+            "https://api.example.test/v1/chat/completions"
+        );
+        assert_eq!(
+            models_endpoint("https://api.example.test/v1/chat/completions"),
+            "https://api.example.test/v1/models"
+        );
+        assert_eq!(
+            models_endpoint("https://api.example.test/v1/models"),
+            "https://api.example.test/v1/models"
+        );
+    }
+
+    #[test]
+    fn profile_helpers_keep_duplicate_keys_isolated_without_exposing_values() {
+        assert_eq!(provider_profile_id("EXAMPLE_API_KEY"), "example");
+        assert_eq!(
+            provider_profile_name("EXAMPLE_API_KEY", "fallback"),
+            "Example"
+        );
+        assert_eq!(
+            isolated_provider_key_env("EXAMPLE_API_KEY", "team one"),
+            "EXAMPLE_API_KEY_TEAM_ONE"
+        );
+        let mut profiles = vec![ProviderProfile {
+            id: "existing".to_string(),
+            name: "Existing".to_string(),
+            note: String::new(),
+            website: String::new(),
+            provider: "openai-compatible".to_string(),
+            model: "first".to_string(),
+            api_base: "https://one.test".to_string(),
+            api_key_env: "FIRST_API_KEY".to_string(),
+        }];
+        upsert_provider_profile(
+            &mut profiles,
+            ProviderProfile {
+                id: "existing".to_string(),
+                name: "Updated".to_string(),
+                note: String::new(),
+                website: String::new(),
+                provider: "openai-compatible".to_string(),
+                model: "second".to_string(),
+                api_base: "https://two.test".to_string(),
+                api_key_env: "SECOND_API_KEY".to_string(),
+            },
+        );
+        assert_eq!(profiles.len(), 1);
+        assert_eq!(profiles[0].api_key_env, "SECOND_API_KEY");
+    }
+
+    #[test]
+    fn provider_candidates_keep_active_profile_first_and_health_is_scoped() {
+        let mut config = default_config();
+        let fallback = ProviderProfile {
+            id: "fallback".to_string(),
+            name: "Fallback".to_string(),
+            note: String::new(),
+            website: String::new(),
+            provider: "openai-compatible".to_string(),
+            model: "fallback-model".to_string(),
+            api_base: "https://fallback.example/v1".to_string(),
+            api_key_env: "FALLBACK_API_KEY".to_string(),
+        };
+        config.profiles.push(fallback.clone());
+        let candidates = ordered_profile_candidates(&config);
+        assert_eq!(candidates.len(), 2);
+        assert_eq!(candidates[0].0, config.active_profile_id);
+        assert_eq!(candidates[1].0, "fallback");
+        assert_eq!(candidates[1].1.model, "fallback-model");
+
+        let health = ModelHealthCache {
+            schema_version: "omnidesk.model-health.v0.1".to_string(),
+            entries: vec![ModelHealthEntry {
+                api_base: fallback.api_base.clone(),
+                api_key_env: fallback.api_key_env.clone(),
+                model: fallback.model.clone(),
+                status: "available".to_string(),
+                message: "OK".to_string(),
+                checked_at: "100".to_string(),
+            }],
+        };
+        let fallback_config = profile_config(&config, &fallback);
+        assert!(health_entry(&health, &config).is_none());
+        assert!(health_entry(&health, &fallback_config).is_some());
+        assert!(health_is_fresh(health_entry(&health, &fallback_config).unwrap(), 160));
+        assert!(!health_is_fresh(health_entry(&health, &fallback_config).unwrap(), 161));
+    }
+
+    #[test]
+    fn legacy_provider_config_is_read_without_secret_migration_and_rewritten_on_save() {
+        let root = std::env::temp_dir().join(format!(
+            "omnidesk-provider-legacy-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(root.join(".omnidesk/data")).unwrap();
+        fs::write(
+            root.join(PROVIDER_CONFIG_PATH),
+            r#"{"schemaVersion":"project-os.desktop-provider.v0.1","provider":"openai-compatible","model":"legacy-model","apiBase":"https://example.test/v1","apiKeyEnv":"LEGACY_PROVIDER_API_KEY","enabled":true}"#,
+        )
+        .unwrap();
+        let config = load_or_seed_config(&root).unwrap();
+        assert_eq!(config.schema_version, PROVIDER_SCHEMA_VERSION);
+        assert_eq!(config.api_key_env, "LEGACY_PROVIDER_API_KEY");
+        let on_disk = Repository::new(&root)
+            .read_json(PROVIDER_CONFIG_PATH)
+            .unwrap();
+        assert_eq!(on_disk["schemaVersion"], LEGACY_PROVIDER_SCHEMA_VERSION);
+
+        save_config(&root, &config).unwrap();
+        let saved = Repository::new(&root)
+            .read_json(PROVIDER_CONFIG_PATH)
+            .unwrap();
+        assert_eq!(saved["schemaVersion"], PROVIDER_SCHEMA_VERSION);
+        assert_eq!(saved["apiKeyEnv"], "LEGACY_PROVIDER_API_KEY");
+        fs::remove_dir_all(root).unwrap();
+    }
+
     #[test]
     fn secrets_are_atomically_replaced_and_removed() {
         let root = std::env::temp_dir().join(format!(

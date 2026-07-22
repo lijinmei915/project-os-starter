@@ -463,7 +463,7 @@ export function TerminalDock({
       {agentWorking ? (
         <div className="terminalTaskNotice" role="status">
           <span>当前终端任务正在执行。需要补充或调整方向，请回到对话。</span>
-          <button type="button" onClick={() => window.dispatchEvent(new Event("project-os:open-conversation"))}>返回对话调整</button>
+          <button type="button" onClick={() => window.dispatchEvent(new Event("omnidesk:open-conversation"))}>返回对话调整</button>
         </div>
       ) : null}
       <div className="terminalComposer" role="region" aria-label="终端输入">

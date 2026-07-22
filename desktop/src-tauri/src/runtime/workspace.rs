@@ -1,8 +1,9 @@
 use crate::runtime::repository::{JsonMutation, Repository};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::fs;
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
+use std::process::{Command, Stdio};
 use std::time::UNIX_EPOCH;
 
 const STATE_PATH: &str = ".omnidesk/data/state.json";
@@ -14,6 +15,28 @@ const FACT_FRESHNESS_PATH: &str = ".omnidesk/cache/fact-freshness.json";
 const GOALS_PATH: &str = ".omnidesk/data/goals.json";
 const PROVIDER_PATH: &str = ".omnidesk/data/desktop-provider.json";
 const MODEL_CATALOG_PATH: &str = ".omnidesk/data/model-catalog.json";
+const REGISTRY_PATH: &str = ".omnidesk/data/desktop-registry.json";
+const FACT_FRESHNESS_SCHEMA_VERSION: &str = "omnidesk.fact-freshness.v0.1";
+const CAPABILITIES_SCHEMA_VERSION: &str = "omnidesk.project-capabilities.v0.1";
+const MEMORY_SCHEMA_VERSION: &str = "omnidesk.memory.v0.1";
+const PROFILE_SCHEMA_VERSION: &str = "omnidesk.project-profile.v0.1";
+const REGISTRY_SCHEMA_VERSION: &str = "omnidesk.desktop-registry.v0.1";
+const LEGACY_REGISTRY_SCHEMA_VERSION: &str = "project-os.desktop-registry.v0.1";
+
+fn project_legacy_schema(
+    mut document: Value,
+    legacy_version: &str,
+    current_version: &str,
+) -> Value {
+    if document.get("schemaVersion").and_then(Value::as_str) == Some(legacy_version) {
+        document["schemaVersion"] = json!(current_version);
+        document["schemaMigration"] = json!({
+            "from": legacy_version,
+            "mode": "read-projection",
+        });
+    }
+    document
+}
 
 pub struct WorkspaceProjectionState {
     pub state: Option<Value>,
@@ -25,6 +48,417 @@ pub struct WorkspaceProjectionState {
     pub workspace_facts: Value,
     pub goals: Option<Value>,
     pub project_goals: Value,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectProfile {
+    pub overview: String,
+    pub phase_summary: String,
+    pub architecture_summary: String,
+    pub check_commands: String,
+    pub collaboration_rules: String,
+    pub intro: String,
+    pub long_term_goal: String,
+    pub target_users: String,
+    pub use_cases: String,
+    pub user_preferences: String,
+    pub missing_fields: Vec<String>,
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct TreeEntry {
+    pub label: String,
+    pub depth: usize,
+    pub kind: String,
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct RegistryProjectRecord {
+    pub id: String,
+    pub name: String,
+    pub path: String,
+    pub phase: String,
+    #[serde(default)]
+    pub name_locked: bool,
+    #[serde(default = "default_project_access_mode")]
+    pub access_mode: String,
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceRegistry {
+    pub schema_version: String,
+    pub current_project_id: String,
+    pub projects: Vec<RegistryProjectRecord>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RegistryProjectSummary {
+    pub id: String,
+    pub name: String,
+    pub path: String,
+    pub phase: String,
+    pub access_mode: String,
+    pub is_current: bool,
+    pub health: String,
+    pub status_label: String,
+    pub task_count: usize,
+    pub active_task_count: usize,
+    pub failed_task_count: usize,
+    pub completed_task_count: usize,
+    pub latest_activity_at: String,
+    pub latest_activity_title: String,
+}
+
+#[derive(Default)]
+struct ProjectTaskSummary {
+    task_count: usize,
+    active_task_count: usize,
+    failed_task_count: usize,
+    completed_task_count: usize,
+    latest_activity_at: String,
+    latest_activity_title: String,
+}
+
+pub fn default_project_access_mode() -> String {
+    "browse".to_string()
+}
+
+pub fn normalize_project_access_mode(value: &str) -> String {
+    match value.trim() {
+        "governed" => "governed".to_string(),
+        "controlled" => "controlled".to_string(),
+        _ => "browse".to_string(),
+    }
+}
+
+pub fn normalize_project_path(path: &str) -> Result<PathBuf, String> {
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        return Err("请输入项目路径".to_string());
+    }
+
+    let expanded = if trimmed == "~" {
+        std::env::var("HOME")
+            .map(PathBuf::from)
+            .map_err(|err| err.to_string())?
+    } else if let Some(rest) = trimmed.strip_prefix("~/") {
+        std::env::var("HOME")
+            .map(|home| PathBuf::from(home).join(rest))
+            .map_err(|err| err.to_string())?
+    } else {
+        PathBuf::from(trimmed)
+    };
+
+    expanded.canonicalize().map_err(|err| err.to_string())
+}
+
+pub fn project_id_from_path(path: &str) -> String {
+    let mut id = String::from("project");
+    for byte in path.as_bytes() {
+        id.push_str(&format!("{:02x}", byte));
+    }
+    id
+}
+
+pub fn load_or_seed_registry(app_root: &Path) -> Result<WorkspaceRegistry, String> {
+    let path = crate::runtime::state_namespace::state_path_for_read(app_root, REGISTRY_PATH)
+        .unwrap_or_else(|_| app_root.join(REGISTRY_PATH));
+    if path.exists() {
+        let content = fs::read_to_string(&path).map_err(|err| err.to_string())?;
+        let mut registry: WorkspaceRegistry =
+            serde_json::from_str(&content).map_err(|err| err.to_string())?;
+        if !registry.projects.is_empty() {
+            if registry.schema_version == LEGACY_REGISTRY_SCHEMA_VERSION {
+                registry.schema_version = REGISTRY_SCHEMA_VERSION.to_string();
+            }
+            return Ok(registry);
+        }
+    }
+
+    let state = Repository::new(app_root).read_json(STATE_PATH);
+    let name = state
+        .as_ref()
+        .and_then(|json| json.get("name"))
+        .and_then(Value::as_str)
+        .or_else(|| app_root.file_name().and_then(|name| name.to_str()))
+        .unwrap_or("workspace")
+        .to_string();
+    let phase = state
+        .as_ref()
+        .and_then(|json| json.get("phase"))
+        .and_then(Value::as_str)
+        .unwrap_or("unknown")
+        .to_string();
+    let registry = WorkspaceRegistry {
+        schema_version: REGISTRY_SCHEMA_VERSION.to_string(),
+        current_project_id: "current".to_string(),
+        projects: vec![RegistryProjectRecord {
+            id: "current".to_string(),
+            name,
+            path: app_root.display().to_string(),
+            phase,
+            name_locked: false,
+            access_mode: default_project_access_mode(),
+        }],
+    };
+    save_registry(app_root, &registry)?;
+    Ok(registry)
+}
+
+pub fn save_registry(app_root: &Path, registry: &WorkspaceRegistry) -> Result<(), String> {
+    let mut registry = registry.clone();
+    registry.schema_version = REGISTRY_SCHEMA_VERSION.to_string();
+    Repository::new(app_root).transaction(
+        "save-registry",
+        &[JsonMutation::upsert(
+            REGISTRY_PATH,
+            serde_json::to_value(registry).map_err(|err| err.to_string())?,
+        )],
+    )?;
+    Ok(())
+}
+
+pub fn current_registry_project(
+    registry: &mut WorkspaceRegistry,
+    app_root: &Path,
+) -> Result<RegistryProjectRecord, String> {
+    if let Some(project) = registry
+        .projects
+        .iter()
+        .find(|project| project.id == registry.current_project_id)
+    {
+        return Ok(project.clone());
+    }
+
+    let fallback = registry
+        .projects
+        .first()
+        .cloned()
+        .ok_or_else(|| "registry 中没有项目".to_string())?;
+    registry.current_project_id = fallback.id.clone();
+    save_registry(app_root, registry)?;
+    Ok(fallback)
+}
+
+pub fn registry_project_summaries(registry: &WorkspaceRegistry) -> Vec<RegistryProjectSummary> {
+    registry
+        .projects
+        .iter()
+        .map(|project| {
+            let (health, status_label) = registry_project_health(project);
+            let summary = project_task_summary(Path::new(&project.path));
+            RegistryProjectSummary {
+                id: project.id.clone(),
+                name: project.name.clone(),
+                path: project.path.clone(),
+                phase: project.phase.clone(),
+                access_mode: normalize_project_access_mode(&project.access_mode),
+                is_current: project.id == registry.current_project_id,
+                health,
+                status_label,
+                task_count: summary.task_count,
+                active_task_count: summary.active_task_count,
+                failed_task_count: summary.failed_task_count,
+                completed_task_count: summary.completed_task_count,
+                latest_activity_at: summary.latest_activity_at,
+                latest_activity_title: summary.latest_activity_title,
+            }
+        })
+        .collect()
+}
+
+fn project_task_summary(root: &Path) -> ProjectTaskSummary {
+    let task_dir = crate::runtime::tasks::directory(root);
+    let Ok(entries) = fs::read_dir(task_dir) else {
+        return ProjectTaskSummary::default();
+    };
+    let mut summary = ProjectTaskSummary::default();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("json")
+            || path.file_name().and_then(|value| value.to_str()) == Some("manifest.json")
+        {
+            continue;
+        }
+        let Some(task) = fs::read_to_string(&path)
+            .ok()
+            .and_then(|text| serde_json::from_str::<Value>(&text).ok())
+        else {
+            continue;
+        };
+        summary.task_count += 1;
+        match task.get("status").and_then(Value::as_str).unwrap_or("") {
+            "done" => summary.completed_task_count += 1,
+            "failed" => summary.failed_task_count += 1,
+            _ => summary.active_task_count += 1,
+        }
+        let activity_at = task
+            .get("updatedAt")
+            .and_then(Value::as_str)
+            .or_else(|| task.get("createdAt").and_then(Value::as_str))
+            .unwrap_or("");
+        if activity_at > summary.latest_activity_at.as_str() {
+            summary.latest_activity_at = activity_at.to_string();
+            summary.latest_activity_title = task
+                .get("title")
+                .and_then(Value::as_str)
+                .unwrap_or("任务更新")
+                .to_string();
+        }
+    }
+    summary
+}
+
+fn registry_project_health(project: &RegistryProjectRecord) -> (String, String) {
+    let root = PathBuf::from(&project.path);
+    if !root.exists() || !root.is_dir() {
+        return ("missing".to_string(), "路径失效".to_string());
+    }
+    let has_state = crate::runtime::state_namespace::state_path_for_read(&root, STATE_PATH)
+        .map(|path| path.exists())
+        .unwrap_or(false);
+    let has_project = root.join("PROJECT.md").is_file();
+    let has_handoff = root.join("HANDOFF.md").is_file();
+    if has_state && has_project && has_handoff {
+        return ("ready".to_string(), "已接入 · OmniDesk".to_string());
+    }
+    if has_state || has_project || has_handoff || root.join("AGENTS.md").is_file() {
+        return ("partial".to_string(), "缺少关键文件".to_string());
+    }
+    ("external".to_string(), "未初始化 · 普通项目".to_string())
+}
+
+pub fn build_workspace_facts_preview(root: &Path, project_name: &str) -> Value {
+    let state_json = read_json(root, STATE_PATH);
+    let profile_json = read_json(root, PROFILE_PATH);
+    let profile = build_project_profile(root, project_name);
+    let project_md = read_text(root, "PROJECT.md");
+    let handoff = read_text(root, "HANDOFF.md");
+    let runbook = read_text(root, "docs/RUNBOOK.md");
+    let stack = detected_stack(root);
+    let (package_name, package_version) = package_identity(root);
+    let dependencies = dependency_summary(root);
+    let directories = project_directory_summary(root);
+    let created_at = project_created_at(root);
+    let scripts = package_scripts_summary(root);
+    let git_status = git_status_summary(root);
+    let governance_domains =
+        crate::runtime::workspace_governance::governance_domains_from_files(root);
+    let overview = first_non_empty(vec![
+        profile.overview.clone(),
+        json_string_value(&state_json, "/description"),
+        project_intro_from_project_md(&project_md, project_name),
+    ]);
+    let current_progress = first_non_empty(vec![
+        markdown_section(&handoff, &["最近完成", "当前验证", "下一步建议"]),
+        markdown_section(&project_md, &["当前进度", "下一步重点"]),
+        git_status.clone(),
+    ]);
+    let runbook_summary = first_non_empty(vec![
+        scripts.clone(),
+        markdown_section(&runbook, &["启动", "运行", "Commands"]),
+        profile.check_commands.clone(),
+    ]);
+    let risk_boundary = first_non_empty(vec![
+        markdown_section(&handoff, &["风险与注意", "风险"]),
+        profile_field_value(&profile_json, "memory.risks"),
+        "老项目默认只读扫描，用户确认前不修改工程文件。".to_string(),
+    ]);
+    let has_state = crate::runtime::state_namespace::state_path_exists(root, ".omnidesk");
+    let local_state = format!(
+        "{} {}",
+        git_status,
+        if has_state {
+            "已发现 OmniDesk 工作区状态。"
+        } else {
+            "未发现 OmniDesk 工作区状态。"
+        }
+    );
+    let health_score = crate::runtime::workspace_governance::build_health_score(
+        root,
+        &profile,
+        &overview,
+        &scripts,
+        &risk_boundary,
+        &governance_domains,
+    );
+    let generated_at = Command::new("date")
+        .arg("+%Y-%m-%dT%H:%M:%S%z")
+        .output()
+        .ok()
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .map(|text| text.trim().to_string())
+        .unwrap_or_else(|| "unknown".to_string());
+
+    json!({
+        "schemaVersion": "omnidesk.workspace-facts.v0.1",
+        "generatedAt": generated_at,
+        "mode": if has_state { "existing-project" } else { "temporary-readonly" },
+        "status": "connected",
+        "healthScore": health_score,
+        "governanceLevel": {
+            "current": "L1",
+            "name": "治理索引",
+            "description": "项目已零侵入接入，工程文件会被自动扫描、归类和只读预览。",
+            "next": "L2",
+            "nextName": "建议修复",
+            "levels": [
+                { "id": "L0", "name": "只读体检", "description": "扫描、识别、健康检查，不改工程文件。" },
+                { "id": "L1", "name": "治理索引", "description": "建立项目档案、治理域、工程文件索引和上下文记忆。" },
+                { "id": "L2", "name": "建议修复", "description": "生成问题解释、修复建议和变更提案草稿。" },
+                { "id": "L3", "name": "受控修复", "description": "用户确认后自动改文件、运行检查并沉淀记录。" },
+                { "id": "L4", "name": "持续治理", "description": "接入 CI 或定期任务，持续扫描、提醒和复审豁免。" }
+            ]
+        },
+        "project": {
+            "name": project_name,
+            "id": if package_name.is_empty() { project_name } else { &package_name },
+            "path": root.display().to_string(),
+            "kind": profile_field_value(&profile_json, "identity.type"),
+            "version": package_version,
+            "createdAt": created_at,
+            "detectedStack": stack,
+            "dependencies": dependencies,
+            "directories": directories,
+            "coreCapabilities": profile_field_value(&profile_json, "product.coreValue"),
+            "owner": profile_field_value(&profile_json, "project.owner"),
+            "milestone": json_string_value(&state_json, "/stage"),
+            "lifecycle": json_string_value(&state_json, "/phase"),
+            "description": overview
+        },
+        "summary": {
+            "overview": { "status": if overview.is_empty() { "missing" } else { "confirmed" }, "title": "项目概览", "body": if overview.is_empty() { "尚未识别到项目概览。".to_string() } else { overview.clone() }, "sources": ["PROJECT.md", STATE_PATH, PROFILE_PATH], "confidence": 0.82 },
+            "currentProgress": { "status": if current_progress.is_empty() { "missing" } else { "inferred" }, "title": "当前进度", "body": if current_progress.is_empty() { "尚未识别到当前进度。".to_string() } else { current_progress.clone() }, "sources": ["HANDOFF.md", "PROJECT.md", "git status"], "confidence": 0.72 },
+            "runbook": { "status": if runbook_summary.is_empty() { "missing" } else { "confirmed" }, "title": "启动方式", "body": if runbook_summary.is_empty() { "尚未识别到启动方式。".to_string() } else { runbook_summary.clone() }, "sources": ["package.json", "desktop/package.json", "docs/RUNBOOK.md"], "confidence": 0.78 },
+            "riskBoundary": { "status": if risk_boundary.is_empty() { "missing" } else { "inferred" }, "title": "风险边界", "body": if risk_boundary.is_empty() { "尚未识别到风险边界。".to_string() } else { risk_boundary.clone() }, "sources": ["HANDOFF.md", PROFILE_PATH], "confidence": 0.68 },
+            "localState": { "status": "confirmed", "title": "本地状态", "body": local_state, "sources": ["git status", ".omnidesk/"], "confidence": 0.82 }
+        },
+        "evidence": [
+            { "source": "PROJECT.md", "kind": "project-status", "status": if root.join("PROJECT.md").exists() { "found" } else { "missing" }, "note": "项目状态展示层。" },
+            { "source": "HANDOFF.md", "kind": "handoff", "status": if root.join("HANDOFF.md").exists() { "found" } else { "missing" }, "note": "当前交接和风险来源。" },
+            { "source": "desktop/package.json", "kind": "run-config", "status": if root.join("desktop/package.json").exists() { "found" } else { "missing" }, "note": "桌面端启动脚本来源。" },
+            { "source": STATE_PATH, "kind": "project-state", "status": if crate::runtime::state_namespace::state_path_exists(root, STATE_PATH) { "found" } else { "missing" }, "note": "机器可读项目状态。" },
+            { "source": PROFILE_PATH, "kind": "project-profile", "status": if crate::runtime::state_namespace::state_path_exists(root, PROFILE_PATH) { "found" } else { "missing" }, "note": "结构化项目档案。" }
+        ],
+        "governanceDomains": governance_domains,
+        "recommendations": [
+            { "id": "rec-health-score", "domain": "项目概览", "title": "补齐项目健康评分", "problem": "当前已建立治理索引，但缺少统一健康分，用户还难以判断项目整体治理水平。", "impact": "后续无法稳定比较新老项目，也难以跟踪治理改善效果。", "action": "基于文档完整度、启动方式、风险边界、本地状态和验证记录生成健康分。", "severity": "medium", "files": ["schemas/workspace-facts.schema.json", ".omnidesk/cache/workspace-facts.json"], "canPromoteToL3": false },
+            { "id": "rec-file-status", "domain": "工程资产", "title": "为治理文件增加状态", "problem": "工程文件已经纳入治理域，但还没有区分已识别、缺失、过期和本地变更。", "impact": "用户能看到文件列表，但无法快速判断哪些文件需要处理。", "action": "为每个治理文件补充 status、lastSeen、changeKind 和 sourceType。", "severity": "medium", "files": ["desktop/src-tauri/src/main.rs", "desktop/src/main.jsx"], "canPromoteToL3": false },
+            { "id": "rec-ci-governance", "domain": "验证交付", "title": "设计持续治理入口", "problem": "当前联动更新只发生在本地工作台，尚未和 CI 或定期扫描形成闭环。", "impact": "项目离开本地工作台后，治理状态可能无法持续更新。", "action": "增加 CI/定时扫描适配入口，先生成建议和检查清单，不直接修改流水线。", "severity": "low", "files": ["docs/RUNBOOK.md", "desktop/package.json"], "canPromoteToL3": false },
+            { "id": "rec-controlled-fix-entry", "domain": "受控修复", "title": "准备 L3 受控修复入口", "problem": "L2 建议可以解释问题，但还没有把建议转成可审核的变更提案。", "impact": "用户仍需要手动判断哪些建议可以进入自动修复。", "action": "为建议增加生成 patch draft 的入口，只有用户确认后才进入 L3。", "severity": "low", "files": ["desktop/src/main.jsx", "desktop/src-tauri/src/main.rs"], "canPromoteToL3": true }
+        ],
+        "findings": {
+            "confirmed": [],
+            "missing": profile.missing_fields.iter().map(|field| json!({ "title": format!("{}待补齐", field), "body": "该字段尚未从当前事实源中稳定识别。", "severity": "low", "sources": [PROFILE_PATH] })).collect::<Vec<_>>(),
+            "risks": [{ "title": "默认不修改工程文件", "body": "工程文件自动纳入治理索引，但当前只做预览和归类，不在这里直接编辑或改写原工程文件。", "severity": "info", "sources": ["OmniDesk workspace"] }]
+        },
+        "recommendation": { "action": "auto-managed", "confidence": 0.74, "reason": "当前项目处于 L1 治理索引，可继续升级到 L2 建议修复。", "nextSteps": ["自动维护治理索引", "在工程文件区预览来源", "生成 L2 修复建议草稿"] }
+    })
 }
 
 #[derive(Deserialize)]
@@ -46,6 +480,602 @@ fn read_text(root: &Path, relative: &str) -> String {
     Repository::new(root)
         .read_text(relative)
         .unwrap_or_default()
+}
+
+/// Workspace facts use short, source-attributed excerpts rather than complete
+/// Markdown documents so the Runtime never treats prose as an unbounded prompt.
+pub fn clean_markdown_line(line: &str) -> String {
+    line.trim()
+        .trim_start_matches(['-', '*', '>', ' '])
+        .trim()
+        .trim_matches('`')
+        .trim()
+        .to_string()
+}
+
+pub fn markdown_section(content: &str, headings: &[&str]) -> String {
+    let mut collecting = false;
+    let mut lines: Vec<String> = Vec::new();
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('#') {
+            let title = trimmed.trim_start_matches('#').trim();
+            if collecting {
+                break;
+            }
+            collecting = headings.iter().any(|heading| title.contains(heading));
+            continue;
+        }
+        if collecting {
+            let cleaned = clean_markdown_line(trimmed);
+            if !cleaned.is_empty() {
+                lines.push(cleaned);
+            }
+            if lines.len() >= 3 {
+                break;
+            }
+        }
+    }
+    lines.join(" ")
+}
+
+pub fn first_non_empty(values: Vec<String>) -> String {
+    values
+        .into_iter()
+        .map(|value| value.trim().to_string())
+        .find(|value| !value.is_empty())
+        .unwrap_or_default()
+}
+
+pub fn profile_field_value(profile: &Option<Value>, key: &str) -> String {
+    profile
+        .as_ref()
+        .and_then(|json| json.pointer(&format!("/fields/{}/value", key.replace('.', "/"))))
+        .or_else(|| {
+            profile
+                .as_ref()
+                .and_then(|json| json.get("fields"))
+                .and_then(|fields| fields.get(key))
+                .and_then(|field| field.get("value"))
+        })
+        .map(value_to_profile_text)
+        .unwrap_or_default()
+}
+
+pub fn json_string_value(json: &Option<Value>, pointer: &str) -> String {
+    json.as_ref()
+        .and_then(|value| value.pointer(pointer))
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .trim()
+        .to_string()
+}
+
+pub fn is_safe_text_preview_path(path: &str) -> bool {
+    let relative = Path::new(path);
+    if relative.is_absolute()
+        || path.starts_with(".env")
+        || path.contains("/.env")
+        || path == ".omnidesk"
+        || path.starts_with(".omnidesk/")
+    {
+        return false;
+    }
+    if relative.components().any(|component| {
+        matches!(
+            component,
+            Component::ParentDir | Component::RootDir | Component::Prefix(_)
+        )
+    }) {
+        return false;
+    }
+    matches!(
+        relative.extension().and_then(|value| value.to_str()),
+        Some(
+            "md" | "mdx"
+                | "txt"
+                | "json"
+                | "jsonc"
+                | "yaml"
+                | "yml"
+                | "toml"
+                | "js"
+                | "jsx"
+                | "ts"
+                | "tsx"
+                | "css"
+                | "scss"
+                | "html"
+                | "rs"
+                | "sh"
+                | "py"
+                | "sql"
+        )
+    )
+}
+
+pub fn preview_language(path: &str) -> String {
+    match Path::new(path).extension().and_then(|value| value.to_str()) {
+        Some("md" | "mdx") => "markdown",
+        Some("json" | "jsonc") => "json",
+        Some("yaml" | "yml") => "yaml",
+        Some("toml") => "toml",
+        Some("js" | "jsx") => "javascript",
+        Some("ts" | "tsx") => "typescript",
+        Some("css" | "scss") => "css",
+        Some("html") => "html",
+        Some("rs") => "rust",
+        Some("sh") => "shell",
+        Some("py") => "python",
+        Some("sql") => "sql",
+        _ => "text",
+    }
+    .to_string()
+}
+
+pub fn count_visible_files(root: &Path) -> (usize, usize) {
+    let mut file_count = 0;
+    let mut docs_count = 0;
+    count_visible_files_at(root, 0, &mut file_count, &mut docs_count);
+    (file_count, docs_count)
+}
+
+pub fn build_tree_preview(root: &Path) -> Vec<TreeEntry> {
+    let mut tree = vec![TreeEntry {
+        label: root
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("workspace")
+            .to_string(),
+        depth: 0,
+        kind: "folder".to_string(),
+    }];
+    append_tree_preview(root, 1, &mut tree);
+    tree
+}
+
+fn count_visible_files_at(
+    path: &Path,
+    depth: usize,
+    file_count: &mut usize,
+    docs_count: &mut usize,
+) {
+    if depth > 6 || is_ignored_workspace_path(path) {
+        return;
+    }
+    let Ok(entries) = fs::read_dir(path) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let child = entry.path();
+        if is_ignored_workspace_path(&child) {
+            continue;
+        }
+        if child.is_dir() {
+            count_visible_files_at(&child, depth + 1, file_count, docs_count);
+        } else {
+            *file_count += 1;
+            if child.extension().and_then(|ext| ext.to_str()) == Some("md") {
+                *docs_count += 1;
+            }
+        }
+    }
+}
+
+fn append_tree_preview(path: &Path, depth: usize, tree: &mut Vec<TreeEntry>) {
+    const MAX_TREE_ITEMS: usize = 180;
+    const MAX_TREE_DEPTH: usize = 4;
+    if depth > MAX_TREE_DEPTH || tree.len() >= MAX_TREE_ITEMS {
+        return;
+    }
+    let Ok(entries) = fs::read_dir(path) else {
+        return;
+    };
+    let mut entries = entries
+        .flatten()
+        .filter(|entry| !is_ignored_workspace_path(&entry.path()))
+        .collect::<Vec<_>>();
+    entries.sort_by(|a, b| {
+        let a_is_dir = a.path().is_dir();
+        let b_is_dir = b.path().is_dir();
+        b_is_dir
+            .cmp(&a_is_dir)
+            .then_with(|| a.file_name().cmp(&b.file_name()))
+    });
+    for entry in entries {
+        if tree.len() >= MAX_TREE_ITEMS {
+            break;
+        }
+        let child = entry.path();
+        let is_dir = child.is_dir();
+        let Some(label) = child.file_name().and_then(|name| name.to_str()) else {
+            continue;
+        };
+        tree.push(TreeEntry {
+            label: label.to_string(),
+            depth,
+            kind: if is_dir { "folder" } else { "file" }.to_string(),
+        });
+        if is_dir {
+            append_tree_preview(&child, depth + 1, tree);
+        }
+    }
+}
+
+fn is_ignored_workspace_path(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| {
+            matches!(
+                name,
+                ".git"
+                    | ".project-os"
+                    | ".omnidesk"
+                    | "node_modules"
+                    | "target"
+                    | "dist"
+                    | "build"
+                    | "tmp"
+                    | ".cache"
+                    | ".next"
+                    | ".nuxt"
+                    | ".vite"
+                    | ".turbo"
+                    | "coverage"
+                    | ".DS_Store"
+                    | "__pycache__"
+            ) || (name.starts_with(".env") && name != ".env.example")
+        })
+        .unwrap_or(false)
+}
+
+fn value_to_profile_text(value: &Value) -> String {
+    match value {
+        Value::String(text) => text.trim().to_string(),
+        Value::Array(items) => items
+            .iter()
+            .map(value_to_profile_text)
+            .filter(|text| !text.is_empty())
+            .collect::<Vec<_>>()
+            .join("、"),
+        Value::Object(_) => serde_json::to_string(value).unwrap_or_default(),
+        _ => String::new(),
+    }
+}
+
+pub fn project_checks_from_agents(agents_md: &str) -> String {
+    let checks = markdown_section(agents_md, &["Commands"])
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .windows(2)
+        .filter_map(|window| {
+            (window[0] == "bash").then(|| format!("bash {}", window[1].trim_matches('`')))
+        })
+        .take(4)
+        .collect::<Vec<_>>();
+    if checks.is_empty() {
+        String::new()
+    } else {
+        checks.join("、")
+    }
+}
+
+pub fn project_intro_from_project_md(project_md: &str, project_name: &str) -> String {
+    let section = markdown_section(
+        project_md,
+        &["项目简介", "项目介绍", "概览", "Overview", "Summary"],
+    );
+    if !section.is_empty() {
+        return section;
+    }
+    project_md
+        .lines()
+        .map(clean_markdown_line)
+        .find(|line| {
+            !line.is_empty()
+                && !line.starts_with('#')
+                && !line.contains("什么时候更新")
+                && !line.contains("不要写什么")
+                && !line.contains(project_name)
+        })
+        .unwrap_or_default()
+}
+
+pub fn build_project_profile(root: &Path, project_name: &str) -> ProjectProfile {
+    let project_md = read_text(root, "PROJECT.md");
+    let product_plan = read_text(root, "docs/PRODUCT_PLAN.md");
+    let handoff = read_text(root, "HANDOFF.md");
+    let agents_md = read_text(root, "AGENTS.md");
+    let state_json = read_json(root, STATE_PATH);
+    let profile_json = read_json(root, PROFILE_PATH);
+    let intro = first_non_empty(vec![
+        profile_field_value(&profile_json, "identity.summary"),
+        profile_field_value(&profile_json, "identity.uniqueDescription"),
+        json_string_value(&state_json, "/description"),
+        project_intro_from_project_md(&project_md, project_name),
+        markdown_section(
+            &product_plan,
+            &["项目简介", "产品简介", "Project", "Overview"],
+        ),
+    ]);
+    let phase_summary = first_non_empty(vec![
+        profile_field_value(&profile_json, "identity.lifecycle"),
+        json_string_value(&state_json, "/stage"),
+        json_string_value(&state_json, "/phase"),
+        markdown_section(&project_md, &["当前阶段", "当前进度"]),
+    ]);
+    let architecture_summary = first_non_empty(vec![
+        profile_field_value(&profile_json, "engineering.architecture"),
+        format!(
+            "{} / {} / {}",
+            json_string_value(&state_json, "/architecture/desktop"),
+            json_string_value(&state_json, "/architecture/entry"),
+            json_string_value(&state_json, "/architecture/rules")
+        )
+        .trim_matches([' ', '/'])
+        .trim()
+        .to_string(),
+        markdown_section(&project_md, &["当前架构", "技术架构", "Architecture"]),
+    ]);
+    let check_commands = first_non_empty(vec![
+        profile_field_value(&profile_json, "engineering.testing"),
+        project_checks_from_agents(&agents_md),
+        markdown_section(&project_md, &["当前验证", "验证", "检查"]),
+    ]);
+    let collaboration_rules = first_non_empty(vec![
+        profile_field_value(&profile_json, "governance.permissions"),
+        profile_field_value(&profile_json, "user.communicationStyle"),
+        markdown_section(&agents_md, &["协作规则", "Working Boundaries"]),
+        markdown_section(&handoff, &["风险与注意"]),
+    ]);
+    let long_term_goal = first_non_empty(vec![
+        profile_field_value(&profile_json, "product.longTermGoal"),
+        markdown_section(&product_plan, &["长期目标", "目标", "愿景", "Vision"]),
+        markdown_section(&project_md, &["目标", "当前目标", "项目目标"]),
+    ]);
+    let target_users = first_non_empty(vec![
+        profile_field_value(&profile_json, "product.targetUsers"),
+        markdown_section(&product_plan, &["目标用户", "用户画像", "用户", "Audience"]),
+        markdown_section(&project_md, &["目标用户", "用户画像"]),
+    ]);
+    let use_cases = first_non_empty(vec![
+        profile_field_value(&profile_json, "product.useCases"),
+        markdown_section(&product_plan, &["使用场景", "场景", "Use Cases"]),
+        markdown_section(&project_md, &["使用场景", "场景"]),
+    ]);
+    let user_preferences = first_non_empty(vec![
+        profile_field_value(&profile_json, "user.globalPreferences"),
+        profile_field_value(&profile_json, "user.communicationStyle"),
+        markdown_section(&handoff, &["用户偏好", "偏好", "User Preferences"]),
+        markdown_section(&project_md, &["用户偏好", "偏好"]),
+    ]);
+    let missing_fields = [
+        ("项目概览", &intro),
+        ("当前阶段", &phase_summary),
+        ("技术架构", &architecture_summary),
+        ("检查命令", &check_commands),
+        ("协作规则", &collaboration_rules),
+    ]
+    .into_iter()
+    .filter_map(|(label, value)| value.trim().is_empty().then(|| label.to_string()))
+    .collect();
+    ProjectProfile {
+        overview: intro.clone(),
+        phase_summary,
+        architecture_summary,
+        check_commands,
+        collaboration_rules,
+        intro,
+        long_term_goal,
+        target_users,
+        use_cases,
+        user_preferences,
+        missing_fields,
+    }
+}
+
+pub fn package_scripts_summary(root: &Path) -> String {
+    let mut scripts = Vec::new();
+    for relative in ["package.json", "desktop/package.json"] {
+        let Some(package_json) = read_json(root, relative) else {
+            continue;
+        };
+        if let Some(script_map) = package_json.get("scripts").and_then(Value::as_object) {
+            for key in ["dev", "web:dev", "web:build", "build", "test", "lint"] {
+                if let Some(value) = script_map.get(key).and_then(Value::as_str) {
+                    scripts.push(format!("{}: {}", key, value));
+                }
+            }
+        }
+    }
+    scripts.join("；")
+}
+
+pub fn runbook_commands(root: &Path) -> Value {
+    let mut commands = Vec::new();
+    for relative in ["package.json", "desktop/package.json"] {
+        let Some(package_json) = read_json(root, relative) else {
+            continue;
+        };
+        let Some(script_map) = package_json.get("scripts").and_then(Value::as_object) else {
+            continue;
+        };
+        for key in ["dev", "web:dev", "web:build", "build", "test", "lint"] {
+            if !script_map.contains_key(key) {
+                continue;
+            }
+            let command = if relative == "package.json" {
+                format!("npm run {}", key)
+            } else {
+                format!("npm --prefix desktop run {}", key)
+            };
+            let (label, kind) = match key {
+                "dev" | "web:dev" => (
+                    if key == "web:dev" {
+                        "Web 开发预览"
+                    } else {
+                        "开发启动"
+                    },
+                    "start",
+                ),
+                "build" | "web:build" => (
+                    if key == "web:build" {
+                        "Web 构建"
+                    } else {
+                        "项目构建"
+                    },
+                    "check",
+                ),
+                "test" => ("测试", "check"),
+                "lint" => ("代码检查", "check"),
+                _ => (key, "check"),
+            };
+            commands.push(json!({ "id": format!("{}:{}", relative, key), "label": label, "command": command, "kind": kind, "source": relative }));
+        }
+    }
+    if root.join("desktop/src-tauri/Cargo.toml").exists() {
+        commands.push(json!({ "id": "desktop:cargo-check", "label": "桌面壳检查", "command": "cargo check --manifest-path desktop/src-tauri/Cargo.toml", "kind": "check", "source": "desktop/src-tauri/Cargo.toml" }));
+    }
+    json!(commands)
+}
+
+pub fn package_identity(root: &Path) -> (String, String) {
+    for relative in ["package.json", "desktop/package.json"] {
+        let Some(package_json) = read_json(root, relative) else {
+            continue;
+        };
+        let name = package_json
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .trim()
+            .to_string();
+        let version = package_json
+            .get("version")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .trim()
+            .to_string();
+        if !name.is_empty() || !version.is_empty() {
+            return (name, version);
+        }
+    }
+    (String::new(), String::new())
+}
+
+pub fn dependency_summary(root: &Path) -> Vec<String> {
+    let mut dependencies = Vec::new();
+    for relative in ["package.json", "desktop/package.json"] {
+        let Some(package_json) = read_json(root, relative) else {
+            continue;
+        };
+        for key in ["dependencies", "devDependencies"] {
+            if let Some(items) = package_json.get(key).and_then(Value::as_object) {
+                dependencies.extend(items.keys().cloned());
+            }
+        }
+    }
+    if root.join("desktop/src-tauri/Cargo.toml").exists() || root.join("Cargo.toml").exists() {
+        dependencies.push("Rust crates".to_string());
+    }
+    dependencies.sort();
+    dependencies.dedup();
+    dependencies.truncate(10);
+    dependencies
+}
+
+pub fn project_directory_summary(root: &Path) -> Vec<String> {
+    [
+        "src",
+        "desktop",
+        "cli",
+        "assets",
+        "docs",
+        "schemas",
+        "scripts",
+        "tests",
+        "templates",
+    ]
+    .into_iter()
+    .filter(|name| root.join(name).exists())
+    .map(str::to_string)
+    .collect()
+}
+
+pub fn project_created_at(root: &Path) -> String {
+    Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["log", "--reverse", "--format=%cs"])
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .and_then(|output| String::from_utf8(output.stdout).ok())
+        .and_then(|text| text.lines().next().map(str::trim).map(str::to_string))
+        .unwrap_or_default()
+}
+
+pub fn detected_stack(root: &Path) -> Vec<String> {
+    let mut stack = Vec::new();
+    if root.join("desktop/src-tauri/Cargo.toml").exists()
+        || root.join("src-tauri/Cargo.toml").exists()
+    {
+        stack.extend(["Tauri".to_string(), "Rust".to_string()]);
+    }
+    for relative in ["package.json", "desktop/package.json"] {
+        let Some(package_json) = read_json(root, relative) else {
+            continue;
+        };
+        let dependencies = ["dependencies", "devDependencies"]
+            .iter()
+            .filter_map(|key| package_json.get(key).and_then(Value::as_object))
+            .flat_map(|items| items.keys())
+            .collect::<Vec<_>>();
+        if dependencies
+            .iter()
+            .any(|name| name.as_str() == "react" || name.as_str() == "react-dom")
+        {
+            stack.push("React".to_string());
+        }
+        if dependencies
+            .iter()
+            .any(|name| name.as_str() == "vite" || name.as_str() == "@vitejs/plugin-react")
+        {
+            stack.push("Vite".to_string());
+        }
+    }
+    if crate::runtime::state_namespace::state_path_exists(root, ".omnidesk") {
+        stack.push("OmniDesk".to_string());
+    }
+    stack.sort();
+    stack.dedup();
+    stack
+}
+
+pub fn git_status_summary(root: &Path) -> String {
+    let Ok(output) = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .arg("status")
+        .arg("--short")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .output()
+    else {
+        return "未读取到 git 状态。".to_string();
+    };
+    if !output.status.success() {
+        return "当前目录可能不是 git 仓库。".to_string();
+    }
+    let count = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .count();
+    if count == 0 {
+        "git 工作区干净。".to_string()
+    } else {
+        format!("git 工作区有 {} 个变更项。", count)
+    }
 }
 
 fn source_paths() -> [&'static str; 19] {
@@ -116,7 +1146,7 @@ pub fn fact_freshness(root: &Path) -> Value {
 pub fn record_fact_freshness(root: &Path, timestamp: &str) -> Result<(), String> {
     Repository::new(root).transaction("record-fact-freshness", &[JsonMutation::upsert(
         FACT_FRESHNESS_PATH,
-        json!({ "schemaVersion": "project-os.fact-freshness.v0.1", "updatedAt": timestamp, "fingerprints": source_fingerprints(root) }),
+        json!({ "schemaVersion": FACT_FRESHNESS_SCHEMA_VERSION, "updatedAt": timestamp, "fingerprints": source_fingerprints(root) }),
     )])?;
     Ok(())
 }
@@ -192,10 +1222,7 @@ pub fn detected_capabilities(root: &Path) -> Value {
             } else {
                 "available"
             },
-            vec![
-                PROVIDER_PATH,
-                MODEL_CATALOG_PATH,
-            ],
+            vec![PROVIDER_PATH, MODEL_CATALOG_PATH],
         ),
     ];
     let rank = |status: &str| match status {
@@ -242,7 +1269,8 @@ pub fn detected_capabilities(root: &Path) -> Value {
         ("cli", root.join("cli").exists(), vec!["cli"]),
         (
             "ai",
-            crate::runtime::state_namespace::state_path_exists(root, MODEL_CATALOG_PATH) || package_text.contains("openai"),
+            crate::runtime::state_namespace::state_path_exists(root, MODEL_CATALOG_PATH)
+                || package_text.contains("openai"),
             vec![MODEL_CATALOG_PATH],
         ),
         (
@@ -260,7 +1288,17 @@ pub fn detected_capabilities(root: &Path) -> Value {
         "id": id, "status": if detected { "detected" } else { "available" }, "source": "scan",
         "signals": signals.into_iter().filter(|signal| crate::runtime::state_namespace::state_path_exists(root, signal)).collect::<Vec<_>>()
     })).collect::<Vec<_>>();
-    json!({ "schemaVersion": "project-os.project-capabilities.v0.1", "updatedAt": saved.as_ref().and_then(|value| value.get("updatedAt")).and_then(Value::as_str).unwrap_or(""), "capabilities": capabilities.clone(), "workspaceCapabilities": capabilities, "domainCapabilities": domain_capabilities })
+    let mut projection = json!({ "schemaVersion": CAPABILITIES_SCHEMA_VERSION, "updatedAt": saved.as_ref().and_then(|value| value.get("updatedAt")).and_then(Value::as_str).unwrap_or(""), "capabilities": capabilities.clone(), "workspaceCapabilities": capabilities, "domainCapabilities": domain_capabilities });
+    if saved
+        .as_ref()
+        .and_then(|value| value.get("schemaVersion"))
+        .and_then(Value::as_str)
+        == Some("project-os.project-capabilities.v0.1")
+    {
+        projection["schemaMigration"] =
+            json!({ "from": "project-os.project-capabilities.v0.1", "mode": "read-projection" });
+    }
+    projection
 }
 
 /// Updates a user-selected workspace capability while the Repository lock is
@@ -284,9 +1322,18 @@ pub fn update_capability(
         return Err("不支持的能力状态".to_string());
     }
     Repository::new(root).transaction_with("update-project-capability", |repository| {
-        let mut manifest = repository.read_json(CAPABILITIES_PATH).unwrap_or_else(|| {
-            json!({ "schemaVersion": "project-os.project-capabilities.v0.1", "capabilities": [] })
-        });
+        let mut manifest = repository.read_json(CAPABILITIES_PATH).unwrap_or_else(
+            || json!({ "schemaVersion": CAPABILITIES_SCHEMA_VERSION, "capabilities": [] }),
+        );
+        manifest = project_legacy_schema(
+            manifest,
+            "project-os.project-capabilities.v0.1",
+            CAPABILITIES_SCHEMA_VERSION,
+        );
+        if let Some(object) = manifest.as_object_mut() {
+            object.remove("schemaMigration");
+        }
+        manifest["schemaVersion"] = json!(CAPABILITIES_SCHEMA_VERSION);
         if manifest.get("workspaceCapabilities").is_none() {
             manifest["workspaceCapabilities"] = manifest
                 .get("capabilities")
@@ -326,16 +1373,17 @@ pub fn update_capability(
 }
 
 pub fn load_memory(root: &Path, project_id: &str) -> Value {
-    Repository::new(root)
+    let memory = Repository::new(root)
         .read_json(MEMORY_PATH)
         .unwrap_or_else(|| {
             json!({
-                "schemaVersion": "project-os.memory.v0.1",
+                "schemaVersion": MEMORY_SCHEMA_VERSION,
                 "projectId": project_id,
                 "updatedAt": "",
                 "items": []
             })
-        })
+        });
+    project_legacy_schema(memory, "project-os.memory.v0.1", MEMORY_SCHEMA_VERSION)
 }
 
 /// Loads the persisted state consumed by the Workspace snapshot projection.
@@ -345,7 +1393,8 @@ pub fn load_projection_state(root: &Path) -> WorkspaceProjectionState {
     let repository = Repository::new(root);
     WorkspaceProjectionState {
         state: repository.read_json(STATE_PATH),
-        recommendations: repository.read_json(".omnidesk/cache/recommendations/recommend-next.json"),
+        recommendations: repository
+            .read_json(".omnidesk/cache/recommendations/recommend-next.json"),
         task_backlog: repository.read_json(BACKLOG_PATH),
         goal_validation: repository
             .read_json(".omnidesk/data/goal-validation.json")
@@ -380,8 +1429,9 @@ pub fn save_memory(
         .ok_or_else(|| "项目记忆必须是 JSON object".to_string())?;
     object.insert(
         "schemaVersion".to_string(),
-        Value::String("project-os.memory.v0.1".to_string()),
+        Value::String(MEMORY_SCHEMA_VERSION.to_string()),
     );
+    object.remove("schemaMigration");
     object.insert(
         "projectId".to_string(),
         Value::String(project_id.to_string()),
@@ -415,9 +1465,17 @@ pub fn update_profile(
     }
     Repository::new(root).transaction_with("update-project-profile", |repository| {
         let mut profile = repository.read_json(PROFILE_PATH).unwrap_or_else(|| {
-            json!({ "schemaVersion": "project-os.project-profile.v0.1", "projectId": project_id, "updatedAt": "", "fields": {} })
+            json!({ "schemaVersion": PROFILE_SCHEMA_VERSION, "projectId": project_id, "updatedAt": "", "fields": {} })
         });
-        profile["schemaVersion"] = json!("project-os.project-profile.v0.1");
+        profile = project_legacy_schema(
+            profile,
+            "project-os.project-profile.v0.1",
+            PROFILE_SCHEMA_VERSION,
+        );
+        if let Some(object) = profile.as_object_mut() {
+            object.remove("schemaMigration");
+        }
+        profile["schemaVersion"] = json!(PROFILE_SCHEMA_VERSION);
         profile["projectId"] = json!(project_id);
         profile["updatedAt"] = json!(timestamp);
         if !profile.get("fields").is_some_and(Value::is_object) {
@@ -544,6 +1602,126 @@ mod tests {
     }
 
     #[test]
+    fn engineering_file_preview_rules_reject_runtime_and_secret_paths() {
+        assert!(is_safe_text_preview_path("desktop/src/main.jsx"));
+        assert!(is_safe_text_preview_path("docs/ARCHITECTURE.md"));
+        assert!(!is_safe_text_preview_path(".env.local"));
+        assert!(!is_safe_text_preview_path(".omnidesk/data/state.json"));
+        assert!(!is_safe_text_preview_path("../outside.rs"));
+        assert!(!is_safe_text_preview_path("assets/image.png"));
+        assert_eq!(preview_language("desktop/src/main.jsx"), "javascript");
+        assert_eq!(preview_language("desktop/src-tauri/src/main.rs"), "rust");
+        assert_eq!(preview_language("unknown.extension"), "text");
+    }
+
+    #[test]
+    fn registry_projects_legacy_schema_without_startup_rewrite() {
+        let root = test_root("legacy-registry");
+        fs::create_dir_all(root.join(".omnidesk/data")).unwrap();
+        fs::write(
+            root.join(REGISTRY_PATH),
+            r#"{"schemaVersion":"project-os.desktop-registry.v0.1","currentProjectId":"one","projects":[{"id":"one","name":"One","path":"/tmp/one","phase":"active"}]}"#,
+        )
+        .unwrap();
+
+        let registry = load_or_seed_registry(&root).unwrap();
+        assert_eq!(registry.schema_version, REGISTRY_SCHEMA_VERSION);
+        assert!(fs::read_to_string(root.join(REGISTRY_PATH))
+            .unwrap()
+            .contains(LEGACY_REGISTRY_SCHEMA_VERSION));
+
+        save_registry(&root, &registry).unwrap();
+        assert!(fs::read_to_string(root.join(REGISTRY_PATH))
+            .unwrap()
+            .contains(REGISTRY_SCHEMA_VERSION));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn registry_repairs_a_missing_current_project_once() {
+        let root = test_root("registry-current-project");
+        fs::create_dir_all(root.join(".omnidesk/data")).unwrap();
+        fs::write(
+            root.join(REGISTRY_PATH),
+            r#"{"schemaVersion":"omnidesk.desktop-registry.v0.1","currentProjectId":"missing","projects":[{"id":"one","name":"One","path":"/tmp/one","phase":"active"}]}"#,
+        )
+        .unwrap();
+
+        let mut registry = load_or_seed_registry(&root).unwrap();
+        let project = current_registry_project(&mut registry, &root).unwrap();
+        assert_eq!(project.id, "one");
+        assert_eq!(registry.current_project_id, "one");
+        let persisted = Repository::new(&root).read_json(REGISTRY_PATH).unwrap();
+        assert_eq!(persisted["currentProjectId"], "one");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn registry_summary_uses_task_statuses_and_omits_manifest() {
+        let root = test_root("registry-summary");
+        let tasks = root.join(".omnidesk/data/tasks");
+        fs::create_dir_all(&tasks).unwrap();
+        fs::write(tasks.join("manifest.json"), r#"{"tasks":["ignored"]}"#).unwrap();
+        fs::write(
+            tasks.join("active.json"),
+            r#"{"title":"进行中的任务","status":"running","updatedAt":"2026-07-22T10:00:00Z"}"#,
+        )
+        .unwrap();
+        fs::write(
+            tasks.join("failed.json"),
+            r#"{"title":"失败任务","status":"failed","updatedAt":"2026-07-22T11:00:00Z"}"#,
+        )
+        .unwrap();
+        fs::write(
+            tasks.join("done.json"),
+            r#"{"title":"完成任务","status":"done","updatedAt":"2026-07-22T09:00:00Z"}"#,
+        )
+        .unwrap();
+        let registry = WorkspaceRegistry {
+            schema_version: REGISTRY_SCHEMA_VERSION.to_string(),
+            current_project_id: "one".to_string(),
+            projects: vec![RegistryProjectRecord {
+                id: "one".to_string(),
+                name: "One".to_string(),
+                path: root.display().to_string(),
+                phase: "active".to_string(),
+                name_locked: false,
+                access_mode: "controlled".to_string(),
+            }],
+        };
+
+        let summary = registry_project_summaries(&registry);
+        assert_eq!(summary[0].task_count, 3);
+        assert_eq!(summary[0].active_task_count, 1);
+        assert_eq!(summary[0].failed_task_count, 1);
+        assert_eq!(summary[0].completed_task_count, 1);
+        assert_eq!(summary[0].latest_activity_title, "失败任务");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn workspace_facts_preview_is_read_only_and_keeps_the_contract() {
+        let root = test_root("facts-preview");
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("PROJECT.md"), "# 示例项目\n项目概览。\n").unwrap();
+        fs::write(
+            root.join("HANDOFF.md"),
+            "# 当前交接\n\n## 风险\n默认只读。\n",
+        )
+        .unwrap();
+
+        let preview = build_workspace_facts_preview(&root, "示例项目");
+        assert_eq!(preview["schemaVersion"], "omnidesk.workspace-facts.v0.1");
+        assert_eq!(preview["mode"], "temporary-readonly");
+        assert_eq!(preview["status"], "connected");
+        assert_eq!(preview["project"]["name"], "示例项目");
+        assert_eq!(preview["governanceLevel"]["current"], "L1");
+        assert_eq!(preview["recommendations"].as_array().unwrap().len(), 4);
+        assert!(!root.join(".omnidesk").exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn freshness_round_trip_uses_repository_state() {
         let root = test_root("freshness");
         fs::create_dir_all(&root).unwrap();
@@ -612,9 +1790,44 @@ mod tests {
             json!({ "items": [{ "id": "one" }] }),
         )
         .unwrap();
-        assert_eq!(memory["schemaVersion"], "project-os.memory.v0.1");
+        assert_eq!(memory["schemaVersion"], MEMORY_SCHEMA_VERSION);
         assert_eq!(load_memory(&root, "project-b")["projectId"], "project-a");
         assert!(root.join(".omnidesk/runtime/events").is_dir());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn legacy_workspace_documents_are_projected_and_rewritten_on_save() {
+        let root = test_root("legacy-workspace-documents");
+        fs::create_dir_all(root.join(".omnidesk/data")).unwrap();
+        fs::write(
+            root.join(MEMORY_PATH),
+            r#"{"schemaVersion":"project-os.memory.v0.1","projectId":"project-a","items":[]}"#,
+        )
+        .unwrap();
+        fs::write(
+            root.join(CAPABILITIES_PATH),
+            r#"{"schemaVersion":"project-os.project-capabilities.v0.1","workspaceCapabilities":[]}"#,
+        )
+        .unwrap();
+        let memory = load_memory(&root, "project-a");
+        assert_eq!(memory["schemaVersion"], MEMORY_SCHEMA_VERSION);
+        assert_eq!(memory["schemaMigration"]["mode"], "read-projection");
+        let capabilities = detected_capabilities(&root);
+        assert_eq!(capabilities["schemaVersion"], CAPABILITIES_SCHEMA_VERSION);
+        assert_eq!(capabilities["schemaMigration"]["mode"], "read-projection");
+
+        save_memory(&root, "project-a", "now", memory).unwrap();
+        update_capability(&root, "tasks", "enabled", &[], &[], "now").unwrap();
+        let saved_memory = Repository::new(&root).read_json(MEMORY_PATH).unwrap();
+        let saved_capabilities = Repository::new(&root).read_json(CAPABILITIES_PATH).unwrap();
+        assert_eq!(saved_memory["schemaVersion"], MEMORY_SCHEMA_VERSION);
+        assert_eq!(
+            saved_capabilities["schemaVersion"],
+            CAPABILITIES_SCHEMA_VERSION
+        );
+        assert!(saved_memory.get("schemaMigration").is_none());
+        assert!(saved_capabilities.get("schemaMigration").is_none());
         fs::remove_dir_all(root).unwrap();
     }
 
@@ -665,6 +1878,55 @@ mod tests {
         assert!(state.state.is_none());
         assert_eq!(state.goal_validation_report["status"], "missing");
         assert_eq!(state.project_goals["projectGoals"], json!([]));
+    }
+
+    #[test]
+    fn project_profile_prefers_confirmed_state_over_markdown_fallbacks() {
+        let root = test_root("project-profile");
+        fs::create_dir_all(root.join(".omnidesk/data")).unwrap();
+        fs::write(
+            root.join(STATE_PATH),
+            r#"{"description":"已确认的项目概览","stage":"交付中","phase":"active"}"#,
+        )
+        .unwrap();
+        fs::write(
+            root.join("PROJECT.md"),
+            "# 项目简介\n不应覆盖已确认状态。\n",
+        )
+        .unwrap();
+        fs::write(
+            root.join("AGENTS.md"),
+            "# Commands\n`bash tests/run-tests.sh`\n",
+        )
+        .unwrap();
+
+        let profile = build_project_profile(&root, "示例项目");
+
+        assert_eq!(profile.overview, "已确认的项目概览");
+        assert_eq!(profile.phase_summary, "交付中");
+        assert_eq!(profile.check_commands, "bash tests/run-tests.sh");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn runbook_projection_uses_only_registered_project_commands() {
+        let root = test_root("runbook");
+        fs::create_dir_all(&root).unwrap();
+        fs::write(
+            root.join("package.json"),
+            r#"{"scripts":{"dev":"vite","test":"node --test","custom":"ignored"}}"#,
+        )
+        .unwrap();
+
+        let commands = runbook_commands(&root);
+
+        assert_eq!(commands.as_array().unwrap().len(), 2);
+        assert_eq!(commands[0]["command"], "npm run dev");
+        assert_eq!(
+            package_scripts_summary(&root),
+            "dev: vite；test: node --test"
+        );
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

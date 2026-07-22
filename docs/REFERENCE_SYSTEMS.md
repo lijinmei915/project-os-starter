@@ -9,7 +9,7 @@ use_when: "评估是否接入成熟治理工程、比较 Hermes 等工具、或�
 
 # 参照系统
 
-> 用途：记录 OmniDesk / Project OS Desktop 与成熟 Agent、IDE、项目治理工具的关系。
+> 用途：记录 OmniDesk 与成熟 Agent、IDE、项目治理工具的关系。
 > 什么时候更新：新增参照工具、调整接入策略、或产品定位从参照工具中吸收新边界时。
 > 不要写什么：具体 UI 微调、一次性竞品截图流水、未经确认的市场宣传结论。
 
@@ -51,13 +51,13 @@ OmniDesk 面向“不想先懂工程治理的人”。
 
 ## 对比矩阵
 
-| 维度 | Hermes / 成熟 Agent runtime | OmniDesk / Project OS Desktop |
+| 维度 | Hermes / 成熟 Agent runtime | OmniDesk Desktop Runtime |
 |------|------------------------------|-------------------------------|
 | 核心入口 | Agent 执行环境或工程治理 runtime | 面向小白的超级个人工作台 |
 | 用户心智 | 配置 Agent、选择工具、执行任务 | 添加项目、跟着系统工作 |
 | 项目治理 | 通常提供规则和执行能力 | 把研发流程显性化为工作区和项目资产 |
-| 项目记忆 | 偏会话、任务或工具状态 | 写回 `.project-os/`，成为项目可交接资产 |
-| 文件体系 | 工具自身工程结构 | 真实项目文件 + Project OS 治理文件 |
+| 项目记忆 | 偏会话、任务或工具状态 | 写入 `.omnidesk/data/`，成为项目可交接资产 |
+| 文件体系 | 工具自身工程结构 | 真实项目文件 + OmniDesk Runtime 状态分区 |
 | 自动演进 | 依赖 Agent 能力和工具插件 | 推荐、检查、记忆、规则更新形成产品机制 |
 | 最佳关系 | 可接入执行器 / 参照系统 | 上层体验和治理中枢 |
 
@@ -73,11 +73,11 @@ Hermes 适合作为：
 Hermes 不应该成为：
 
 - OmniDesk 的主 UI
-- Project OS 的规则源头
+- OmniDesk 的规则源头
 - 用户必须理解的配置前置条件
-- 替代 `.project-os/` 项目记忆的唯一状态源
+- 替代 `.omnidesk/` 项目记忆的唯一状态源
 
-桌面端已完成两层运行时接入：在 `Agent 配置 / 适配器` 中只读探测 `hermes-acp` 优先、`hermes` 次之的本地可用性；`hermes-acp --check` 只证明 ACP 通道可启动，不证明模型凭据可用。OmniDesk 的当前连接是 Hermes 的非敏感运行配置源：保存或切换当前连接后，自动同步 Hermes `config.yaml` 中的 custom provider、网关地址、API mode 和默认模型，保留 Hermes 其他设置。Patch Draft 生成时，OmniDesk 会优先以 ACP stdio 建立一次性 session，并只把当前 provider 的密钥注入子进程内存环境。对于 Hermes 的 custom provider，还会按网关主域临时注入兼容的 `<VENDOR>_API_KEY`，避免 Hermes 的 host-scoped 凭据保护把有效 Key 误判为缺失；密钥不会写入 Hermes 文件或前端。Hermes 只能返回草案，实际写入仍必须走 OmniDesk 的 Diff review 和 Apply 确认。请求提示禁止工具调用，且所有需要 ACP client 支持的工具或权限请求都会被拒绝。未安装、仅 CLI、ACP 健康检查失败、模型调用失败、无有效 diff 或 ACP 调用失败，都必须如实显示或回退到既有 provider/local 草案，不得伪造已执行或已写入。
+桌面端在 `Agent 配置` 中只读探测 `hermes-acp` 优先、`hermes` 次之的本地可用性；`hermes-acp --check` 只证明 ACP 通道可启动，不证明模型凭据可用。OmniDesk 的当前连接是 Hermes 的非敏感运行配置源：保存或切换当前连接后，自动同步 Hermes `config.yaml` 中的 custom provider、网关地址、API mode 和默认模型，保留 Hermes 其他设置。Patch Draft 生成时，OmniDesk 会优先以 ACP stdio 建立一次性 session，并只把当前 provider 的密钥注入子进程内存环境。对于 Hermes 的 custom provider，还会按网关主域临时注入兼容的 `<VENDOR>_API_KEY`，避免 Hermes 的 host-scoped 凭据保护把有效 Key 误判为缺失；密钥不会写入 Hermes 文件或前端。Hermes 只能返回草案，实际写入仍必须走 OmniDesk 的 Diff review 和 Apply 确认。请求提示禁止工具调用，且所有需要 ACP client 支持的工具或权限请求都会被拒绝。未安装、仅 CLI、ACP 健康检查失败、模型调用失败、无有效 diff 或 ACP 调用失败，都必须如实显示或回退到既有 provider/local 草案，不得伪造已执行或已写入。
 
 ## 借鉴原则
 
@@ -124,7 +124,7 @@ OmniDesk 应采用分层接入：
 ```txt
 OmniDesk UI
   -> OmniDesk Local Agent Runtime
-    -> Workspace / Task / Agent Run evidence
+    -> .omnidesk data / Task / Agent Run evidence
     -> Hermes / Codex CLI / Claude Code / scripts / MCP
 ```
 
@@ -133,7 +133,7 @@ OmniDesk UI
 - OmniDesk 负责用户体验和项目治理。
 - OmniDesk Runtime 负责事实、记忆、规则和检查闭环。
 - Hermes 等工具负责执行某些任务。
-- 执行结果必须回写到 `.project-os/`，不能只留在外部工具。
+- 执行结果必须回写到 `.omnidesk/` 证据与状态分区，不能只留在外部工具。
 
 ## 当前阶段取舍
 

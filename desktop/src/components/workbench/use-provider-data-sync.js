@@ -19,7 +19,7 @@ export function useProviderDataSync({
       getProviderStatus(fallbackProvider),
       getModelCatalog(fallbackModelCatalog),
       getModelHealth().catch(() => ({
-        schemaVersion: "project-os.model-health.v0.1",
+        schemaVersion: "omnidesk.model-health.v0.1",
         entries: [],
       })),
     ])

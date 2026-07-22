@@ -1,6 +1,7 @@
 import { normalizeTurnSummary } from "./summary.js";
 
-export const conversationSchemaVersion = "project-os.conversation.v0.3";
+export const conversationSchemaVersion = "omnidesk.conversation.v0.3";
+export const legacyConversationSchemaVersion = "project-os.conversation.v0.3";
 
 function normalizeWaitingForUserActionTurn(turn) {
   if (!isWaitingForUserAction(turn)) return turn;
@@ -11,7 +12,7 @@ export function migrateConversationRecord(record = {}) {
   const turns = Array.isArray(record.turns) ? record.turns.map(normalizeWaitingForUserActionTurn) : [];
   const waitingForUserAction = turns.some((turn) => turn?.outcome === "awaiting-confirmation"
     && Array.isArray(turn.actions) && turn.actions.some((action) => action?.id === "generate-patch"));
-  return {
+  const migrated = {
     ...record,
     runtimeState: waitingForUserAction && ["thinking", "executing"].includes(record.runtimeState)
       ? "awaiting-confirmation"
@@ -22,6 +23,15 @@ export function migrateConversationRecord(record = {}) {
       : normalizeTurnSummary(record.summary),
     turns,
   };
+  if (record.schemaVersion === legacyConversationSchemaVersion) {
+    migrated.schemaMigration = {
+      from: legacyConversationSchemaVersion,
+      mode: "read-projection",
+    };
+  } else {
+    delete migrated.schemaMigration;
+  }
+  return migrated;
 }
 
 function isWaitingForUserAction(turn) {

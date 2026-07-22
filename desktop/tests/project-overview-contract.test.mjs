@@ -18,6 +18,10 @@ test("accepts the project overview contract", () => {
 test("accepts progress and runbook slot contracts", () => {
   assert.deepEqual(validateProjectOverviewContract(progressContract), []);
   assert.deepEqual(validateProjectOverviewContract(runbookContract), []);
+  assert.equal(progressContract.schemaVersion, "omnidesk.project-progress-contract.v0.1");
+  assert.equal(runbookContract.schemaVersion, "omnidesk.project-runbook-contract.v0.1");
+  assert.ok(progressContract.facts.every((fact) => !fact.primary.startsWith(".project-os/")));
+  assert.ok(runbookContract.facts.every((fact) => !fact.primary.startsWith(".project-os/")));
 });
 
 test("rejects duplicate slots and unregistered runtime references", () => {

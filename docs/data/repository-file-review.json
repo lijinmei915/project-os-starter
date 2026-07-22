@@ -1,0 +1,292 @@
+{
+  "schemaVersion": "omnidesk.repository-file-review.v1",
+  "sourceOfTruth": "docs/data/repository-file-inventory.json",
+  "decisions": [
+    {
+      "path": "CLAUDE.md",
+      "decision": "retire",
+      "rationale": "旧 Claude Code adapter 仍引用 Project OS routing；AGENTS.md 是当前唯一规则入口。",
+      "reviewStatus": "candidate-confirmed"
+    },
+    {
+      "path": "COLLABORATION.md",
+      "decision": "merge-or-retire",
+      "rationale": "协作规则与 AGENTS.md、HANDOFF.md 重叠，且产品阶段已过时。",
+      "reviewStatus": "candidate-confirmed"
+    },
+    {
+      "path": "PRODUCT.md",
+      "decision": "keep",
+      "rationale": "已重写为 OmniDesk 的产品定位、用户、价值、边界与体验原则。",
+      "reviewStatus": "reviewed",
+      "verification": "bash scripts/check-doc-structure.sh . && bash scripts/check-frontmatter.sh ."
+    },
+    {
+      "path": "docs/design/layout.md",
+      "decision": "rewrite",
+      "rationale": "仍由设计标准和工作台可视化文档引用，但内容保留旧报告页、AI 项目工程助手和早期双栏工作台描述；应以当前 Desktop Workbench 的布局和响应式规则重写。",
+      "reviewStatus": "reviewed",
+      "verification": "已按当前三栏 Workbench、对话、终端和紧凑窗口规则重写；bash scripts/check-doc-structure.sh .、npm --prefix desktop test 和 npm --prefix desktop run web:build 通过。"
+    },
+    {
+      "path": "docs/design/tokens.md",
+      "decision": "rewrite",
+      "rationale": "Token 文档仍是设计标准、工作台 Token 页和前端说明的引用源，但含有 Project OS 名称及已退役报告 token；应保留现有 Desktop token 语义并删除过时兼容描述。",
+      "reviewStatus": "reviewed",
+      "verification": "已收口为 theme.css 数值 SSOT、Desktop token 层级和使用边界；bash scripts/check-doc-structure.sh .、npm --prefix desktop test 和 npm --prefix desktop run web:build 通过。"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/app.rs",
+      "decision": "rewrite",
+      "rationale": "Tauri command 装配层仍聚合对话请求桥接、Workspace 投影和运行编排。已抽离 chat_runtime、workspace_governance、workspace 文件预览/树扫描/忽略规则、hermes_protocol（含 executor status）、Patch Draft 上下文/提示词/语义门槛，以及 Provider HTTP transport/响应解析/候选排序/健康缓存匹配；密钥读取、实际探测、连接切换持久化、降级、审批和证据仍由 command 层编排，不能新增第二条业务执行路径。",
+      "reviewStatus": "in-progress",
+      "verification": "chat_runtime、workspace_governance、hermes_protocol、patch 与 provider 定向 Rust 测试、cargo check、bash tests/run-tests.sh 和 npm --prefix desktop run test:native 通过；Provider 与 Patch Draft 收口后完整回归通过（Desktop Node 450/450、Rust 102/102、Patch 6/6、Web build、离线 Eval、账本与 diff integrity）且 native smoke 通过。"
+    },
+    {
+      "path": "desktop/src/components/workbench/theme-menu.jsx",
+      "decision": "keep",
+      "rationale": "Desktop 主题的用户入口。已迁为 omnidesk-desktop-theme 新写入，旧 project-os-desktop-theme 仅在浏览器 Preview 读取时兼容，避免丢失已有偏好。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop test && npm --prefix desktop run web:build"
+    },
+    {
+      "path": "kit",
+      "decision": "retire",
+      "rationale": "旧 CLI 中控台调用的脚本已退役，不是 Desktop Runtime 入口。",
+      "reviewStatus": "candidate-confirmed"
+    },
+    {
+      "path": "examples/filled-project.md",
+      "decision": "retire",
+      "rationale": "旧项目文档模板示例，不属于 OmniDesk 产品或测试。",
+      "reviewStatus": "candidate-confirmed"
+    },
+    {
+      "path": "examples/prompt-simulation.md",
+      "decision": "retire",
+      "rationale": "旧 Project OS routing 场景，不再覆盖当前 Runtime 行为。",
+      "reviewStatus": "candidate-confirmed"
+    },
+    {
+      "path": "schemas/project-os-config.schema.json",
+      "decision": "compatibility-review",
+      "rationale": "旧 CLI 配置契约；先确认没有生产消费者再退役。",
+      "reviewStatus": "candidate-confirmed",
+      "verification": "node scripts/audit-schema-contracts.mjs --check；git grep 未发现 Desktop Runtime、测试或 CI 消费者。"
+    },
+    {
+      "path": "schemas/entry-context.schema.json",
+      "decision": "compatibility-review",
+      "rationale": "旧 Desktop/Web/IDE/CLI/CI Gateway 入口上下文，不属于当前唯一 Desktop Runtime 执行边界。保留到外部发布或动态读取消费者完成复核。",
+      "reviewStatus": "candidate-confirmed",
+      "verification": "node scripts/audit-schema-contracts.mjs --check；git grep 未发现 Desktop Runtime、测试或 CI 消费者。"
+    },
+    {
+      "path": "schemas/fact-event.schema.json",
+      "decision": "compatibility-review",
+      "rationale": "旧事实管线事件契约；当前 Runtime 直接持久化 OmniDesk workspace/fact 状态，不再生产该事件格式。",
+      "reviewStatus": "candidate-confirmed",
+      "verification": "node scripts/audit-schema-contracts.mjs --check；git grep 未发现 Desktop Runtime、测试或 CI 消费者。"
+    },
+    {
+      "path": "schemas/project-goals.schema.json",
+      "decision": "compatibility-review",
+      "rationale": "旧 projectGoals 聚合格式；当前 Goals Runtime 已使用 omnidesk.goals.v0.1，旧版本只允许兼容读取投影。",
+      "reviewStatus": "candidate-confirmed",
+      "verification": "node scripts/audit-schema-contracts.mjs --check；git grep 未发现 Desktop Runtime、测试或 CI 消费者。"
+    },
+    {
+      "path": "schemas/workspace-slot.schema.json",
+      "decision": "compatibility-review",
+      "rationale": "旧工作区 slot 契约；当前前端 slot 投影使用已收口的 OmniDesk progress/runbook contracts。",
+      "reviewStatus": "candidate-confirmed",
+      "verification": "node scripts/audit-schema-contracts.mjs --check；git grep 未发现 Desktop Runtime、测试或 CI 消费者。"
+    },
+    {
+      "path": "schemas/agent-run.schema.json",
+      "decision": "keep",
+      "rationale": "运行数据版本已是 omnidesk.agent-run.v0.1；schema ID 已收口为 omnidesk.local。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop test"
+    },
+    {
+      "path": "schemas/conversation-event.schema.json",
+      "decision": "keep",
+      "rationale": "运行数据版本已是 omnidesk.conversation-event.v0.1；schema ID 已收口为 omnidesk.local。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop test"
+    },
+    {
+      "path": "schemas/project-overview-view-model.schema.json",
+      "decision": "keep",
+      "rationale": "仅由前端投影构造，已直接迁移为 omnidesk.project-overview-view-model.v0.1。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop test"
+    },
+    {
+      "path": "schemas/project-progress-contract.v0.1.json",
+      "decision": "keep",
+      "rationale": "仅由前端 slot runtime 读取；已迁移到 omnidesk 版本和 native state 分区路径。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop test"
+    },
+    {
+      "path": "schemas/project-runbook-contract.v0.1.json",
+      "decision": "keep",
+      "rationale": "仅由前端 slot runtime 读取；已迁移到 omnidesk 版本和 native cache 路径。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop test"
+    },
+    {
+      "path": "schemas/project-fact.schema.json",
+      "decision": "keep",
+      "rationale": "前端事实记录契约不承载持久化用户状态；schema identity 已直接迁为 omnidesk.local。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop test && node scripts/audit-schema-contracts.mjs --check"
+    },
+    {
+      "path": "schemas/project-state.schema.json",
+      "decision": "keep",
+      "rationale": "静态数据契约来源说明，不是 Runtime 状态文件；schema identity 已直接迁为 omnidesk.local。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop test && node scripts/audit-schema-contracts.mjs --check"
+    },
+    {
+      "path": ".gitignore",
+      "decision": "keep",
+      "rationale": "定义本地密钥、运行状态、构建输出和测试产物的隔离边界。",
+      "reviewStatus": "reviewed",
+      "verification": "bash tests/run-tests.sh"
+    },
+    {
+      "path": ".env.example",
+      "decision": "keep",
+      "rationale": "仅说明当前 Desktop Provider key 引用与本地密钥扫描开关；旧截图、CLI retention 与非当前 Provider 变量已移除。",
+      "reviewStatus": "reviewed",
+      "verification": "OMNIDESK_ALLOW_EMPTY_PROVIDER_KEYS=1 bash scripts/check-secrets.sh . && bash tests/run-tests.sh"
+    },
+    {
+      "path": "tokens.css",
+      "decision": "retire",
+      "rationale": "当前 Desktop 样式入口是 desktop/src/styles.css；根 token 文件没有构建或产品消费者。",
+      "reviewStatus": "candidate-confirmed"
+    },
+    {
+      "path": "skills-lock.json",
+      "decision": "retire",
+      "rationale": "旧跨工具 skill 分发锁文件，没有当前 Runtime、CI 或测试消费者。",
+      "reviewStatus": "candidate-confirmed"
+    },
+    {
+      "path": "VERSION",
+      "decision": "retire",
+      "rationale": "根版本文件没有构建、发布或 Runtime 消费者；当前版本由 desktop/package.json 与 Cargo.toml 定义。",
+      "reviewStatus": "candidate-confirmed"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "decision": "keep",
+      "rationale": "常规 CI 的 Desktop Runtime 和仓库契约门槛。",
+      "reviewStatus": "reviewed",
+      "verification": "bash tests/run-tests.sh"
+    },
+    {
+      "path": ".github/workflows/agent-eval.yml",
+      "decision": "keep",
+      "rationale": "受保护真实 Provider Eval、artifact 和基线回退门槛。",
+      "reviewStatus": "reviewed",
+      "verification": "GitHub Actions Agent Eval 29815260557"
+    },
+    {
+      "path": "tests/run-tests.sh",
+      "decision": "keep",
+      "rationale": "仓库级本地回归入口，串联文档、Desktop、Web build、Eval baseline 与 Rust Runtime。",
+      "reviewStatus": "reviewed",
+      "verification": "bash tests/run-tests.sh"
+    },
+    {
+      "path": "scripts/check-doc-structure.sh",
+      "decision": "keep",
+      "rationale": "文档职责、必备章节和链接关系的机器校验入口。",
+      "reviewStatus": "reviewed",
+      "verification": "bash scripts/check-doc-structure.sh ."
+    },
+    {
+      "path": "scripts/check-frontmatter.sh",
+      "decision": "keep",
+      "rationale": "知识文档 metadata 的机器校验入口。",
+      "reviewStatus": "reviewed",
+      "verification": "bash scripts/check-frontmatter.sh ."
+    },
+    {
+      "path": "scripts/check-secrets.sh",
+      "decision": "keep",
+      "rationale": "提交前阻止 Provider Key 和明显密钥泄漏。",
+      "reviewStatus": "reviewed",
+      "verification": "bash scripts/check-secrets.sh ."
+    },
+    {
+      "path": "desktop/src/main.jsx",
+      "decision": "split-by-domain",
+      "rationale": "Vite/Tauri 前端入口且仍承担过多装配、领域投影和页面组合；保留为薄装配层，逐步提取领域 surface。",
+      "reviewStatus": "in-progress",
+      "verification": "npm --prefix desktop test && npm --prefix desktop run web:build"
+    },
+    {
+      "path": "desktop/src/styles.css",
+      "decision": "split-by-domain",
+      "rationale": "当前唯一样式入口，包含全局、布局、对话、任务、终端和 Provider 样式；保留入口，逐步提取领域样式文件。",
+      "reviewStatus": "in-progress",
+      "verification": "npm --prefix desktop run web:build && npm --prefix desktop run test:native"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/app.rs",
+      "decision": "split-by-domain",
+      "rationale": "Tauri command 装配层仍混有 Patch、Agent Run、状态投影和少量 Provider 编排；公共 command、密钥读取、连接切换、降级、审批和运行证据保留在此，Provider HTTP transport/响应解析已下沉。",
+      "reviewStatus": "in-progress",
+      "verification": "cargo check --manifest-path desktop/src-tauri/Cargo.toml && bash tests/run-tests.sh"
+    },
+    {
+      "path": "docs/data/doc-structure.manifest.json",
+      "decision": "keep",
+      "rationale": "文档职责地图已收口为 OmniDesk schema identity，产品与治理职责均指向当前 Desktop Runtime 文档。",
+      "reviewStatus": "reviewed",
+      "verification": "bash scripts/check-doc-structure.sh . && bash scripts/check-frontmatter.sh ."
+    },
+    {
+      "path": "docs/data/knowledge-registry.json",
+      "decision": "keep",
+      "rationale": "当前可发现知识文档已统一为 OmniDesk Runtime、产品和运行边界；历史决策与复盘仅作为 log 阅读。",
+      "reviewStatus": "reviewed",
+      "verification": "bash scripts/check-doc-structure.sh . && bash scripts/check-frontmatter.sh ."
+    },
+    {
+      "path": "INSTALL.md",
+      "decision": "keep",
+      "rationale": "正文已是 OmniDesk Desktop 本地安装入口；manifest 和知识登记已同步为当前职责。",
+      "reviewStatus": "reviewed",
+      "verification": "bash scripts/check-doc-structure.sh . && bash scripts/check-frontmatter.sh ."
+    },
+    {
+      "path": "AGENTS.md",
+      "decision": "keep",
+      "rationale": "当前 Desktop Runtime 行为边界、迁移规则与验证门槛仍由此文件唯一负责。",
+      "reviewStatus": "reviewed",
+      "verification": "bash tests/run-tests.sh"
+    },
+    {
+      "path": "docs/BACKEND.md",
+      "decision": "keep",
+      "rationale": "已改为 OmniDesk 本地 Rust Runtime 说明，明确没有独立 Web 后端或虚构基础设施。",
+      "reviewStatus": "reviewed",
+      "verification": "bash scripts/check-doc-structure.sh . && bash scripts/check-frontmatter.sh ."
+    },
+    {
+      "path": "docs/FRONTEND.md",
+      "decision": "keep",
+      "rationale": "已改为实际 React、Vite、Tauri、Workbench hooks 和 CSS 架构说明。",
+      "reviewStatus": "reviewed",
+      "verification": "bash scripts/check-doc-structure.sh . && bash scripts/check-frontmatter.sh ."
+    }
+  ]
+}

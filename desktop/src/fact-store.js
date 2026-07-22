@@ -55,7 +55,7 @@ export function buildProjectFactStore({ observedAt = new Date().toISOString(), r
   const facts = PROJECT_OVERVIEW_FACT_IDS.map((id) => createFact({ id, observedAt, freshness, candidates: candidates.get(id) || [] }));
   const factById = new Map(facts.map((fact) => [fact.id, fact]));
   return Object.freeze({
-    schemaVersion: "project-os.project-fact-store.v0.1",
+    schemaVersion: "omnidesk.project-fact-store.v0.1",
     projectId: snapshot?.currentProjectId || project.id || snapshot?.projectName || "current-project",
     observedAt,
     facts: Object.freeze(facts),

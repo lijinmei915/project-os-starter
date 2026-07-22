@@ -19,7 +19,7 @@ test("retains a bounded recent conversation window and summarizes evicted turns"
 
 test("keeps the prior summary when a restored conversation is already within the window", () => {
   const result = retainConversationTurns([{ id: "turn-1", role: "user", text: "继续" }], {
-    previousSummary: { currentTopic: "性能基线", version: "project-os.turn-summary.v0.1" },
+    previousSummary: { currentTopic: "性能基线", version: "omnidesk.turn-summary.v0.1" },
   });
   assert.equal(result.evictedTurnCount, 0);
   assert.equal(result.summary.currentTopic, "性能基线");

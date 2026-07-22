@@ -15,7 +15,51 @@ depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
 
 ## 接手摘要
 
-- 2026-07-21 用户确认退役旧工具链：已删除追踪的 `GEMINI.md` adapter；未追踪的 `cli/`、空 `adapters/` 与 `templates/` 分发树因仓库安全 hook 拒绝递归删除，已从工作区移入系统废纸篓 `~/.Trash/omnidesk-legacy-toolchain-20260721-133536`。它们不再参与 Runtime、CI、测试或 Git 状态；`.omnidesk/evidence` 未受影响。
+- 2026-07-22 文件治理继续推进：桌面主题的 schema 投影、默认配置、归一化与 `.omnidesk/data/desktop-theme.json` 持久化已从 `runtime/app.rs` 下沉到 `runtime/theme.rs`；`get_desktop_theme` / `save_desktop_theme` 仍是薄 Tauri adapter。legacy theme 仅在读取时投影，显式保存才写入 OmniDesk schema。验证：Cargo check、legacy theme 定向测试、完整本地回归、账本与 diff integrity 通过；提交后仍应运行原生 smoke与受保护真实 Eval。
+
+- 2026-07-22 文件治理继续推进：工作区事实预览的档案汇总、治理域、健康评分、证据、L1-L4 分级、建议与默认只读风险边界已从 `runtime/app.rs` 下沉到 `runtime/workspace.rs`。刷新 command 仅解析当前项目并返回这一唯一投影；Preview 仍不会写入 `.omnidesk` 或工程文件。新增 Workspace 只读 contract 与静态边界回归。验证：Desktop Node 459/459、Rust 110/110、Patch 6/6、Web build、离线 Eval、原生 smoke、账本与 diff integrity 通过；提交后仍应运行受保护真实 Eval。
+
+- 2026-07-22 文件治理继续推进：项目注册表的数据模型、`.omnidesk/data/desktop-registry.json` 持久化、旧 schema 的显式读取投影、当前项目兜底修复、路径规范化、稳定项目 ID、健康标签和任务统计投影已从 `runtime/app.rs` 下沉到 `runtime/workspace.rs`。Tauri command 只保留项目接入/切换的输入适配与 Snapshot 装配；Workspace 模块独立验证 legacy 投影、当前项目修复和任务摘要。新增 Workspace 单元测试和静态边界测试。验证：Desktop Node 458/458、Rust 109/109、Patch 6/6、Web build、离线 Eval、原生 smoke、账本与 diff integrity 通过；提交后仍应运行受保护真实 Eval。
+
+- 2026-07-22 文件治理继续推进：对话输入/上下文/结果契约、本地回退路由、Provider 提示词、项目证据和消息引用选择已从 `runtime/app.rs` 下沉到 `runtime/chat_content.rs`；Tauri command 仅保留 Provider 选择、取消、SSE 事件与失败审计编排。新增 Rust 与静态边界回归，避免证据规则回流到 command adapter。原生 smoke 同时修复重启后过早调用 Tauri bridge 的 hydrate 时序问题，并为 WebDriver 请求增加有界超时与阶段诊断。验证：Desktop Node 457/457、Rust 106/106、Patch 6/6、Web build、离线 Eval、原生 smoke、账本与 diff integrity 通过；提交后仍应运行受保护真实 Eval。
+
+- 2026-07-22 文件治理继续推进：只读计划的 schema、附件、上下文、启发式计划和 Provider 计划生成已从 `runtime/app.rs` 下沉到 `runtime/planning.rs`。Tauri command 仍拥有当前项目解析、Provider 预检、取消、失败审计与本地 fallback；新模块不持有审批、写入或检查权限。新增 Rust 与静态边界回归。验证：Rust planning 定向、Cargo check、Desktop Node 455/455 与 diff integrity 通过；本批提交后仍应运行受保护真实 Eval。
+
+- 2026-07-22 文件治理继续推进：native package 的作者元数据与运行记录保留文案已从旧 Project OS 命名收口到 OmniDesk；新增环境契约回归，避免活跃产品元数据或 UI 再引入旧产品归属。验证：Desktop Node 454/454、Cargo check、Web build 与 diff integrity 通过；本批未改原生窗口行为，提交后仍应运行受保护真实 Eval。
+
+- 2026-07-22 文件治理继续推进：风险边界的事实投影和只读呈现已从 `main.jsx` 下沉到 `components/workbench/risk-boundary-panel.jsx`；Workbench 仅注入报告、快照与文件预览回调。新增边界回归。验证：Desktop Node 453/453、Web build 与 diff integrity 通过；本批未改原生窗口行为，提交后仍应运行受保护真实 Eval。
+
+- 2026-07-22 文件治理继续推进：启动方式的 Runbook Slot、复制反馈及终端准备动作已从 `main.jsx` 下沉到 `components/workbench/runbook-panel.jsx`；clipboard 与终端仍通过显式回调注入，surface 不直接持有 Runtime client。顺带修复来源按钮没有接收 `onOpenSource` 的问题。验证：Desktop Node 452/452、Web build 与 diff integrity 通过；本批未改原生窗口行为，提交后仍应运行受保护真实 Eval。
+
+- 2026-07-22 文件治理继续推进：项目进展的事实聚合与只读呈现已从 `main.jsx` 下沉到 `components/workbench/current-progress-panel.jsx`。Workbench 只注入导航、文件预览回调及 Snapshot；新 surface 自己编译进展 Slot，不持有 Runtime client 或任务写入逻辑。新增静态边界回归。验证：Desktop Node 451/451、Web build、文件账本、Schema 账本与 diff integrity 通过；本批未改原生窗口行为，提交后仍应运行受保护真实 Eval。
+
+- 2026-07-22 文件治理继续推进：工作区可见文件统计、树投影、目录优先排序、深度/数量上限以及 `.git`、`.omnidesk`、构建产物、`.env` 的忽略规则已从 `app.rs` 下沉到 `runtime/workspace.rs`。`WorkspaceSnapshot` 只序列化 Workspace 的 `TreeEntry` 投影，不再拥有另一套树规则。验证：完整 `bash tests/run-tests.sh` 通过（Desktop Node 450/450、Rust 103/103、Patch 6/6、Web build、bundle 预算、离线 Eval、账本与 diff integrity），`npm --prefix desktop run test:native` 通过；提交后仍应运行受保护真实 Eval。
+
+- 2026-07-22 文件治理继续推进：工程文件预览的安全路径白名单和语言识别已从 `app.rs` 下沉到 `runtime/workspace.rs`；Tauri command 保留当前项目选择、canonical 路径与有界文本读取。`.env`、`.omnidesk` 状态、路径逃逸与二进制文件仍被拒绝。验证：完整 `bash tests/run-tests.sh` 通过（Desktop Node 450/450、Rust 103/103、Patch 6/6、Web build、bundle 预算、离线 Eval、账本与 diff integrity），`npm --prefix desktop run test:native` 通过；提交后仍应运行受保护真实 Eval。
+
+- 2026-07-21 文件治理继续推进：Hermes ACP/CLI 的程序候选发现、`--check` 健康探测、版本摘要和前端状态契约已从 `app.rs` 下沉到 `runtime/hermes_protocol.rs`。Tauri command 仍为 `get_hermes_executor_status`，返回字段和 Preview 契约不变；探测不启动模型，也不访问密钥。验证：完整 `bash tests/run-tests.sh` 通过（Desktop Node 450/450、Rust 102/102、Patch 6/6、Web build、bundle 预算、离线 Eval、账本与 diff integrity），`npm --prefix desktop run test:native` 通过；提交后仍应运行受保护真实 Eval。
+
+- 2026-07-21 文件治理继续推进：`docs/DECISIONS.md` 已收口为历史决策档案，明确现行规则必须服从 `AGENTS.md`、`PROJECT.md`、`docs/DOCUMENTATION.md` 和对应 Runtime；D001-D018 的 Project OS CLI、Shell governance、安装器、模板、评分和跨工具 routing 只保留追溯价值，不构成恢复授权。D019 同步更新为 native `.omnidesk` 状态、legacy 差异归档与生产链路退役的实际状态；文档 manifest 和知识 registry 已反映“历史而非 SSOT”的职责。验证：文件账本、schema 审计、文档结构、frontmatter 与 diff integrity 通过。
+
+- 2026-07-21 文件治理继续推进：Patch Draft 的计划文件提取、安全上下文读取、语义拒绝、本地占位草稿、Provider/Hermes 提示词及上下文路径规则已下沉到 `runtime/patch.rs`。`.env`、路径逃逸和全部 `.omnidesk` Runtime 状态均不能成为模型上下文；Hermes 受控读取复用同一规则。`app.rs` 仅保留 Provider/Hermes 选择、取消、降级和审批编排。验证：完整 `bash tests/run-tests.sh` 通过（Desktop Node 450/450、Rust 102/102、Patch 6/6、Web build、bundle 预算、离线 Eval、账本与 diff integrity），`npm --prefix desktop run test:native` 通过；提交后仍应运行受保护真实 Eval。
+
+- 2026-07-21 文件治理继续推进：OpenAI-compatible Provider 的 endpoint 规范化、HTTP transport、非成功响应摘要、chat completion 内容、`/models` 列表解析、候选连接排序及健康缓存匹配已集中到 `runtime/provider.rs`；计划、Patch 草稿、流式对话、模型探测和连接测试复用同一协议实现。`app.rs` 继续拥有密钥读取、实际探测、连接切换持久化、失败降级、审批与运行证据，未改变独立审批或 Provider 成功不等于任务成功的边界。验证：完整 `bash tests/run-tests.sh` 通过（Desktop Node 450/450、Rust 101/101、Patch 5/5、Web build、bundle 预算、离线 Eval、账本与 diff integrity），`npm --prefix desktop run test:native` 通过；提交后仍应触发受保护真实 Eval。
+
+- 2026-07-21 文件治理继续推进：Hermes ACP 的程序发现、自定义 Provider 密钥环境变量映射、JSON-RPC 帧/响应处理、取消与超时、未知 RPC 回绝以及结构化 envelope 解析，已下沉到 `runtime/hermes_protocol.rs`；`app.rs` 只保留子进程生命周期、受控读取工具、审批状态机和运行证据编排。验证：Hermes Rust 13/13、`cargo check`、完整 `bash tests/run-tests.sh`（Desktop Node 450/450、Rust 99/99、Patch 5/5、Web build、bundle 预算、离线 Eval 基线、账本和 diff integrity）通过。原生 smoke 首次出现 WKWebView 输入事件时序波动，诊断重跑通过，并验证终端启动和重启审批恢复；真实 Provider Eval 仍需提交后在受保护环境运行。
+
+- 2026-07-21 文件治理继续推进：Preview 新建默认值和 Provider 健康缓存已统一为 `omnidesk.*`，旧 `project-os.*` 只保留显式读取投影；`app.rs` 的 Workspace 治理扫描、变更状态汇总与健康评分已下沉到 `runtime/workspace_governance.rs`，注册表通过该模块的只读 Git 状态 API 复用结果，命令层不再维护这套领域规则。新模块覆盖治理域分类与健康评分维度契约。验证：完整 `bash tests/run-tests.sh` 通过（Desktop Node 450/450、Rust 97/97、Patch 5/5、Web build、bundle 预算、离线 Eval 基线、账本和 diff integrity），`npm --prefix desktop run test:native` 通过。受保护真实 Eval 仍需在本批提交后运行。
+
+- 2026-07-21 文件治理继续推进：Workspace 的 fact freshness、capabilities、memory、profile 与前端 conversation、turn summary、project memory、fact store 已改为 `omnidesk.*` 新写入；旧 `project-os.*` 只在读取时投影 `schemaMigration: { mode: "read-projection" }`，下一次正常保存才落盘新版本。Vite Preview 同样只读投影。Provider、主题与注册表也采用“读旧不自动改盘、显式保存写新”的安全策略；Provider 仍只持久化 `apiKeyEnv` 引用，不读写或复制密钥内容。`styles.css` 已变成顺序固定的入口，拆为 `base/theme/workspace/conversation/terminal/provider-rail`；`chat_routing.rs` 与 `chat_stream.rs` 接管纯对话协议逻辑。执行域的 allowlist 检查、Patch apply、输出截断和任务摘要已下沉到 `runtime/execution.rs`，`app.rs` 只编排命令与审批状态；该模块有独立 5 条 Rust 回归。剩余 5 份无 Runtime 消费者的旧 schema 已登记为 compatibility review，未删除。完整本地门槛通过：Desktop Node 449/449、Rust 91/91、Patch 5/5、Web build、bundle 预算、离线 Eval 基线、diff integrity 和原生 WebDriver smoke。受保护真实 Eval 仍需在本批提交后运行。
+
+- 2026-07-21 持久化任务记录已开始 OmniDesk schema 迁移：Runtime 新写入使用 `omnidesk.desktop-task.v0.1`；读取旧 `project-os.desktop-task.v0.1` 仅做内存 `read-projection` 并保留 `schemaMigration` 证据，不批量重写用户历史。正常任务保存会自然持久化新版本。Rust 任务定向 7/7 与 `cargo check` 通过；Conversation、Goal、Provider 等持久化版本仍须分别迁移。
+
+- 2026-07-21 文件治理的 schema 首批已完成：`agent-run`、`conversation-event`、`project-overview-view-model`、`project-progress-contract` 与 `project-runbook-contract` 已从旧 `$id` / `project-os.*` 版本和 `.project-os` 合同路径收口为 `omnidesk.*` 与 native `.omnidesk/data|cache` 路径。它们均为 Runtime/前端生成契约，不承载用户历史状态；新增 schema identity 与 native path 断言，Desktop Node 443/443 通过。其余持久化 schema 仍必须先添加显式读取迁移，不能直接批量改版本。
+
+- 2026-07-21 已启动 `OmniDesk 仓库文件治理与架构收敛 v1`：新增可重复生成的全仓文件账本与独立审查登记，覆盖 496 个 tracked 文件，逐项记录类别、Owner、路径提及、处置决策和验证。首批已审核并保留 `AGENTS.md`、`INSTALL.md`、`PRODUCT.md`、`docs/FRONTEND.md` 与 `docs/BACKEND.md`；后两份已从通用模板重写为实际 React Workbench 与 Rust Local Agent Runtime 边界。无消费者的 Claude/协作规则副本、旧 kit、旧 examples、版本/锁/tokens 文件已在用户确认后退役；旧 CLI config schema 仍保留 compatibility review。验证：文档结构、frontmatter、Web build 和 diff check 通过。
+
+- 2026-07-21 native namespace 受保护真实 Eval `29815260557` 已在当前提交 `8cd4456` 通过。下载 artifact 后本地重跑 trace gate 与基线比较也通过：12/12 case、任务成功率 100%、Patch 可应用率 90.9%、检查通过率 100%、恢复成功率 100%；每份结果均引用 artifact 内相对 trace 路径。`failed-check-repair` 证明初始检查真实失败、独立审批后修复并通过复检；`goal-rebind` 证明四份已授权文件均已变更；`interrupted-run` 证明网络中断不会自动重放写入或越过原审批。此前 `29808415450` 因 `HTTP 403 subscription quota insufficient` 失败的 artifact 仍保留为 Provider 故障证据，未篡改或替代基线。
+
+- 2026-07-21 用户确认退役旧工具链：已删除追踪的 `GEMINI.md` adapter；未追踪的 `cli/`、空 `adapters/`、`templates/` 分发树、旧 `bin/project-os` 二进制、模板 zip/展开包与临时 Eval fixture 已从工作区移入系统废纸篓 `~/.Trash/omnidesk-legacy-toolchain-20260721-133536`。它们不再参与 Runtime、CI、测试或 Git 状态；`.omnidesk/evidence` 未受影响。
 
 - 2026-07-21 已清除剩余的生产 legacy fallback：真实 Eval Hermes runner 只读取 `.omnidesk/data/desktop-provider.json`；项目概览 facts schema 改为 native data/cache 分区；环境与运行手册不再描述 legacy Runtime 回退。验证：项目概览/slot/Eval 定向测试、Desktop Node 442/442、文档结构通过。审计发现 `cli/` 仅有未追踪 `target/` 缓存、`adapters/` 为空、`templates/` 未追踪；它们不属于当前提交，未删除。
 

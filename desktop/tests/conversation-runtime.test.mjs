@@ -122,8 +122,8 @@ test("migrates and recovers interrupted conversation records", () => {
       },
     ],
   });
-  assert.equal(migrated.schemaVersion, "project-os.conversation.v0.3");
-  assert.equal(migrated.summary.version, "project-os.turn-summary.v0.1");
+  assert.equal(migrated.schemaVersion, "omnidesk.conversation.v0.3");
+  assert.equal(migrated.summary.version, "omnidesk.turn-summary.v0.1");
   const recovered = recoverConversationRuntime({ ...migrated, runtimeState: "executing" });
   assert.equal(recovered.recoveryReason, "interrupted");
   assert.deepEqual(recovered.recoveryAction, { id: "retry", label: "重试", task: "修复对话接管" });

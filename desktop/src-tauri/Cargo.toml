@@ -2,7 +2,7 @@
 name = "OmniDesk"
 version = "0.1.0"
 description = "OmniDesk local AI project workbench"
-authors = ["Project OS"]
+authors = ["OmniDesk"]
 edition = "2021"
 default-run = "OmniDesk"
 

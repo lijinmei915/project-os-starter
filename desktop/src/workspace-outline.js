@@ -43,7 +43,7 @@ const governanceMeta = {
   },
   "验证交付": {
     files: ["docs/TESTING.md", "docs/RUNBOOK.md", "scripts/*", ".omnidesk/evidence/runs/*"],
-    governanceRole: "质量治理入口，负责检查项、验收报告和运行记录。",
+    governanceRole: "质量治理入口，负责检查项、验收证据和运行记录。",
     maturity: "状态化",
     nextAction: "把失败验收直接转成修复任务，并沉淀验证证据。",
     statusSource: ".omnidesk/evidence/runs/*",
@@ -87,7 +87,7 @@ const itemMeta = {
     statusSource: ".omnidesk/evidence/goal-validation-report.json",
     maturity: "状态化",
     governanceRole: "目标验收结果入口，回答最近一次验收是否通过、哪些检查失败、下一步怎么处理。",
-    nextAction: "把验收结果、检查项和失败修复入口展示成报告工作面。",
+    nextAction: "把验收结果、检查项和失败修复入口展示成证据工作面。",
   },
   "运行记录": { statusSource: ".omnidesk/evidence/runs/*" },
   "交接记录": { statusSource: "HANDOFF.md" },
@@ -103,11 +103,11 @@ const itemMeta = {
   "执行结果": { statusSource: ".omnidesk/evidence/desktop-summary.md" },
   "工程文件": { statusSource: "project tree" },
   "治理文件": { statusSource: ".omnidesk/cache/workspace-facts.json" },
-  "报告产物": {
-    statusSource: ".omnidesk/evidence/reports/*",
+  "执行证据": {
+    statusSource: ".omnidesk/evidence/runs/*",
     maturity: "状态化",
-    governanceRole: "工程治理报告入口，展示扫描、评分、推荐和验收等生成产物，不是普通视觉页面。",
-    nextAction: "明确每个报告产物的来源、用途和下一步动作，避免用户不知道报告能干嘛。",
+    governanceRole: "任务执行与验收证据入口，展示已审批的写入、检查、修复与最终结果。",
+    nextAction: "让每份执行证据都能回到所属任务和下一步动作，避免脱离上下文的报告页面。",
   },
   "Schema": { statusSource: "schemas/*" },
   "脚本模板": { statusSource: "scripts/*" },
@@ -405,7 +405,7 @@ export const projectGovernanceOutline = [
     meta: "按需",
     icon: "files",
     defaultOpen: false,
-    description: "代码、项目规则和报告等由任务或对话按需引用的项目来源。",
+    description: "代码、项目规则和执行证据等由任务或对话按需引用的项目来源。",
     children: [
       {
         id: "assets-files-menu",
@@ -429,12 +429,12 @@ export const projectGovernanceOutline = [
       },
       {
         id: "assets-reports-menu",
-        title: "报告与证据",
-        meta: "报告",
+        title: "执行证据",
+        meta: "证据",
         icon: "clipboard",
-        description: "检查、验收和推荐形成的可追溯证据。",
+        description: "检查、验收和任务执行形成的可追溯证据。",
         items: [
-          { id: "report-artifacts", title: "报告与证据", description: "验收和任务执行产生的可追溯证据。", relatedFiles: [".omnidesk/evidence/goal-validation-report.json", ".omnidesk/evidence/runs/*"] },
+          { id: "report-artifacts", title: "执行证据", description: "验收和任务执行产生的可追溯证据。", relatedFiles: [".omnidesk/evidence/goal-validation-report.json", ".omnidesk/evidence/runs/*"] },
         ],
       },
       {

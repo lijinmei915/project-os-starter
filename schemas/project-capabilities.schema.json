@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://project-os.local/schemas/project-capabilities.schema.json",
-  "title": "Project Capabilities",
+  "$id": "https://omnidesk.local/schemas/project-capabilities.schema.json",
+  "title": "OmniDesk Project Capabilities",
   "description": "Project-level activation state for capabilities supported by the complete OmniDesk workspace registry.",
   "type": "object",
   "required": ["schemaVersion", "updatedAt", "workspaceCapabilities", "domainCapabilities"],
   "properties": {
-    "schemaVersion": { "const": "project-os.project-capabilities.v0.1" },
+    "schemaVersion": { "const": "omnidesk.project-capabilities.v0.1" },
     "updatedAt": { "type": "string" },
     "capabilities": {
       "type": "array",

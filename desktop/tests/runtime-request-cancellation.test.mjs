@@ -14,12 +14,15 @@ test("carries the active request id through chat, plan, and the native cancellat
   const requestState = read("src/components/workbench/use-conversation-request-state.js");
   const client = read("src/lib/desktop-conversation-client.js");
   const runtime = read("src-tauri/src/runtime/app.rs");
+  const chatRuntime = read("src-tauri/src/runtime/chat_runtime.rs");
 
   assert.match(chatResult, /requestId,/);
   assert.match(plan, /cancelRuntimeRequest\?\.\(requestId\)/);
   assert.match(requestState, /cancelRuntimeRequest\?\.\(requestId\)/);
   assert.match(client, /cancel_runtime_request/);
-  assert.match(runtime, /struct RuntimeRequestState/);
+  assert.match(runtime, /chat_runtime::\{emit_conversation_event, RuntimeRequestState\}/);
+  assert.match(chatRuntime, /pub struct RuntimeRequestState/);
+  assert.match(chatRuntime, /pub fn emit_conversation_event/);
   assert.match(runtime, /tokio::select!/);
   assert.match(runtime, /generate_hermes_patch_draft/);
   assert.match(runtime, /run_hermes_acp_prompt/);

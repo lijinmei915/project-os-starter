@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const webdriverPort = Number(process.env.OMNIDESK_WEBDRIVER_PORT || 4447);
 const webdriverUrl = `http://127.0.0.1:${webdriverPort}`;
+const webdriverRequestTimeoutMs = 15_000;
 const diagnoseTerminal = process.env.OMNIDESK_NATIVE_TEST_TRACE_TERMINAL === "1";
 const diagnosticReportPath = diagnoseTerminal
   ? path.join(os.tmpdir(), `omnidesk-native-terminal-diagnostic-${process.pid}.json`)
@@ -32,10 +33,17 @@ function writeFixture() {
 }
 
 async function request(route, options = {}) {
-  const response = await fetch(`${webdriverUrl}${route}`, {
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-    ...options
-  });
+  let response;
+  try {
+    response = await fetch(`${webdriverUrl}${route}`, {
+      headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+      signal: AbortSignal.timeout(webdriverRequestTimeoutMs),
+      ...options
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`WebDriver 请求超时或断开：${route}（${message}）`);
+  }
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || payload.value?.error) {
     throw new Error(payload.value?.message || payload.value?.error || `WebDriver 请求失败：${response.status} ${route}`);
@@ -193,17 +201,22 @@ async function invokeNative(command, payload = {}) {
 }
 
 let failure;
+let currentStage = "创建原生夹具";
 try {
   writeFixture();
+  currentStage = "启动原生应用";
   startApp();
+  currentStage = "创建 WebDriver 会话";
   await openSession();
 
+  currentStage = "定位对话输入框";
   const input = await waitForElement('textarea[aria-label="任务输入"]');
   const send = await waitForElement('button[aria-label="发送"]');
   const initialDisabled = await request(`/session/${sessionId}/element/${send}/enabled`);
   if (initialDisabled !== false) throw new Error("空输入时发送按钮应不可用。");
 
   const prompt = "原生 WebDriver 输入验证";
+  currentStage = "输入框状态同步";
   await request(`/session/${sessionId}/element/${input}/value`, {
     method: "POST",
     body: JSON.stringify({ text: prompt, value: [...prompt] })
@@ -220,17 +233,22 @@ try {
     throw new Error(`原生测试构建没有写入终端启动阶段记录：${JSON.stringify({ runtimeIdentity, startupLocalTrace, startupTrace })}`);
   }
 
+  currentStage = "创建恢复夹具";
   const seeded = await invokeNative("seed_native_agent_run_for_recovery");
   const expectedAuthorizedFiles = ["README.md", "AGENTS.md", "PROJECT.md", "docs/TESTING.md"];
   if (seeded?.status !== "awaiting-approval" || seeded?.approval?.token !== "native-recovery-approval"
     || JSON.stringify(seeded?.checkpoint?.allowedFiles) !== JSON.stringify(expectedAuthorizedFiles)) {
     throw new Error(`原生恢复夹具未创建等待审批 Run：${JSON.stringify(seeded)}`);
   }
+  currentStage = "重启原生应用";
   await closeSession();
   stopApp();
   await new Promise((resolve) => setTimeout(resolve, 500));
   startApp();
   await openSession();
+  currentStage = "等待重启后的窗口渲染";
+  await waitForElement('textarea[aria-label="任务输入"]');
+  currentStage = "验证恢复审批";
   const interrupted = await invokeNative("read_native_agent_run_for_recovery");
   if (interrupted?.status !== "interrupted" || interrupted?.checkpoint?.nextAction !== "resume-approval"
     || interrupted?.approval?.token !== "native-recovery-approval"
@@ -275,7 +293,7 @@ try {
   console.log(`原生 WebDriver smoke 通过：可定位并驱动输入与发送状态，重启后恢复原审批${diagnoseTerminal ? "，并完成终端诊断" : ""}；未提交消息，未写入工程文件。`);
 } catch (error) {
   failure = error instanceof Error ? error : new Error(String(error));
-  console.error(`原生 WebDriver smoke 失败：${failure.message}`);
+  console.error(`原生 WebDriver smoke 失败（${currentStage}）：${failure.message}`);
 } finally {
   await closeSession();
   stopApp({ cleanup: true });
