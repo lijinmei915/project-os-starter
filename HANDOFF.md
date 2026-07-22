@@ -15,6 +15,8 @@ depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
 
 ## 接手摘要
 
+- 2026-07-22 真实 Eval 回归修复：受保护 Eval `29888636700` 的唯一失败为 `test-regression` 使用 `.mjs` 测试文件，而 `runtime/patch.rs::is_context_path` 遗漏 Node 模块扩展名，导致正确的真实模型草稿在审批前被拒绝。已将 `.mjs` / `.cjs` 纳入同一安全上下文白名单，并新增 contextual Node test diff 契约；不放宽 `.env`、路径逃逸或无上下文 hunk 的拒绝规则。提交 `df39e62` 后，完整本地回归（Node 459/459、Rust 111/111、构建、离线 Eval、账本、diff integrity）与原生 WebDriver smoke 均通过；受保护真实 Eval `29889159179` 已通过，12/12 case 均有 artifact-relative trace，任务成功率 100%、Patch 可应用率 90.9%、检查通过率 100%、恢复成功率 100%。
+
 - 2026-07-22 文件治理继续推进：桌面主题的 schema 投影、默认配置、归一化与 `.omnidesk/data/desktop-theme.json` 持久化已从 `runtime/app.rs` 下沉到 `runtime/theme.rs`；`get_desktop_theme` / `save_desktop_theme` 仍是薄 Tauri adapter。legacy theme 仅在读取时投影，显式保存才写入 OmniDesk schema。验证：Cargo check、legacy theme 定向测试、完整本地回归、账本与 diff integrity 通过；提交后仍应运行原生 smoke与受保护真实 Eval。
 
 - 2026-07-22 文件治理继续推进：工作区事实预览的档案汇总、治理域、健康评分、证据、L1-L4 分级、建议与默认只读风险边界已从 `runtime/app.rs` 下沉到 `runtime/workspace.rs`。刷新 command 仅解析当前项目并返回这一唯一投影；Preview 仍不会写入 `.omnidesk` 或工程文件。新增 Workspace 只读 contract 与静态边界回归。验证：Desktop Node 459/459、Rust 110/110、Patch 6/6、Web build、离线 Eval、原生 smoke、账本与 diff integrity 通过；提交后仍应运行受保护真实 Eval。

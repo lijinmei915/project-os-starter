@@ -1,6 +1,6 @@
 {
   "schemaVersion": "omnidesk.repository-file-inventory.v1",
-  "generatedAt": "2026-07-22T03:41:29.593Z",
+  "generatedAt": "2026-07-22T03:50:31.309Z",
   "sourceOfTruth": "git ls-files",
   "scope": "受版本控制文件；忽略的本地运行数据和构建输出不在本账本内。",
   "reviewContract": {
@@ -136,7 +136,7 @@
       "path": "HANDOFF.md",
       "kind": "root-document",
       "owner": "Documentation Governance",
-      "bytes": 257840,
+      "bytes": 258629,
       "pathMentions": [
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
         "desktop/src/lib/agent-topic-cards.js",
@@ -189,7 +189,7 @@
       "path": "PROJECT.md",
       "kind": "root-document",
       "owner": "Documentation Governance",
-      "bytes": 8063,
+      "bytes": 8370,
       "pathMentions": [
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
         "desktop/src/lib/agent-topic-runtime-capability.js",
