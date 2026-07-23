@@ -1,7 +1,7 @@
 ---
 layer: knowledge
 type: status
-last_verified: 2026-07-21
+last_verified: 2026-07-23
 teaches: "当前交接上下文、风险点和下一步建议"
 use_when: "新的 AI 会话接手工作、需要了解最近做了什么和接下来该做什么时"
 depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
@@ -14,6 +14,52 @@ depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
 > 不要写什么：长期路线图、完整产品介绍、详细架构说明或历史流水账。
 
 ## 接手摘要
+
+- 2026-07-23 文件治理继续推进：只读计划的本地回退、Provider 连接选择、取消、失败审计与降级证据已从 `runtime/app.rs` 收口到 `runtime/planning.rs::generate_plan`。Tauri command 只组装当前项目上下文并登记/释放请求；无论 Provider 状态如何，计划仍不执行工程写入、终端或检查。静态 Owner 约束禁止预检和失败记录回流命令层。定向验证：Planning Rust 2/2、Cargo check、Owner 边界 136/136 与 diff integrity 通过；完整套件与原生 smoke 待本批账本更新后重跑。`app.rs` 从 2300 行降至 2261 行；提交后仍须运行受保护真实 Provider Eval。
+
+- 2026-07-23 文件治理继续推进：Patch Draft 的任务/计划语义门槛、固定授权上下文、连接选择、一次 Hermes 重生成、普通 Provider 降级、失败审计和占位草稿证据已统一下沉到 `runtime/patch_draft.rs::generate_draft`。Tauri command 只解析当前项目、登记/释放取消请求并注入输入；占位 diff 仍由 Apply 边界拒绝，绝不进入工程写入。新增禁用 Provider 时的授权上下文与占位草稿回归，并以静态 Owner 约束防止选择/降级逻辑回流。验证：文件账本 542 项、0 候选，Desktop Node 540/540、Runtime Rust 145/145、Patch Normalizer 7/7、Web build、790.80 KiB/800 KiB 首屏预算、离线 Eval、diff integrity 与原生 WebDriver smoke 通过。`app.rs` 从 2453 行降至 2300 行；提交后仍须运行受保护真实 Provider Eval。
+
+- 2026-07-23 文件治理继续推进：Hermes 模型调用返回后的 Agent Run 状态、step、审批、checkpoint、下一恢复动作和证据已从 `runtime/app.rs` 收口到 `runtime/agent_runs.rs::settle_model_run`。待审批结果保留原审批并设为 `resume-approval`；成功、失败、取消均明确写为不可恢复终态，Tauri command 不再拼装完成状态。新增持久化回归覆盖待审批、成功、失败和取消，静态 Owner 测试防止结束状态逻辑回流。验证：文件账本 542 项、0 候选，Desktop Node 540/540、Runtime Rust 144/144、Patch Normalizer 7/7、Web build、790.80 KiB/800 KiB 首屏预算、离线 Eval、diff integrity 与原生 WebDriver smoke 通过。`app.rs` 从 2473 行降至 2453 行；提交后仍须运行受保护真实 Provider Eval。
+
+- 2026-07-23 文件治理继续推进：模型阶段的 Agent Run 创建或恢复校验、approval token 与项目归属验证、上一受控工具结果续接、`running` checkpoint、草稿证据和持久化已从 `runtime/app.rs` 收口到 `runtime/agent_runs.rs`。Tauri command 只保留项目/Provider 准备、取消令牌和 Hermes 子进程 transport；新建与恢复路径都在状态转换前验证项目，不匹配时不修改 Run。`app.rs` 从 2512 行降至 2473 行。验证：文件账本 542 项、0 候选，Desktop Node 540/540、Runtime Rust 142/142、Patch Normalizer 7/7、Web build、790.80 KiB/800 KiB 首屏预算、离线 Eval、diff integrity 与原生 WebDriver smoke 通过；本批提交后仍须运行受保护真实 Provider Eval。
+
+- 2026-07-23 文件治理继续推进：已批准 Agent 工具的加载、审批消费、Patch/检查分派、成败结算与持久化已从 `runtime/app.rs` 整体收口到 `runtime/execution.rs`；Tauri command 只解析当前项目与权限并委托执行。审计时发现原路径未在消费审批前比对 `AgentRun.projectId` 与当前项目，现已在写入和状态转换之前强制项目绑定；切换项目后会拒绝执行、保留原审批且零写入。`app.rs` 从 2581 行降至 2512 行。验证：文件账本 542 项、0 候选，Desktop Node 539/539、Runtime Rust 140/140、Patch Normalizer 7/7、Web build、790.80 KiB/800 KiB 首屏预算、离线 Eval、diff integrity 与原生 WebDriver smoke 通过；本批提交后仍须运行受保护真实 Provider Eval。
+
+- 2026-07-22 文件治理继续推进：已批准 Patch Draft 的 `notApplicable`/占位拒绝、unified diff 格式、路径与授权文件校验、`git apply --check`、实际 Git Apply、有界输出与成败审计已从 `runtime/app.rs` 收口到 `runtime/execution.rs`。Tauri command 只解析当前项目及 `controlled` 权限并委托 Execution；新增空/不可应用/占位/越权/坏 hunk/成功应用与审计回归，静态 Owner 约束防止 Apply 细节回流。`app.rs` 从 2693 行降至 2581 行。验证：文件账本 542 项、0 候选，Desktop Node 539/539、Runtime Rust 138/138、Patch Normalizer 7/7、Web build、790.80 KiB/800 KiB 首屏预算、离线 Eval、diff integrity 与原生 WebDriver smoke 通过；本批提交后仍须运行受保护真实 Provider Eval。
+
+- 2026-07-22 文件治理继续推进：Provider API Key 名称/值校验、临时 Key 优先解析、持久凭据读取、模型测试配置、catalog 探测组合、Unix 时间戳和 Hermes 配置文件同步已从 `runtime/app.rs` 收口到 `runtime/provider.rs`。Tauri command 只适配输入、触发 Provider 操作、同步公开状态与记录健康结果；明文 Key 仍只进入忽略的 `.env.local`，不进入 Repository 状态或账本。新增临时 Key 不落盘、保存 Key 校验/启用/状态隔离及静态 Owner 回归。`app.rs` 从 2779 行降至 2693 行。验证：文件账本 542 项、0 候选，Desktop Node 538/538、Runtime Rust 135/135、Patch Normalizer 7/7、Web build、790.80 KiB/800 KiB 首屏预算、离线 Eval、diff integrity 与原生 WebDriver smoke 通过；本批提交后仍须运行受保护真实 Provider Eval。
+
+- 2026-07-22 文件治理继续推进：Provider 对话的密钥读取、请求体构造、严格 JSON 结果解析、SSE 增量消费与可见回复投影已从 `runtime/app.rs` 下沉到 `runtime/chat_stream.rs`；command adapter 通过回调发布 `model.delta`，继续独占请求取消、Tauri 事件、Provider 失败审计和本地降级。新增多模态请求内容、空回复/意图归一化 Rust 回归及静态 Owner 防回退测试。`app.rs` 从 2899 行降至 2779 行。验证：文件账本 542 项、0 候选，Desktop Node 537/537、Runtime Rust 133/133、Patch Normalizer 7/7、Web build、790.80 KiB/800 KiB 首屏预算、离线 Eval、diff integrity 与原生 WebDriver smoke 通过；本批提交后仍须运行受保护真实 Provider Eval。
+
+- 2026-07-22 文件治理继续推进：普通 Provider 的失败记录、候选顺序、健康缓存复用、连接探测、降级选择与持久化已归属 `runtime/provider.rs`，`app.rs` 只在 active Provider 变化后同步 Hermes 配置。Workbench 的 Preview Snapshot、Provider/模型/任务默认契约已下沉到 `lib/workbench-defaults.js`；Preview Workspace Snapshot 与 native `.omnidesk` 只读回退投影已下沉到 `lib/workspace-preview-client.js`；Workspace Snapshot、目标动作、剪贴板和目录选择 transport 已下沉到 `lib/workspace-runtime-bridge.js`。`main.jsx` 不再直接读取状态文件或依赖 Tauri invoke、系统目录插件与项目档案投影。文件账本现在直接覆盖 Git tracked 与非忽略新文件，共 542 项、0 候选；schema 仍为 14 active、0 候选。验证：Desktop Node 536/536、Runtime Rust 131/131、Patch Normalizer 7/7、Web build、790.80 KiB/800 KiB 首屏预算、离线 Eval、diff integrity 通过；原生 WebDriver 首次会话在 `execute/sync` 断开，随后两次独立端口复跑通过并验证输入、发送状态及重启审批恢复。当前 `main.jsx` 1244 行、`app.rs` 2899 行，仍是下一批拆分对象。
+
+- 2026-07-22 文件治理：Agent Run 已批准工具的开始、成功结算与失败结算状态转换统一归属 `runtime/agent_runs.rs`，`app.rs` 只保留实际 Patch/检查副作用与持久化编排；失败执行会保存 terminal failure、checkpoint、错误结果与 `tool-failed` 证据。聊天和只读计划的图片附件类型、4 张数量上限与 4 MB data URL 上限也统一归属 `runtime/planning.rs`。新增 Rust 行为回归与静态 Owner 防回退约束。当前账本为 504 个文件、0 候选，schema 为 14 active、0 候选。验证：Desktop Node 525/525、Runtime Rust 131/131、Patch Normalizer 7/7、Web build、800 KiB bundle 软预算、离线 Eval 与 diff integrity 通过；本批之前的同工作树原生 WebDriver smoke 通过。
+
+- 2026-07-22 文件治理：普通 Provider 的 Patch Draft 请求、严格 JSON 解析和统一 diff 归一化已从 `runtime/app.rs` 下沉到 `runtime/patch_draft.rs`。独立 `patch.rs` Normalizer 保持不依赖 Provider Runtime，避免离线 Patch 校验器被桌面网络传输耦合；Tauri 命令仍拥有 Provider 选择、取消和降级证据。新增 Owner 边界回归。验证：Cargo check、Patch Rust 7/7、Desktop Node 522/522 与 diff integrity 通过。
+
+- 2026-07-22 文件治理：用户已独立确认退役旧 AI 项目报告截图基线；删除 `tests/screenshots/` 下的两个占位文件和两张报告截图。文件账本规则由待确认改为已退役；删除后必须重建账本并运行完整本地回归与原生窗口 smoke。
+
+- 2026-07-22 文件治理：Workbench 的能力标签、能力说明、主题专属 Surface 映射和默认对话建议已从 `main.jsx` 下沉到 `lib/workbench-catalog.js`，入口只消费不可变展示配置。新增静态 Owner 边界；本地 Preview 实测工作台加载、默认建议、设计实现导航和系统架构主题页正常。验证：Desktop Node 回归与 Web build 通过。
+
+- 2026-07-22 文件治理：经用户授权，已退役无 Desktop Runtime 消费者的重复 Logo、未使用 Codex wrapper、旧截图 diff 工具、未引用替代 Logo 和 Provider 状态行组件。文件账本改为按当前存在的受管文件重建，现为 508 项、4 个待独立确认候选。验证：完整本地回归通过（Desktop Node 520/520、Rust 127/127、Patch 7/7、Web build、离线 Eval、账本与 diff integrity）及原生 WebDriver smoke 通过。
+
+- 2026-07-22 文件治理继续推进：Provider 模型目录探测的输入校验、`/models` transport 与响应归一化已从 `runtime/app.rs` 下沉到 `runtime/provider.rs`；Tauri command 只决定 Key 来自临时输入还是本地 secret。新增缺失连接输入在网络调用前被拒绝的 Rust 回归与静态 Owner 边界。验证：完整本地回归通过（Desktop Node 520/520、Rust 127/127、Patch 7/7、Web build、790.53 KiB/800 KiB bundle 预算、离线 Eval、账本与 diff integrity）及原生 WebDriver smoke 通过。
+
+- 2026-07-22 文件治理继续推进：Provider 面向桌面的状态 DTO、配置 revision、Profile 创建/保存/删除策略与凭据存在性投影已从 `runtime/app.rs` 下沉到 `runtime/provider.rs`。Tauri adapter 仍是唯一读取或删除本地 Key 的边界，只向领域投影注入布尔存在性，并仅根据领域返回的未引用 Key 变量执行删除；状态中不携带 secret。Hermes 同步、健康探测和故障切换保持在 command 编排层。新增 Provider 状态与 Profile 策略、静态 Owner 边界回归，并清理了 Workbench 中迁移后未使用的 RightRail 图标导入。验证：完整本地回归通过（Desktop Node 519/519、Rust 126/126、Patch 7/7、Web build、790.53 KiB/800 KiB bundle 预算、离线 Eval、账本与 diff integrity）及原生 WebDriver smoke 通过。
+
+- 2026-07-22 文件治理继续推进：`RightRail` 已从 `main.jsx` 下沉到 `components/workbench/right-rail.jsx`。右栏的目标确认/验收、任务筛选、对话归档管理和项目档案展示都在同一 Surface Owner 内；任务、目标和对话的写操作仍由 Workbench 通过回调注入，数据投影继续复用 `lib/right-rail-view-model.js`。文件与 schema 账本已重建。验证：完整本地回归通过（Desktop Node 517/517、Rust 124/124、Patch 7/7、Web build、790.53 KiB/800 KiB bundle 预算、离线 Eval、账本与 diff integrity）及原生 WebDriver smoke 通过。
+
+- 2026-07-22 文件治理继续推进：`EngineeringFileTab` 已从 `main.jsx` 完整下沉到 `components/workbench/engineering-file-tab.jsx`。该 Owner 统一处理工程主题路由、治理/目标/记忆/资产面板装配、Agent Run 审批与恢复回调、关联文件只读预览；Runtime 服务、展示注册表及工作流动作均由 `AgentWorkspace` 显式注入。`main.jsx` 不再持有主题面板实现。领域边界回归随 Owner 更新，文件与 schema 账本已重新生成。验证：完整本地回归通过（Desktop Node 517/517、Rust 124/124、Patch 7/7、Web build、790.44 KiB/800 KiB bundle 预算、离线 Eval、账本与 diff integrity）和原生 WebDriver smoke 通过；浏览器 Preview 已实测“目标与任务”与“执行终端”渲染。
+
+- 2026-07-22 文件治理继续推进：`AgentTopicPanel` 已从 `main.jsx` 下沉到 `components/workbench/agent-topic-panel.jsx`，任务板状态、目标任务动作和 Agent Run 结果保持在同一 Workbench Owner 内；`EngineeringFileTab` 显式传入 Agent Run、审批/恢复回调与任务展示依赖。修复了任务主题原有的 `boardState`、`agentRuns`、`workspaceRouteById` 未声明引用，以及治理任务装配遗漏的 `designImplementationTopics` / `governanceFileHealthLabel`。浏览器 Preview 已从“目标与任务”导航到任务列表并渲染任务状态与操作。验证：完整本地回归通过（Desktop Node 517/517、Rust 124/124、Patch 7/7、Web build、bundle 预算、离线 Eval、账本与 diff integrity），原生 WebDriver smoke 通过。
+
+- 2026-07-22 文件治理继续推进：右侧栏的活动目标解析、任务去重/筛选、队列回退、进度、验收状态和对话分组已从 `main.jsx::RightRail` 下沉到 `lib/right-rail-view-model.js`。右侧栏保留交互状态和所有注入回调，不直接持有领域推导；新增 ViewModel 与静态 Owner 边界回归，覆盖噪声任务排除、任务状态进度和 snapshot queue 回退。验证：完整本地回归通过（Desktop Node 515/515、Rust 124/124、Patch 7/7、Web build、bundle 预算、离线 Eval、账本与 diff integrity），原生 WebDriver smoke 通过。
+
+- 2026-07-22 任务板稳定性修复：`task-board-view-model` 已将内部的 `goalTitleForTask` 显式暴露给 `useAgentTopicTaskBoard`，`AgentTopicPanel` 随后注入任务详情、归档和任务操作面板；此前任务主题会引用未声明变量。新增目标标题映射回归。验证：完整本地回归（Desktop Node 512/512、Rust 124/124、Patch 7/7、Web build、bundle 预算、离线 Eval、账本与 diff integrity）及原生 WebDriver smoke 通过。
+
+- 2026-07-22 文件治理继续推进：项目事实 Slot 编译、刷新失败留存、stale 自动刷新与事实差量 reconcile 已从 `main.jsx` 下沉到 `components/workbench/workspace-facts-preview.jsx`。导航与刷新统一由 `onNavigate` / `onRefreshFacts` 注入，修复此前迁移后 Slot action 闭包未显式取得导航回调的缺口；`project-overview` schema 账本已登记新消费者。验证：完整本地回归（Desktop Node 512/512、Rust 124/124、Patch 7/7、Web build、bundle 预算、离线 Eval、文件与 schema 账本、diff integrity）及原生 WebDriver smoke 通过。
+
+- 2026-07-22 文件治理继续推进：跨项目仪表盘的项目/任务聚合与纯展示已从 `main.jsx::WorkspaceFactsPreview` 下沉到 `components/workbench/workspace-dashboard.jsx`；全局概览不再初始化事实刷新 Slot 状态机，Workbench 只显式注入快照、任务状态字典、导航和项目接入回调。验收标准、目标历史、验收报告、运行记录和项目接入面板也已归入 `components/workbench/goal-validation-panels.jsx`。新增静态 Owner 边界回归。验证：完整本地回归（Desktop Node 511/511、Rust 124/124、Patch 7/7、Web build、bundle 预算、离线 Eval、账本与 diff integrity）及原生 WebDriver smoke 通过；真实 Provider Eval 仍以受保护环境既有基线为准。
 
 - 2026-07-22 文件治理继续推进：任务状态文案与计划检查选择已从 `main.jsx` 下沉到 `lib/task-workflow-presentation.js`，Workbench 只注入当前状态字典和受控检查能力。新增静态 Owner 边界回归。验证：Desktop Node 461/461、Web build、原生 WebDriver smoke 及受保护真实 Eval `29890989675` 通过，后者保留 12/12 artifact-relative trace 并维持全部核心指标。
 
@@ -738,7 +784,7 @@ depends_on: [PROJECT.md, AGENTS.md, docs/PRODUCT_PLAN.md, docs/CHANGELOG.md]
 - 桌面端 Tabs 和 Tooltip 已接入官方 primitive 路线：新增 `@radix-ui/react-tabs`、`@radix-ui/react-tooltip`，工作区顶部 Plan / Diff / Checks / Trace 已改用 Radix Tabs，顶部 Theme / Report / New Task 已改用 Radix Tooltip 包装；视觉仍由 Desktop tokens 控制。
 - 桌面端 Dialog 和 DropdownMenu 已接入官方 primitive 路线：新增 `@radix-ui/react-dialog`、`@radix-ui/react-dropdown-menu`，New Task 已改为 Radix Dialog 并复用生成计划链路，Report 已改为 Radix DropdownMenu；视觉仍由 Desktop tokens 控制。
 - 桌面端 Switch 已接入官方 primitive 路线：新增 `@radix-ui/react-switch`，Provider 的“启用 provider”已从原生 checkbox 改为 Radix Switch；视觉仍由 Desktop tokens 控制。
-- 桌面端开始抽 workbench pattern 层：新增 `desktop/src/components/workbench/task-command-bar.jsx` 和 `provider-status-row.jsx`，Diff / Runner 操作按钮组与 Provider 状态行已从 `main.jsx` 拆出。
+- 桌面端开始抽 workbench pattern 层：新增 `desktop/src/components/workbench/task-command-bar.jsx`，Diff / Runner 操作按钮组已从 `main.jsx` 拆出；此前无消费者的 Provider 状态行已于 2026-07-22 经授权退役。
 - 桌面端主题色已收口为可配置 token：`desktop/src/styles.css` 新增 `--desktop-theme-h/s/l`，并派生 `--desktop-accent`、`--desktop-accent-soft`、`--desktop-border-accent`、`--desktop-state-accent-bg*`；原绿色硬编码已迁到 accent token，界面其余部分保持中性色。
 - 顶部主题菜单已接入：新增 `desktop/src/components/workbench/theme-menu.jsx`，挂在主题图标按钮上，支持深色 / 浅色切换和 5 个主题色预设；当前先写入 `localStorage` 并实时更新根 CSS 变量。
 - 主题设置已升级到桌面端本地配置：Rust 新增 `get_desktop_theme` / `save_desktop_theme`，配置写入 `.project-os/desktop-theme.json`；浏览器预览仍 fallback 到 `localStorage`。

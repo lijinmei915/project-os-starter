@@ -49,13 +49,15 @@ pub fn load_or_seed(app_root: &Path) -> Result<DesktopThemeConfig, String> {
 pub fn save(app_root: &Path, config: &DesktopThemeConfig) -> Result<(), String> {
     let mut config = config.clone();
     config.schema_version = SCHEMA_VERSION.to_string();
-    Repository::new(app_root).transaction(
-        "save-desktop-theme",
-        &[JsonMutation::upsert(
-            THEME_PATH,
-            serde_json::to_value(config).map_err(|err| err.to_string())?,
-        )],
-    ).map(|_| ())
+    Repository::new(app_root)
+        .transaction(
+            "save-desktop-theme",
+            &[JsonMutation::upsert(
+                THEME_PATH,
+                serde_json::to_value(config).map_err(|err| err.to_string())?,
+            )],
+        )
+        .map(|_| ())
 }
 
 pub fn normalize(mut config: DesktopThemeConfig) -> DesktopThemeConfig {

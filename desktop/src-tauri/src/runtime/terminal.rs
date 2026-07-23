@@ -111,7 +111,10 @@ pub fn save_image(root: &Path, name: &str, data_url: &str) -> Result<String, Str
         .and_then(|value| value.to_str())
         .unwrap_or("png")
         .to_ascii_lowercase();
-    if !matches!(extension.as_str(), "png" | "jpg" | "jpeg" | "gif" | "webp" | "svg") {
+    if !matches!(
+        extension.as_str(),
+        "png" | "jpg" | "jpeg" | "gif" | "webp" | "svg"
+    ) {
         return Err("终端图片只支持 PNG、JPG、GIF、WebP 或 SVG".to_string());
     }
     let (mime, encoded) = data_url
@@ -141,7 +144,11 @@ pub fn save_image(root: &Path, name: &str, data_url: &str) -> Result<String, Str
         .as_millis();
     let file_name = format!(
         "omnidesk-image-{stamp}.{}",
-        if safe_name.is_empty() { extension.clone() } else { extension }
+        if safe_name.is_empty() {
+            extension.clone()
+        } else {
+            extension
+        }
     );
     let path = dir.join(file_name);
     fs::write(&path, bytes).map_err(|err| err.to_string())?;
@@ -174,7 +181,12 @@ pub fn start_session(
     let cols = input.cols.clamp(20, 400);
     let rows = input.rows.clamp(8, 200);
     let pair = native_pty_system()
-        .openpty(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })
+        .openpty(PtySize {
+            rows,
+            cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        })
         .map_err(|err| err.to_string())?;
     let mut command = CommandBuilder::new(shell.clone());
     command.cwd(root.clone());
@@ -182,8 +194,14 @@ pub fn start_session(
     command.env("COLORTERM", "truecolor");
     command.env("PROMPT_EOL_MARK", "");
 
-    let child = pair.slave.spawn_command(command).map_err(|err| err.to_string())?;
-    let mut reader = pair.master.try_clone_reader().map_err(|err| err.to_string())?;
+    let child = pair
+        .slave
+        .spawn_command(command)
+        .map_err(|err| err.to_string())?;
+    let mut reader = pair
+        .master
+        .try_clone_reader()
+        .map_err(|err| err.to_string())?;
     let writer = pair.master.take_writer().map_err(|err| err.to_string())?;
     let reader_session_id = session_id.clone();
     std::thread::spawn(move || {
@@ -195,7 +213,11 @@ pub fn start_session(
                     let data = String::from_utf8_lossy(&buffer[..size]).to_string();
                     let _ = app.emit(
                         "terminal://output",
-                        TerminalOutputEvent { session_id: reader_session_id.clone(), generation, data },
+                        TerminalOutputEvent {
+                            session_id: reader_session_id.clone(),
+                            generation,
+                            data,
+                        },
                     );
                 }
                 Err(_) => break,
@@ -206,7 +228,14 @@ pub fn start_session(
         .sessions
         .lock()
         .map_err(|err| err.to_string())?
-        .insert(session_id.clone(), TerminalSession { child, master: pair.master, writer });
+        .insert(
+            session_id.clone(),
+            TerminalSession {
+                child,
+                master: pair.master,
+                writer,
+            },
+        );
 
     Ok(TerminalSessionResult {
         session_id,
@@ -217,24 +246,40 @@ pub fn start_session(
     })
 }
 
-pub fn write_session(state: &TerminalState, input: WriteTerminalSessionInput) -> Result<(), String> {
+pub fn write_session(
+    state: &TerminalState,
+    input: WriteTerminalSessionInput,
+) -> Result<(), String> {
     let session_id = normalized_session_id(&input.session_id);
     let mut sessions = state.sessions.lock().map_err(|err| err.to_string())?;
-    let session = sessions.get_mut(&session_id).ok_or_else(|| "终端还没有启动".to_string())?;
-    session.writer.write_all(input.data.as_bytes()).map_err(|err| err.to_string())?;
+    let session = sessions
+        .get_mut(&session_id)
+        .ok_or_else(|| "终端还没有启动".to_string())?;
+    session
+        .writer
+        .write_all(input.data.as_bytes())
+        .map_err(|err| err.to_string())?;
     session.writer.flush().map_err(|err| err.to_string())
 }
 
-pub fn resize_session(state: &TerminalState, input: ResizeTerminalSessionInput) -> Result<(), String> {
+pub fn resize_session(
+    state: &TerminalState,
+    input: ResizeTerminalSessionInput,
+) -> Result<(), String> {
     let session_id = normalized_session_id(&input.session_id);
     let sessions = state.sessions.lock().map_err(|err| err.to_string())?;
-    let session = sessions.get(&session_id).ok_or_else(|| "终端还没有启动".to_string())?;
-    session.master.resize(PtySize {
-        rows: input.rows.clamp(8, 200),
-        cols: input.cols.clamp(20, 400),
-        pixel_width: 0,
-        pixel_height: 0,
-    }).map_err(|err| err.to_string())
+    let session = sessions
+        .get(&session_id)
+        .ok_or_else(|| "终端还没有启动".to_string())?;
+    session
+        .master
+        .resize(PtySize {
+            rows: input.rows.clamp(8, 200),
+            cols: input.cols.clamp(20, 400),
+            pixel_width: 0,
+            pixel_height: 0,
+        })
+        .map_err(|err| err.to_string())
 }
 
 pub fn stop_session(state: &TerminalState, input: StopTerminalSessionInput) -> Result<(), String> {
@@ -249,13 +294,27 @@ pub fn stop_session(state: &TerminalState, input: StopTerminalSessionInput) -> R
 #[cfg(feature = "webdriver")]
 pub fn record_native_trace(root: &Path, stage: &str, timestamp: &str) -> Result<(), String> {
     const ALLOWED_STAGES: &[&str] = &[
-        "terminal-session.start-before", "terminal-session.start-complete", "terminal-session.start-error",
-        "terminal-session.effect-start", "terminal-session.output-subscribed", "terminal-session.effect-error",
-        "terminal-session.effect-cleanup", "terminal-dock.mount", "terminal-dock.xterm-created",
-        "terminal-dock.xterm-opened", "terminal-dock.initial-focus-start", "terminal-dock.initial-focus-complete",
-        "terminal-dock.initial-focus-error", "terminal-dock.fit-start", "terminal-dock.fit-complete",
-        "terminal-dock.fit-error", "terminal-dock.active-effect", "terminal-dock.active-focus-start",
-        "terminal-dock.active-focus-complete", "terminal-dock.active-focus-error", "terminal-dock.cleanup",
+        "terminal-session.start-before",
+        "terminal-session.start-complete",
+        "terminal-session.start-error",
+        "terminal-session.effect-start",
+        "terminal-session.output-subscribed",
+        "terminal-session.effect-error",
+        "terminal-session.effect-cleanup",
+        "terminal-dock.mount",
+        "terminal-dock.xterm-created",
+        "terminal-dock.xterm-opened",
+        "terminal-dock.initial-focus-start",
+        "terminal-dock.initial-focus-complete",
+        "terminal-dock.initial-focus-error",
+        "terminal-dock.fit-start",
+        "terminal-dock.fit-complete",
+        "terminal-dock.fit-error",
+        "terminal-dock.active-effect",
+        "terminal-dock.active-focus-start",
+        "terminal-dock.active-focus-complete",
+        "terminal-dock.active-focus-error",
+        "terminal-dock.cleanup",
     ];
     if !ALLOWED_STAGES.contains(&stage) {
         return Err("WebDriver terminal trace stage is not allowed".to_string());
@@ -268,20 +327,30 @@ pub fn record_native_trace(root: &Path, stage: &str, timestamp: &str) -> Result<
         .ok()
         .and_then(|content| serde_json::from_str::<Vec<Value>>(&content).ok())
         .unwrap_or_default();
-    if entries.iter().any(|entry| entry.get("stage").and_then(Value::as_str) == Some(stage)) {
+    if entries
+        .iter()
+        .any(|entry| entry.get("stage").and_then(Value::as_str) == Some(stage))
+    {
         return Ok(());
     }
     entries.push(json!({ "at": timestamp, "stage": stage }));
     if entries.len() > 30 {
         entries.drain(..entries.len() - 30);
     }
-    fs::write(&path, serde_json::to_vec(&entries).map_err(|err| err.to_string())?)
-        .map_err(|err| err.to_string())
+    fs::write(
+        &path,
+        serde_json::to_vec(&entries).map_err(|err| err.to_string())?,
+    )
+    .map_err(|err| err.to_string())
 }
 
 fn normalized_session_id(value: &str) -> String {
     let value = value.trim();
-    if value.is_empty() { default_session_id() } else { value.to_string() }
+    if value.is_empty() {
+        default_session_id()
+    } else {
+        value.to_string()
+    }
 }
 
 #[cfg(test)]

@@ -124,30 +124,35 @@ test("asset pages own distinct code, governance, report, and schema modules", ()
 test("agent configuration pages own distinct model, tool, and security modules", () => {
   assert.deepEqual(workspaceRouteById("model-connections").owns, ["model-provider", "model-availability", "model-default"]);
   assert.deepEqual(workspaceRouteById("tool-allowlist").owns, ["tool-allowed", "tool-confirmation", "tool-restrictions"]);
+  const outlineSource = fs.readFileSync(new URL("../src/workspace-outline.js", import.meta.url), "utf8");
+  assert.match(outlineSource, /id: "tool-allowlist", title: "受控工具"/);
+  assert.match(outlineSource, /desktop\/src-tauri\/src\/runtime\/execution\.rs/);
+  assert.doesNotMatch(outlineSource, /agent-runtime\/tool-registry\.js/);
   assert.equal(workspaceRouteById("skill-capabilities"), null);
   assert.equal(workspaceRouteById("adapters"), null);
   assert.deepEqual(workspaceRouteById("security-boundary").owns, ["security-data", "security-execution", "security-confirmation"]);
 });
 
 test("critical project-flow pages do not fall back to the generic topic surface", () => {
-  const source = fs.readFileSync(new URL("../src/main.jsx", import.meta.url), "utf8");
-  assert.match(source, /dedicatedSurfaceByTopic/);
-  assert.match(source, /"project-progress": "current-progress"/);
-  assert.match(source, /"project-runbook": "runbook"/);
-  assert.match(source, /"project-risks": "risk-boundary"/);
-  assert.match(source, /"local-project-state": "local-project-state"/);
-  assert.match(source, /"collaboration-boundary": "collaboration-boundary"/);
-  assert.match(source, /"execution-permissions": "execution-permissions"/);
-  assert.match(source, /"documentation-rules": "documentation-rules"/);
-  assert.match(source, /"system-architecture": "system-architecture"/);
-  assert.match(source, /"data-contracts": "data-contracts"/);
-  assert.match(source, /"code-structure": "code-structure"/);
-  assert.match(source, /"validation-checks": "validation-checks"/);
-  assert.match(source, /"validation-report": "validation-report"/);
-  assert.match(source, /"run-records": "run-records"/);
-  assert.match(source, /"handoff-records": "handoff-records"/);
-  assert.match(source, /"decision-records": "decision-records"/);
-  assert.match(source, /"lessons-learned": "lessons-learned"/);
+  const workbench = fs.readFileSync(new URL("../src/main.jsx", import.meta.url), "utf8");
+  const catalog = fs.readFileSync(new URL("../src/lib/workbench-catalog.js", import.meta.url), "utf8");
+  assert.match(workbench, /dedicatedSurfaceByTopic/);
+  assert.match(catalog, /"project-progress": "current-progress"/);
+  assert.match(catalog, /"project-runbook": "runbook"/);
+  assert.match(catalog, /"project-risks": "risk-boundary"/);
+  assert.match(catalog, /"local-project-state": "local-project-state"/);
+  assert.match(catalog, /"collaboration-boundary": "collaboration-boundary"/);
+  assert.match(catalog, /"execution-permissions": "execution-permissions"/);
+  assert.match(catalog, /"documentation-rules": "documentation-rules"/);
+  assert.match(catalog, /"system-architecture": "system-architecture"/);
+  assert.match(catalog, /"data-contracts": "data-contracts"/);
+  assert.match(catalog, /"code-structure": "code-structure"/);
+  assert.match(catalog, /"validation-checks": "validation-checks"/);
+  assert.match(catalog, /"validation-report": "validation-report"/);
+  assert.match(catalog, /"run-records": "run-records"/);
+  assert.match(catalog, /"handoff-records": "handoff-records"/);
+  assert.match(catalog, /"decision-records": "decision-records"/);
+  assert.match(catalog, /"lessons-learned": "lessons-learned"/);
 });
 
 test("ui standards is a group and token/component pages own distinct features", () => {

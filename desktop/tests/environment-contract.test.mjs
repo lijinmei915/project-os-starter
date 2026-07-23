@@ -16,9 +16,12 @@ test("uses OmniDesk names for local environment entrypoints", () => {
 
 test("uses OmniDesk identity for the native package metadata and active run records", () => {
   const cargo = fs.readFileSync(path.join(desktopRoot, "src-tauri/Cargo.toml"), "utf8");
-  const workbench = fs.readFileSync(path.join(desktopRoot, "src/main.jsx"), "utf8");
+  const runRecords = fs.readFileSync(
+    path.join(desktopRoot, "src/components/workbench/goal-validation-panels.jsx"),
+    "utf8",
+  );
   assert.match(cargo, /authors = \["OmniDesk"\]/);
   assert.equal(cargo.includes('authors = ["Project OS"]'), false);
-  assert.match(workbench, /清理策略由 OmniDesk Runtime 维护/);
-  assert.equal(workbench.includes("清理策略由 Project OS 配置维护"), false);
+  assert.match(runRecords, /清理策略由 OmniDesk Runtime 维护/);
+  assert.equal(runRecords.includes("清理策略由 Project OS 配置维护"), false);
 });

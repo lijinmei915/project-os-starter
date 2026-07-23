@@ -1,22 +1,26 @@
 pub mod agent_runs;
 pub mod agent_tools;
 pub mod app;
-pub mod chat_routing;
 pub mod chat_content;
+pub mod chat_routing;
 pub mod chat_runtime;
 pub mod chat_stream;
 pub mod conversations;
 pub mod execution;
 pub mod goals;
+pub mod hermes_execution;
 pub mod hermes_protocol;
 pub mod provider;
 pub mod repository;
 pub mod state_namespace;
+pub mod system_integration;
 pub mod tasks;
 pub mod terminal;
 pub mod theme;
 pub mod workspace;
 pub mod workspace_governance;
+pub mod workspace_watcher;
 
 pub mod patch;
+pub mod patch_draft;
 pub mod planning;

@@ -288,7 +288,9 @@ pub fn legacy_retirement_readiness(root: &Path) -> Result<LegacyRetirementReadin
 /// Archives only legacy files that diverged after cutover. This is a separate,
 /// explicit retention action: it never removes `.project-os`, and callers must
 /// use the archive as evidence before requesting a destructive cleanup.
-pub fn archive_legacy_retirement_differences(root: &Path) -> Result<LegacyRetentionArchive, String> {
+pub fn archive_legacy_retirement_differences(
+    root: &Path,
+) -> Result<LegacyRetentionArchive, String> {
     let readiness = legacy_retirement_readiness(root)?;
     if !readiness.namespace_active {
         return Err("状态命名空间尚未激活，不能归档 legacy 差异".to_string());
@@ -345,7 +347,11 @@ pub fn archive_legacy_retirement_differences(root: &Path) -> Result<LegacyRetent
     });
     write_atomic(
         &archive_root.join("manifest.json"),
-        &[serde_json::to_vec_pretty(&manifest).map_err(|error| error.to_string())?, b"\n".to_vec()].concat(),
+        &[
+            serde_json::to_vec_pretty(&manifest).map_err(|error| error.to_string())?,
+            b"\n".to_vec(),
+        ]
+        .concat(),
     )?;
     Ok(LegacyRetentionArchive {
         archive_relative,
@@ -412,7 +418,10 @@ pub fn cleanup_legacy_state_for_retirement(root: &Path) -> Result<LegacyRetireme
 
     let removed_files = files.len();
     fs::remove_dir_all(&legacy_root).map_err(|error| error.to_string())?;
-    Ok(LegacyRetirementCleanup { archive_relative, removed_files })
+    Ok(LegacyRetirementCleanup {
+        archive_relative,
+        removed_files,
+    })
 }
 
 pub fn namespace_is_active(root: &Path) -> bool {
@@ -431,7 +440,10 @@ pub fn namespace_is_active(root: &Path) -> bool {
 pub fn state_path_for_read(root: &Path, relative_path: &str) -> Result<PathBuf, String> {
     let normalized = normalize_relative_path(relative_path)?;
     if normalized == LEGACY_STATE_ROOT || normalized.starts_with(&format!("{LEGACY_STATE_ROOT}/")) {
-        return Err("旧 .project-os 路径只允许通过迁移导入，Runtime 读写必须使用 .omnidesk 分区".to_string());
+        return Err(
+            "旧 .project-os 路径只允许通过迁移导入，Runtime 读写必须使用 .omnidesk 分区"
+                .to_string(),
+        );
     }
     Ok(root.join(normalized))
 }
@@ -441,12 +453,7 @@ pub fn state_path_for_write(root: &Path, relative_path: &str) -> Result<PathBuf,
 }
 
 pub fn state_path_exists(root: &Path, relative_path: &str) -> bool {
-    state_path_for_read(root, relative_path)
-        .is_ok_and(|path| path.exists())
-}
-
-pub fn state_path_from_absolute(path: &Path) -> Result<PathBuf, String> {
-    Ok(path.to_path_buf())
+    state_path_for_read(root, relative_path).is_ok_and(|path| path.exists())
 }
 
 pub fn namespace_manifest(outcome: &MigrationOutcome, legacy_exists: bool) -> Value {
@@ -644,7 +651,11 @@ mod tests {
     #[test]
     fn activation_refuses_conflicts_without_enabling_legacy_runtime_reads() {
         let root = test_root("activation-conflict");
-        write_atomic(&root.join(".project-os/state.json"), br#"{"source":"legacy"}"#).unwrap();
+        write_atomic(
+            &root.join(".project-os/state.json"),
+            br#"{"source":"legacy"}"#,
+        )
+        .unwrap();
         write_atomic(
             &root.join(".omnidesk/data/state.json"),
             br#"{"source":"omnidesk"}"#,
@@ -761,11 +772,18 @@ mod tests {
         assert_eq!(archive.files.len(), 1);
         assert_eq!(archive.files[0].legacy_relative, "state.json");
         assert_eq!(
-            fs::read(root.join(&archive.archive_relative).join("source/state.json")).unwrap(),
+            fs::read(
+                root.join(&archive.archive_relative)
+                    .join("source/state.json")
+            )
+            .unwrap(),
             br#"{\"version\":0,\"legacy\":true}"#
         );
         assert!(root.join(".project-os/state.json").exists());
-        assert!(root.join(&archive.archive_relative).join("manifest.json").exists());
+        assert!(root
+            .join(&archive.archive_relative)
+            .join("manifest.json")
+            .exists());
         fs::remove_dir_all(root).unwrap();
     }
 

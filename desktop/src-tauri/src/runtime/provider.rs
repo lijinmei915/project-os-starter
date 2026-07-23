@@ -1,16 +1,114 @@
 use crate::runtime::repository::{JsonMutation, Repository};
+use crate::runtime::state_namespace::state_path_for_read;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashSet;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const PROVIDER_CONFIG_PATH: &str = ".omnidesk/data/desktop-provider.json";
 const MODEL_CATALOG_PATH: &str = ".omnidesk/data/model-catalog.json";
 const MODEL_HEALTH_PATH: &str = ".omnidesk/cache/model-health.json";
 pub const PROVIDER_SCHEMA_VERSION: &str = "omnidesk.desktop-provider.v0.1";
 const LEGACY_PROVIDER_SCHEMA_VERSION: &str = "project-os.desktop-provider.v0.1";
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderModelTestResult {
+    pub model: String,
+    pub success: bool,
+    pub message: String,
+}
+
+pub async fn test_connection(
+    provider: &ProviderConfig,
+    api_key: &str,
+) -> Result<ProviderModelTestResult, String> {
+    let response = post_chat_completion(
+        provider,
+        api_key,
+        &serde_json::json!({
+            "model": provider.model,
+            "messages": [{ "role": "user", "content": "Reply with OK only." }],
+            "temperature": 0
+        }),
+        Duration::from_secs(45),
+    )
+    .await?;
+    let content = chat_completion_content(require_success(response, "模型测试失败").await?)
+        .await
+        .map_err(|error| {
+            if error == "provider 返回空内容" {
+                "模型返回为空".to_string()
+            } else {
+                error
+            }
+        })?;
+    Ok(ProviderModelTestResult {
+        model: provider.model.clone(),
+        success: true,
+        message: format!("{} 可用：{}", provider.model, trim_for_trace(&content)),
+    })
+}
+
+pub fn model_test_config(
+    api_base: &str,
+    api_key_env: &str,
+    model: &str,
+) -> Result<ProviderConfig, String> {
+    if api_base.trim().is_empty() {
+        return Err("请先填写 API 请求地址".to_string());
+    }
+    if model.trim().is_empty() {
+        return Err("请先选择或填写模型名称".to_string());
+    }
+    Ok(ProviderConfig {
+        schema_version: PROVIDER_SCHEMA_VERSION.to_string(),
+        provider: "openai-compatible".to_string(),
+        model: model.trim().to_string(),
+        api_base: api_base.trim().to_string(),
+        api_key_env: api_key_env.trim().to_string(),
+        enabled: true,
+        active_profile_id: String::new(),
+        profiles: Vec::new(),
+    })
+}
+
+pub fn resolve_credential(
+    root: &Path,
+    api_key_env: &str,
+    inline_api_key: &str,
+) -> Result<String, String> {
+    if !inline_api_key.trim().is_empty() {
+        return Ok(inline_api_key.trim().to_string());
+    }
+    if api_key_env.trim().is_empty() {
+        return Err("请先填写 Key 保存变量名或粘贴 API Key".to_string());
+    }
+    read_secret(root, api_key_env.trim())
+        .ok_or_else(|| format!("环境变量或 .env.local 中未设置 {}", api_key_env.trim()))
+}
+
+pub async fn test_connection_with_credential(
+    root: &Path,
+    provider: &ProviderConfig,
+    inline_api_key: &str,
+) -> Result<ProviderModelTestResult, String> {
+    let api_key = resolve_credential(root, &provider.api_key_env, inline_api_key)?;
+    test_connection(provider, &api_key).await
+}
+
+pub async fn probe_catalog_with_credential(
+    root: &Path,
+    api_base: &str,
+    api_key_env: &str,
+    inline_api_key: &str,
+) -> Result<Vec<String>, String> {
+    let api_key = resolve_credential(root, api_key_env, inline_api_key)?;
+    probe_model_catalog(api_base, &api_key).await
+}
 
 pub fn chat_completions_endpoint(api_base: &str) -> String {
     let base = api_base.trim_end_matches('/');
@@ -95,6 +193,19 @@ pub async fn get_models(
         .map_err(|err| err.to_string())
 }
 
+/// Fetches a normalized model catalog from an OpenAI-compatible connection.
+/// Callers resolve credentials locally before entering this transport boundary.
+pub async fn probe_model_catalog(api_base: &str, api_key: &str) -> Result<Vec<String>, String> {
+    if api_base.trim().is_empty() {
+        return Err("请先填写 API 请求地址".to_string());
+    }
+    if api_key.trim().is_empty() {
+        return Err("请先填写 Key 保存变量名或粘贴 API Key".to_string());
+    }
+    let response = get_models(api_base.trim(), api_key.trim(), Duration::from_secs(30)).await?;
+    listed_models(require_success(response, "模型列表请求失败").await?).await
+}
+
 pub async fn require_success(
     response: reqwest::Response,
     operation: &str,
@@ -104,7 +215,10 @@ pub async fn require_success(
         return Ok(response);
     }
     let body = response.text().await.unwrap_or_default();
-    Err(format!("{operation} HTTP {status}: {}", trim_for_trace(&body)))
+    Err(format!(
+        "{operation} HTTP {status}: {}",
+        trim_for_trace(&body)
+    ))
 }
 
 pub async fn chat_completion_content(response: reqwest::Response) -> Result<String, String> {
@@ -167,6 +281,95 @@ pub struct ProviderProfile {
     pub model: String,
     pub api_base: String,
     pub api_key_env: String,
+}
+
+/// Credential values remain outside runtime state. This DTO intentionally
+/// contains only credential presence so the desktop can render each profile
+/// without exposing secret material.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderStatus {
+    pub provider: String,
+    pub model: String,
+    pub api_base: String,
+    pub api_key_env: String,
+    pub enabled: bool,
+    pub has_api_key: bool,
+    pub active_profile_id: String,
+    pub profiles: Vec<ProviderProfileStatus>,
+    pub source: String,
+    pub workspace_root: String,
+    pub revision: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderProfileStatus {
+    pub id: String,
+    pub name: String,
+    pub note: String,
+    pub website: String,
+    pub provider: String,
+    pub model: String,
+    pub api_base: String,
+    pub api_key_env: String,
+    pub has_api_key: bool,
+}
+
+/// Builds the public Provider status without reading a credential. The caller
+/// owns the secret boundary and supplies only a presence lookup.
+pub fn status<F>(
+    config: &ProviderConfig,
+    workspace_root: String,
+    revision: String,
+    has_credential: F,
+) -> ProviderStatus
+where
+    F: Fn(&str) -> bool,
+{
+    let profiles = config
+        .profiles
+        .iter()
+        .map(|profile| ProviderProfileStatus {
+            id: profile.id.clone(),
+            name: profile.name.clone(),
+            note: profile.note.clone(),
+            website: profile.website.clone(),
+            provider: profile.provider.clone(),
+            model: profile.model.clone(),
+            api_base: profile.api_base.clone(),
+            api_key_env: profile.api_key_env.clone(),
+            has_api_key: has_credential(&profile.api_key_env),
+        })
+        .collect();
+    ProviderStatus {
+        provider: config.provider.clone(),
+        model: config.model.clone(),
+        api_base: config.api_base.clone(),
+        api_key_env: config.api_key_env.clone(),
+        enabled: config.enabled,
+        has_api_key: has_credential(&config.api_key_env),
+        active_profile_id: config.active_profile_id.clone(),
+        profiles,
+        source: "tauri".to_string(),
+        workspace_root,
+        revision,
+    }
+}
+
+/// The revision lets the desktop invalidate its status view when provider
+/// configuration changes, without including any credential data in state.
+pub fn status_source(root: &Path) -> (String, String) {
+    let path = state_path_for_read(root, PROVIDER_CONFIG_PATH)
+        .unwrap_or_else(|_| root.join(PROVIDER_CONFIG_PATH));
+    let revision = fs::metadata(&path)
+        .ok()
+        .and_then(|metadata| {
+            let modified = metadata.modified().ok()?.duration_since(UNIX_EPOCH).ok()?;
+            Some(format!("{}-{}", modified.as_millis(), metadata.len()))
+        })
+        .unwrap_or_else(|| "missing".to_string());
+    (root.to_string_lossy().to_string(), revision)
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -318,6 +521,130 @@ pub fn upsert_provider_profile(profiles: &mut Vec<ProviderProfile>, profile: Pro
     }
 }
 
+/// Normalizes an editable connection into the persisted profile shape. The
+/// caller owns its transport DTO; the Provider domain owns profile identity
+/// and required connection fields.
+pub fn profile_from_input(
+    provider: &str,
+    model: &str,
+    api_base: &str,
+    api_key_env: &str,
+    profile_id_value: &str,
+    profile_name_value: &str,
+    note: &str,
+    website: &str,
+) -> Result<ProviderProfile, String> {
+    let provider = provider.trim();
+    let model = model.trim();
+    let api_base = api_base.trim();
+    let api_key_env = api_key_env.trim();
+    if provider.is_empty() {
+        return Err("请输入 provider".to_string());
+    }
+    if model.is_empty() {
+        return Err("请输入 model".to_string());
+    }
+    if api_base.is_empty() {
+        return Err("请输入 apiBase".to_string());
+    }
+    if api_key_env.is_empty() {
+        return Err("请输入 apiKeyEnv".to_string());
+    }
+    let id = if profile_id_value.trim().is_empty() {
+        provider_profile_id(api_key_env)
+    } else {
+        profile_id_value.trim().to_string()
+    };
+    let name = if profile_name_value.trim().is_empty() {
+        provider_profile_name(api_key_env, model)
+    } else {
+        profile_name_value.trim().to_string()
+    };
+    Ok(ProviderProfile {
+        id,
+        name,
+        note: note.trim().to_string(),
+        website: website.trim().to_string(),
+        provider: provider.to_string(),
+        model: model.to_string(),
+        api_base: api_base.to_string(),
+        api_key_env: api_key_env.to_string(),
+    })
+}
+
+/// Selects the saved profile as active while preserving all other profiles.
+/// Key values never enter this policy; profile key variable names must remain
+/// unique so later secret removal cannot affect another connection.
+pub fn save_profile(
+    existing: &ProviderConfig,
+    profile: ProviderProfile,
+    enabled: bool,
+) -> Result<ProviderConfig, String> {
+    if existing
+        .profiles
+        .iter()
+        .any(|item| item.id != profile.id && item.api_key_env == profile.api_key_env)
+    {
+        return Err("每个连接必须使用独立的 Key 保存变量，请重新保存连接。".to_string());
+    }
+    let mut profiles = existing.profiles.clone();
+    upsert_provider_profile(&mut profiles, profile.clone());
+    Ok(ProviderConfig {
+        schema_version: PROVIDER_SCHEMA_VERSION.to_string(),
+        provider: profile.provider,
+        model: profile.model,
+        api_base: profile.api_base,
+        api_key_env: profile.api_key_env,
+        enabled,
+        active_profile_id: profile.id,
+        profiles,
+    })
+}
+
+/// Removes one profile and returns a key variable only when no remaining
+/// profile references it. The caller owns the secret-file deletion boundary.
+pub fn delete_profile(
+    existing: &ProviderConfig,
+    profile_id_value: &str,
+) -> Result<(ProviderConfig, Option<String>), String> {
+    let profile_id = profile_id_value.trim();
+    if profile_id.is_empty() {
+        return Err("缺少连接 ID".to_string());
+    }
+    let removed = existing
+        .profiles
+        .iter()
+        .find(|profile| profile.id == profile_id)
+        .cloned()
+        .ok_or_else(|| "没有找到要删除的连接".to_string())?;
+    let mut config = existing.clone();
+    config.profiles.retain(|profile| profile.id != profile_id);
+    let unused_key_env = (!removed.api_key_env.trim().is_empty()
+        && !config
+            .profiles
+            .iter()
+            .any(|profile| profile.api_key_env == removed.api_key_env))
+    .then_some(removed.api_key_env);
+    if config.active_profile_id == profile_id {
+        if let Some(next) = config.profiles.first().cloned() {
+            config.provider = next.provider;
+            config.model = next.model;
+            config.api_base = next.api_base;
+            config.api_key_env = next.api_key_env;
+            config.active_profile_id = next.id;
+        } else {
+            config.provider = "openai-compatible".to_string();
+            config.model.clear();
+            config.api_base.clear();
+            config.api_key_env.clear();
+            config.enabled = false;
+            config.active_profile_id.clear();
+        }
+    }
+    config.schema_version = PROVIDER_SCHEMA_VERSION.to_string();
+    Ok((config, unused_key_env))
+}
+
 pub fn provider_profile_id(api_key_env: &str) -> String {
     api_key_env
         .trim()
@@ -389,6 +716,111 @@ pub fn health_is_fresh(entry: &ModelHealthEntry, now_seconds: u64) -> bool {
         return false;
     };
     now_seconds >= checked_at && now_seconds - checked_at <= 60
+}
+
+pub fn current_unix_timestamp() -> String {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+        .to_string()
+}
+
+pub fn record_failure(root: &Path, provider: &ProviderConfig, message: &str) -> Result<(), String> {
+    record_health(
+        root,
+        ModelHealthEntry {
+            api_base: provider.api_base.clone(),
+            api_key_env: provider.api_key_env.clone(),
+            model: provider.model.clone(),
+            status: classify_failure(message).to_string(),
+            message: trim_for_trace(message),
+            checked_at: current_unix_timestamp(),
+        },
+    )
+}
+
+/// Selects one usable saved connection, records every failed candidate, and
+/// persists a successful fallback. The caller owns any executor-specific
+/// synchronization that must happen after the active profile changes.
+pub async fn prepare_for_request(
+    root: &Path,
+    configured: &ProviderConfig,
+    excluded_profile_ids: &HashSet<String>,
+) -> Result<(ProviderConfig, String), String> {
+    let health = load_or_seed_health(root)?;
+    let mut failures = Vec::new();
+    for (profile_id, candidate) in ordered_profile_candidates(configured) {
+        if excluded_profile_ids.contains(&profile_id) {
+            continue;
+        }
+        let label = configured
+            .profiles
+            .iter()
+            .find(|profile| profile.id == profile_id)
+            .map(|profile| profile.name.clone())
+            .filter(|name| !name.trim().is_empty())
+            .unwrap_or_else(|| candidate.model.clone());
+        let Some(api_key) = read_secret(root, &candidate.api_key_env) else {
+            record_failure(root, &candidate, "未配置 API Key")?;
+            failures.push(format!("{}（认证失败）", label));
+            continue;
+        };
+        if let Some(entry) = health_entry(&health, &candidate) {
+            let now = current_unix_timestamp().parse::<u64>().unwrap_or(0);
+            if health_is_fresh(entry, now) {
+                if entry.status == "available" {
+                    let switch_note = if profile_id != configured.active_profile_id {
+                        format!("已自动切换到可用连接「{}」。", label)
+                    } else {
+                        String::new()
+                    };
+                    if profile_id != configured.active_profile_id {
+                        save_config(root, &candidate)?;
+                    }
+                    return Ok((candidate, switch_note));
+                }
+                failures.push(format!("{}（{}）", label, entry.status));
+                continue;
+            }
+        }
+        match test_connection(&candidate, &api_key).await {
+            Ok(result) => {
+                record_health(
+                    root,
+                    ModelHealthEntry {
+                        api_base: candidate.api_base.clone(),
+                        api_key_env: candidate.api_key_env.clone(),
+                        model: candidate.model.clone(),
+                        status: "available".to_string(),
+                        message: result.message,
+                        checked_at: current_unix_timestamp(),
+                    },
+                )?;
+                let switch_note = if profile_id != configured.active_profile_id {
+                    format!("已自动切换到可用连接「{}」。", label)
+                } else {
+                    String::new()
+                };
+                if profile_id != configured.active_profile_id {
+                    save_config(root, &candidate)?;
+                }
+                return Ok((candidate, switch_note));
+            }
+            Err(error) => {
+                record_failure(root, &candidate, &error)?;
+                failures.push(format!("{}（{}）", label, classify_failure(&error)));
+            }
+        }
+    }
+    Err(format!(
+        "没有可用模型连接：{}",
+        if failures.is_empty() {
+            "未找到可用 profile".to_string()
+        } else {
+            failures.join("；")
+        }
+    ))
 }
 
 /// Renders the Hermes gateway stanza without accessing the filesystem or any
@@ -839,6 +1271,55 @@ pub fn remove_secret(root: &Path, key: &str) -> Result<(), String> {
     crate::runtime::repository::write_atomic(&path, format!("{}\n", lines.join("\n")).as_bytes())
 }
 
+pub fn save_secret_and_enable(
+    root: &Path,
+    config: &ProviderConfig,
+    api_key_env: &str,
+    api_key: &str,
+) -> Result<ProviderConfig, String> {
+    let api_key_env = api_key_env.trim();
+    let api_key = api_key.trim();
+    if api_key_env.is_empty() {
+        return Err("缺少 API Key Env".to_string());
+    }
+    if api_key.is_empty() {
+        return Err("请先粘贴 API Key".to_string());
+    }
+    if !api_key_env
+        .chars()
+        .all(|ch| ch.is_ascii_uppercase() || ch.is_ascii_digit() || ch == '_')
+    {
+        return Err("API Key Env 只能使用大写字母、数字和下划线".to_string());
+    }
+    write_secret(root, api_key_env, api_key)?;
+    let mut next = config.clone();
+    next.api_key_env = api_key_env.to_string();
+    next.enabled = true;
+    save_config(root, &next)?;
+    Ok(next)
+}
+
+pub fn sync_hermes_runtime_config(config: &ProviderConfig) -> Result<(), String> {
+    if !config.enabled || config.model.trim().is_empty() || config.api_base.trim().is_empty() {
+        return Ok(());
+    }
+    let Some(home) = std::env::var_os("HOME") else {
+        return Ok(());
+    };
+    let path = PathBuf::from(home).join(".hermes/config.yaml");
+    if !path.is_file() {
+        return Ok(());
+    }
+    let current =
+        fs::read_to_string(&path).map_err(|err| format!("读取 Hermes 配置失败: {err}"))?;
+    let next = render_hermes_runtime_config(&current, config)?;
+    if next != current {
+        crate::runtime::repository::write_atomic(&path, next.as_bytes())
+            .map_err(|err| format!("同步 Hermes 配置失败: {err}"))?;
+    }
+    Ok(())
+}
+
 pub fn migrate_secret(root: &Path, previous_key: &str, next_key: &str) -> Result<(), String> {
     if previous_key != next_key {
         if let Some(secret) = read_secret(root, previous_key) {
@@ -904,6 +1385,14 @@ fn read_launchctl_env_value(key: &str) -> Option<String> {
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn test_directory(label: &str) -> std::path::PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        std::env::temp_dir().join(format!("omnidesk-{label}-{}-{nonce}", std::process::id()))
+    }
     #[test]
     fn provider_state_round_trips_through_repository() {
         let root = std::env::temp_dir().join(format!(
@@ -963,6 +1452,40 @@ mod tests {
     }
 
     #[test]
+    fn status_projection_uses_credential_presence_without_receiving_secret_values() {
+        let mut config = default_config();
+        config.profiles.push(ProviderProfile {
+            id: "fallback".to_string(),
+            name: "Fallback".to_string(),
+            note: "备用连接".to_string(),
+            website: "https://fallback.example".to_string(),
+            provider: "openai-compatible".to_string(),
+            model: "fallback-model".to_string(),
+            api_base: "https://fallback.example/v1".to_string(),
+            api_key_env: "FALLBACK_API_KEY".to_string(),
+        });
+
+        let status = status(
+            &config,
+            "/workspace".to_string(),
+            "42-64".to_string(),
+            |key| key == "FALLBACK_API_KEY",
+        );
+
+        assert!(!status.has_api_key);
+        assert_eq!(status.workspace_root, "/workspace");
+        assert_eq!(status.revision, "42-64");
+        assert_eq!(status.profiles.len(), 2);
+        assert!(!status.profiles[0].has_api_key);
+        assert!(status.profiles[1].has_api_key);
+        let serialized = serde_json::to_value(status).unwrap();
+        assert_eq!(serialized["source"], "tauri");
+        assert_eq!(serialized["profiles"][1]["apiKeyEnv"], "FALLBACK_API_KEY");
+        assert!(serialized.to_string().contains("FALLBACK_API_KEY"));
+        assert!(!serialized.to_string().contains("secret-value"));
+    }
+
+    #[test]
     fn endpoint_helpers_normalize_provider_roots_and_existing_routes() {
         assert_eq!(
             chat_completions_endpoint("https://api.example.test/v1/"),
@@ -980,6 +1503,104 @@ mod tests {
             models_endpoint("https://api.example.test/v1/models"),
             "https://api.example.test/v1/models"
         );
+    }
+
+    #[tokio::test]
+    async fn model_catalog_probe_rejects_missing_connection_inputs_before_network_io() {
+        assert_eq!(
+            probe_model_catalog("", "key").await.unwrap_err(),
+            "请先填写 API 请求地址"
+        );
+        assert_eq!(
+            probe_model_catalog("https://api.example/v1", "")
+                .await
+                .unwrap_err(),
+            "请先填写 Key 保存变量名或粘贴 API Key"
+        );
+    }
+
+    #[tokio::test]
+    async fn preflight_switches_after_a_quota_failure_and_records_both_profiles() {
+        use std::io::{Read as _, Write as _};
+        use std::net::TcpListener;
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = std::thread::spawn(move || {
+            for (status, body) in [
+                (
+                    "403 Forbidden",
+                    r#"{"error":{"message":"subscription quota insufficient"}}"#,
+                ),
+                ("200 OK", r#"{"choices":[{"message":{"content":"OK"}}]}"#),
+            ] {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut request = [0_u8; 4096];
+                let _ = stream.read(&mut request);
+                write!(
+                    stream,
+                    "HTTP/1.1 {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                    status,
+                    body.len(),
+                    body
+                )
+                .unwrap();
+            }
+        });
+        let root = test_directory("provider-preflight");
+        fs::create_dir_all(&root).unwrap();
+        write_secret(&root, "TW_KEY", "test-primary").unwrap();
+        write_secret(&root, "QY_KEY", "test-fallback").unwrap();
+        let primary = ProviderProfile {
+            id: "tw".to_string(),
+            name: "TW Gateway".to_string(),
+            note: String::new(),
+            website: String::new(),
+            provider: "openai-compatible".to_string(),
+            model: "primary".to_string(),
+            api_base: format!("http://{}", address),
+            api_key_env: "TW_KEY".to_string(),
+        };
+        let fallback = ProviderProfile {
+            id: "qy".to_string(),
+            name: "QY".to_string(),
+            note: String::new(),
+            website: String::new(),
+            provider: "openai-compatible".to_string(),
+            model: "fallback".to_string(),
+            api_base: format!("http://{}", address),
+            api_key_env: "QY_KEY".to_string(),
+        };
+        let config = ProviderConfig {
+            schema_version: LEGACY_PROVIDER_SCHEMA_VERSION.to_string(),
+            provider: primary.provider.clone(),
+            model: primary.model.clone(),
+            api_base: primary.api_base.clone(),
+            api_key_env: primary.api_key_env.clone(),
+            enabled: true,
+            active_profile_id: primary.id.clone(),
+            profiles: vec![primary, fallback],
+        };
+
+        let (selected, note) = prepare_for_request(&root, &config, &HashSet::new())
+            .await
+            .unwrap();
+
+        assert_eq!(selected.active_profile_id, "qy");
+        assert!(note.contains("QY"));
+        assert_eq!(load_or_seed_config(&root).unwrap().active_profile_id, "qy");
+        let health = load_or_seed_health(&root).unwrap();
+        assert_eq!(health.entries.len(), 2);
+        assert!(health
+            .entries
+            .iter()
+            .any(|entry| entry.status == "quota-exhausted"));
+        assert!(health
+            .entries
+            .iter()
+            .any(|entry| entry.status == "available"));
+        server.join().unwrap();
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
@@ -1021,6 +1642,55 @@ mod tests {
     }
 
     #[test]
+    fn profile_mutation_policy_keeps_keys_isolated_and_reselects_active_profile() {
+        let existing = default_config();
+        let fallback = profile_from_input(
+            "openai-compatible",
+            "fallback-model",
+            "https://fallback.example/v1",
+            "FALLBACK_API_KEY",
+            "",
+            "",
+            "备用连接",
+            "https://fallback.example",
+        )
+        .unwrap();
+        assert_eq!(fallback.id, "fallback");
+        assert_eq!(fallback.name, "Fallback");
+
+        let saved = save_profile(&existing, fallback.clone(), true).unwrap();
+        assert_eq!(saved.active_profile_id, "fallback");
+        assert_eq!(saved.api_key_env, "FALLBACK_API_KEY");
+        assert_eq!(saved.profiles.len(), 2);
+
+        let duplicate = ProviderProfile {
+            id: "duplicate".to_string(),
+            name: "Duplicate".to_string(),
+            note: String::new(),
+            website: String::new(),
+            provider: "openai-compatible".to_string(),
+            model: "duplicate-model".to_string(),
+            api_base: "https://duplicate.example/v1".to_string(),
+            api_key_env: "FALLBACK_API_KEY".to_string(),
+        };
+        assert!(save_profile(&saved, duplicate, true).is_err());
+
+        let (after_delete, unused_key_env) = delete_profile(&saved, "fallback").unwrap();
+        assert_eq!(unused_key_env.as_deref(), Some("FALLBACK_API_KEY"));
+        assert_eq!(after_delete.active_profile_id, "deepseek");
+        assert_eq!(after_delete.api_key_env, "DEEPSEEK_API_KEY");
+        assert!(after_delete.enabled);
+
+        let (empty, unused_key_env) = delete_profile(&after_delete, "deepseek").unwrap();
+        assert_eq!(unused_key_env.as_deref(), Some("DEEPSEEK_API_KEY"));
+        assert!(empty.profiles.is_empty());
+        assert!(!empty.enabled);
+        assert!(
+            profile_from_input("", "model", "https://api.example", "KEY", "", "", "", "").is_err()
+        );
+    }
+
+    #[test]
     fn provider_candidates_keep_active_profile_first_and_health_is_scoped() {
         let mut config = default_config();
         let fallback = ProviderProfile {
@@ -1054,8 +1724,14 @@ mod tests {
         let fallback_config = profile_config(&config, &fallback);
         assert!(health_entry(&health, &config).is_none());
         assert!(health_entry(&health, &fallback_config).is_some());
-        assert!(health_is_fresh(health_entry(&health, &fallback_config).unwrap(), 160));
-        assert!(!health_is_fresh(health_entry(&health, &fallback_config).unwrap(), 161));
+        assert!(health_is_fresh(
+            health_entry(&health, &fallback_config).unwrap(),
+            160
+        ));
+        assert!(!health_is_fresh(
+            health_entry(&health, &fallback_config).unwrap(),
+            161
+        ));
     }
 
     #[test]
@@ -1109,6 +1785,55 @@ mod tests {
         assert_eq!(text.matches("EXAMPLE_API_KEY=").count(), 1);
         remove_secret(&root, "EXAMPLE_API_KEY").unwrap();
         assert!(read_secret(&root, "EXAMPLE_API_KEY").is_none());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn credential_resolution_prefers_inline_values_without_persisting_them() {
+        let root = test_directory("provider-inline-secret");
+        fs::create_dir_all(&root).unwrap();
+        write_secret(&root, "EXAMPLE_API_KEY", "stored").unwrap();
+        assert_eq!(
+            resolve_credential(&root, "EXAMPLE_API_KEY", " temporary ").unwrap(),
+            "temporary"
+        );
+        assert_eq!(
+            resolve_credential(&root, "EXAMPLE_API_KEY", "").unwrap(),
+            "stored"
+        );
+        assert_eq!(
+            resolve_credential(&root, "", "").unwrap_err(),
+            "请先填写 Key 保存变量名或粘贴 API Key"
+        );
+        assert!(!fs::read_to_string(root.join(".env.local"))
+            .unwrap()
+            .contains("temporary"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn saved_provider_secret_is_validated_enabled_and_kept_outside_state() {
+        let root = test_directory("provider-save-secret");
+        fs::create_dir_all(&root).unwrap();
+        let config = default_config();
+        assert_eq!(
+            save_secret_and_enable(&root, &config, "bad-key", "secret")
+                .err()
+                .unwrap(),
+            "API Key Env 只能使用大写字母、数字和下划线"
+        );
+        let saved = save_secret_and_enable(&root, &config, "OMNIDESK_TEST_KEY", "secret").unwrap();
+        assert!(saved.enabled);
+        assert_eq!(saved.api_key_env, "OMNIDESK_TEST_KEY");
+        assert_eq!(
+            read_secret(&root, "OMNIDESK_TEST_KEY").as_deref(),
+            Some("secret")
+        );
+        let state = Repository::new(&root)
+            .read_json(PROVIDER_CONFIG_PATH)
+            .unwrap()
+            .to_string();
+        assert!(!state.contains("secret"));
         fs::remove_dir_all(root).unwrap();
     }
 }

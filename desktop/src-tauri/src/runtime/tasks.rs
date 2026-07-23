@@ -338,9 +338,7 @@ pub fn delete(root: &Path, id: &str, timestamp: &str) -> Result<(), String> {
         if task.is_some() {
             mutations.push(JsonMutation::delete(task_relative));
         }
-        for (relative, conversation) in
-            repository.list_json_records(CONVERSATION_DIRECTORY)?
-        {
+        for (relative, conversation) in repository.list_json_records(CONVERSATION_DIRECTORY)? {
             let belongs_to_task = conversation.get("taskId").and_then(Value::as_str) == Some(id)
                 || task_conversation_id.as_deref()
                     == conversation.get("id").and_then(Value::as_str);
@@ -348,10 +346,7 @@ pub fn delete(root: &Path, id: &str, timestamp: &str) -> Result<(), String> {
                 mutations.push(JsonMutation::delete(relative));
             }
         }
-        for (relative_path, collection_key) in [
-            (GOALS_PATH, "goals"),
-            (BACKLOG_PATH, "items"),
-        ] {
+        for (relative_path, collection_key) in [(GOALS_PATH, "goals"), (BACKLOG_PATH, "items")] {
             let Some(mut document) = repository.read_json(relative_path) else {
                 continue;
             };
@@ -433,7 +428,10 @@ mod tests {
             "id": "legacy-task"
         }));
         assert_eq!(projected["schemaVersion"], TASK_SCHEMA_VERSION);
-        assert_eq!(projected["schemaMigration"]["from"], LEGACY_TASK_SCHEMA_VERSION);
+        assert_eq!(
+            projected["schemaMigration"]["from"],
+            LEGACY_TASK_SCHEMA_VERSION
+        );
         assert_eq!(projected["schemaMigration"]["mode"], "read-projection");
     }
 
@@ -457,11 +455,7 @@ mod tests {
             r#"{"goals":[{"id":"goal-1","taskIds":["task-1"]}]}"#,
         )
         .unwrap();
-        fs::write(
-            root.join(BACKLOG_PATH),
-            r#"{"items":[{"id":"task-1"}]}"#,
-        )
-        .unwrap();
+        fs::write(root.join(BACKLOG_PATH), r#"{"items":[{"id":"task-1"}]}"#).unwrap();
         delete(&root, "task-1", "now").unwrap();
         assert!(!task_dir.join("task-1.json").exists());
         assert!(!conversation_dir.join("conversation-1.json").exists());

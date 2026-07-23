@@ -70,7 +70,7 @@ OMNIDESK_ALLOW_EMPTY_PROVIDER_KEYS=1 bash scripts/check-secrets.sh .
 
 ## 状态迁移
 
-Runtime 启动时将 legacy `.project-os/` 非破坏性迁移到 `.omnidesk/`：
+接入外部历史工程时，Runtime 将 legacy `.project-os/` 非破坏性迁移到 `.omnidesk/`：
 
 ```txt
 .omnidesk/data      用户数据与配置

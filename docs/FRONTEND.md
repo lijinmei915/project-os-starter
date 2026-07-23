@@ -52,10 +52,12 @@ desktop/src/
   components/workbench/    # 领域 surface、展示组件与领域 hooks
   lib/                     # Runtime client、controller、view model、纯状态逻辑
   conversation-runtime/    # 对话 action、投影和执行衔接
-  agent-runtime/           # 前端侧 Agent tool registry 与受控执行契约
+  agent-runtime/           # Node Eval 支撑：受控工具、恢复与 Hermes 契约；不参与产品 Runtime
 ```
 
 `main.jsx` 只装配领域 controller、生命周期和应用外壳。新增业务状态机、直接 Tauri 调用或大段领域视图不应继续堆入该文件；应先提取到对应 `lib/` 或 `components/workbench/` 领域边界。
+
+`agent-runtime/` 仅被 `desktop/scripts/run-agent-eval-*` 与 Node 回归使用，用来验证受控 Agent 契约、恢复与 Hermes 工具环。生产执行的唯一 owner 是 `desktop/src-tauri/src/runtime/`；不得从 React Workbench 导入或以该目录替代原生 Runtime。
 
 ## 组件与样式约定
 

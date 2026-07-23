@@ -474,7 +474,7 @@ export const projectGovernanceOutline = [
         icon: "shield",
         description: "允许执行的工具和命令。",
         items: [
-          { id: "tool-allowlist", title: "工具白名单", description: "受控读取、工程写入、检查和终端限制。", relatedFiles: ["desktop/src/agent-runtime/tool-registry.js", "desktop/src-tauri/src/runtime/app.rs", "desktop/src-tauri/src/runtime/patch.rs"] },
+          { id: "tool-allowlist", title: "受控工具", description: "固定检查、工程写入、审批和终端的执行边界。", relatedFiles: ["desktop/src-tauri/src/runtime/execution.rs", "desktop/src-tauri/src/runtime/patch.rs", "desktop/src-tauri/src/runtime/agent_runs.rs"] },
         ],
       },
       {

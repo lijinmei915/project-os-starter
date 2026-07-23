@@ -1,7 +1,7 @@
 ---
 layer: knowledge
 type: status
-last_verified: 2026-07-21
+last_verified: 2026-07-23
 teaches: "OmniDesk 当前产品内核、阶段、可靠性基线和唯一下一步"
 use_when: "AI 需要判断 OmniDesk 当前状态、架构边界或下一步工作时"
 depends_on: [AGENTS.md, docs/ARCHITECTURE.md, docs/PRODUCT_PLAN.md]
@@ -44,7 +44,7 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 - Agent Run 持久化、独立审批、Patch 应用、检查、最多两轮修复，以及工具边界的阶段 checkpoint 恢复。
 - Workspace、Conversation、Task、Goal、Provider、Execution 的 Runtime 模块与 Repository 事务边界。
 - 正式 12-case Eval：任务成功率 100%、Patch 可应用率 90.9%、检查通过率 100%、恢复成功率 100%。
-- 当前工作树回归：Desktop Node 449/449、Runtime Rust 91/91、Patch Normalizer 5/5、原生 WebDriver smoke；Web build 与 800 KiB 首屏软预算通过。
+- 当前工作树回归：Desktop Node 540/540、Runtime Rust 142/142、Patch Normalizer 7/7、原生 WebDriver smoke；Web build 与 790.80 KiB/800 KiB 首屏软预算通过。
 - `.omnidesk/` v1 四分区 schema、非破坏性迁移器和启动激活已接入生产 Runtime：支持幂等复制、冲突拒绝、符号链接跳过和 legacy 回退。
 - Repository、Workspace、Provider、Task、Conversation、Agent Run 与 Preview 均按分区直接读写；文件树和 Agent 读取工具隐藏 Runtime 状态目录与可能遗留的旧目录。
 - Desktop Runtime 已停止编译旧 `governance` bridge，不再暴露 `run_project_os_action`，受控检查只执行 Desktop Node、Web build 与 Cargo 检查；浏览器 Preview 的事实刷新只重新读取只读 snapshot。
@@ -64,10 +64,11 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 - 真实 Provider Eval 强制提供 artifact trace 目录；结果中的 trace 引用为 artifact 相对路径，不再指向临时 fixture。
 - `.project-os` 已在归档和逐字节复验后删除；9 处历史差异保留于 `.omnidesk/evidence/legacy-retirement/1784572963533/`。
 - `OmniDesk 单内核收敛与可靠长任务 v1` 已完成；当前开始按文件账本逐项收口仓库结构、文档 SSOT、契约命名和领域 Owner。
-- 文件账本已覆盖全部 496 个 tracked 文件；`PRODUCT.md`、`INSTALL.md`、`AGENTS.md`、前端说明和本地 Runtime 说明已完成首批审核与改写。
+- 文件账本已覆盖全部 542 个 tracked 或非忽略文件且无待分类候选；schema 账本登记 14 个 active 契约且无待复核候选。Runtime、Eval、根入口和当前文档 SSOT 均已有明确 Owner、消费者证据、保留/拆分决策与验证记录。
+- Provider Patch Draft 的固定授权上下文、连接选择、一次 Hermes 重生成、普通 Provider 降级与占位草稿证据，只读计划的连接选择、降级与失败证据，凭据策略与模型探测、请求预检与故障切换、Provider chat transport/SSE、Hermes 配置文件同步与 ACP 执行、Agent 读工具、系统集成、Workspace watcher 与批准工具状态转换已从 `app.rs` 收口到对应 Runtime Owner；聊天和只读计划共用同一图片附件输入契约。Workbench 默认契约、Preview Workspace 只读状态投影及 Workspace 原生/Preview transport bridge 也已从 `main.jsx` 下沉，入口继续只承担 controller 与 surface 装配。
 - Workspace 的事实新鲜度、能力、记忆与档案记录，以及前端对话、摘要、项目记忆和事实投影，现统一新写入 `omnidesk.*`；读取旧 `project-os.*` 仅生成带 `schemaMigration` 的内存投影。Provider 凭据配置仍隔离，未做泛化迁移。
 - `styles.css` 已收口为有序入口，领域规则拆到 `styles/theme|workspace|conversation|terminal|provider-rail.css`；构建与边界测试约束入口顺序和 Owner。
-- 执行 allowlist、Patch apply、输出截断和任务摘要已归属 `runtime/execution.rs`；`app.rs` 保留 Tauri 命令、审批与生命周期编排。5 份无 Desktop Runtime 消费者的旧 schema 已标记 compatibility review，等待外部消费者复核与独立删除确认。
+- 执行 allowlist、Patch Draft 可应用性/授权校验、Git Apply、已批准工具调度与项目绑定、输出截断、审计和任务摘要已归属 `runtime/execution.rs`；Agent Run 的模型阶段创建/恢复校验、running checkpoint、工具结果续接，以及模型完成后的审批/终态/证据收束已归属 `runtime/agent_runs.rs`。`app.rs` 仅保留项目权限解析、Tauri 命令适配、Provider/Hermes transport 与生命周期编排，当前 2261 行。无 Runtime 消费者的旧 schema 已完成独立确认与退役，当前 14 份 schema 均有 Desktop 消费者证据。
 
 正在做：
 
@@ -83,5 +84,5 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 
 ## 下一步重点
 
-1. 审核并收口其余根目录入口、文档 manifest、knowledge registry 与旧示例；删除前保留消费者证据和独立确认。
-2. 逐项审核 schema、生成物、前端与 Runtime 文件 Owner；每个批次通过对应本地回归、原生 smoke 与受保护 Eval 门槛。
+1. 在独立确认后归档并压缩 `HANDOFF.md` 的历史流水，只保留当前接手摘要；不得丢失可追溯证据。
+2. 审核其余 schema、生成物与前端 Owner；每个批次通过对应本地回归、原生 smoke 与受保护 Eval 门槛。

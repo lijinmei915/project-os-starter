@@ -1,7 +1,7 @@
 ---
 layer: knowledge
 type: spec
-last_verified: 2026-07-21
+last_verified: 2026-07-23
 depends_on: [AGENTS.md, docs/ARCHITECTURE.md, docs/ENVIRONMENT.md, docs/TESTING.md]
 teaches: "OmniDesk 本地 Rust Runtime 的服务边界、持久化、Provider、工具执行与安全约束"
 use_when: "AI 要修改 Tauri command、Rust Runtime、Provider、状态事务、Patch、终端或受控检查时"
@@ -37,15 +37,17 @@ React 只通过登记的 Tauri command 或事件与 Runtime 交互。Runtime com
 | `workspace` | 项目档案、能力、事实、记忆、工程文件预览、树扫描/忽略策略与工作区投影 |
 | `conversations` | 对话记录、事件、归档与上下文 |
 | `tasks` / `goals` | 任务、目标、授权范围、索引与验收 |
-| `agent_runs` | attempt、审批、恢复 checkpoint 与最终态 |
+| `agent_runs` | attempt、审批、模型阶段创建/恢复、checkpoint、工具结果续接、模型完成状态与证据 |
 | `provider` | Profile、密钥隔离、OpenAI-compatible transport、响应解析、预检与错误分类 |
 | `hermes_protocol` | ACP 程序发现、只读健康探测、协议帧、超时/取消、结构化响应与拒绝响应 |
 | `patch` | Patch Draft 语义门槛、上下文文件范围、提示词、占位草稿、unified diff、路径、hunk 与授权校验 |
+| `patch_draft` | Patch Draft 模型连接选择、Hermes 重生成、Provider 降级、失败审计与草稿证据 |
+| `planning` | 只读计划的本地回退、连接选择、Provider 降级与只读证据 |
 | `execution` | 受控写入、检查、结果和审计 |
 | `repository` | 原子事务、版本校验、锁、事件与异常恢复 |
 | `state_namespace` | `.project-os -> .omnidesk` 显式迁移和四分区激活 |
 
-`app.rs` 是 Tauri command 装配层，不应继续吸收新的领域规则。新增行为先进入相应 Runtime 模块，再由 command 适配输入和输出。Provider 的密钥读取、连接切换、失败降级和 Agent 审批/证据仍由命令编排层控制；HTTP endpoint 规范化、请求 transport、非成功响应摘要、聊天内容和模型列表解析统一归 `provider`，防止计划、草稿、流式对话和连接探测形成不同协议语义。
+`app.rs` 是 Tauri command 装配层，不应继续吸收新的领域规则。新增行为先进入相应 Runtime 模块，再由 command 适配输入和输出。Provider profile 切换后的 Hermes 同步、请求取消、Tauri 增量事件和 Agent 审批创建仍由命令编排层控制；只读计划的连接选择、降级和证据归 `planning`，Patch Draft 的连接选择、一次重生成、Provider 降级和草稿证据归 `patch_draft`，Patch Apply 的 unified diff、授权文件、Git Apply、已批准工具分派/结算、Run 项目绑定与审计证据归 `execution`，模型开始/完成的持久化状态、审批 checkpoint、恢复动作和证据归 `agent_runs`，HTTP endpoint、通用 transport、非成功响应摘要和模型列表解析归 `provider`，Provider 对话请求、严格结果解析与 SSE 增量消费归 `chat_stream`，防止计划、草稿、流式对话和连接探测形成不同协议语义。
 
 ## 状态与安全
 

@@ -19,10 +19,7 @@ fn safe_file_stem(id: &str) -> String {
 }
 
 fn relative_path(id: &str) -> String {
-    format!(
-        ".omnidesk/data/conversations/{}.json",
-        safe_file_stem(id)
-    )
+    format!(".omnidesk/data/conversations/{}.json", safe_file_stem(id))
 }
 
 pub fn list(root: &Path) -> Result<Vec<Value>, String> {
@@ -150,7 +147,10 @@ mod tests {
             "schemaVersion": "project-os.desktop-conversation.v0.1"
         }));
         assert_eq!(projected["schemaVersion"], CONVERSATION_SCHEMA_VERSION);
-        assert_eq!(projected["schemaMigration"]["from"], LEGACY_CONVERSATION_SCHEMA_VERSION);
+        assert_eq!(
+            projected["schemaMigration"]["from"],
+            LEGACY_CONVERSATION_SCHEMA_VERSION
+        );
         assert_eq!(projected["schemaMigration"]["mode"], "read-projection");
     }
 
@@ -158,14 +158,19 @@ mod tests {
     fn saving_a_projected_conversation_persists_only_the_current_schema() {
         let root = std::env::temp_dir().join(format!(
             "omnidesk-conversation-migration-{}",
-            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
         ));
         let projected = project_conversation_schema(json!({
             "id": "legacy-conversation",
             "schemaVersion": LEGACY_CONVERSATION_SCHEMA_VERSION,
         }));
         save(&root, "/project", projected, "now").unwrap();
-        let saved = Repository::new(&root).read_json(&relative_path("legacy-conversation")).unwrap();
+        let saved = Repository::new(&root)
+            .read_json(&relative_path("legacy-conversation"))
+            .unwrap();
         assert_eq!(saved["schemaVersion"], CONVERSATION_SCHEMA_VERSION);
         assert!(saved.get("schemaMigration").is_none());
         std::fs::remove_dir_all(root).unwrap();

@@ -74,6 +74,184 @@ pub struct TreeEntry {
     pub kind: String,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EngineeringFilePreview {
+    pub path: String,
+    pub name: String,
+    pub content: String,
+    pub language: String,
+    pub truncated: bool,
+    pub size: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ProjectRuntimeContext {
+    pub name: String,
+    pub stage: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QueueItem {
+    pub id: String,
+    pub title: String,
+    pub status: String,
+    pub body: String,
+    pub tone: String,
+    pub goal_id: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoryItem {
+    pub marker: String,
+    pub title: String,
+    pub body: String,
+    pub muted: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceSnapshot {
+    pub project_name: String,
+    pub current_project_id: String,
+    pub current_project_path: String,
+    pub phase: String,
+    pub stage: String,
+    pub file_count: usize,
+    pub docs_count: usize,
+    pub recommendation_count: usize,
+    pub run_count: usize,
+    pub projects: Vec<RegistryProjectSummary>,
+    pub tree: Vec<TreeEntry>,
+    pub queue: Vec<QueueItem>,
+    pub memory: Vec<MemoryItem>,
+    pub project_profile: ProjectProfile,
+    pub workspace_facts: Value,
+    pub runbook_commands: Value,
+    pub project_capabilities: Value,
+    pub fact_freshness: Value,
+    pub goal_validation: Value,
+    pub goal_validation_report: Value,
+    pub goal_signoff_history: Value,
+    pub goals: Value,
+    pub project_goals: Value,
+    pub state_retirement: Value,
+    pub trace: Vec<String>,
+}
+
+pub fn count_run_records(root: &Path) -> usize {
+    let Ok(runs_dir) =
+        crate::runtime::state_namespace::state_path_for_read(root, ".omnidesk/evidence/runs")
+    else {
+        return 0;
+    };
+    fs::read_dir(runs_dir)
+        .ok()
+        .into_iter()
+        .flatten()
+        .filter_map(Result::ok)
+        .filter(|entry| entry.path().extension().and_then(|ext| ext.to_str()) == Some("json"))
+        .count()
+}
+
+pub fn workspace_queue(
+    task_backlog: &Option<Value>,
+    recommendations: &Option<Value>,
+) -> Vec<QueueItem> {
+    let mut queue = task_backlog_queue(task_backlog);
+    queue.extend(recommendation_queue(recommendations));
+    queue
+}
+
+fn recommendation_queue(recommendations: &Option<Value>) -> Vec<QueueItem> {
+    recommendations
+        .as_ref()
+        .and_then(|json| json.get("recommendations"))
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .take(5)
+                .enumerate()
+                .map(|(index, item)| QueueItem {
+                    id: item
+                        .get("id")
+                        .and_then(Value::as_str)
+                        .map(ToString::to_string)
+                        .unwrap_or_else(|| format!("recommendation-{}", index + 1)),
+                    title: item
+                        .get("title")
+                        .or_else(|| item.get("id"))
+                        .and_then(Value::as_str)
+                        .unwrap_or("推荐补齐项")
+                        .to_string(),
+                    status: item
+                        .get("priority")
+                        .and_then(Value::as_str)
+                        .unwrap_or("排队中")
+                        .to_string(),
+                    body: item
+                        .get("reason")
+                        .or_else(|| item.get("body"))
+                        .and_then(Value::as_str)
+                        .unwrap_or("来自 OmniDesk 建议缓存。")
+                        .to_string(),
+                    tone: "blue".to_string(),
+                    goal_id: String::new(),
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn task_backlog_queue(backlog: &Option<Value>) -> Vec<QueueItem> {
+    backlog
+        .as_ref()
+        .and_then(|json| json.get("items"))
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .take(12)
+                .map(|item| QueueItem {
+                    id: item
+                        .get("id")
+                        .and_then(Value::as_str)
+                        .unwrap_or("backlog-item")
+                        .to_string(),
+                    title: item
+                        .get("title")
+                        .and_then(Value::as_str)
+                        .unwrap_or("未命名任务")
+                        .to_string(),
+                    status: item
+                        .get("status")
+                        .and_then(Value::as_str)
+                        .unwrap_or("planned")
+                        .to_string(),
+                    body: item
+                        .get("body")
+                        .and_then(Value::as_str)
+                        .unwrap_or("来自 OmniDesk 任务池。")
+                        .to_string(),
+                    tone: item
+                        .get("tone")
+                        .and_then(Value::as_str)
+                        .unwrap_or("neutral")
+                        .to_string(),
+                    goal_id: item
+                        .get("goalId")
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .to_string(),
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct RegistryProjectRecord {
@@ -243,6 +421,208 @@ pub fn current_registry_project(
     registry.current_project_id = fallback.id.clone();
     save_registry(app_root, registry)?;
     Ok(fallback)
+}
+
+/// Registers a project by canonical path. The canonical path is the stable
+/// identity; display names remain editable metadata and never define identity.
+pub fn register_project(
+    app_root: &Path,
+    registry: &mut WorkspaceRegistry,
+    path: &str,
+    access_mode: &str,
+) -> Result<(), String> {
+    let project_root = normalize_project_path(path)?;
+    if !project_root.is_dir() {
+        return Err("项目路径不存在或不是目录".to_string());
+    }
+    let project_path = project_root.display().to_string();
+    let state = Repository::new(&project_root).read_json(STATE_PATH);
+    let name = project_root
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("workspace")
+        .to_string();
+    let phase = state
+        .as_ref()
+        .and_then(|json| json.get("phase"))
+        .and_then(Value::as_str)
+        .unwrap_or("external")
+        .to_string();
+    let id = project_id_from_path(&project_path);
+    let matches_project = |project: &RegistryProjectRecord| {
+        project.id == id
+            || PathBuf::from(&project.path)
+                .canonicalize()
+                .map(|candidate| candidate == project_root)
+                .unwrap_or(false)
+    };
+    if let Some(project) = registry
+        .projects
+        .iter_mut()
+        .find(|project| matches_project(project))
+    {
+        project.id = id.clone();
+        if !project.name_locked {
+            project.name = name;
+        }
+        project.path = project_path;
+        project.phase = phase;
+        project.access_mode = normalize_project_access_mode(access_mode);
+    } else {
+        registry.projects.push(RegistryProjectRecord {
+            id: id.clone(),
+            name,
+            path: project_path,
+            phase,
+            name_locked: false,
+            access_mode: normalize_project_access_mode(access_mode),
+        });
+    }
+    let mut kept_primary = false;
+    registry.projects.retain(|project| {
+        if !matches_project(project) {
+            return true;
+        }
+        if kept_primary {
+            return false;
+        }
+        kept_primary = true;
+        true
+    });
+    registry.current_project_id = id;
+    save_registry(app_root, registry)
+}
+
+pub fn preview_project_path(path: &str) -> Result<Value, String> {
+    let root = normalize_project_path(path)?;
+    if !root.is_dir() {
+        return Err("项目路径不存在或不是目录".to_string());
+    }
+    let name = root
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("workspace");
+    let has = |file_name: &str| root.join(file_name).exists();
+    let has_project_manifest = has("package.json") || has("pyproject.toml") || has("Cargo.toml");
+    let mut risks = Vec::new();
+    if !has(".git") {
+        risks.push("未发现 Git 仓库");
+    }
+    if !has_project_manifest {
+        risks.push("未找到常见项目文件");
+    }
+    Ok(json!({
+        "path": root.display().to_string(),
+        "project": {
+            "name": name,
+            "hasGit": has(".git"),
+            "hasProjectOs": crate::runtime::state_namespace::state_path_exists(&root, ".omnidesk")
+        },
+        "detected": {
+            "packageJson": has("package.json"),
+            "pyproject": has("pyproject.toml"),
+            "cargo": has("Cargo.toml"),
+            "readme": has("README.md")
+        },
+        "risks": risks
+    }))
+}
+
+pub fn switch_registry_project(
+    app_root: &Path,
+    registry: &mut WorkspaceRegistry,
+    id: &str,
+) -> Result<(), String> {
+    if !registry.projects.iter().any(|project| project.id == id) {
+        return Err("未找到这个项目".to_string());
+    }
+    registry.current_project_id = id.to_string();
+    save_registry(app_root, registry)
+}
+
+pub fn rename_registry_project(
+    app_root: &Path,
+    registry: &mut WorkspaceRegistry,
+    id: &str,
+    name: &str,
+) -> Result<(), String> {
+    let next_name = name.trim();
+    if next_name.is_empty() {
+        return Err("项目名称不能为空。".to_string());
+    }
+    if next_name.chars().count() > 60 {
+        return Err("项目名称太长了，建议控制在 60 个字以内。".to_string());
+    }
+    let project = registry
+        .projects
+        .iter_mut()
+        .find(|project| project.id == id)
+        .ok_or_else(|| "未找到这个项目".to_string())?;
+    project.name = next_name.to_string();
+    project.name_locked = true;
+    save_registry(app_root, registry)
+}
+
+pub fn relocate_registry_project(
+    app_root: &Path,
+    registry: &mut WorkspaceRegistry,
+    id: &str,
+    path: &str,
+) -> Result<(), String> {
+    let next_path = path.trim();
+    if next_path.is_empty() {
+        return Err("请选择新的项目文件夹。".to_string());
+    }
+    let next_root = normalize_project_path(next_path)
+        .map_err(|error| format!("无法访问新的项目路径: {}", error))?;
+    if !next_root.is_dir() {
+        return Err("请选择一个文件夹作为项目路径。".to_string());
+    }
+    let state = Repository::new(&next_root).read_json(STATE_PATH);
+    let project = registry
+        .projects
+        .iter_mut()
+        .find(|project| project.id == id)
+        .ok_or_else(|| "未找到这个项目".to_string())?;
+    project.path = next_root.display().to_string();
+    if !project.name_locked {
+        project.name = next_root
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or(&project.name)
+            .to_string();
+    }
+    project.phase = state
+        .as_ref()
+        .and_then(|json| json.get("phase"))
+        .and_then(Value::as_str)
+        .unwrap_or(&project.phase)
+        .to_string();
+    registry.current_project_id = id.to_string();
+    save_registry(app_root, registry)
+}
+
+pub fn remove_registry_project(
+    app_root: &Path,
+    registry: &mut WorkspaceRegistry,
+    id: &str,
+) -> Result<(), String> {
+    if registry.projects.len() <= 1 {
+        return Err("至少保留一个工作台项目；这个项目不能移除。".to_string());
+    }
+    let original_len = registry.projects.len();
+    registry.projects.retain(|project| project.id != id);
+    if registry.projects.len() == original_len {
+        return Err("未找到这个项目".to_string());
+    }
+    if registry.current_project_id == id {
+        registry.current_project_id = registry
+            .projects
+            .first()
+            .map(|project| project.id.clone())
+            .ok_or_else(|| "registry 中没有项目".to_string())?;
+    }
+    save_registry(app_root, registry)
 }
 
 pub fn registry_project_summaries(registry: &WorkspaceRegistry) -> Vec<RegistryProjectSummary> {
@@ -611,6 +991,62 @@ pub fn preview_language(path: &str) -> String {
         _ => "text",
     }
     .to_string()
+}
+
+/// Reads a bounded text preview after enforcing the same workspace path policy
+/// used by the file tree. State directories, environment files, symlink escapes,
+/// binary data, and folders are never exposed through this read-only surface.
+pub fn read_engineering_file(
+    root: &Path,
+    requested_path: &str,
+) -> Result<EngineeringFilePreview, String> {
+    const MAX_PREVIEW_BYTES: usize = 80 * 1024;
+    let relative = requested_path.trim();
+    if relative.is_empty() {
+        return Err("请选择一个工程文件".to_string());
+    }
+    if !is_safe_text_preview_path(relative) {
+        return Err("这个文件暂不支持预览：只能查看项目内的普通文本文件。".to_string());
+    }
+    let root = root
+        .canonicalize()
+        .map_err(|error| format!("项目目录不可访问: {}", error))?;
+    let path = crate::runtime::state_namespace::state_path_for_read(&root, relative)?;
+    let canonical = path
+        .canonicalize()
+        .map_err(|_| format!("没有找到这个文件：{}", relative))?;
+    if !canonical.starts_with(&root) {
+        return Err("只能预览当前项目内的文件".to_string());
+    }
+    if !canonical.is_file() {
+        return Err("请选择一个具体文件，文件夹暂不预览".to_string());
+    }
+    let metadata = fs::metadata(&canonical).map_err(|error| error.to_string())?;
+    let bytes =
+        fs::read(&canonical).map_err(|error| format!("读取 {} 失败: {}", relative, error))?;
+    if bytes.iter().take(512).any(|byte| *byte == 0) {
+        return Err("这个文件看起来不是文本文件，暂不预览。".to_string());
+    }
+    let truncated = bytes.len() > MAX_PREVIEW_BYTES;
+    let preview_bytes = if truncated {
+        &bytes[..MAX_PREVIEW_BYTES]
+    } else {
+        &bytes
+    };
+    let content = String::from_utf8(preview_bytes.to_vec())
+        .map_err(|_| "这个文件不是 UTF-8 文本，暂不预览。".to_string())?;
+    Ok(EngineeringFilePreview {
+        path: relative.to_string(),
+        name: canonical
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or(relative)
+            .to_string(),
+        content,
+        language: preview_language(relative),
+        truncated,
+        size: metadata.len(),
+    })
 }
 
 pub fn count_visible_files(root: &Path) -> (usize, usize) {
@@ -1415,6 +1851,182 @@ pub fn load_projection_state(root: &Path) -> WorkspaceProjectionState {
     }
 }
 
+/// Resolves the small, user-visible state slice shared by chat and planning.
+/// Callers provide the registry name as the safe fallback for projects that do
+/// not yet have an OmniDesk state document.
+pub fn project_runtime_context(root: &Path, fallback_name: &str) -> ProjectRuntimeContext {
+    let state = Repository::new(root).read_json(STATE_PATH);
+    ProjectRuntimeContext {
+        name: state
+            .as_ref()
+            .and_then(|json| json.get("name"))
+            .and_then(Value::as_str)
+            .unwrap_or(fallback_name)
+            .to_string(),
+        stage: state
+            .as_ref()
+            .and_then(|json| json.get("stage"))
+            .and_then(Value::as_str)
+            .unwrap_or("未读取到阶段信息")
+            .to_string(),
+    }
+}
+
+/// Builds the complete read-only workbench snapshot from the registered
+/// workspace state. Tauri commands intentionally only resolve the active
+/// project and delegate DTO composition here.
+pub fn build_workspace_snapshot(
+    root: &Path,
+    current_project: &RegistryProjectRecord,
+    registry: &WorkspaceRegistry,
+) -> Result<WorkspaceSnapshot, String> {
+    let projection = load_projection_state(root);
+    let project_name = current_project.name.clone();
+    let phase = projection
+        .state
+        .as_ref()
+        .and_then(|json| json.get("phase"))
+        .and_then(Value::as_str)
+        .unwrap_or(&current_project.phase)
+        .to_string();
+    let stage = projection
+        .state
+        .as_ref()
+        .and_then(|json| json.get("stage"))
+        .and_then(Value::as_str)
+        .unwrap_or("未读取到阶段信息")
+        .to_string();
+    let recommendation_count = projection
+        .recommendations
+        .as_ref()
+        .and_then(|json| json.pointer("/summary/recommendationCount"))
+        .and_then(Value::as_u64)
+        .unwrap_or(0) as usize;
+    let mut queue = workspace_queue(&projection.task_backlog, &projection.recommendations);
+    if queue.is_empty() {
+        queue.push(QueueItem {
+            id: "registry-next-step".to_string(),
+            title: "接入本地项目 registry".to_string(),
+            status: "建议下一步".to_string(),
+            body: "让桌面工作台记住已接入项目，并作为后续模型计划层的入口。".to_string(),
+            tone: "blue".to_string(),
+            goal_id: String::new(),
+        });
+    }
+    let goals = projection.goals.unwrap_or_else(|| {
+        goal_stack_from_validation(
+            &projection.goal_validation,
+            &projection.goal_validation_report,
+            &projection.goal_signoff_history,
+            &project_name,
+        )
+    });
+    let (file_count, docs_count) = count_visible_files(root);
+    let run_count = count_run_records(root);
+    let state_retirement =
+        serde_json::to_value(crate::runtime::state_namespace::legacy_retirement_readiness(root)?)
+            .map_err(|error| error.to_string())?;
+
+    Ok(WorkspaceSnapshot {
+        project_name: project_name.clone(),
+        current_project_id: current_project.id.clone(),
+        current_project_path: current_project.path.clone(),
+        phase: phase.clone(),
+        stage: stage.clone(),
+        file_count,
+        docs_count,
+        recommendation_count,
+        run_count,
+        projects: registry_project_summaries(registry),
+        tree: build_tree_preview(root),
+        queue,
+        memory: vec![
+            MemoryItem {
+                marker: "Δ".to_string(),
+                title: "已学习方向".to_string(),
+                body: "用户希望 OmniDesk 成为长期使用的本地 AI 工程工作台。".to_string(),
+                muted: false,
+            },
+            MemoryItem {
+                marker: "Σ".to_string(),
+                title: "执行边界".to_string(),
+                body: "Tauri + Local Agent Core；模型密钥、文件读取和命令执行留在本地 core。"
+                    .to_string(),
+                muted: true,
+            },
+        ],
+        project_profile: build_project_profile(root, &project_name),
+        workspace_facts: projection.workspace_facts,
+        runbook_commands: runbook_commands(root),
+        project_capabilities: detected_capabilities(root),
+        fact_freshness: fact_freshness(root),
+        goal_validation: projection.goal_validation,
+        goal_validation_report: projection.goal_validation_report,
+        goal_signoff_history: projection.goal_signoff_history,
+        goals,
+        project_goals: projection.project_goals,
+        state_retirement,
+        trace: vec![
+            format!("ROOT: {}", root.display()),
+            format!("REGISTRY: {} project(s)", registry.projects.len()),
+            format!("STATE: {} / {}", project_name, phase),
+            format!("STAGE: {}", stage),
+            format!(
+                "INDEX: {} files, {} docs, {} run records",
+                file_count, docs_count, run_count
+            ),
+        ],
+    })
+}
+
+fn goal_stack_from_validation(
+    validation: &Value,
+    report: &Value,
+    history: &Value,
+    project_name: &str,
+) -> Value {
+    let goal_id = validation
+        .pointer("/goal/id")
+        .and_then(Value::as_str)
+        .unwrap_or("current-goal");
+    let goal_title = validation
+        .pointer("/goal/title")
+        .and_then(Value::as_str)
+        .unwrap_or("当前目标");
+    let goal_status = validation
+        .pointer("/goal/status")
+        .and_then(Value::as_str)
+        .unwrap_or("active");
+    let report_status = report
+        .get("status")
+        .and_then(Value::as_str)
+        .unwrap_or("missing");
+    let completed_at = history
+        .pointer("/entries/0/signedOffAt")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let stack_status = match goal_status {
+        "signed-off" => "done",
+        "verified" => "pending-confirm",
+        "validation-failed" => "active",
+        other => other,
+    };
+    json!({
+        "schemaVersion": "omnidesk.goals.v0.1",
+        "activeGoalId": goal_id,
+        "goals": [{
+            "id": goal_id,
+            "title": goal_title,
+            "projectName": project_name,
+            "status": stack_status,
+            "completedAt": completed_at,
+            "validationStatus": report_status,
+            "summary": if stack_status == "done" { "目标已确认完成。" } else { "当前目标。" },
+            "taskIds": []
+        }]
+    })
+}
+
 /// Validates and persists project memory through the same Repository boundary
 /// as the rest of workspace state. The caller supplies the project identity
 /// and timestamp; this service owns its storage shape and path.
@@ -1615,6 +2227,49 @@ mod tests {
     }
 
     #[test]
+    fn engineering_file_preview_is_bounded_and_rejects_binary_content() {
+        let root = test_root("engineering-preview");
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("README.md"), "# Preview\n").unwrap();
+        fs::write(root.join("binary.txt"), [b'a', 0, b'b']).unwrap();
+
+        let preview = read_engineering_file(&root, "README.md").unwrap();
+        assert_eq!(preview.name, "README.md");
+        assert_eq!(preview.language, "markdown");
+        assert_eq!(preview.content, "# Preview\n");
+        assert!(!preview.truncated);
+        assert!(read_engineering_file(&root, "binary.txt").is_err());
+        assert!(read_engineering_file(&root, ".env.local").is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn project_runtime_context_uses_state_then_registry_fallback() {
+        let root = test_root("runtime-context");
+        fs::create_dir_all(root.join(".omnidesk/data")).unwrap();
+        assert_eq!(
+            project_runtime_context(&root, "Registry Project"),
+            ProjectRuntimeContext {
+                name: "Registry Project".to_string(),
+                stage: "未读取到阶段信息".to_string(),
+            }
+        );
+        fs::write(
+            root.join(STATE_PATH),
+            r#"{"name":"State Project","stage":"验证中"}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            project_runtime_context(&root, "Registry Project"),
+            ProjectRuntimeContext {
+                name: "State Project".to_string(),
+                stage: "验证中".to_string(),
+            }
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn registry_projects_legacy_schema_without_startup_rewrite() {
         let root = test_root("legacy-registry");
         fs::create_dir_all(root.join(".omnidesk/data")).unwrap();
@@ -1653,6 +2308,39 @@ mod tests {
         assert_eq!(registry.current_project_id, "one");
         let persisted = Repository::new(&root).read_json(REGISTRY_PATH).unwrap();
         assert_eq!(persisted["currentProjectId"], "one");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn registry_domain_owns_project_registration_preview_and_removal() {
+        let root = test_root("registry-mutations");
+        let external = root.join("external-project");
+        fs::create_dir_all(root.join(".omnidesk/data")).unwrap();
+        fs::create_dir_all(external.join(".git")).unwrap();
+        fs::write(external.join("package.json"), r#"{"name":"external"}"#).unwrap();
+
+        let mut registry = load_or_seed_registry(&root).unwrap();
+        register_project(
+            &root,
+            &mut registry,
+            external.to_str().unwrap(),
+            "controlled",
+        )
+        .unwrap();
+        let external_id = project_id_from_path(external.canonicalize().unwrap().to_str().unwrap());
+        assert_eq!(registry.current_project_id, external_id);
+        assert_eq!(registry.projects.len(), 2);
+        assert_eq!(registry.projects.last().unwrap().access_mode, "controlled");
+
+        let preview = preview_project_path(external.to_str().unwrap()).unwrap();
+        assert_eq!(preview["project"]["hasGit"], true);
+        assert_eq!(preview["detected"]["packageJson"], true);
+
+        rename_registry_project(&root, &mut registry, &external_id, "已接入项目").unwrap();
+        assert!(registry.projects.iter().any(|project| project.name_locked));
+        remove_registry_project(&root, &mut registry, &external_id).unwrap();
+        assert_eq!(registry.projects.len(), 1);
+        assert_ne!(registry.current_project_id, external_id);
         fs::remove_dir_all(root).unwrap();
     }
 
@@ -1948,5 +2636,22 @@ mod tests {
                 .count(),
             1
         );
+    }
+
+    #[test]
+    fn workspace_queue_projects_backlog_before_bounded_recommendations() {
+        let queue = workspace_queue(
+            &Some(
+                json!({ "items": [{ "id": "task-1", "title": "修复", "status": "planned", "goalId": "goal-1" }] }),
+            ),
+            &Some(
+                json!({ "recommendations": [{ "id": "recommendation-1", "title": "检查", "priority": "high", "reason": "需要验证" }] }),
+            ),
+        );
+        assert_eq!(queue.len(), 2);
+        assert_eq!(queue[0].id, "task-1");
+        assert_eq!(queue[0].goal_id, "goal-1");
+        assert_eq!(queue[1].id, "recommendation-1");
+        assert_eq!(queue[1].tone, "blue");
     }
 }

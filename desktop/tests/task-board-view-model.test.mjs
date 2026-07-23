@@ -27,6 +27,7 @@ test("builds the task board from one filtered, goal-ordered task sequence", () =
   assert.deepEqual(model.visibleTasks.map((task) => task.id), ["first", "second"]);
   assert.deepEqual(model.taskGroups[0].tasks.map((task) => task.id), ["second", "first"]);
   assert.deepEqual(model.taskGoalOptions.map((goal) => goal.id), ["goal-a", "project-goal"]);
+  assert.equal(model.goalTitleForTask(model.currentTask), "目标 A");
 });
 
 test("filters completed tasks by verified evidence", () => {

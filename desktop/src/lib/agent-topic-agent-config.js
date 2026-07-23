@@ -9,10 +9,10 @@ export function agentConfigCapabilitySpec(topicId, provider) {
       files: [".omnidesk/data/desktop-provider.json", ".omnidesk/data/model-catalog.json", ".omnidesk/cache/model-health.json"],
     },
     "tool-allowlist": {
-      title: "工具白名单", status: "待产品化", tone: "warning",
-      value: "让新项目明确哪些检查、治理动作和终端命令可以被 Agent 调用。",
-      next: "把 Tauri command、检查脚本、治理动作汇总成项目级允许列表。",
-      files: ["desktop/src/agent-runtime/tool-registry.js", "desktop/src-tauri/src/runtime/app.rs", "desktop/src-tauri/src/runtime/patch.rs"],
+      title: "受控工具", status: "规则已接入", tone: "success",
+      value: "让用户知道 Agent 只能请求固定的 Runtime 检查，工程写入和检查各自需要确认。",
+      next: "查看任务证据，按当前任务范围审批 Patch 或受控检查。",
+      files: ["desktop/src-tauri/src/runtime/execution.rs", "desktop/src-tauri/src/runtime/patch.rs", "desktop/src-tauri/src/runtime/agent_runs.rs"],
     },
     "security-boundary": {
       title: "安全边界", status: "规则已接入", tone: "success",

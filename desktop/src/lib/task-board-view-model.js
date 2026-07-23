@@ -66,6 +66,7 @@ export function buildTaskBoardViewModel({ activeTaskId, filter, isNoiseTask, sna
     failedTasks,
     mergeGoalOptions: stageGoals.filter((goal) => !completedGoalStatuses.has(goal.status)),
     recentResultTasks: [...doneTasks, ...failedTasks].slice(0, 5),
+    goalTitleForTask,
     taskGoalOptions,
     taskGroups,
     visibleTasks,

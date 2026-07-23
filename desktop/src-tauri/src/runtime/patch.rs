@@ -1,8 +1,8 @@
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Component, Path};
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 /// Transport contract for one read-only Patch Draft. Keeping it with the
 /// semantic and unified-diff validators prevents the app command layer from
@@ -47,18 +47,33 @@ pub fn draft_ineligibility_reason(plan: &Value, files: &[String]) -> Option<Stri
         })
         .unwrap_or_default();
     if candidate_changes.is_empty() {
-        return Some("任务计划没有声明实际工程改动；当前应先讨论、补充计划或运行已登记检查。".to_string());
+        return Some(
+            "任务计划没有声明实际工程改动；当前应先讨论、补充计划或运行已登记检查。".to_string(),
+        );
     }
     let no_write_change = candidate_changes.iter().all(|item| {
-        ["先不写文件", "不自动写文件", "不修改文件", "只形成", "形成下一步建议", "运行检查", "执行检查"]
-            .iter()
-            .any(|marker| item.contains(marker))
+        [
+            "先不写文件",
+            "不自动写文件",
+            "不修改文件",
+            "只形成",
+            "形成下一步建议",
+            "运行检查",
+            "执行检查",
+        ]
+        .iter()
+        .any(|marker| item.contains(marker))
     });
     if no_write_change {
-        return Some("任务计划明确不修改工程文件；当前应先运行检查或查看建议，不生成 Patch。".to_string());
+        return Some(
+            "任务计划明确不修改工程文件；当前应先运行检查或查看建议，不生成 Patch。".to_string(),
+        );
     }
     if files.is_empty() {
-        return Some("任务计划没有提供可读取且已授权的工程文件；请先补充具体文件范围，再生成 Patch。".to_string());
+        return Some(
+            "任务计划没有提供可读取且已授权的工程文件；请先补充具体文件范围，再生成 Patch。"
+                .to_string(),
+        );
     }
     None
 }
@@ -216,7 +231,9 @@ FILE CONTEXT:
 {}
 "#,
         serde_json::to_string_pretty(plan).unwrap_or_else(|_| "{}".to_string()),
-        retry_reason.map(|reason| format!("REGENERATION REASON (fix it without expanding scope): {reason}")).unwrap_or_default()
+        retry_reason
+            .map(|reason| format!("REGENERATION REASON (fix it without expanding scope): {reason}"))
+            .unwrap_or_default()
     )
 }
 
@@ -280,7 +297,10 @@ pub fn normalize_hermes_unified_diff(
 /// Verify that a unified diff is confined to the files the draft was allowed
 /// to inspect. Applying a draft must not trust UI metadata alone.
 #[allow(dead_code)] // The standalone patch-normalizer binary shares this module but does not apply drafts.
-pub fn validate_unified_diff_authorized(diff: &str, allowed_files: &[String]) -> Result<(), String> {
+pub fn validate_unified_diff_authorized(
+    diff: &str,
+    allowed_files: &[String],
+) -> Result<(), String> {
     let allowed = allowed_files
         .iter()
         .map(|path| path.as_str())
@@ -319,15 +339,26 @@ fn validate_apply_path(path: &str) -> Result<(), String> {
     if path == "/dev/null" {
         return Ok(());
     }
-    let relative = path.strip_prefix("a/").or_else(|| path.strip_prefix("b/")).unwrap_or(path);
+    let relative = path
+        .strip_prefix("a/")
+        .or_else(|| path.strip_prefix("b/"))
+        .unwrap_or(path);
     let candidate = Path::new(relative);
     if relative.is_empty()
         || candidate.is_absolute()
-        || candidate.components().any(|component| matches!(component, Component::ParentDir | Component::RootDir | Component::Prefix(_)))
+        || candidate.components().any(|component| {
+            matches!(
+                component,
+                Component::ParentDir | Component::RootDir | Component::Prefix(_)
+            )
+        })
     {
         return Err("patch 不允许访问项目目录之外的路径。".to_string());
     }
-    if candidate.components().any(|component| component.as_os_str().to_string_lossy().starts_with(".env")) {
+    if candidate
+        .components()
+        .any(|component| component.as_os_str().to_string_lossy().starts_with(".env"))
+    {
         return Err("patch 不允许修改受保护的环境文件。".to_string());
     }
     Ok(())
@@ -596,14 +627,20 @@ mod tests {
         assert!(draft_ineligibility_reason(&validation, &["src/app.ts".to_string()]).is_some());
         let change = json!({ "candidateChanges": ["调整状态提示"] });
         assert!(draft_ineligibility_reason(&change, &[]).is_some());
-        assert_eq!(draft_ineligibility_reason(&change, &["src/app.ts".to_string()]), None);
+        assert_eq!(
+            draft_ineligibility_reason(&change, &["src/app.ts".to_string()]),
+            None
+        );
     }
 
     #[test]
     fn context_files_are_scoped_to_safe_existing_project_sources() {
         let root = std::env::temp_dir().join(format!(
             "omnidesk-patch-context-{}",
-            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
         ));
         fs::create_dir_all(root.join("src")).unwrap();
         fs::create_dir_all(root.join(".omnidesk/data")).unwrap();
@@ -620,10 +657,14 @@ mod tests {
         let files = plan_context_files(&plan, &root);
         assert_eq!(files, vec!["src/app.rs"]);
         let contexts = read_context_files(&root, &files).unwrap();
-        assert_eq!(contexts, vec![("src/app.rs".to_string(), "fn main() {}\n".to_string())]);
+        assert_eq!(
+            contexts,
+            vec![("src/app.rs".to_string(), "fn main() {}\n".to_string())]
+        );
         assert!(!is_context_path(".omnidesk/data/state.json"));
         assert!(read_context_files(&root, &[".env.local".to_string()]).is_err());
-        let draft = local_placeholder_draft("update app", &files, &contexts, "provider unavailable");
+        let draft =
+            local_placeholder_draft("update app", &files, &contexts, "provider unavailable");
         assert!(draft.diff.contains("PATCH_DRAFT_PENDING"));
         assert_eq!(draft.allowed_files, vec!["src/app.rs"]);
         fs::remove_dir_all(root).unwrap();
@@ -641,7 +682,9 @@ mod tests {
     fn rejects_diff_files_outside_the_explicit_authorization_set() {
         let diff = "--- a/README.md\n+++ b/README.md\n@@ -1 +1 @@\n-old\n+new\n";
         assert!(super::validate_unified_diff_authorized(diff, &["README.md".to_string()]).is_ok());
-        assert!(super::validate_unified_diff_authorized(diff, &["src/app.js".to_string()]).is_err());
+        assert!(
+            super::validate_unified_diff_authorized(diff, &["src/app.js".to_string()]).is_err()
+        );
         assert!(super::validate_unified_diff_authorized(diff, &[]).is_err());
     }
 

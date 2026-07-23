@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { activeProviderProfileName, classifyProviderFailure, formatModelTestTime, isolatedProviderKeyEnv, providerConnectionLabel, providerModelUpdate } from "../src/lib/provider-presentation.js";
+import { activeProviderProfileName, catalogModelsForProvider, classifyProviderFailure, compactModelLabel, formatModelTestTime, isolatedProviderKeyEnv, modelAvailabilityKey, providerConnectionLabel, providerModelHealth, providerModelKey, providerModelUpdate } from "../src/lib/provider-presentation.js";
 
 test("keeps Provider display labels and isolated key names deterministic", () => {
   assert.equal(activeProviderProfileName({ activeProfileId: "team", profiles: [{ id: "team", name: "团队网关" }] }), "团队网关");
@@ -31,4 +31,19 @@ test("classifies quota failures separately from network failures", () => {
 test("classifies provider network failures without confusing them with credentials", () => {
   assert.equal(classifyProviderFailure("request timed out"), "network-unavailable");
   assert.equal(classifyProviderFailure("认证失败"), "authentication-failed");
+});
+
+test("derives provider model options and health without touching credentials", () => {
+  const provider = { activeProfileId: "team", apiBase: "https://api.example.com/v1", apiKeyEnv: "TEAM_KEY", enabled: true, model: "gpt-5.6" };
+  assert.equal(compactModelLabel("gpt-5.6-terra"), "5.6");
+  assert.equal(providerModelKey(provider), "https://api.example.com/v1|TEAM_KEY|team");
+  assert.equal(modelAvailabilityKey(provider, "gpt-5.6"), "https://api.example.com/v1|TEAM_KEY|gpt-5.6");
+  assert.deepEqual(catalogModelsForProvider(provider, {
+    providers: [{ apiBase: provider.apiBase, apiKeyEnv: provider.apiKeyEnv, models: ["gpt-5.5", "gpt-5.6"] }],
+  }), ["gpt-5.5", "gpt-5.6"]);
+  assert.deepEqual(providerModelHealth(provider, { "gpt-5.6": { status: "available" } }), {
+    label: "Work",
+    status: "available",
+    message: "",
+  });
 });

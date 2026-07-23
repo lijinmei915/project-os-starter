@@ -1,7 +1,7 @@
 ---
 layer: knowledge
 type: log
-last_verified: 2026-07-21
+last_verified: 2026-07-23
 teaches: "历史踩坑记录、错误模式和已确立的避坑约束"
 use_when: "AI 即将做类似操作前检查是否有已知的坑、或犯错后需要记录新教训时"
 ---
@@ -13,6 +13,14 @@ use_when: "AI 即将做类似操作前检查是否有已知的坑、或犯错后
 > 不要写什么：成功经验、普通进展、重复的 changelog 内容、当前状态摘要。
 > 每次犯错后立即记录。
 > 格式：犯的错 / 根本原因 / 加了什么规则。
+
+### 2026-07-23 已批准工具在消费前必须重新校验项目绑定
+
+**犯的错**：Agent Run 审批记录保存了 `projectId`，但旧执行命令只对当前选中项目做权限校验。用户在审批后切换项目时，已批准的 Patch 或检查可能被重定向到另一个项目。
+
+**根本原因**：将 approval token、allowed files 和 access mode 视为完整授权边界，漏掉了“审批对象所属项目”这个不可变主体；Tauri command 直接重新解析 current project，也让这个缺口没有在 Execution 领域集中校验。
+
+**加了什么规则**：任何已批准写入或检查必须在消费 approval 前比对 `AgentRun.projectId` 与实际执行项目 ID；不一致时零写入、零状态转换并保留原审批。项目绑定、token、工具参数和权限必须在同一 Execution 边界中完成再验证。
 
 ### 2026-07-21 WebDriver feature 专用 Runtime 代码必须按 feature 编译
 

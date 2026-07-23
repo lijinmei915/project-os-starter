@@ -43,7 +43,7 @@ npm --prefix desktop run test:native
 
 ## 状态迁移与恢复
 
-启动 Runtime 时会从 `.project-os` 非破坏性迁移到 `.omnidesk`。迁移会复制、比对、记录 manifest 并激活新命名空间；冲突或符号链接会保留源数据与迁移证据，并阻止 native 状态启用，绝不覆盖源数据或回退为 legacy Runtime 读写。
+接入外部历史工程时，Runtime 会从 `.project-os` 非破坏性迁移到 `.omnidesk`。迁移会复制、比对、记录 manifest 并激活新命名空间；冲突或符号链接会保留源数据与迁移证据，并阻止 native 状态启用，绝不覆盖源数据或回退为 legacy Runtime 读写。
 
 出现迁移问题时：
 

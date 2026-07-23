@@ -50,7 +50,6 @@
 | `SectionTitle` | Primitive | `desktop/src/main.jsx` | 小节标题与 meta |
 | `Metric` | Primitive | `desktop/src/main.jsx` | 紧凑指标行 |
 | `MemoryItem` | Pattern | `desktop/src/main.jsx` | 记忆条目 |
-| `ProviderStatusRow` | Pattern | `desktop/src/components/workbench/provider-status-row.jsx` | Provider 启用状态与 Key 状态展示 |
 | `TaskCommandBar` | Pattern | `desktop/src/components/workbench/task-command-bar.jsx` | Diff / Runner 等任务操作按钮组 |
 | `ThemeMenu` | Pattern | `desktop/src/components/workbench/theme-menu.jsx` | 顶部主题下拉，支持深浅模式和主题色切换 |
 | `OverviewPageHeader` | Pattern | `desktop/src/components/workbench/overview-section.jsx` | 项目概览和当前进度共用的页面头部：标题、弱元信息、阶段状态、说明、来源与动作插槽 |

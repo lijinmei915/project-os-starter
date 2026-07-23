@@ -12,15 +12,29 @@ const outputPath = outputArgument >= 0
 
 const reviewPath = path.join(root, "docs/data/repository-file-review.json");
 const review = JSON.parse(fs.readFileSync(reviewPath, "utf8"));
-if (review.schemaVersion !== "omnidesk.repository-file-review.v1" || !Array.isArray(review.decisions)) {
+if (review.schemaVersion !== "omnidesk.repository-file-review.v1" || !Array.isArray(review.decisions) || (review.rules && !Array.isArray(review.rules))) {
   throw new Error("repository-file-review.json 格式无效");
 }
 const knownDecisions = new Map(review.decisions.map((item) => [item.path, item]));
+const reviewRules = review.rules || [];
+if (reviewRules.some((rule) => !rule.id || !rule.pathPrefix || !rule.decision || !rule.rationale || !rule.reviewStatus || !rule.verification)) {
+  throw new Error("repository-file-review.json 规则缺少必填字段");
+}
+
+function decisionFor(file) {
+  const exact = knownDecisions.get(file);
+  if (exact) return { ...exact, source: "registry" };
+  const rule = reviewRules
+    .filter(({ pathPrefix }) => file.startsWith(pathPrefix))
+    .sort((left, right) => right.pathPrefix.length - left.pathPrefix.length)[0];
+  return rule ? { ...rule, source: `rule:${rule.id}` } : null;
+}
 
 function classify(file) {
   if (file === ".github/workflows/agent-eval.yml" || file === ".github/workflows/ci.yml") return ["ci", "Release Engineering"];
   if (file.startsWith("desktop/src-tauri/src/runtime/")) return ["runtime", "Local Agent Runtime"];
   if (file.startsWith("desktop/src-tauri/")) return ["native", "Desktop Shell"];
+  if (file.startsWith("desktop/src/agent-runtime/")) return ["eval-support", "Agent Reliability"];
   if (file.startsWith("desktop/src/components/workbench/")) return ["frontend", "Workbench"];
   if (file.startsWith("desktop/src/")) return ["frontend", "Desktop Frontend"];
   if (file.startsWith("desktop/tests/")) return ["test", "Desktop Quality"];
@@ -51,13 +65,23 @@ function pathMentions(file) {
   }
 }
 
-const trackedFiles = execFileSync("git", ["ls-files"], { cwd: root, encoding: "utf8" })
+const trackedFiles = execFileSync(
+  "git",
+  ["ls-files", "--cached", "--others", "--exclude-standard"],
+  { cwd: root, encoding: "utf8" },
+)
   .split(/\r?\n/)
   .filter(Boolean)
+  .filter((file, index, files) => files.indexOf(file) === index)
+  // git ls-files retains entries deleted in the working tree until staging. Inventory only files that
+  // are present for the current audit so an authorized retirement can be recorded and regenerated.
+  .filter((file) => fs.existsSync(path.join(root, file)))
   .sort();
 
 const moduleSourceFiles = trackedFiles.filter((file) => /\.(?:[cm]?js|jsx|rs)$/.test(file));
 const moduleSourceText = new Map(moduleSourceFiles.map((file) => [file, fs.readFileSync(path.join(root, file), "utf8")]));
+const assetReferenceFiles = trackedFiles.filter((file) => file.endsWith(".css"));
+const assetReferenceText = new Map(assetReferenceFiles.map((file) => [file, fs.readFileSync(path.join(root, file), "utf8")]));
 
 function normalizedRelativePath(value) {
   return path.posix.normalize(value).replace(/^\.\//, "");
@@ -80,8 +104,8 @@ function resolvesTo(importer, specifier, target) {
 }
 
 function moduleConsumers(file) {
+  const consumers = [];
   if (/\.(?:[cm]?js|jsx|json)$/.test(file)) {
-    const consumers = [];
     const specifierPattern = /(?:import\s*(?:[^"']*?\s+from\s*)?|export\s+[^"']*?\s+from\s*|import\s*\(|require\s*\()\s*["']([^"']+)["']/g;
     for (const [candidate, source] of moduleSourceText) {
       for (const match of source.matchAll(specifierPattern)) {
@@ -91,22 +115,43 @@ function moduleConsumers(file) {
         }
       }
     }
-    return consumers.sort();
   }
   if (file.endsWith(".rs")) {
     const moduleName = path.posix.basename(file, ".rs");
     const modulePattern = new RegExp(`(?:mod\\s+${moduleName}\\s*;|(?:crate::)?runtime::${moduleName}(?:::)?)`);
-    return [...moduleSourceText.entries()]
+    consumers.push(...[...moduleSourceText.entries()]
       .filter(([candidate, source]) => candidate !== file && candidate.endsWith(".rs") && modulePattern.test(source))
       .map(([candidate]) => candidate)
-      .sort();
+    );
   }
-  return [];
+  if (file.endsWith(".css")) {
+    const importPattern = /@import\s+(?:url\(\s*)?["']([^"')]+)["']/g;
+    for (const [candidate, source] of assetReferenceText) {
+      for (const match of source.matchAll(importPattern)) {
+        if (resolvesTo(candidate, match[1], file)) {
+          consumers.push(candidate);
+          break;
+        }
+      }
+    }
+  }
+  if (/\.(?:svg|png|jpg|jpeg|webp|gif|woff2?)$/i.test(file)) {
+    const urlPattern = /url\(\s*["']?([^"')]+)["']?\s*\)/g;
+    for (const [candidate, source] of assetReferenceText) {
+      for (const match of source.matchAll(urlPattern)) {
+        if (resolvesTo(candidate, match[1], file)) {
+          consumers.push(candidate);
+          break;
+        }
+      }
+    }
+  }
+  return [...new Set(consumers)].sort();
 }
 
 const files = trackedFiles.map((file) => {
   const [kind, owner] = classify(file);
-  const decision = knownDecisions.get(file);
+  const decision = decisionFor(file);
   const absolute = path.join(root, file);
   const stat = fs.statSync(absolute);
   const consumers = moduleConsumers(file);
@@ -114,7 +159,8 @@ const files = trackedFiles.map((file) => {
     path: file,
     kind,
     owner,
-    bytes: stat.size,
+    // The generated inventory cannot record its own changing serialized size.
+    bytes: file === path.relative(root, outputPath) ? 0 : stat.size,
     pathMentions: pathMentions(file),
     moduleConsumers: consumers,
     consumerEvidence: consumers.length ? "static-module-consumer" : "no-static-module-consumer",
@@ -125,7 +171,9 @@ const files = trackedFiles.map((file) => {
     rationale: decision?.rationale || "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
     reviewStatus: decision?.reviewStatus || "classified",
     verification: decision?.verification || "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
-    decisionEvidence: decision ? "manual-review-registry" : "inventory-default-retention",
+    decisionEvidence: decision
+      ? decision.source === "registry" ? "manual-review-registry" : `manual-review-${decision.source}`
+      : "inventory-default-retention",
   };
 });
 
@@ -133,8 +181,8 @@ const summary = Object.groupBy(files, ({ kind }) => kind);
 const payload = {
   schemaVersion: "omnidesk.repository-file-inventory.v1",
   generatedAt: new Date().toISOString(),
-  sourceOfTruth: "git ls-files",
-  scope: "受版本控制文件；忽略的本地运行数据和构建输出不在本账本内。",
+  sourceOfTruth: "git ls-files --cached --others --exclude-standard",
+  scope: "受版本控制文件及准备纳入版本控制的非忽略工作树文件；忽略的本地运行数据和构建输出不在本账本内。",
   reviewContract: {
     decisions: ["keep", "rewrite", "move", "merge", "rename", "retire", "compatibility-review", "review"],
     requiredEvidence: ["owner", "pathMentions", "moduleConsumers", "runtime-or-test-consumer", "verification"],

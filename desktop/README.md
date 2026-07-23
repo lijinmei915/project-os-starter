@@ -46,6 +46,17 @@ npm install
 npm run dev
 ```
 
+## 重新生成应用图标
+
+`APP_ICON.svg` 是跨平台 bundle 图标的唯一源文件。修改它后运行：
+
+```bash
+npm run icons:generate
+git diff -- src-tauri/icons
+```
+
+该命令会生成 macOS、Windows、iOS 和 Android 所需的图标资源；提交前应审阅生成 diff。`src-tauri/gen/schemas/` 由 Tauri 根据当前 capability 和配置生成，不能手工编辑。
+
 ## 边界
 
 - 桌面端 dev 模式读取 Vite dev server `http://127.0.0.1:1420`

@@ -1,7 +1,7 @@
 ---
 layer: knowledge
 type: spec
-last_verified: 2026-07-21
+last_verified: 2026-07-22
 depends_on: [PROJECT.md, docs/ARCHITECTURE.md, docs/TESTING.md]
 teaches: "OmniDesk 的产品方向、当前阶段和明确不做事项"
 use_when: "AI 需要判断工作是否服务当前产品阶段或安排后续里程碑时"
@@ -21,22 +21,22 @@ OmniDesk 是本地优先的 AI 工程工作台。用户在一个桌面应用内�
 
 ## 当前阶段判断
 
-当前阶段：`OmniDesk 单内核收敛与可靠长任务 v1`。
+当前阶段：`OmniDesk 仓库文件治理与架构收敛 v1`。
 
 本阶段的完成标准：
 
-1. `.omnidesk` 成为唯一激活状态根，`.project-os -> .omnidesk` 迁移幂等、可审计且可回退。
-2. 旧 CLI、installer、templates、adapters、routing skill 和评分工具不再被 Desktop、CI、测试或文档当作产品入口。
-3. Agent Run 在 Patch、检查和修复的阶段边界可恢复；不自动重放未确认写入或检查。
-4. Eval 保留真实 trace，原生端、网络中断、应用重启和多文件任务具有发布级证据。
-5. 迁移验收完成后，按保留策略退役 `.project-os` 兼容层。
+1. 全部受版本控制文件在账本中拥有类型、Owner、消费者、决策和验证证据。
+2. 根目录与文档 SSOT 只描述 OmniDesk Desktop Runtime；旧工具链仅保留迁移或历史证据说明。
+3. 有效 Runtime 契约、显式兼容读取和无消费者候选被明确区分；新写入统一使用 `omnidesk.*`。
+4. `main.jsx`、`styles.css` 与 `runtime/app.rs` 按对话、工作区、任务、目标、Provider、终端和执行领域收口，不改变已有 UI 或授权边界。
+5. 完整本地回归、原生窗口 smoke 与受保护真实 Eval 为每个保留入口提供可复核的发布证据。
 
 ## 当前优先级
 
-1. 断开剩余文档、模板和 installer 消费者，避免旧工具链继续定义用户或维护者流程。
-2. 让原生恢复测试证明已持久化阶段可以在真实应用重启后继续，不把离线状态机测试当作等价证据。
-3. 将 Eval trace 固化为受保护环境的 artifact，并覆盖网络中断和大型多文件修复。
-4. 完成迁移验收与数据保留策略后，删除 `.project-os` 兼容读写。
+1. 完成剩余 Runtime/前端聚合文件的 Owner 收口，并以静态边界和领域回归阻止业务逻辑回流。
+2. 审核兼容 schema 与历史文档消费者；未获得独立删除确认前保留可追溯证据，不恢复旧入口。
+3. 为账本中的每个保留文件补齐生成、构建或测试消费者证据。
+4. 在稳定工作树上复跑原生窗口 smoke，并以受保护真实 Eval 复核执行链路未回退。
 
 ## 本阶段不做
 

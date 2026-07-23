@@ -285,12 +285,7 @@ pub fn governance_domains_from_files(root: &Path) -> Vec<Value> {
             "project-identity",
             "项目概览",
             "项目身份、定位、类型和生命周期。",
-            &[
-                "PROJECT.md",
-                "README.md",
-                PROFILE_PATH,
-                STATE_PATH,
-            ],
+            &["PROJECT.md", "README.md", PROFILE_PATH, STATE_PATH],
             "项目定位、类型、阶段或工作区状态变化时自动刷新。",
         ),
         governance_domain_json(

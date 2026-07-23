@@ -1,18 +1,134 @@
 {
   "schemaVersion": "omnidesk.repository-file-review.v1",
   "sourceOfTruth": "docs/data/repository-file-inventory.json",
+  "rules": [
+    {
+      "id": "desktop-test-suites",
+      "pathPrefix": "desktop/tests/",
+      "decision": "keep",
+      "rationale": "Desktop Runtime、Workbench、Preview 与 Agent 闭环回归套件；Node 测试覆盖 tests/*.test.mjs，E2E smoke 由 Playwright 独立运行。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop test && npm --prefix desktop run test:smoke；原生窗口行为另运行 npm --prefix desktop run test:native。"
+    },
+    {
+      "id": "frontend-style-domains",
+      "pathPrefix": "desktop/src/styles/",
+      "decision": "keep",
+      "rationale": "由 desktop/src/styles.css 有序装配的领域样式；分别拥有基础、主题、工作区、对话、终端和 Provider Rail 规则。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop run web:build && npm --prefix desktop test；不要绕过 styles.css 新增第二个样式入口。"
+    },
+    {
+      "id": "workbench-surfaces-and-hooks",
+      "pathPrefix": "desktop/src/components/workbench/",
+      "decision": "keep",
+      "rationale": "Desktop Workbench 的领域 Surface、可组合视图与交互 hooks；Runtime 调用必须经注入的 domain client，保持 main.jsx 仅做装配。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop test && npm --prefix desktop run web:build；domain-boundaries.test.mjs 约束 Owner 边界。"
+    },
+    {
+      "id": "frontend-ui-primitives",
+      "pathPrefix": "desktop/src/components/ui/",
+      "decision": "keep",
+      "rationale": "Workbench 复用的基础 UI 原语；不直接调用 Runtime，避免领域交互分散到组件库。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop test && npm --prefix desktop run web:build"
+    },
+    {
+      "id": "frontend-domain-libraries",
+      "pathPrefix": "desktop/src/lib/",
+      "decision": "keep",
+      "rationale": "对话、任务、目标、Provider、终端与工作区的纯投影、客户端和状态协调模块；由 Workbench surface 或测试消费。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop test && node scripts/audit-repository-files.mjs --check"
+    },
+    {
+      "id": "conversation-runtime-domains",
+      "pathPrefix": "desktop/src/conversation-runtime/",
+      "decision": "keep",
+      "rationale": "对话意图、状态机、事件、投影与受控动作的纯前端领域层；不旁路 Desktop Runtime 权限边界。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop test && npm --prefix desktop run web:build"
+    },
+    {
+      "id": "frontend-workspace-projections",
+      "pathPrefix": "desktop/src/",
+      "decision": "keep",
+      "rationale": "Workbench 的入口、能力目录、项目事实、工作区路由与 Slot 投影；生产写入仍经 Runtime client，不在投影层旁路。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop test && npm --prefix desktop run web:build"
+    },
+    {
+      "id": "tauri-core-entrypoints",
+      "pathPrefix": "desktop/src-tauri/",
+      "decision": "keep",
+      "rationale": "Tauri Native Shell、Runtime 模块注册和离线 Patch normalizer 入口；具体领域规则归 runtime 子模块，app.rs 单独持续拆分。",
+      "reviewStatus": "reviewed",
+      "verification": "cargo check --manifest-path desktop/src-tauri/Cargo.toml && bash tests/run-tests.sh"
+    },
+    {
+      "id": "repository-audit-data",
+      "pathPrefix": "docs/data/",
+      "decision": "keep",
+      "rationale": "文档结构、Schema 和文件账本的可再生审计数据；不得手工伪造生成字段。",
+      "reviewStatus": "reviewed",
+      "verification": "node scripts/audit-repository-files.mjs --check && node scripts/audit-schema-contracts.mjs --check"
+    },
+    {
+      "id": "repository-audit-scripts",
+      "pathPrefix": "scripts/",
+      "decision": "keep",
+      "rationale": "仓库文件、Schema、文档结构与密钥扫描的质量门槛脚本。",
+      "reviewStatus": "reviewed",
+      "verification": "bash tests/run-tests.sh"
+    },
+    {
+      "id": "agent-eval-support",
+      "pathPrefix": "desktop/src/agent-runtime/",
+      "decision": "keep",
+      "rationale": "Node Agent Eval 与回归使用的受控工具、恢复、事件与 Hermes 契约支撑；它不参与 React Workbench 或 Tauri 生产 Runtime，生产执行唯一 owner 是 desktop/src-tauri/src/runtime/。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop test && node scripts/audit-repository-files.mjs --check；受保护环境另运行真实 Provider Eval。"
+    },
+    {
+      "id": "retired-report-visual-baselines",
+      "pathPrefix": "tests/screenshots/",
+      "decision": "retire",
+      "rationale": "旧 AI 项目报告的视觉基线目录；当前 CI、Desktop Runtime、Playwright smoke 和仓库回归均不消费这些截图。",
+      "reviewStatus": "retired",
+      "verification": "用户于 2026-07-22 独立确认删除；删除后运行文件账本审计、完整回归与原生窗口 smoke。"
+    },
+    {
+      "id": "tauri-generated-schemas",
+      "pathPrefix": "desktop/src-tauri/gen/schemas/",
+      "decision": "keep",
+      "rationale": "Tauri CLI 根据当前配置与 capability 生成的 schema；default capability 直接引用 desktop-schema.json，其他文件共同描述同一原生权限契约。",
+      "reviewStatus": "reviewed",
+      "verification": "cargo check --manifest-path desktop/src-tauri/Cargo.toml && npm --prefix desktop run test:native；禁止手工编辑。"
+    },
+    {
+      "id": "tauri-platform-icons",
+      "pathPrefix": "desktop/src-tauri/icons/",
+      "decision": "keep",
+      "rationale": "Tauri bundle 的跨平台图标资源；desktop/APP_ICON.svg 是唯一源，tauri.conf.json 直接消费 macOS/Windows bundle 图标，其余平台资源随同一 Tauri 生成命令维护。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop run icons:generate && git diff -- desktop/src-tauri/icons；提交前审阅生成 diff，禁止手工编辑平台变体。"
+    }
+  ],
   "decisions": [
     {
       "path": "CLAUDE.md",
       "decision": "retire",
       "rationale": "旧 Claude Code adapter 仍引用 Project OS routing；AGENTS.md 是当前唯一规则入口。",
-      "reviewStatus": "candidate-confirmed"
+      "reviewStatus": "retired",
+      "verification": "不在当前 Git tracked 文件中；2026-07-22 消费者扫描为零。"
     },
     {
       "path": "COLLABORATION.md",
-      "decision": "merge-or-retire",
+      "decision": "retire",
       "rationale": "协作规则与 AGENTS.md、HANDOFF.md 重叠，且产品阶段已过时。",
-      "reviewStatus": "candidate-confirmed"
+      "reviewStatus": "retired",
+      "verification": "不在当前 Git tracked 文件中；2026-07-22 消费者扫描为零。"
     },
     {
       "path": "PRODUCT.md",
@@ -36,13 +152,6 @@
       "verification": "已收口为 theme.css 数值 SSOT、Desktop token 层级和使用边界；bash scripts/check-doc-structure.sh .、npm --prefix desktop test 和 npm --prefix desktop run web:build 通过。"
     },
     {
-      "path": "desktop/src-tauri/src/runtime/app.rs",
-      "decision": "rewrite",
-      "rationale": "Tauri command 装配层仍聚合对话请求桥接、Workspace 投影和运行编排。已抽离 chat_runtime、workspace_governance、workspace 文件预览/树扫描/忽略规则、hermes_protocol（含 executor status）、Patch Draft 上下文/提示词/语义门槛，以及 Provider HTTP transport/响应解析/候选排序/健康缓存匹配；密钥读取、实际探测、连接切换持久化、降级、审批和证据仍由 command 层编排，不能新增第二条业务执行路径。",
-      "reviewStatus": "in-progress",
-      "verification": "chat_runtime、workspace_governance、hermes_protocol、patch 与 provider 定向 Rust 测试、cargo check、bash tests/run-tests.sh 和 npm --prefix desktop run test:native 通过；Provider 与 Patch Draft 收口后完整回归通过（Desktop Node 450/450、Rust 102/102、Patch 6/6、Web build、离线 Eval、账本与 diff integrity）且 native smoke 通过。"
-    },
-    {
       "path": "desktop/src/components/workbench/theme-menu.jsx",
       "decision": "keep",
       "rationale": "Desktop 主题的用户入口。已迁为 omnidesk-desktop-theme 新写入，旧 project-os-desktop-theme 仅在浏览器 Preview 读取时兼容，避免丢失已有偏好。",
@@ -50,57 +159,326 @@
       "verification": "npm --prefix desktop test && npm --prefix desktop run web:build"
     },
     {
+      "path": "desktop/APP_ICON.svg",
+      "decision": "keep",
+      "rationale": "Tauri 跨平台 bundle 图标的唯一 SVG 源；平台变体由 desktop/package.json 的 icons:generate 命令生成。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop exec tauri -- icon --help && npm --prefix desktop run icons:generate && git diff -- desktop/src-tauri/icons"
+    },
+    {
+      "path": "desktop/LOGO.svg",
+      "decision": "retire",
+      "rationale": "与 desktop/src/assets/logo.svg 字节完全重复，但根目录副本没有构建、CSS 或运行时消费者。",
+      "reviewStatus": "retired",
+      "verification": "经用户 2026-07-22 授权删除；删除前 cmp -s 与 desktop/src/assets/logo.svg 一致，git grep 未发现消费者；删除后由完整 Runtime 回归验证。"
+    },
+    {
+      "path": "desktop/bin/codex",
+      "decision": "retire",
+      "rationale": "捆绑的 Codex CLI 启动包装器；当前 Desktop Runtime、终端、构建、CI 和测试均没有消费者，且产品不再将外部 CLI 作为执行依赖。",
+      "reviewStatus": "retired",
+      "verification": "经用户 2026-07-22 授权删除；git grep 未发现消费者；删除后运行 bash tests/run-tests.sh。"
+    },
+    {
+      "path": "tests/visual-diff.mjs",
+      "decision": "retire",
+      "rationale": "旧报告截图像素比较工具；没有 CI、Desktop Runtime 或现行视觉 smoke 消费者，并保留旧 Project OS 临时目录命名。",
+      "reviewStatus": "retired",
+      "verification": "经用户 2026-07-22 授权删除；git grep 未发现消费者；删除后运行 bash tests/run-tests.sh。"
+    },
+    {
+      "path": "desktop/index.html",
+      "decision": "keep",
+      "rationale": "Vite/Tauri 的前端 HTML 入口，提供 React mount point 和加载失败时的最小错误提示。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop run web:build && npm --prefix desktop run test:native"
+    },
+    {
+      "path": "desktop/task-storage.js",
+      "decision": "compatibility-review",
+      "rationale": "仅由 task-storage.test.mjs 消费的旧原子写入测试 helper；当前生产 Task 持久化归 Rust Runtime Repository，需在测试覆盖映射完成后单独决定是否退役。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop test；删除或迁移前须证明 runtime/tasks.rs 与 repository.rs 已覆盖同等恢复语义。"
+    },
+    {
+      "path": "desktop/vite.config.js",
+      "decision": "keep",
+      "rationale": "Desktop Preview 开发服务器和只读兼容层入口；测试直接覆盖 namespace、operation contract 与资源预算边界。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop test && npm --prefix desktop run web:build"
+    },
+    {
+      "path": "desktop/src/assets/logo.svg",
+      "decision": "keep",
+      "rationale": "当前 Workbench 标识资源；theme.css 以 CSS url 静态引用。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop run web:build && git grep -n 'assets/logo.svg' -- desktop/src"
+    },
+    {
+      "path": "desktop/src/assets/omnidesk-logo.svg",
+      "decision": "retire",
+      "rationale": "未被前端、样式、构建或测试引用的旧替代 Logo，不能与当前主题标识并行作为隐性来源。",
+      "reviewStatus": "retired",
+      "verification": "经用户 2026-07-22 授权删除；git grep 未发现消费者；删除后由 Web build 与完整 Runtime 回归验证。"
+    },
+    {
+      "path": "desktop/src/components/workbench/provider-status-row.jsx",
+      "decision": "retire",
+      "rationale": "未被任何 Workbench surface、Provider presentation 或测试引用的旧状态行组件；当前连接状态由 provider-connection-summary 与 provider-status-row 之外的组合 surface 呈现。",
+      "reviewStatus": "retired",
+      "verification": "经用户 2026-07-22 授权删除；git grep 未发现消费者；删除后运行 npm --prefix desktop test。"
+    },
+    {
+      "path": "desktop/package.json",
+      "decision": "keep",
+      "rationale": "Desktop 前端的唯一依赖、构建和本地质量命令入口；其中 native smoke 与受保护 Eval 命令直接服务当前 Runtime。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop test && npm --prefix desktop run web:build && npm --prefix desktop run test:native"
+    },
+    {
+      "path": "desktop/package-lock.json",
+      "decision": "keep",
+      "rationale": "锁定 desktop/package.json 的前端依赖图，保证本地、CI 与原生壳构建可复现；不得手工编辑。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop ci && npm --prefix desktop test"
+    },
+    {
+      "path": "desktop/playwright.config.mjs",
+      "decision": "keep",
+      "rationale": "浏览器只读 Preview smoke 的 Playwright 配置；与原生 WebDriver smoke 分开，避免将浏览器测试误作桌面执行验收。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop run test:smoke"
+    },
+    {
+      "path": "desktop/scripts/check-bundle-budget.mjs",
+      "decision": "keep",
+      "rationale": "前端首屏 bundle 软预算检查，由 desktop/package.json 的 check:bundle 和仓库回归调用。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop run web:build && npm --prefix desktop run check:bundle"
+    },
+    {
+      "path": "desktop/scripts/run-native-webdriver-smoke.mjs",
+      "decision": "keep",
+      "rationale": "隔离工作区中的 macOS 原生 Tauri WebDriver smoke；验证输入状态和中断后的审批恢复，不读取密钥或写当前工程。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop run test:native"
+    },
+    {
+      "path": "desktop/schemas/state-layout.schema.json",
+      "decision": "keep",
+      "rationale": "定义 .omnidesk 四分区和历史导入 metadata 的状态布局契约；legacyRoot 仅用于显式迁移描述，不是 Runtime 回退入口。",
+      "reviewStatus": "reviewed",
+      "verification": "node scripts/audit-schema-contracts.mjs --check && bash tests/run-tests.sh"
+    },
+    {
+      "path": "desktop/src-tauri/Cargo.toml",
+      "decision": "keep",
+      "rationale": "原生 Runtime、patch normalizer 和仅测试 WebDriver feature 的唯一 Rust 构建清单。",
+      "reviewStatus": "reviewed",
+      "verification": "cargo check --manifest-path desktop/src-tauri/Cargo.toml && npm --prefix desktop run test:native"
+    },
+    {
+      "path": "desktop/src-tauri/Cargo.lock",
+      "decision": "keep",
+      "rationale": "锁定 Cargo.toml 的原生依赖图，确保 Runtime 和测试 feature 的可复现构建；不得手工编辑。",
+      "reviewStatus": "reviewed",
+      "verification": "cargo check --manifest-path desktop/src-tauri/Cargo.toml"
+    },
+    {
+      "path": "desktop/src-tauri/build.rs",
+      "decision": "keep",
+      "rationale": "Tauri 原生构建入口，生成 bundle 和 capability 相关构建产物。",
+      "reviewStatus": "reviewed",
+      "verification": "cargo check --manifest-path desktop/src-tauri/Cargo.toml"
+    },
+    {
+      "path": "desktop/src-tauri/capabilities/default.json",
+      "decision": "keep",
+      "rationale": "生产窗口的最小 Tauri capability allowlist；仅开放文件选择 dialog 与 core event 默认权限。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop run test:native && cargo check --manifest-path desktop/src-tauri/Cargo.toml"
+    },
+    {
+      "path": "desktop/src-tauri/tauri.conf.json",
+      "decision": "compatibility-review",
+      "rationale": "生产 Tauri 配置是 Runtime、CSP、窗口和 bundle 图标的入口。identifier 仍为 ai.project-os.desktop，属于已发布应用身份；改名会改变 macOS 安装/升级识别，必须在独立迁移与发布计划中处理，不能随文件治理直接改写。",
+      "reviewStatus": "reviewed",
+      "verification": "cargo check --manifest-path desktop/src-tauri/Cargo.toml && npm --prefix desktop run test:native；应用标识迁移须另行验证安装、升级与用户数据保留。"
+    },
+    {
+      "path": "desktop/src-tauri/tauri.webdriver.conf.json",
+      "decision": "keep",
+      "rationale": "仅原生 smoke 使用的覆盖配置：独立端口、测试 bundle identifier 和 CSP，生产构建不加载 WebDriver endpoint。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop run test:native"
+    },
+    {
+      "path": "desktop/README.md",
+      "decision": "keep",
+      "rationale": "Desktop Runtime 的开发和调试入口，明确浏览器 Preview 不能替代原生受控执行。",
+      "reviewStatus": "reviewed",
+      "verification": "bash scripts/check-doc-structure.sh . && bash scripts/check-frontmatter.sh ."
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "decision": "keep",
+      "rationale": "系统模块、状态所有权和执行边界的架构 SSOT；不承担交接或变更流水。",
+      "reviewStatus": "reviewed",
+      "verification": "bash scripts/check-doc-structure.sh . && bash scripts/check-frontmatter.sh ."
+    },
+    {
+      "path": "docs/CHANGELOG.md",
+      "decision": "keep",
+      "rationale": "结构性变更历史证据；其中旧 Project OS 条目仅用于追溯，不能作为现行产品规则。",
+      "reviewStatus": "reviewed",
+      "verification": "bash scripts/check-doc-structure.sh . && git grep -n 'docs/CHANGELOG.md' -- desktop docs PRODUCT.md"
+    },
+    {
+      "path": "docs/DECISIONS.md",
+      "decision": "keep",
+      "rationale": "关键架构取舍的历史档案；文件已明确服从 AGENTS.md、PROJECT.md 与 DOCUMENTATION.md 的现行规则。",
+      "reviewStatus": "reviewed",
+      "verification": "bash scripts/check-doc-structure.sh . && bash scripts/check-frontmatter.sh ."
+    },
+    {
+      "path": "docs/DESIGN_STANDARDS.md",
+      "decision": "keep",
+      "rationale": "当前 Workbench 的设计 token、布局和组件边界总入口，由前端实现与设计文档共同消费。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop run web:build && bash scripts/check-doc-structure.sh ."
+    },
+    {
+      "path": "docs/DOCUMENTATION.md",
+      "decision": "keep",
+      "rationale": "文档职责和 SSOT 的治理入口；变更文档边界时必须同步此处和 manifest。",
+      "reviewStatus": "reviewed",
+      "verification": "bash scripts/check-doc-structure.sh . && bash scripts/check-frontmatter.sh ."
+    },
+    {
+      "path": "docs/ENVIRONMENT.md",
+      "decision": "keep",
+      "rationale": "Desktop 依赖、Provider 配置和本地验证命令的环境说明，不包含旧 CLI 或 installer 流程。",
+      "reviewStatus": "reviewed",
+      "verification": "bash scripts/check-doc-structure.sh . && bash scripts/check-frontmatter.sh ."
+    },
+    {
+      "path": "docs/LESSONS.md",
+      "decision": "keep",
+      "rationale": "误改、误判与测试偏差的历史约束记录，供后续高风险 Runtime 改动前查阅。",
+      "reviewStatus": "reviewed",
+      "verification": "bash scripts/check-doc-structure.sh . && bash scripts/check-frontmatter.sh ."
+    },
+    {
+      "path": "docs/NAMING.md",
+      "decision": "keep",
+      "rationale": "OmniDesk 文件、状态分区和契约命名规则；禁止新增 .project-os 写入。",
+      "reviewStatus": "reviewed",
+      "verification": "bash scripts/check-doc-structure.sh . && bash scripts/check-frontmatter.sh ."
+    },
+    {
+      "path": "docs/PRODUCT_PLAN.md",
+      "decision": "keep",
+      "rationale": "当前阶段、范围边界与完成标准的产品规划 SSOT，不保存单次提交流水。",
+      "reviewStatus": "reviewed",
+      "verification": "bash scripts/check-doc-structure.sh . && bash scripts/check-frontmatter.sh ."
+    },
+    {
+      "path": "docs/PROJECT_MEMORY_AND_RUNNER.md",
+      "decision": "keep",
+      "rationale": "项目记忆、Agent Run、人工审批与恢复边界的专题规范，直接约束执行闭环。",
+      "reviewStatus": "reviewed",
+      "verification": "bash scripts/check-doc-structure.sh . && bash scripts/check-frontmatter.sh ."
+    },
+    {
+      "path": "docs/REFERENCE_SYSTEMS.md",
+      "decision": "rewrite",
+      "rationale": "参照系统的比较边界仍有早期“项目治理中枢”等表述；应收口为 Desktop Runtime 如何借鉴 Hermes、Cursor、Claude Projects，而不能恢复跨工具治理产品定位。",
+      "reviewStatus": "reviewed",
+      "verification": "重写后运行 bash scripts/check-doc-structure.sh .、bash scripts/check-frontmatter.sh . 和 git grep -n 'Project OS|项目治理中枢' docs/REFERENCE_SYSTEMS.md。"
+    },
+    {
+      "path": "docs/RUNBOOK.md",
+      "decision": "keep",
+      "rationale": "本地自检、发布门槛、迁移和故障处理指南；真实 Provider Eval 只指向受保护环境。",
+      "reviewStatus": "reviewed",
+      "verification": "bash scripts/check-doc-structure.sh . && bash scripts/check-frontmatter.sh ."
+    },
+    {
+      "path": "docs/TESTING.md",
+      "decision": "keep",
+      "rationale": "测试分层、原生验收与真实 Eval 发布证据的 SSOT；不将 Preview 当作桌面写入验证。",
+      "reviewStatus": "reviewed",
+      "verification": "bash tests/run-tests.sh && npm --prefix desktop run test:native"
+    },
+    {
+      "path": "docs/design/component-index.md",
+      "decision": "keep",
+      "rationale": "Workbench 组件分层与真实源码索引，供组件治理页面和设计规范引用。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop run web:build && git grep -n 'component-index.md' -- desktop docs"
+    },
+    {
+      "path": "docs/design/workbench-visualization.md",
+      "decision": "keep",
+      "rationale": "工作区可视化结构与状态规则；应随当前菜单和工作面变更更新，不作为新增产品能力的路线图。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop run web:build && bash scripts/check-frontmatter.sh ."
+    },
+    {
       "path": "kit",
       "decision": "retire",
       "rationale": "旧 CLI 中控台调用的脚本已退役，不是 Desktop Runtime 入口。",
-      "reviewStatus": "candidate-confirmed"
+      "reviewStatus": "retired",
+      "verification": "不在当前 Git tracked 文件中；2026-07-22 消费者扫描为零。"
     },
     {
       "path": "examples/filled-project.md",
       "decision": "retire",
       "rationale": "旧项目文档模板示例，不属于 OmniDesk 产品或测试。",
-      "reviewStatus": "candidate-confirmed"
+      "reviewStatus": "retired",
+      "verification": "不在当前 Git tracked 文件中；2026-07-22 消费者扫描为零。"
     },
     {
       "path": "examples/prompt-simulation.md",
       "decision": "retire",
       "rationale": "旧 Project OS routing 场景，不再覆盖当前 Runtime 行为。",
-      "reviewStatus": "candidate-confirmed"
+      "reviewStatus": "retired",
+      "verification": "不在当前 Git tracked 文件中；2026-07-22 消费者扫描为零。"
     },
     {
       "path": "schemas/project-os-config.schema.json",
-      "decision": "compatibility-review",
+      "decision": "retire",
       "rationale": "旧 CLI 配置契约；先确认没有生产消费者再退役。",
-      "reviewStatus": "candidate-confirmed",
-      "verification": "node scripts/audit-schema-contracts.mjs --check；git grep 未发现 Desktop Runtime、测试或 CI 消费者。"
+      "reviewStatus": "retired",
+      "verification": "不在当前 Git tracked 文件中；node scripts/audit-schema-contracts.mjs --check 仅登记 14 个 active OmniDesk 契约。"
     },
     {
       "path": "schemas/entry-context.schema.json",
-      "decision": "compatibility-review",
+      "decision": "retire",
       "rationale": "旧 Desktop/Web/IDE/CLI/CI Gateway 入口上下文，不属于当前唯一 Desktop Runtime 执行边界。保留到外部发布或动态读取消费者完成复核。",
-      "reviewStatus": "candidate-confirmed",
-      "verification": "node scripts/audit-schema-contracts.mjs --check；git grep 未发现 Desktop Runtime、测试或 CI 消费者。"
+      "reviewStatus": "retired",
+      "verification": "不在当前 Git tracked 文件中；node scripts/audit-schema-contracts.mjs --check 仅登记 14 个 active OmniDesk 契约。"
     },
     {
       "path": "schemas/fact-event.schema.json",
-      "decision": "compatibility-review",
+      "decision": "retire",
       "rationale": "旧事实管线事件契约；当前 Runtime 直接持久化 OmniDesk workspace/fact 状态，不再生产该事件格式。",
-      "reviewStatus": "candidate-confirmed",
-      "verification": "node scripts/audit-schema-contracts.mjs --check；git grep 未发现 Desktop Runtime、测试或 CI 消费者。"
+      "reviewStatus": "retired",
+      "verification": "不在当前 Git tracked 文件中；node scripts/audit-schema-contracts.mjs --check 仅登记 14 个 active OmniDesk 契约。"
     },
     {
       "path": "schemas/project-goals.schema.json",
-      "decision": "compatibility-review",
+      "decision": "retire",
       "rationale": "旧 projectGoals 聚合格式；当前 Goals Runtime 已使用 omnidesk.goals.v0.1，旧版本只允许兼容读取投影。",
-      "reviewStatus": "candidate-confirmed",
-      "verification": "node scripts/audit-schema-contracts.mjs --check；git grep 未发现 Desktop Runtime、测试或 CI 消费者。"
+      "reviewStatus": "retired",
+      "verification": "不在当前 Git tracked 文件中；node scripts/audit-schema-contracts.mjs --check 仅登记 14 个 active OmniDesk 契约。"
     },
     {
       "path": "schemas/workspace-slot.schema.json",
-      "decision": "compatibility-review",
+      "decision": "retire",
       "rationale": "旧工作区 slot 契约；当前前端 slot 投影使用已收口的 OmniDesk progress/runbook contracts。",
-      "reviewStatus": "candidate-confirmed",
-      "verification": "node scripts/audit-schema-contracts.mjs --check；git grep 未发现 Desktop Runtime、测试或 CI 消费者。"
+      "reviewStatus": "retired",
+      "verification": "不在当前 Git tracked 文件中；node scripts/audit-schema-contracts.mjs --check 仅登记 14 个 active OmniDesk 契约。"
     },
     {
       "path": "schemas/agent-run.schema.json",
@@ -169,19 +547,22 @@
       "path": "tokens.css",
       "decision": "retire",
       "rationale": "当前 Desktop 样式入口是 desktop/src/styles.css；根 token 文件没有构建或产品消费者。",
-      "reviewStatus": "candidate-confirmed"
+      "reviewStatus": "retired",
+      "verification": "不在当前 Git tracked 文件中；2026-07-22 构建与消费者扫描为零。"
     },
     {
       "path": "skills-lock.json",
       "decision": "retire",
       "rationale": "旧跨工具 skill 分发锁文件，没有当前 Runtime、CI 或测试消费者。",
-      "reviewStatus": "candidate-confirmed"
+      "reviewStatus": "retired",
+      "verification": "不在当前 Git tracked 文件中；2026-07-22 构建与消费者扫描为零。"
     },
     {
       "path": "VERSION",
       "decision": "retire",
       "rationale": "根版本文件没有构建、发布或 Runtime 消费者；当前版本由 desktop/package.json 与 Cargo.toml 定义。",
-      "reviewStatus": "candidate-confirmed"
+      "reviewStatus": "retired",
+      "verification": "不在当前 Git tracked 文件中；2026-07-22 构建与消费者扫描为零。"
     },
     {
       "path": ".github/workflows/ci.yml",
@@ -228,23 +609,65 @@
     {
       "path": "desktop/src/main.jsx",
       "decision": "split-by-domain",
-      "rationale": "Vite/Tauri 前端入口且仍承担过多装配、领域投影和页面组合；保留为薄装配层，逐步提取领域 surface。",
+      "rationale": "Vite/Tauri 前端入口仍承担较多 controller 装配和页面组合；Preview/Provider 默认契约、领域投影与主要 surface 已下沉，继续保留为薄装配层。",
       "reviewStatus": "in-progress",
       "verification": "npm --prefix desktop test && npm --prefix desktop run web:build"
     },
     {
       "path": "desktop/src/styles.css",
-      "decision": "split-by-domain",
-      "rationale": "当前唯一样式入口，包含全局、布局、对话、任务、终端和 Provider 样式；保留入口，逐步提取领域样式文件。",
-      "reviewStatus": "in-progress",
+      "decision": "keep",
+      "rationale": "已收口为 6 行有序样式入口；基础、主题、工作区、对话、终端和 Provider Rail 规则分别由 desktop/src/styles/ 下的领域文件拥有。",
+      "reviewStatus": "reviewed",
       "verification": "npm --prefix desktop run web:build && npm --prefix desktop run test:native"
     },
     {
       "path": "desktop/src-tauri/src/runtime/app.rs",
       "decision": "split-by-domain",
-      "rationale": "Tauri command 装配层仍混有 Patch、Agent Run、状态投影和少量 Provider 编排；公共 command、密钥读取、连接切换、降级、审批和运行证据保留在此，Provider HTTP transport/响应解析已下沉。",
+      "rationale": "Tauri command 装配层保留项目/权限解析、请求取消、Provider 切换后的 Hermes 同步触发、Hermes transport 和 command 生命周期；Patch Draft 连接选择、重生成、Provider 降级与草稿证据已下沉到 Patch Draft，Patch Apply 校验、Git 执行、已批准工具分派/结算、Run 项目绑定与审计已下沉到 Execution，模型阶段创建/恢复与完成状态收束已下沉到 Agent Run，Provider 凭据策略/配置文件同步、预检/故障切换/健康证据、HTTP transport、工作区监听及系统/终端集成也已下沉。",
       "reviewStatus": "in-progress",
       "verification": "cargo check --manifest-path desktop/src-tauri/Cargo.toml && bash tests/run-tests.sh"
+    },
+    {
+      "path": "desktop/src/lib/workbench-defaults.js",
+      "decision": "keep",
+      "rationale": "Workbench 的 Preview Snapshot、Provider、模型目录、任务状态与建议卡默认契约 Owner；入口只导入，不复制默认数据。",
+      "reviewStatus": "reviewed",
+      "verification": "node --test desktop/tests/workbench-defaults.test.mjs desktop/tests/domain-boundaries.test.mjs && npm --prefix desktop run web:build"
+    },
+    {
+      "path": "desktop/src/lib/workspace-preview-client.js",
+      "decision": "keep",
+      "rationale": "浏览器 Preview 的只读 Workspace Snapshot 加载与 native .omnidesk 状态投影 Owner；Workbench 入口只消费合并后的 Snapshot，不直接读取状态文件。",
+      "reviewStatus": "reviewed",
+      "verification": "node --test desktop/tests/workspace-preview-client.test.mjs desktop/tests/domain-boundaries.test.mjs && npm --prefix desktop run web:build"
+    },
+    {
+      "path": "desktop/tests/workspace-preview-client.test.mjs",
+      "decision": "keep",
+      "rationale": "Preview Workspace client 的专属契约回归，验证 Snapshot 优先级、native .omnidesk 回退与旧状态路径隔离。",
+      "reviewStatus": "reviewed",
+      "verification": "node --test desktop/tests/workspace-preview-client.test.mjs"
+    },
+    {
+      "path": "desktop/src/lib/workspace-runtime-bridge.js",
+      "decision": "keep",
+      "rationale": "Workbench 的 Workspace Snapshot、目标动作、系统剪贴板和目录选择 transport Owner；原生与 Preview 能力边界在入口之外统一装配。",
+      "reviewStatus": "reviewed",
+      "verification": "node --test desktop/tests/workspace-runtime-bridge.test.mjs desktop/tests/domain-boundaries.test.mjs && npm --prefix desktop run web:build"
+    },
+    {
+      "path": "desktop/tests/workspace-runtime-bridge.test.mjs",
+      "decision": "keep",
+      "rationale": "Workspace runtime bridge 的 transport 契约回归，验证 Preview 回退、原生 invoke、剪贴板和目录选择边界。",
+      "reviewStatus": "reviewed",
+      "verification": "node --test desktop/tests/workspace-runtime-bridge.test.mjs"
+    },
+    {
+      "path": "desktop/src/lib/workbench-catalog.js",
+      "decision": "keep",
+      "rationale": "Workbench 能力标签、主题专属 Surface 与默认对话建议的纯展示 Owner；不调用 Runtime，也不保存用户状态。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop test && npm --prefix desktop run web:build；浏览器 Preview 验证能力导航与主题页。"
     },
     {
       "path": "docs/data/doc-structure.manifest.json",
@@ -287,6 +710,300 @@
       "rationale": "已改为实际 React、Vite、Tauri、Workbench hooks 和 CSS 架构说明。",
       "reviewStatus": "reviewed",
       "verification": "bash scripts/check-doc-structure.sh . && bash scripts/check-frontmatter.sh ."
+    },
+    {
+      "path": "README.md",
+      "decision": "keep",
+      "rationale": "唯一用户入口，已明确 Desktop Runtime 与浏览器 Preview 的能力边界，并不再暴露旧工具链入口。",
+      "reviewStatus": "reviewed",
+      "verification": "bash scripts/check-doc-structure.sh . && bash scripts/check-frontmatter.sh ."
+    },
+    {
+      "path": "PROJECT.md",
+      "decision": "keep",
+      "rationale": "当前产品状态 SSOT，记录 Runtime 内核、可靠性基线、文件治理进度和下一步。",
+      "reviewStatus": "reviewed",
+      "verification": "bash scripts/check-doc-structure.sh . && bash scripts/check-frontmatter.sh ."
+    },
+    {
+      "path": "HANDOFF.md",
+      "decision": "rewrite",
+      "rationale": "当前文件承担当前交接摘要但累积为历史流水；应在保留可追溯归档后压缩为最近完成、风险与下一步，不能未经确认删除历史。",
+      "reviewStatus": "reviewed",
+      "verification": "已核验当前职责、858 行体量与历史条目；归档和压缩前必须获得独立删除/迁移确认，并运行 bash scripts/check-doc-structure.sh . 与 bash scripts/check-frontmatter.sh .。"
+    },
+    {
+      "path": "schemas/conversation.schema.json",
+      "decision": "keep",
+      "rationale": "当前 Conversation 记录与 turn summary 契约，由 conversation runtime 和回归直接消费。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop test && node scripts/audit-schema-contracts.mjs --check"
+    },
+    {
+      "path": "schemas/fact-freshness.schema.json",
+      "decision": "keep",
+      "rationale": "Workspace facts freshness 的 native 写入与身份回归契约。",
+      "reviewStatus": "reviewed",
+      "verification": "bash tests/run-tests.sh && node scripts/audit-schema-contracts.mjs --check"
+    },
+    {
+      "path": "schemas/project-capabilities.schema.json",
+      "decision": "keep",
+      "rationale": "工作区与领域能力激活的 native Runtime 契约，旧版本仅通过读取投影兼容。",
+      "reviewStatus": "reviewed",
+      "verification": "bash tests/run-tests.sh && node scripts/audit-schema-contracts.mjs --check"
+    },
+    {
+      "path": "schemas/project-fact-store.schema.json",
+      "decision": "keep",
+      "rationale": "前端 Fact Store 的结构化事实记录契约，由事实投影与测试直接消费。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop test && node scripts/audit-schema-contracts.mjs --check"
+    },
+    {
+      "path": "schemas/project-overview-contract.v0.1.json",
+      "decision": "keep",
+      "rationale": "项目概览 selectors、slots、事实来源与操作白名单的声明式契约。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop test && node scripts/audit-schema-contracts.mjs --check"
+    },
+    {
+      "path": "schemas/project-profile.schema.json",
+      "decision": "keep",
+      "rationale": "项目档案字段、来源和确认状态的 native Workspace 读写契约。",
+      "reviewStatus": "reviewed",
+      "verification": "bash tests/run-tests.sh && node scripts/audit-schema-contracts.mjs --check"
+    },
+    {
+      "path": "schemas/workspace-facts.schema.json",
+      "decision": "keep",
+      "rationale": "本地工作区事实和治理风险的只读投影契约，由 Workspace Runtime 生成。",
+      "reviewStatus": "reviewed",
+      "verification": "bash tests/run-tests.sh && node scripts/audit-schema-contracts.mjs --check"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/agent_runs.rs",
+      "decision": "keep",
+      "rationale": "Agent Run 的持久化阶段、审批、模型阶段创建/恢复校验、checkpoint、工具结果续接、模型完成后的审批或终态收束与恢复证据 Owner；由 app command adapter 调用。",
+      "reviewStatus": "reviewed",
+      "verification": "bash tests/run-tests.sh"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/agent_tools.rs",
+      "decision": "keep",
+      "rationale": "受控 Agent 只读工程工具、参数分发和运行时目录隔离的唯一 Owner。",
+      "reviewStatus": "reviewed",
+      "verification": "bash tests/run-tests.sh"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/chat_content.rs",
+      "decision": "keep",
+      "rationale": "本地对话回复、提示词和证据投影 Owner，不承担 Tauri command 编排。",
+      "reviewStatus": "reviewed",
+      "verification": "bash tests/run-tests.sh"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/chat_routing.rs",
+      "decision": "keep",
+      "rationale": "对话意图与只读计划升级判定 Owner。",
+      "reviewStatus": "reviewed",
+      "verification": "bash tests/run-tests.sh"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/chat_runtime.rs",
+      "decision": "keep",
+      "rationale": "请求取消和对话事件发射的 Runtime Owner。",
+      "reviewStatus": "reviewed",
+      "verification": "bash tests/run-tests.sh"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/chat_stream.rs",
+      "decision": "keep",
+      "rationale": "Provider 对话请求、严格结果解析、SSE 增量消费与可见回复投影 Owner；通过回调交付增量，不拥有 Tauri 事件、取消、失败审计或降级。",
+      "reviewStatus": "reviewed",
+      "verification": "bash tests/run-tests.sh"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/conversations.rs",
+      "decision": "keep",
+      "rationale": "Conversation 的分区持久化与 legacy 只读投影 Owner。",
+      "reviewStatus": "reviewed",
+      "verification": "bash tests/run-tests.sh"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/execution.rs",
+      "decision": "keep",
+      "rationale": "受控检查 allowlist、Patch Draft 可应用性/授权路径校验、Git Apply、已批准工具分派/结算、Run 项目绑定、有界输出、执行审计和运行摘要证据的唯一 Owner。",
+      "reviewStatus": "reviewed",
+      "verification": "bash tests/run-tests.sh"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/goals.rs",
+      "decision": "keep",
+      "rationale": "目标创建、验收、归档、合并与任务重绑定事务 Owner。",
+      "reviewStatus": "reviewed",
+      "verification": "bash tests/run-tests.sh"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/hermes_protocol.rs",
+      "decision": "keep",
+      "rationale": "Hermes ACP 协议、执行器状态和结构化包校验 Owner。",
+      "reviewStatus": "reviewed",
+      "verification": "bash tests/run-tests.sh"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/mod.rs",
+      "decision": "keep",
+      "rationale": "Runtime 领域模块唯一注册入口。",
+      "reviewStatus": "reviewed",
+      "verification": "cargo check --manifest-path desktop/src-tauri/Cargo.toml"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/patch.rs",
+      "decision": "keep",
+      "rationale": "授权文件、上下文、统一 diff 校验与草稿提示词 Owner；不承担 Provider 或 Hermes transport。",
+      "reviewStatus": "reviewed",
+      "verification": "bash tests/run-tests.sh"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/patch_draft.rs",
+      "decision": "keep",
+      "rationale": "只读 Patch Draft 的连接选择、固定授权上下文、Hermes 一次重生成、Provider 降级、失败审计与草稿证据 Owner；不执行工程写入或检查。",
+      "reviewStatus": "reviewed",
+      "verification": "bash tests/run-tests.sh && npm --prefix desktop run test:native"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/planning.rs",
+      "decision": "keep",
+      "rationale": "只读计划的本地回退、Provider 连接选择、取消、失败审计、降级和计划生成 Owner；不拥有工程写入、终端或检查审批。",
+      "reviewStatus": "reviewed",
+      "verification": "bash tests/run-tests.sh"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/provider.rs",
+      "decision": "keep",
+      "rationale": "Provider profile、密钥隔离与输入策略、模型探测/测试、健康缓存、Hermes 配置文件同步和 HTTP transport Owner。",
+      "reviewStatus": "reviewed",
+      "verification": "bash tests/run-tests.sh"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/repository.rs",
+      "decision": "keep",
+      "rationale": "OmniDesk 分区状态的锁、原子事务和恢复 Owner。",
+      "reviewStatus": "reviewed",
+      "verification": "bash tests/run-tests.sh"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/state_namespace.rs",
+      "decision": "keep",
+      "rationale": "`.project-os` 到 `.omnidesk` 的非破坏迁移、激活和退役检查 Owner。",
+      "reviewStatus": "reviewed",
+      "verification": "bash tests/run-tests.sh"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/tasks.rs",
+      "decision": "keep",
+      "rationale": "Task 存储、恢复和删除时跨实体清理 Owner。",
+      "reviewStatus": "reviewed",
+      "verification": "bash tests/run-tests.sh"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/terminal.rs",
+      "decision": "keep",
+      "rationale": "PTY 会话、终端图片缓存与原生 trace Owner。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop run test:native"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/theme.rs",
+      "decision": "keep",
+      "rationale": "Desktop 主题默认值、归一化和 native 分区持久化 Owner。",
+      "reviewStatus": "reviewed",
+      "verification": "bash tests/run-tests.sh"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/workspace.rs",
+      "decision": "keep",
+      "rationale": "项目注册、事实预览、能力、记忆和工程树投影 Owner。",
+      "reviewStatus": "reviewed",
+      "verification": "bash tests/run-tests.sh"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/workspace_watcher.rs",
+      "decision": "keep",
+      "rationale": "工作区事实文件监听、忽略规则、防抖和 workspace://files-changed 事件的唯一 Owner；不读取 Provider、Patch、审批或项目注册表。",
+      "reviewStatus": "reviewed",
+      "verification": "cargo check --manifest-path desktop/src-tauri/Cargo.toml && bash tests/run-tests.sh"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/workspace_governance.rs",
+      "decision": "keep",
+      "rationale": "工作区治理域、Git 风险和健康分数的只读投影 Owner。",
+      "reviewStatus": "reviewed",
+      "verification": "bash tests/run-tests.sh"
+    },
+    {
+      "path": "desktop/evals/agent-development-cases.json",
+      "decision": "keep",
+      "rationale": "固定 12-case Agent 开发闭环评测定义。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop run check:agent-eval"
+    },
+    {
+      "path": "desktop/evals/agent-eval-report.json",
+      "decision": "keep",
+      "rationale": "受保护真实 Eval 的已提交基线，不接受手写成功结果。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop run check:agent-eval"
+    },
+    {
+      "path": "desktop/scripts/check-agent-eval-report.mjs",
+      "decision": "keep",
+      "rationale": "Eval 指标和基线回退的离线发布门槛。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop run check:agent-eval"
+    },
+    {
+      "path": "desktop/scripts/check-agent-eval-traces.mjs",
+      "decision": "keep",
+      "rationale": "真实 Eval artifact-relative trace 完整性检查。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop run check:agent-eval"
+    },
+    {
+      "path": "desktop/scripts/run-agent-eval-hermes-cli.mjs",
+      "decision": "keep",
+      "rationale": "受保护环境 Hermes CLI Eval executor。",
+      "reviewStatus": "reviewed",
+      "verification": "GitHub Actions Agent Eval 29890989675"
+    },
+    {
+      "path": "desktop/scripts/run-agent-eval-recovery.mjs",
+      "decision": "keep",
+      "rationale": "Agent Run 中断恢复轨迹 executor。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop test"
+    },
+    {
+      "path": "desktop/scripts/run-agent-eval-safety.mjs",
+      "decision": "keep",
+      "rationale": "Agent Tool Gateway 安全路径真实轨迹 executor。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop test"
+    },
+    {
+      "path": "desktop/scripts/run-agent-eval-suite.mjs",
+      "decision": "keep",
+      "rationale": "12-case Eval 汇总与 artifact 输出入口。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop run check:agent-eval"
+    },
+    {
+      "path": "desktop/scripts/run-agent-eval.mjs",
+      "decision": "keep",
+      "rationale": "真实 Provider Eval 主入口，只在受保护环境运行。",
+      "reviewStatus": "reviewed",
+      "verification": "GitHub Actions Agent Eval 29890989675"
     }
   ]
 }

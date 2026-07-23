@@ -27,8 +27,8 @@ test("rejects oversized and aggregate attachment input before it enters state", 
 
 test("keeps Preview and Tauri engineering-file retention aligned with the resource budget", () => {
   const viteConfig = fs.readFileSync(path.join(desktopRoot, "vite.config.js"), "utf8");
-  const nativeRuntime = fs.readFileSync(path.join(desktopRoot, "src-tauri", "src", "runtime", "app.rs"), "utf8");
+  const workspaceRuntime = fs.readFileSync(path.join(desktopRoot, "src-tauri", "src", "runtime", "workspace.rs"), "utf8");
   assert.equal(resourceBudget.filePreviewMaxBytes, 80 * 1024);
   assert.match(viteConfig, /const maxBytes = 80 \* 1024;/);
-  assert.match(nativeRuntime, /const MAX_PREVIEW_BYTES: usize = 80 \* 1024;/);
+  assert.match(workspaceRuntime, /const MAX_PREVIEW_BYTES: usize = 80 \* 1024;/);
 });

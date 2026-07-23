@@ -165,6 +165,38 @@ pub fn git_status(root: &Path) -> Result<Value, String> {
     )
 }
 
+/// Executes only the registered read-only Agent tools. The Tauri adapter owns
+/// selecting the current project root; this module owns argument validation and dispatch.
+pub fn execute_read_tool(root: &Path, name: &str, arguments: &Value) -> Result<Value, String> {
+    let arguments = arguments
+        .as_object()
+        .ok_or_else(|| "工具参数格式错误".to_string())?;
+    let path = arguments.get("path").and_then(Value::as_str).unwrap_or(".");
+    match name.trim() {
+        "list_files" => list_files(root, path),
+        "read_file" => read_file(root, path),
+        "search_project" => search_project(
+            root,
+            path,
+            arguments.get("query").and_then(Value::as_str).unwrap_or(""),
+        ),
+        "git_status" => git_status(root),
+        _ => Err("Native Core 只接受已登记的只读 Agent Tool".to_string()),
+    }
+}
+
+/// Hermes ACP uses the same registered read-only tools as the native command.
+/// Keep its protocol-specific error boundary here so ACP cannot duplicate path
+/// or query argument handling.
+pub fn execute_hermes_read_tool(
+    root: &Path,
+    name: &str,
+    arguments: &Value,
+) -> Result<Value, String> {
+    execute_read_tool(root, name, arguments)
+        .map_err(|error| format!("Hermes 读取工具失败：{error}"))
+}
+
 fn is_ignored(path: &Path) -> bool {
     path.components().any(|component| {
         matches!(
@@ -278,6 +310,27 @@ mod tests {
         assert!(!paths.iter().any(|path| path.starts_with(".omnidesk")));
         assert!(read_file(&root, ".project-os/state.json").is_err());
         assert!(read_file(&root, ".omnidesk/data/state.json").is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn dispatch_rejects_unknown_tools_before_they_access_a_project() {
+        let root = test_root("dispatch");
+        fs::create_dir_all(&root).unwrap();
+        assert!(execute_read_tool(&root, "write_file", &json!({})).is_err());
+        assert!(execute_read_tool(&root, "list_files", &json!([])).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn hermes_dispatch_shares_the_registered_read_only_boundary() {
+        let root = test_root("hermes-dispatch");
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("README.md"), "hello\n").unwrap();
+        assert!(
+            execute_hermes_read_tool(&root, "read_file", &json!({ "path": "README.md" })).is_ok()
+        );
+        assert!(execute_hermes_read_tool(&root, "shell", &json!({})).is_err());
         fs::remove_dir_all(root).unwrap();
     }
 }

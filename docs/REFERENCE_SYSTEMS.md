@@ -1,157 +1,69 @@
 ---
 layer: knowledge
 type: spec
-last_verified: 2026-07-18
-depends_on: [docs/ARCHITECTURE.md, docs/PRODUCT_PLAN.md]
-teaches: "OmniDesk 和 Hermes、Claude Projects、Cursor 等成熟工具的关系、借鉴边界和接入策略"
-use_when: "评估是否接入成熟治理工程、比较 Hermes 等工具、或决定 OmniDesk 该借鉴什么不借鉴什么时"
+last_verified: 2026-07-22
+depends_on: [docs/ARCHITECTURE.md, docs/PRODUCT_PLAN.md, docs/PROJECT_MEMORY_AND_RUNNER.md]
+teaches: "OmniDesk 如何借鉴成熟 Agent 与 IDE 的执行体验，同时保持 Desktop Runtime 的审批和证据边界"
+use_when: "评估 Hermes、Provider 或未来参照系统是否应影响 OmniDesk 的执行边界或交互模式时"
 ---
 
 # 参照系统
 
-> 用途：记录 OmniDesk 与成熟 Agent、IDE、项目治理工具的关系。
-> 什么时候更新：新增参照工具、调整接入策略、或产品定位从参照工具中吸收新边界时。
-> 不要写什么：具体 UI 微调、一次性竞品截图流水、未经确认的市场宣传结论。
+> 用途：说明成熟 Agent 和 IDE 可以借鉴什么，以及不能越过 OmniDesk Desktop Runtime 的哪些边界。
+> 什么时候更新：执行通道、审批模型或产品边界发生变化时。
+> 不要写什么：竞品截图流水、第三方工具安装教程、未接入 runtime 的功能承诺或历史 Project OS 路线。
 
 ## 核心结论
 
-OmniDesk 不直接复制 Hermes、Cursor、Claude Projects 或 OpenHands。
+OmniDesk 是本地优先的 AI 工程工作台，不是第三方 Agent、CLI 或 IDE 的管理层。用户在桌面端接入一个工程、对话、审阅 Patch、独立批准写入和检查，并查看任务证据。
 
-OmniDesk 的定位是：
+成熟产品只提供两类参照：
 
-```txt
-用户入口 + 项目治理中枢 + 本地项目记忆
-```
+- 交互参照：清晰的对话状态、文件上下文、diff 审阅、终端输出和可取消任务。
+- 工程参照：checkpoint、有限重试、审批边界、失败证据和恢复语义。
 
-成熟工具的定位是：
-
-```txt
-可借鉴的交互参照 + 可接入的执行器 + 可复用的工程经验
-```
-
-中文说明：
-用户最终只需要在 OmniDesk 里添加项目、对话、确认计划、查看文件、看 diff 和跑检查。Hermes、Codex CLI、Claude Code、脚本 runner 或其他 Agent runtime 可以作为底层能力，但不应该替代 OmniDesk 的产品入口。
-
-## 目标用户差异
-
-OmniDesk 面向“不想先懂工程治理的人”。
-
-用户把任何新老项目接进来后，系统应该负责：
-
-- 识别项目状态
-- 显性化研发流程
-- 维护项目记忆
-- 管理目标和待办
-- 约束 AI 行为边界
-- 辅助 coding 和 diff review
-- 跑检查并沉淀运行记录
-- 根据使用过程推荐下一步
-
-因此 OmniDesk 的主体验不能停留在“调用一个 Agent”。
+它们不改变 OmniDesk 的产品边界：`.omnidesk/` 是唯一活动状态根；Provider 成功响应不等于任务完成；工程写入和受控检查必须分别审批。
 
 ## 对比矩阵
 
-| 维度 | Hermes / 成熟 Agent runtime | OmniDesk Desktop Runtime |
-|------|------------------------------|-------------------------------|
-| 核心入口 | Agent 执行环境或工程治理 runtime | 面向小白的超级个人工作台 |
-| 用户心智 | 配置 Agent、选择工具、执行任务 | 添加项目、跟着系统工作 |
-| 项目治理 | 通常提供规则和执行能力 | 把研发流程显性化为工作区和项目资产 |
-| 项目记忆 | 偏会话、任务或工具状态 | 写入 `.omnidesk/data/`，成为项目可交接资产 |
-| 文件体系 | 工具自身工程结构 | 真实项目文件 + OmniDesk Runtime 状态分区 |
-| 自动演进 | 依赖 Agent 能力和工具插件 | 推荐、检查、记忆、规则更新形成产品机制 |
-| 最佳关系 | 可接入执行器 / 参照系统 | 上层体验和治理中枢 |
+| 维度 | 成熟 Agent / IDE 的可借鉴模式 | OmniDesk 的固定边界 |
+|---|---|---|
+| 对话 | 流式结果、取消和可见的任务状态 | 只在桌面 Runtime 内执行写入型任务；Preview 只读 |
+| Patch | 指定文件上下文、unified diff、可展开审阅 | diff 必须经授权文件、路径和 hunk 校验后才可审批 |
+| 执行 | 检查输出、有限修复、失败可追溯 | 每次 Apply 与检查独立审批；最多两轮修复 |
+| 记忆 | 有界任务上下文与可检索摘要 | 只保存项目范围内可追溯的 `.omnidesk` 状态，不把 Provider 对话当状态源 |
+| 终端 | 可见会话和输出 | 会话属于本地 Runtime；重启后不伪称可续接未持久化输出 |
 
 ## Hermes 的定位
 
-Hermes 适合作为：
+Hermes 是可选草稿生成通道，不是 OmniDesk 的 UI、状态源或写入执行器。普通 Provider 与 Hermes 都必须经过同一套授权文件、Patch 校验、审批、检查和证据链。
 
-- 长时任务执行器
-- Agent 工作流参照
-- 治理工程形态参考
-- 可选的受控执行器
-
-Hermes 不应该成为：
-
-- OmniDesk 的主 UI
-- OmniDesk 的规则源头
-- 用户必须理解的配置前置条件
-- 替代 `.omnidesk/` 项目记忆的唯一状态源
-
-桌面端在 `Agent 配置` 中只读探测 `hermes-acp` 优先、`hermes` 次之的本地可用性；`hermes-acp --check` 只证明 ACP 通道可启动，不证明模型凭据可用。OmniDesk 的当前连接是 Hermes 的非敏感运行配置源：保存或切换当前连接后，自动同步 Hermes `config.yaml` 中的 custom provider、网关地址、API mode 和默认模型，保留 Hermes 其他设置。Patch Draft 生成时，OmniDesk 会优先以 ACP stdio 建立一次性 session，并只把当前 provider 的密钥注入子进程内存环境。对于 Hermes 的 custom provider，还会按网关主域临时注入兼容的 `<VENDOR>_API_KEY`，避免 Hermes 的 host-scoped 凭据保护把有效 Key 误判为缺失；密钥不会写入 Hermes 文件或前端。Hermes 只能返回草案，实际写入仍必须走 OmniDesk 的 Diff review 和 Apply 确认。请求提示禁止工具调用，且所有需要 ACP client 支持的工具或权限请求都会被拒绝。未安装、仅 CLI、ACP 健康检查失败、模型调用失败、无有效 diff 或 ACP 调用失败，都必须如实显示或回退到既有 provider/local 草案，不得伪造已执行或已写入。
-
-## 借鉴原则
-
-可以借鉴：
-
-- 工作区树形结构
-- 任务执行状态
-- 工具调用日志
-- 文件和 diff 的独立 tab
-- 项目治理对象显性化
-- Agent 能力作为可插拔资源
-
-不要照搬：
-
-- 对普通用户暴露过多 Agent 配置
-- 把工作流做成只适合工程师理解的控制台
-- 把记忆只留在某个工具会话里
-- 把工具 runtime 当作产品入口
-- 一开始就追求完整 IDE、插件市场或多 Agent 编排
-
-## 对话治理开源参照
-
-OmniDesk 的对话治理优先借鉴“显式状态、可中断、可恢复、人工确认”的工程模式，不直接把第三方 Agent runtime 作为桌面端核心依赖。
-
-| 参照项目 | 主要借鉴点 | 当前边界 |
-|----------|------------|----------|
-| LangGraph | 状态图、checkpoint、interrupt / resume、节点级事件 | 首选架构参照；先映射到现有 `conversation-runtime`，不立即引入整套运行时 |
-| AutoGen | 多角色协作和消息协议 | 仅作未来多 Agent 协作参照，当前单 Agent 治理不需要 |
-| Semantic Kernel | Planner、插件和策略编排 | 参考插件/策略分层，不把 Python/.NET runtime 引入桌面壳 |
-| OpenHands | coding agent 的任务、终端和补丁体验 | 参考执行体验，文件写入仍归 OmniDesk Apply 边界 |
-| Temporal | 长事务、重试、持久化工作流 | 未来服务化或后台任务再评估，桌面本地阶段不引入 |
-
-OmniDesk 当前的等价实现由 `desktop/src/conversation-runtime/`、任务存储、`requestId / taskId` 事件关联和受控执行器组成。任何开源框架接入都必须满足：
-
-- UI、项目事实、任务持久化和治理规则仍由 OmniDesk 拥有。
-- 第三方编排器只能调度注册动作，不能直接写文件或绕过 Apply / Verify 确认。
-- checkpoint 必须能恢复到明确的 `pendingAction`、任务状态和最后一个可见事件。
-- 无模型或编排器不可用时，必须显示不可用并保留本地确定性计划，不得伪造执行成功。
+Hermes 不可用时，Runtime 可以降级到已配置的普通 Provider 生成草稿，并把降级原因写入运行证据。本地占位草稿永远不可应用。无论通道是否成功返回，未经审批的 Patch 不会写入工程；检查没有通过的任务也不会显示为完成。
 
 ## 接入策略
 
-OmniDesk 应采用分层接入：
+当前架构只允许以下路径：
 
 ```txt
-OmniDesk UI
+Workbench UI
   -> OmniDesk Local Agent Runtime
-    -> .omnidesk data / Task / Agent Run evidence
-    -> Hermes / Codex CLI / Claude Code / scripts / MCP
+    -> Provider 或 Hermes 生成草稿
+    -> Patch 校验 -> Apply 审批 -> 受控检查审批
+    -> .omnidesk evidence / 最终任务状态
 ```
 
-规则：
-
-- OmniDesk 负责用户体验和项目治理。
-- OmniDesk Runtime 负责事实、记忆、规则和检查闭环。
-- Hermes 等工具负责执行某些任务。
-- 执行结果必须回写到 `.omnidesk/` 证据与状态分区，不能只留在外部工具。
+不得把外部 CLI、脚本 runner、模板、adapter 或跨工具 routing 作为生产执行路径。若未来引入新的模型通道，必须先证明它不能绕过授权文件、Patch normalizer、独立审批、检查边界和持久化证据。
 
 ## 当前阶段取舍
 
-当前阶段先做：
+当前阶段保留：
 
-- 项目接入
-- 工作区树
-- 对话式 coding
-- 文件查看
-- diff review
-- 受控 runner
-- 项目记忆和推荐
-- Hermes ACP 可用性探测和状态展示
+- Provider 与 Hermes 的可追溯草稿生成。
+- 受控 Patch、独立审批、检查、两轮以内修复和恢复证据。
+- 面向本地工程的对话、文件上下文、diff 与任务时间线。
 
-当前阶段暂不做：
+当前阶段不做：
 
-- 完整 IDE
-- 多 Agent 编排
-- 远程执行
-- 插件市场
-- 让 Hermes 成为默认必需依赖
+- 多 Agent 编排、远程执行、插件市场或完整 IDE。
+- Project OS CLI、安装器、模板分发、评分报告、跨工具 adapter 与 routing。
+- 把第三方 Provider 或 Hermes 的成功响应当作任务完成。

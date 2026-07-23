@@ -1,7 +1,7 @@
 ---
 layer: governance
 type: spec
-last_verified: 2026-07-21
+last_verified: 2026-07-22
 teaches: "OmniDesk 文档的 SSOT、边界和校验规则"
 use_when: "AI 要修改 OmniDesk 文档、判断信息归属或调整文档结构时"
 ---
@@ -29,7 +29,7 @@ use_when: "AI 要修改 OmniDesk 文档、判断信息归属或调整文档结�
 | 长期路线 | `docs/PRODUCT_PLAN.md` |
 | 重要取舍与错误约束 | `docs/DECISIONS.md`、`docs/LESSONS.md` |
 
-`.omnidesk/` 是运行时状态根；兼容期内 `.project-os/` 只作为迁移源。状态变化必须经 Runtime 的 namespace resolver 持久化，不用 Markdown 或手工 JSON 充当运行时真相源。
+`.omnidesk/` 是唯一活动运行时状态根。外部历史工程中的 `.project-os/` 只可由显式迁移器一次性导入，不能作为正常读写回退。状态变化必须经 Runtime 的 namespace resolver 持久化，不用 Markdown 或手工 JSON 充当运行时真相源。
 
 ## 文档结构契约
 
@@ -63,7 +63,7 @@ bash tests/run-tests.sh
 
 ## 更新规则
 
-- 产品状态变化：同步 `PROJECT.md`、`HANDOFF.md` 与 active `.omnidesk/data/state.json`；兼容层尚在时也同步 `.project-os/state.json`。
+- 产品状态变化：同步 `PROJECT.md`、`HANDOFF.md` 与 active `.omnidesk/data/state.json`；不得新写入 `.project-os/state.json`。
 - 运行时契约变化：更新 `AGENTS.md`、`docs/ARCHITECTURE.md` 或 `docs/TESTING.md` 中唯一负责的文档。
 - 真实 Eval 结果：保留在 `.omnidesk/evidence/` 的 artifact，基线结构更新在 `desktop/evals/`，不把模型输出抄入 Markdown。
 - 误改、误判或安全缺陷：在 `docs/LESSONS.md` 记录根因和新增约束。

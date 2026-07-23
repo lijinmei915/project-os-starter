@@ -1,3 +1,4 @@
+use crate::runtime::execution::execute_guarded_check;
 use crate::runtime::repository::{JsonMutation, Repository};
 use serde_json::{json, Value};
 use std::path::Path;
@@ -36,13 +37,21 @@ fn project_goals_schema(mut goals: Value) -> Value {
     if goals.get("schemaVersion").and_then(Value::as_str) != Some(LEGACY_GOALS_SCHEMA_VERSION) {
         return goals;
     }
-    let Some(object) = goals.as_object_mut() else { return goals; };
-    object.insert("schemaVersion".to_string(), Value::String(GOALS_SCHEMA_VERSION.to_string()));
-    object.insert("schemaMigration".to_string(), json!({
-        "from": LEGACY_GOALS_SCHEMA_VERSION,
-        "mode": "read-projection",
-        "to": GOALS_SCHEMA_VERSION,
-    }));
+    let Some(object) = goals.as_object_mut() else {
+        return goals;
+    };
+    object.insert(
+        "schemaVersion".to_string(),
+        Value::String(GOALS_SCHEMA_VERSION.to_string()),
+    );
+    object.insert(
+        "schemaMigration".to_string(),
+        json!({
+            "from": LEGACY_GOALS_SCHEMA_VERSION,
+            "mode": "read-projection",
+            "to": GOALS_SCHEMA_VERSION,
+        }),
+    );
     goals
 }
 
@@ -65,6 +74,31 @@ fn compact_title(title: &str) -> String {
         return part.to_string();
     }
     format!("{}...", trimmed.chars().take(16).collect::<String>())
+}
+
+/// Builds a readable, timestamp-scoped goal identifier without allowing
+/// presentation text to define Runtime storage rules in the command adapter.
+pub fn id_from_title(title: &str, timestamp: &str) -> String {
+    let mut id = title
+        .chars()
+        .filter_map(|ch| {
+            if ch.is_ascii_alphanumeric() {
+                Some(ch.to_ascii_lowercase())
+            } else if ch.is_whitespace() || ch == '-' || ch == '_' {
+                Some('-')
+            } else {
+                None
+            }
+        })
+        .collect::<String>();
+    while id.contains("--") {
+        id = id.replace("--", "-");
+    }
+    id = id.trim_matches('-').to_string();
+    if id.is_empty() {
+        id = "goal".to_string();
+    }
+    format!("{}-{}", id, timestamp.replace([':', '.'], "-"))
 }
 
 fn add_to_project_goal(project_goals: &mut Value, parent_id: &str, goal_id: &str, timestamp: &str) {
@@ -706,6 +740,58 @@ pub fn record_validation(
     })
 }
 
+/// Runs the fixed validation suite for one existing goal. Check execution
+/// remains owned by Execution; this domain owns only goal lookup, report
+/// composition, and the resulting goal-state transaction.
+pub fn run_validation(root: &Path, goal_id: &str, timestamp: &str) -> Result<(), String> {
+    if !root.exists() || !root.is_dir() {
+        return Err("当前项目路径不存在或不是目录".to_string());
+    }
+    let goal_id = goal_id.trim();
+    if goal_id.is_empty() {
+        return Err("验收必须绑定当前目标。".to_string());
+    }
+    let repository = Repository::new(root);
+    let goals = repository
+        .read_json(GOALS_PATH)
+        .ok_or_else(|| "未找到目标列表".to_string())?;
+    let goal = goals
+        .get("goals")
+        .and_then(Value::as_array)
+        .and_then(|items| {
+            items
+                .iter()
+                .find(|item| item.get("id").and_then(Value::as_str) == Some(goal_id))
+        })
+        .ok_or_else(|| "当前目标不存在，无法运行验收。".to_string())?;
+    let goal_title = goal
+        .get("title")
+        .and_then(Value::as_str)
+        .or_else(|| goal.get("shortTitle").and_then(Value::as_str))
+        .unwrap_or("当前目标");
+
+    let mut checks = Vec::new();
+    for check_id in ["web-build", "cargo-check", "runtime"] {
+        let check = execute_guarded_check(root, check_id)?;
+        checks.push(serde_json::to_value(check).map_err(|error| error.to_string())?);
+    }
+    let passed = checks.iter().all(|check| {
+        check
+            .get("success")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+    });
+    let report = json!({
+        "schemaVersion": "omnidesk.goal-validation-report.v0.1",
+        "generatedAt": timestamp,
+        "goalId": goal_id,
+        "goalTitle": goal_title,
+        "status": if passed { "passed" } else { "failed" },
+        "checks": checks,
+    });
+    record_validation(root, goal_id, goal_title, passed, report, timestamp)
+}
+
 pub fn update_status(
     goals: &mut Value,
     goal_id: &str,
@@ -802,6 +888,18 @@ mod tests {
         rebind_task(&mut goals, "task-1", "b", "now");
         assert_eq!(goals["goals"][0]["taskIds"], json!([]));
         assert_eq!(goals["goals"][1]["taskIds"], json!(["task-1"]));
+    }
+
+    #[test]
+    fn goal_ids_normalize_titles_without_losing_the_timestamp_boundary() {
+        assert_eq!(
+            id_from_title("Ship  API / v1", "2026-07-22T10:20:30Z"),
+            "ship-api-v1-2026-07-22T10-20-30Z"
+        );
+        assert_eq!(
+            id_from_title("中文目标", "2026-07-22T10:20:30Z"),
+            "goal-2026-07-22T10-20-30Z"
+        );
     }
 
     #[test]
@@ -1038,13 +1136,33 @@ mod tests {
     }
 
     #[test]
+    fn validation_rejects_an_unbound_goal_before_running_any_check() {
+        let root = std::env::temp_dir().join(format!(
+            "omnidesk-goal-validation-unbound-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        assert_eq!(
+            run_validation(&root, "  ", "now").unwrap_err(),
+            "验收必须绑定当前目标。"
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn projects_legacy_goal_schema_without_rewriting_history() {
         let projected = project_goals_schema(json!({
             "schemaVersion": "project-os.goals.v0.1",
             "goals": []
         }));
         assert_eq!(projected["schemaVersion"], GOALS_SCHEMA_VERSION);
-        assert_eq!(projected["schemaMigration"]["from"], LEGACY_GOALS_SCHEMA_VERSION);
+        assert_eq!(
+            projected["schemaMigration"]["from"],
+            LEGACY_GOALS_SCHEMA_VERSION
+        );
         assert_eq!(projected["schemaMigration"]["mode"], "read-projection");
     }
 }

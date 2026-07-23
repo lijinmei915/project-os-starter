@@ -1,7 +1,7 @@
 ---
 layer: entry
 type: guide
-last_verified: 2026-07-21
+last_verified: 2026-07-22
 depends_on: [README.md, docs/ENVIRONMENT.md, docs/TESTING.md]
 teaches: "OmniDesk Desktop 的本地依赖、安装、启动与验证方式"
 use_when: "维护者需要在新机器上运行 OmniDesk Desktop 时"
@@ -49,6 +49,6 @@ npm --prefix desktop run test:native
 
 ## 升级与迁移
 
-Runtime 启动时会将旧 `.project-os/` 状态非破坏性迁移到 `.omnidesk/` 的 `data`、`runtime`、`cache` 和 `evidence` 分区。冲突时保持 legacy 只读回退，不覆盖用户数据。迁移完成前不要手动删除 `.project-os/`。
+接入外部历史工程时，Runtime 会将旧 `.project-os/` 状态非破坏性迁移到 `.omnidesk/` 的 `data`、`runtime`、`cache` 和 `evidence` 分区。冲突会保留源数据与迁移证据并拒绝激活；Runtime 不会回退为 legacy 读写。迁移完成前不要手动删除源目录。
 
 详细状态与恢复策略见 `docs/ARCHITECTURE.md`；真实 Provider Eval 和发布证据见 `docs/TESTING.md`。

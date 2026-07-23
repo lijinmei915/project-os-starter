@@ -1,7 +1,7 @@
 ---
 layer: knowledge
 type: spec
-last_verified: 2026-07-20
+last_verified: 2026-07-22
 depends_on: [AGENTS.md, PROJECT.md, docs/PRODUCT_PLAN.md]
 teaches: "OmniDesk Desktop Runtime 的系统边界、模块职责、状态所有权和运行路径"
 use_when: "AI 需要判断架构影响范围、模块所有权、执行边界或迁移顺序时"
@@ -17,7 +17,7 @@ use_when: "AI 需要判断架构影响范围、模块所有权、执行边界或
 
 OmniDesk 是本地优先的 AI 工程工作台。唯一产品内核是 `desktop/`：React Workbench 承载用户交互，Tauri Local Agent Runtime 持有本地权限、状态事务、Provider、Patch、检查和终端生命周期。
 
-早期 Project OS CLI、安装器、评分报告、模板和跨工具 adapter 不再是产品内核。它们在迁移期间仅作为兼容工具存在，禁止继续承载新的业务能力。
+早期 Project OS CLI、安装器、评分报告、模板和跨工具 adapter 不再是产品内核。外部历史工程的 legacy 状态仅可通过迁移器导入，禁止继续承载新的业务能力或作为 Runtime 回退路径。
 
 ## 整体架构分层
 
@@ -46,7 +46,7 @@ Workbench UI
 - Desktop 通过 Tauri command 调用本地 Runtime，并通过事件接收流式进度。
 - Preview 只提供显式登记的读取操作；写入、终端、检查、Provider 密钥和工程 Patch 必须拒绝。
 - Hermes 是可选执行器，普通 Provider 是模型通道；二者都必须经过 OmniDesk 的授权文件、审批、Patch 校验和检查边界。
-- 旧 `project-os` CLI、Shell wrapper、CI adapter 不再定义产品语义，只在迁移期间提供兼容行为。
+- 旧 `project-os` CLI、Shell wrapper、CI adapter 不再定义产品语义；仅迁移器可读取外部历史状态，Desktop Runtime 不回退读写 legacy 状态。
 
 ## 仓库实现层次
 
@@ -58,7 +58,7 @@ Workbench UI
 | `desktop/tests/` | 前端契约、工作流、状态机和边界回归 |
 | `docs/` | 长期架构、测试、决策和运行说明 |
 | `.omnidesk/` | 当前产品状态根；由 namespace manifest 激活后承担 Runtime 读写 |
-| `.project-os/` | 非破坏性迁移源；只在未激活或冲突回退时继续读写，最终退役 |
+| 外部工程 `.project-os/` | 非破坏性一次性迁移源；冲突时保留源数据和证据并拒绝激活，不作为 Runtime 读写回退 |
 | `scripts/` | 仅保留文档结构、frontmatter 与密钥安全的仓库校验；不承载产品语义 |
 
 ## 运行路径
@@ -99,7 +99,7 @@ Agent Run 已持久化 attempt、审批、观察、request checkpoint、当前�
 ### 状态迁移
 
 ```txt
-.project-os 检测
+外部 legacy `.project-os` 检测
   -> 恢复未完成 legacy 事务
   -> 分类复制到 .omnidesk
   -> 内容比对与冲突检查
@@ -109,7 +109,7 @@ Agent Run 已持久化 attempt、审批、观察、request checkpoint、当前�
   -> 用户明确确认后删除旧兼容数据
 ```
 
-迁移必须幂等、可审计、可恢复。不得用目录直接改名替代迁移，也不得在验证成功前删除源数据。退役预检要求 namespace 已激活、所有 legacy 常规文件在目标分区中存在且字节一致、没有符号链接、漏迁或冲突；它只给出可删结论，不触发删除。若切换后的 active 状态与 legacy 历史内容不同，必须先以独立确认动作将差异文件归档到 `.omnidesk/evidence/legacy-retirement/<id>/source/` 并写入 manifest，之后才能请求删除。出现任一目标内容冲突时，manifest 必须保持 `legacy / legacy-primary`；激活 `omnidesk / omnidesk-primary` 后不再回读可能已过期的 legacy 内容。
+迁移必须幂等、可审计、可恢复。不得用目录直接改名替代迁移，也不得在验证成功前删除源数据。退役预检要求 namespace 已激活、所有 legacy 常规文件在目标分区中存在且字节一致、没有符号链接、漏迁或冲突；它只给出可删结论，不触发删除。若切换后的 active 状态与 legacy 历史内容不同，必须先以独立确认动作将差异文件归档到 `.omnidesk/evidence/legacy-retirement/<id>/source/` 并写入 manifest，之后才能请求删除。出现任一目标内容冲突时，迁移必须拒绝激活并保留源数据与证据；激活 `omnidesk / omnidesk-primary` 后不再回读可能已过期的 legacy 内容。
 
 ## 模块职责
 

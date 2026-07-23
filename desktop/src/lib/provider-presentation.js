@@ -17,6 +17,47 @@ export function activeProviderProfileName(provider) {
   return activeProfile?.name || provider?.profileName || provider?.apiBase || "当前 API";
 }
 
+export function compactModelLabel(model) {
+  const text = String(model || "").trim();
+  if (!text) return "模型";
+  const gptVersion = text.match(/^gpt[-_]?(\d+(?:\.\d+)?)/i);
+  if (gptVersion) return gptVersion[1];
+  const version = text.match(/(\d+(?:\.\d+)?)(?!.*\d)/);
+  if (version) return version[1];
+  return text;
+}
+
+export function providerModelKey(provider) {
+  return [provider?.apiBase || "", provider?.apiKeyEnv || "", provider?.activeProfileId || provider?.profileId || ""].join("|");
+}
+
+export function modelAvailabilityKey(provider, model) {
+  return [provider?.apiBase || "", provider?.apiKeyEnv || "", model || ""].join("|");
+}
+
+export function providerModelHealth(provider, availability = {}) {
+  if (!provider?.enabled || !provider?.model) return { label: "Not work", status: "unavailable" };
+  const entry = availability[provider.model];
+  if (entry?.status === "available") return { label: "Work", status: "available", message: entry.message || "" };
+  if (entry?.status === "quota-exhausted") {
+    return { label: "Quota exhausted", status: "quota-exhausted", message: entry.message || "当前连接额度不足" };
+  }
+  if (["unavailable", "authentication-failed", "model-unavailable", "network-unavailable"].includes(entry?.status)) {
+    return { label: "Not work", status: entry.status, message: entry.message || "" };
+  }
+  return { label: "Checking", status: "unknown" };
+}
+
+export function catalogModelsForProvider(provider, modelCatalog) {
+  const providers = Array.isArray(modelCatalog?.providers) ? modelCatalog.providers : [];
+  const preset =
+    providers.find((item) => item.apiBase === provider?.apiBase && item.apiKeyEnv === provider?.apiKeyEnv) ||
+    providers.find((item) => item.id === provider?.profileId || item.id === provider?.activeProfileId);
+  const models = Array.isArray(preset?.models) ? preset.models.filter(Boolean) : [];
+  const current = provider?.model ? [provider.model] : [];
+  return Array.from(new Set([...models, ...current]));
+}
+
 export function providerConnectionLabel(profile) {
   return profile?.name || profile?.apiBase || "未命名连接";
 }

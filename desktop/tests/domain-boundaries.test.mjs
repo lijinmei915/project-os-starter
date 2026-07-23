@@ -34,6 +34,50 @@ test("keeps the Workbench shell away from direct runtime commands and the retire
   }
 });
 
+test("keeps Workbench fallback contracts outside the entrypoint", () => {
+  const workbench = source("src/main.jsx");
+  const defaults = source("src/lib/workbench-defaults.js");
+  assert.match(workbench, /from "\.\/lib\/workbench-defaults"/);
+  for (const contract of [
+    "fallbackSnapshot",
+    "fallbackProvider",
+    "fallbackModelCatalog",
+    "planCards",
+    "taskStatuses",
+  ]) {
+    assert.equal(workbench.includes(`const ${contract} =`), false);
+    assert.match(defaults, new RegExp(`export const ${contract} =`));
+  }
+});
+
+test("keeps Preview Workspace state projection outside the entrypoint", () => {
+  const workbench = source("src/main.jsx");
+  const bridge = source("src/lib/workspace-runtime-bridge.js");
+  const client = source("src/lib/workspace-preview-client.js");
+  assert.match(workbench, /from "\.\/lib\/workspace-runtime-bridge"/);
+  assert.equal(workbench.includes("workspace-preview-client"), false);
+  assert.equal(workbench.includes("async function loadPreviewWorkspaceSnapshot"), false);
+  assert.equal(workbench.includes("async function loadPreviewJson"), false);
+  assert.match(bridge, /from "\.\/workspace-preview-client\.js"/);
+  assert.match(bridge, /export async function loadWorkspaceSnapshot/);
+  assert.match(client, /export async function loadPreviewWorkspaceSnapshot/);
+  assert.match(client, /export async function loadPreviewJson/);
+  assert.match(client, /\.omnidesk\/data\/desktop-registry\.json/);
+  assert.equal(client.includes(".project-os"), false);
+});
+
+test("keeps Workspace runtime transports outside the Workbench entrypoint", () => {
+  const workbench = source("src/main.jsx");
+  const bridge = source("src/lib/workspace-runtime-bridge.js");
+  assert.equal(workbench.includes("@tauri-apps/api/core"), false);
+  assert.equal(workbench.includes("@tauri-apps/plugin-dialog"), false);
+  assert.equal(workbench.includes("/__omnidesk/copy-text"), false);
+  for (const action of ["loadWorkspaceSnapshot", "refreshWorkspaceFactsPreview", "copyTextToSystemClipboard", "pickProjectDirectory"]) {
+    assert.doesNotMatch(workbench, new RegExp(`(?:async )?function ${action}\\(`));
+    assert.match(bridge, new RegExp(`export async function ${action}\\(`));
+  }
+});
+
 test("keeps the task detail surface outside the Workbench shell", () => {
   const workbench = source("src/main.jsx");
   const activeTask = source("src/components/workbench/active-task.jsx");
@@ -49,10 +93,11 @@ test("keeps the task detail surface outside the Workbench shell", () => {
 
 test("keeps current project progress rendering outside the Workbench shell", () => {
   const workbench = source("src/main.jsx");
+  const engineeringFile = source("src/components/workbench/engineering-file-tab.jsx");
   const progress = source(
     "src/components/workbench/current-progress-panel.jsx",
   );
-  assert.match(workbench, /<CurrentProgressPanel/);
+  assert.match(engineeringFile, /<CurrentProgressPanel/);
   assert.equal(workbench.includes("function CurrentProgressSlot"), false);
   assert.equal(workbench.includes("function CurrentProgressPanel"), false);
   assert.match(progress, /export function CurrentProgressPanel/);
@@ -61,10 +106,40 @@ test("keeps current project progress rendering outside the Workbench shell", () 
   assert.equal(progress.includes("runtime-api"), false);
 });
 
+test("keeps the cross-project dashboard outside the Workspace facts refresh boundary", () => {
+  const workbench = source("src/main.jsx");
+  const dashboard = source("src/components/workbench/workspace-dashboard.jsx");
+  const engineeringFile = source("src/components/workbench/engineering-file-tab.jsx");
+  const facts = engineeringFile;
+  assert.match(workbench, /import \{ EngineeringFileTab \}/);
+  assert.match(engineeringFile, /<WorkspaceDashboard/);
+  assert.equal(workbench.includes('className="portfolioCommandBar"'), false);
+  assert.equal(facts.includes("globalOverview"), false);
+  assert.match(dashboard, /export function WorkspaceDashboard/);
+  assert.match(dashboard, /onRequestProjectAccess/);
+  assert.match(dashboard, /taskStatuses/);
+  assert.equal(dashboard.includes("runtime-api"), false);
+  assert.equal(dashboard.includes("desktop-task-client"), false);
+});
+
+test("keeps Workspace facts refresh and Slot rendering outside the Workbench entrypoint", () => {
+  const workbench = source("src/main.jsx");
+  const facts = source("src/components/workbench/workspace-facts-preview.jsx");
+  const engineeringFile = source("src/components/workbench/engineering-file-tab.jsx");
+  assert.match(engineeringFile, /<WorkspaceFactsPreview onNavigate=/);
+  assert.doesNotMatch(workbench, /function WorkspaceFactsPreview\(/);
+  assert.match(facts, /export function WorkspaceFactsPreview/);
+  assert.match(facts, /onRefreshFacts/);
+  assert.match(facts, /onNavigate/);
+  assert.match(facts, /createProjectOverviewSlotRuntime/);
+  assert.equal(facts.includes("runtime-api"), false);
+});
+
 test("keeps project runbook rendering outside the Workbench shell", () => {
   const workbench = source("src/main.jsx");
   const runbook = source("src/components/workbench/runbook-panel.jsx");
-  assert.match(workbench, /<RunbookPanel/);
+  const engineeringFile = source("src/components/workbench/engineering-file-tab.jsx");
+  assert.match(engineeringFile, /<RunbookPanel/);
   assert.equal(workbench.includes("function RunbookPanel"), false);
   assert.equal(workbench.includes("function RunbookSlot"), false);
   assert.match(runbook, /export function RunbookPanel/);
@@ -78,10 +153,27 @@ test("keeps project risk rendering outside the Workbench shell", () => {
   const riskBoundary = source(
     "src/components/workbench/risk-boundary-panel.jsx",
   );
-  assert.match(workbench, /<RiskBoundaryPanel/);
+  const engineeringFile = source("src/components/workbench/engineering-file-tab.jsx");
+  assert.match(engineeringFile, /<RiskBoundaryPanel/);
   assert.equal(workbench.includes("function RiskBoundaryPanel"), false);
   assert.match(riskBoundary, /export function RiskBoundaryPanel/);
   assert.equal(riskBoundary.includes("runtime-api"), false);
+});
+
+test("keeps governance health surfaces outside the Workbench shell", () => {
+  const workbench = source("src/main.jsx");
+  const surfaces = source(
+    "src/components/workbench/governance-health-sections.jsx",
+  );
+  const engineeringFile = source("src/components/workbench/engineering-file-tab.jsx");
+  assert.match(engineeringFile, /<GovernanceFilesHealthSection/);
+  assert.match(engineeringFile, /<DesignImplementationHealthSection/);
+  assert.equal(workbench.includes("function GovernanceFilesHealthSection"), false);
+  assert.equal(workbench.includes("function DesignImplementationHealthSection"), false);
+  assert.match(surfaces, /export function GovernanceFilesHealthSection/);
+  assert.match(surfaces, /export function DesignImplementationHealthSection/);
+  assert.equal(surfaces.includes("runtime-api"), false);
+  assert.equal(surfaces.includes("desktop-task-client"), false);
 });
 
 test("keeps task-context navigation injected instead of dispatching UI events", () => {
@@ -120,7 +212,7 @@ test("keeps the AgentWorkspace conversation canvas outside its workspace contain
   const canvas = source(
     "src/components/workbench/agent-workspace-conversation-canvas.jsx",
   );
-  const workspace = componentSource(workbench, "AgentWorkspace", "statusLabel");
+  const workspace = componentSource(workbench, "AgentWorkspace", "currentRuntimeSource");
   assert.match(workbench, /<AgentWorkspaceConversationCanvas/);
   assert.equal(workspace.includes('className="conversationStart"'), false);
   assert.match(canvas, /export function AgentWorkspaceConversationCanvas/);
@@ -145,29 +237,48 @@ test("keeps conversation turn actions in a conversation hook", () => {
 
 test("keeps AgentTopic task-board state and derived rows in a task hook", () => {
   const workbench = source("src/main.jsx");
+  const engineeringFile = source("src/components/workbench/engineering-file-tab.jsx");
+  const topic = source("src/components/workbench/agent-topic-panel.jsx");
   const taskBoard = source(
     "src/components/workbench/use-agent-topic-task-board.js",
   );
-  assert.match(workbench, /useAgentTopicTaskBoard/);
+  assert.match(engineeringFile, /<AgentTopicPanel/);
+  assert.match(topic, /useAgentTopicTaskBoard/);
   assert.equal(workbench.includes("buildTaskBoardViewModel"), false);
   assert.match(taskBoard, /useTaskBoardState/);
   assert.match(taskBoard, /buildTaskBoardViewModel/);
   assert.equal(taskBoard.includes("runtime-api"), false);
 });
 
+test("keeps Agent Run approvals and task presentation injected through the engineering topic boundary", () => {
+  const workbench = source("src/main.jsx");
+  const workspace = componentSource(workbench, "AgentWorkspace", "currentRuntimeSource");
+  const engineeringFile = source("src/components/workbench/engineering-file-tab.jsx");
+  const topic = source("src/components/workbench/agent-topic-panel.jsx");
+  assert.match(workspace, /agentRuns=\{agentRuns\}/);
+  assert.match(workspace, /onApproveAgentRun=\{onApproveAgentRun\}/);
+  assert.match(workspace, /onResumeAgentRun=\{onResumeAgentRun\}/);
+  assert.match(workspace, /presentation=\{\{ agentTopicPresentation, dedicatedSurfaceByTopic, taskStatuses, workspaceRouteById \}\}/);
+  assert.doesNotMatch(workbench, /function EngineeringFileTab\(/);
+  assert.match(engineeringFile, /export function EngineeringFileTab/);
+  assert.match(engineeringFile, /presentation=\{agentTopicPresentation\}/);
+  assert.match(engineeringFile, /agentRuns=\{agentRuns\}/);
+  assert.match(topic, /const boardState = useAgentTopicTaskBoard/);
+  assert.equal(topic.includes("runtime-api"), false);
+  assert.equal(engineeringFile.includes("runtime-api"), false);
+});
+
 test("keeps AgentTopic task mutations behind injected Task and Workspace actions", () => {
   const workbench = source("src/main.jsx");
+  const engineeringFile = source("src/components/workbench/engineering-file-tab.jsx");
+  const topic = source("src/components/workbench/agent-topic-panel.jsx");
   const controller = source("src/lib/task-board-action-controller.js");
   const goalActions = source("src/lib/agent-topic-goal-actions.js");
   const taskActions = source(
     "src/components/workbench/use-agent-topic-task-actions.js",
   );
-  const topic = componentSource(
-    workbench,
-    "AgentTopicPanel",
-    "EngineeringFileTab",
-  );
-  assert.match(workbench, /useAgentTopicTaskActions/);
+  assert.match(engineeringFile, /<AgentTopicPanel/);
+  assert.match(topic, /useAgentTopicTaskActions/);
   assert.match(taskActions, /createTaskBoardActionController/);
   assert.match(taskActions, /createAgentTopicGoalActions/);
   assert.match(taskActions, /saveDesktopTask: onPersistTask/);
@@ -180,13 +291,16 @@ test("keeps AgentTopic task mutations behind injected Task and Workspace actions
 
 test("keeps the AgentTopic task workbench outside its topic container", () => {
   const workbench = source("src/main.jsx");
+  const engineeringFile = source("src/components/workbench/engineering-file-tab.jsx");
+  const topic = source("src/components/workbench/agent-topic-panel.jsx");
   const taskBoard = source(
     "src/components/workbench/agent-topic-task-board.jsx",
   );
   const content = source(
     "src/components/workbench/agent-topic-panel-content.jsx",
   );
-  assert.match(workbench, /<AgentTopicPanelContent/);
+  assert.match(engineeringFile, /<AgentTopicPanel/);
+  assert.match(topic, /<AgentTopicPanelContent/);
   assert.match(content, /<AgentTopicTaskBoard/);
   assert.equal(workbench.includes('className="taskBoardToolbar"'), false);
   assert.match(taskBoard, /export function AgentTopicTaskBoard/);
@@ -196,9 +310,12 @@ test("keeps the AgentTopic task workbench outside its topic container", () => {
 
 test("keeps AgentTopic overview cards in a pure Task and Workspace presentation module", () => {
   const workbench = source("src/main.jsx");
+  const engineeringFile = source("src/components/workbench/engineering-file-tab.jsx");
+  const topic = source("src/components/workbench/agent-topic-panel.jsx");
   const viewModel = source("src/lib/agent-topic-view-model.js");
   const cards = source("src/lib/agent-topic-cards.js");
-  assert.match(workbench, /buildAgentTopicViewModel/);
+  assert.match(engineeringFile, /<AgentTopicPanel/);
+  assert.match(topic, /buildAgentTopicViewModel/);
   assert.match(viewModel, /buildAgentTopicCards/);
   assert.equal(workbench.includes("const cardsByTopic"), false);
   assert.match(cards, /export function buildAgentTopicCards/);
@@ -207,8 +324,11 @@ test("keeps AgentTopic overview cards in a pure Task and Workspace presentation 
 
 test("keeps AgentTopic capability aggregation in a pure view-model module", () => {
   const workbench = source("src/main.jsx");
+  const engineeringFile = source("src/components/workbench/engineering-file-tab.jsx");
+  const topic = source("src/components/workbench/agent-topic-panel.jsx");
   const viewModel = source("src/lib/agent-topic-view-model.js");
-  assert.match(workbench, /buildAgentTopicViewModel/);
+  assert.match(engineeringFile, /<AgentTopicPanel/);
+  assert.match(topic, /buildAgentTopicViewModel/);
   assert.equal(workbench.includes("const assetDomains ="), false);
   assert.match(viewModel, /export function buildAgentTopicViewModel/);
   assert.match(viewModel, /export function canPreviewAgentTopicFile/);
@@ -217,9 +337,12 @@ test("keeps AgentTopic capability aggregation in a pure view-model module", () =
 
 test("keeps AgentTopic Agent configuration descriptions out of the task container", () => {
   const workbench = source("src/main.jsx");
+  const engineeringFile = source("src/components/workbench/engineering-file-tab.jsx");
+  const topic = source("src/components/workbench/agent-topic-panel.jsx");
   const viewModel = source("src/lib/agent-topic-view-model.js");
   const config = source("src/lib/agent-topic-agent-config.js");
-  assert.match(workbench, /buildAgentTopicViewModel/);
+  assert.match(engineeringFile, /<AgentTopicPanel/);
+  assert.match(topic, /buildAgentTopicViewModel/);
   assert.match(viewModel, /agentConfigCapabilitySpec/);
   assert.equal(workbench.includes("const agentConfigSpecs"), false);
   assert.match(config, /export function agentConfigCapabilitySpec/);
@@ -228,13 +351,16 @@ test("keeps AgentTopic Agent configuration descriptions out of the task containe
 
 test("keeps AgentTopic summary rendering outside the task action container", () => {
   const workbench = source("src/main.jsx");
+  const engineeringFile = source("src/components/workbench/engineering-file-tab.jsx");
+  const topic = source("src/components/workbench/agent-topic-panel.jsx");
   const summary = source(
     "src/components/workbench/agent-topic-capability-summary.jsx",
   );
   const content = source(
     "src/components/workbench/agent-topic-panel-content.jsx",
   );
-  assert.match(workbench, /<AgentTopicPanelContent/);
+  assert.match(engineeringFile, /<AgentTopicPanel/);
+  assert.match(topic, /<AgentTopicPanelContent/);
   assert.match(content, /<AgentTopicCapabilitySummary/);
   assert.equal(workbench.includes('className="agentConfigCapability"'), false);
   assert.match(summary, /export function AgentTopicCapabilitySummary/);
@@ -243,19 +369,17 @@ test("keeps AgentTopic summary rendering outside the task action container", () 
 
 test("keeps controlled execution command rendering outside the AgentTopic container", () => {
   const workbench = source("src/main.jsx");
+  const engineeringFile = source("src/components/workbench/engineering-file-tab.jsx");
+  const topic = source("src/components/workbench/agent-topic-panel.jsx");
   const commands = source(
     "src/components/workbench/controlled-commands-panel.jsx",
   );
   const content = source(
     "src/components/workbench/agent-topic-panel-content.jsx",
   );
-  const topic = componentSource(
-    workbench,
-    "AgentTopicPanel",
-    "EngineeringFileTab",
-  );
   assert.match(content, /<ControlledCommandsPanel/);
-  assert.match(workbench, /<AgentTopicPanelContent/);
+  assert.match(engineeringFile, /<AgentTopicPanel/);
+  assert.match(topic, /<AgentTopicPanelContent/);
   assert.equal(topic.includes("agentControlledCommands"), false);
   assert.match(commands, /export function ControlledCommandsPanel/);
   assert.equal(commands.includes("runtime-api"), false);
@@ -263,6 +387,8 @@ test("keeps controlled execution command rendering outside the AgentTopic contai
 
 test("keeps AgentTopic task dialogs outside the task action container", () => {
   const workbench = source("src/main.jsx");
+  const engineeringFile = source("src/components/workbench/engineering-file-tab.jsx");
+  const topic = source("src/components/workbench/agent-topic-panel.jsx");
   const taskBoard = source(
     "src/components/workbench/agent-topic-task-board.jsx",
   );
@@ -272,7 +398,8 @@ test("keeps AgentTopic task dialogs outside the task action container", () => {
   const content = source(
     "src/components/workbench/agent-topic-panel-content.jsx",
   );
-  assert.match(workbench, /<AgentTopicPanelContent/);
+  assert.match(engineeringFile, /<AgentTopicPanel/);
+  assert.match(topic, /<AgentTopicPanelContent/);
   assert.match(content, /<AgentTopicTaskBoard/);
   assert.match(taskBoard, /<AgentTopicTaskDialogs/);
   assert.equal(workbench.includes('title="永久删除任务"'), false);
@@ -284,11 +411,14 @@ test("keeps AgentTopic task dialogs outside the task action container", () => {
 
 test("keeps AgentTopic task detail and result rendering outside the task action container", () => {
   const workbench = source("src/main.jsx");
+  const engineeringFile = source("src/components/workbench/engineering-file-tab.jsx");
+  const topic = source("src/components/workbench/agent-topic-panel.jsx");
   const detail = source("src/components/workbench/agent-topic-task-detail.jsx");
   const content = source(
     "src/components/workbench/agent-topic-panel-content.jsx",
   );
-  assert.match(workbench, /<AgentTopicPanelContent/);
+  assert.match(engineeringFile, /<AgentTopicPanel/);
+  assert.match(topic, /<AgentTopicPanelContent/);
   assert.match(content, /<AgentTopicCurrentTaskDetail/);
   assert.match(content, /<AgentTopicExecutionResults/);
   assert.equal(workbench.includes('aria-label="任务执行步骤"'), false);
@@ -300,11 +430,14 @@ test("keeps AgentTopic task detail and result rendering outside the task action 
 
 test("keeps AgentTopic Workspace goal mutations behind injected actions", () => {
   const workbench = source("src/main.jsx");
+  const engineeringFile = source("src/components/workbench/engineering-file-tab.jsx");
+  const topic = source("src/components/workbench/agent-topic-panel.jsx");
   const actions = source("src/lib/agent-topic-goal-actions.js");
   const taskActions = source(
     "src/components/workbench/use-agent-topic-task-actions.js",
   );
-  assert.match(workbench, /useAgentTopicTaskActions/);
+  assert.match(engineeringFile, /<AgentTopicPanel/);
+  assert.match(topic, /useAgentTopicTaskActions/);
   assert.match(taskActions, /createAgentTopicGoalActions/);
   assert.equal(workbench.includes("const archiveGoal = async"), false);
   assert.match(actions, /archiveWorkspaceGoal/);
@@ -380,7 +513,7 @@ test("keeps AgentWorkspace navigation and terminal drafts in a Workspace hook", 
   const navigation = source(
     "src/components/workbench/use-agent-workspace-navigation.js",
   );
-  const workspace = componentSource(workbench, "AgentWorkspace", "statusLabel");
+  const workspace = componentSource(workbench, "AgentWorkspace", "currentRuntimeSource");
   assert.match(workbench, /useAgentWorkspaceNavigation/);
   assert.equal(workspace.includes("const prepareTerminalCommand ="), false);
   assert.equal(workspace.includes("const continueTaskInChat ="), false);
@@ -614,7 +747,7 @@ test("keeps AgentWorkspace auxiliary tab branching outside its workspace contain
   const tabs = source(
     "src/components/workbench/agent-workspace-auxiliary-tabs.jsx",
   );
-  const workspace = componentSource(workbench, "AgentWorkspace", "statusLabel");
+  const workspace = componentSource(workbench, "AgentWorkspace", "currentRuntimeSource");
   assert.match(workbench, /<AgentWorkspaceAuxiliaryTabs/);
   assert.equal(workspace.includes('tab.kind === "terminal"'), false);
   assert.equal(workspace.includes('tab.kind === "trace"'), false);
@@ -701,7 +834,7 @@ test("keeps AgentWorkspace conversation reset lifecycle in a Conversation hook",
   const reset = source(
     "src/components/workbench/use-conversation-surface-reset.js",
   );
-  const workspace = componentSource(workbench, "AgentWorkspace", "statusLabel");
+  const workspace = componentSource(workbench, "AgentWorkspace", "currentRuntimeSource");
   assert.match(
     workbench,
     /import \{ useConversationSurfaceReset \} from "\.\/components\/workbench\/use-conversation-surface-reset"/,
@@ -891,7 +1024,7 @@ test("keeps ProjectSidebar clipboard delegation in an injected Workspace hook", 
 
 test("keeps AgentWorkspace Conversation and Task derivation in a pure view-model", () => {
   const workbench = source("src/main.jsx");
-  const workspace = componentSource(workbench, "AgentWorkspace", "statusLabel");
+  const workspace = componentSource(workbench, "AgentWorkspace", "currentRuntimeSource");
   const viewModel = source("src/lib/agent-workspace-view-model.js");
   assert.match(workbench, /buildAgentWorkspaceViewModel/);
   assert.match(workspace, /buildAgentWorkspaceViewModel\(\{/);
@@ -919,11 +1052,7 @@ test("keeps App Workspace goal lifecycle behind an injected Workspace hook", () 
 
 test("keeps engineering previews and Hermes status behind injected Workspace and Execution actions", () => {
   const workbench = source("src/main.jsx");
-  const engineeringFile = componentSource(
-    workbench,
-    "EngineeringFileTab",
-    "RightRail",
-  );
+  const engineeringFile = source("src/components/workbench/engineering-file-tab.jsx");
   const agentConfig = source(
     "src/components/workbench/agent-config-surface-panel.jsx",
   );
@@ -945,29 +1074,39 @@ test("keeps engineering previews and Hermes status behind injected Workspace and
 test("keeps EngineeringFileTab topic routing in a pure Workspace view-model", () => {
   const workbench = source("src/main.jsx");
   const routing = source("src/lib/engineering-topic-surface.js");
-  const engineeringFile = componentSource(
-    workbench,
-    "EngineeringFileTab",
-    "RightRail",
-  );
-  assert.match(workbench, /resolveEngineeringTopicSurface/);
+  const engineeringFile = source("src/components/workbench/engineering-file-tab.jsx");
+  assert.match(engineeringFile, /resolveEngineeringTopicSurface/);
+  assert.match(workbench, /workspaceRouteById/);
   assert.equal(engineeringFile.includes("const isCurrentGoalTopic ="), false);
   assert.match(routing, /export function resolveEngineeringTopicSurface/);
   assert.equal(routing.includes("runtime-api"), false);
 });
 
+test("injects governance task presentation from its shared domain module", () => {
+  const workbench = source("src/main.jsx");
+  const presentation = source("src/lib/governance-presentation.js");
+  assert.match(workbench, /designImplementationTopics/);
+  assert.match(workbench, /governanceFileHealthLabel/);
+  assert.match(presentation, /export const designImplementationTopics/);
+  assert.match(presentation, /export function governanceFileHealthLabel/);
+});
+
 test("keeps reusable Workspace file preview rendering outside topic surfaces", () => {
   const workbench = source("src/main.jsx");
+  const engineeringFile = source("src/components/workbench/engineering-file-tab.jsx");
   const preview = source("src/components/workbench/readonly-file-preview.jsx");
   const frame = source("src/components/workbench/engineering-topic-frame.jsx");
-  assert.match(workbench, /<ReadonlyFilePreview file=\{governanceFile\}/);
-  assert.match(workbench, /<ReadonlyFilePreview file=\{previewFile\}/);
+  const governance = source(
+    "src/components/workbench/governance-health-sections.jsx",
+  );
+  assert.match(governance, /<ReadonlyFilePreview file=\{governanceFile\}/);
+  assert.match(governance, /<ReadonlyFilePreview file=\{previewFile\}/);
   assert.match(
     frame,
     /<ReadonlyFilePreview description="关联工程文件只读预览" file=\{relatedFilePreview\}/,
   );
   assert.match(
-    workbench,
+    engineeringFile,
     /<ReadonlyFilePreview description=\{selectedEngineeringFile\.description\} file=\{selectedEngineeringFile\}/,
   );
   assert.match(preview, /export function ReadonlyFilePreview/);
@@ -981,19 +1120,9 @@ test("keeps EngineeringFileTab topic frame outside surface composition", () => {
   const composer = source(
     "src/components/workbench/engineering-topic-surface-composer.jsx",
   );
-  const engineeringFile = componentSource(
-    workbench,
-    "EngineeringFileTab",
-    "RightRail",
-  );
-  assert.match(
-    workbench,
-    /import \{ EngineeringTopicFrame \} from "\.\/components\/workbench\/engineering-topic-frame"/,
-  );
-  assert.match(
-    workbench,
-    /import \{ EngineeringTopicSurfaceComposer \} from "\.\/components\/workbench\/engineering-topic-surface-composer"/,
-  );
+  const engineeringFile = source("src/components/workbench/engineering-file-tab.jsx");
+  assert.match(engineeringFile, /import \{ EngineeringTopicFrame \}/);
+  assert.match(engineeringFile, /import \{ EngineeringTopicSurfaceComposer \}/);
   assert.match(engineeringFile, /<EngineeringTopicFrame/);
   assert.match(engineeringFile, /<EngineeringTopicSurfaceComposer/);
   assert.equal(
@@ -1014,14 +1143,15 @@ test("keeps EngineeringFileTab topic frame outside surface composition", () => {
 
 test("keeps static Workspace memory and asset surfaces outside EngineeringFileTab", () => {
   const workbench = source("src/main.jsx");
+  const engineeringFile = source("src/components/workbench/engineering-file-tab.jsx");
   const surfaces = source(
     "src/components/workbench/workspace-static-surfaces.jsx",
   );
-  assert.match(workbench, /AssetSurfacePanel/);
-  assert.match(workbench, /MemorySurfacePanel/);
+  assert.match(engineeringFile, /AssetSurfacePanel/);
+  assert.match(engineeringFile, /MemorySurfacePanel/);
   assert.match(
-    workbench,
-    /from "\.\/components\/workbench\/workspace-static-surfaces"/,
+    engineeringFile,
+    /from "\.\/workspace-static-surfaces"/,
   );
   assert.equal(workbench.includes("function MemorySurfacePanel"), false);
   assert.equal(workbench.includes("function AssetSurfacePanel"), false);
@@ -1033,10 +1163,11 @@ test("keeps static Workspace memory and asset surfaces outside EngineeringFileTa
 
 test("keeps static Workspace governance surfaces outside EngineeringFileTab", () => {
   const workbench = source("src/main.jsx");
+  const engineeringFile = source("src/components/workbench/engineering-file-tab.jsx");
   const surfaces = source(
     "src/components/workbench/workspace-static-surfaces.jsx",
   );
-  assert.match(workbench, /GovernanceSurfacePanel/);
+  assert.match(engineeringFile, /GovernanceSurfacePanel/);
   for (const panel of [
     "CollaborationBoundaryPanel",
     "ExecutionPermissionsPanel",
@@ -1143,14 +1274,13 @@ test("keeps request progress in the conversation surface instead of duplicate gl
 
 test("keeps RightRail shared display primitives outside the root Workbench module", () => {
   const workbench = source("src/main.jsx");
+  const rightRail = source("src/components/workbench/right-rail.jsx");
   const components = source(
     "src/components/workbench/right-rail-components.jsx",
   );
   const presentation = source("src/lib/task-presentation.js");
-  assert.match(
-    workbench,
-    /import \{ GoalStatusIcon, GoalTaskItem, ProjectProfileItem, RailDisclosure \} from/,
-  );
+  assert.match(workbench, /import \{ RightRail \} from/);
+  assert.match(rightRail, /import \{ RailDisclosure, GoalTaskItem, ProjectProfileItem \} from/);
   assert.equal(workbench.includes("function RailDisclosure"), false);
   assert.equal(workbench.includes("function GoalTaskItem"), false);
   assert.match(components, /export function RailDisclosure/);
@@ -1158,6 +1288,18 @@ test("keeps RightRail shared display primitives outside the root Workbench modul
   assert.match(components, /export function ProjectProfileItem/);
   assert.match(presentation, /export function taskGoalName/);
   assert.equal(components.includes("runtime-api"), false);
+});
+
+test("keeps RightRail goal and task projection in a pure view-model", () => {
+  const workbench = source("src/main.jsx");
+  const viewModel = source("src/lib/right-rail-view-model.js");
+  const rightRail = source("src/components/workbench/right-rail.jsx");
+  assert.match(workbench, /import \{ RightRail \} from/);
+  assert.match(rightRail, /buildRightRailViewModel/);
+  assert.equal(rightRail.includes("const activeGoalTaskIds"), false);
+  assert.equal(rightRail.includes("const goalTodos ="), false);
+  assert.match(viewModel, /export function buildRightRailViewModel/);
+  assert.equal(viewModel.includes("runtime-api"), false);
 });
 
 test("keeps App Workspace capability and Provider record actions in dedicated hooks", () => {
@@ -1241,7 +1383,7 @@ test("keeps active Task projection inside the Task session boundary", () => {
 
 test("injects goal creation into the AgentWorkspace task board boundary", () => {
   const workbench = source("src/main.jsx");
-  const workspace = componentSource(workbench, "AgentWorkspace", "statusLabel");
+  const workspace = componentSource(workbench, "AgentWorkspace", "currentRuntimeSource");
   assert.match(workspace, /onCreateGoal,/);
   assert.match(
     workbench,
@@ -1251,7 +1393,7 @@ test("injects goal creation into the AgentWorkspace task board boundary", () => 
 
 test("keeps AgentWorkspace runtime selection injected from the App adapter boundary", () => {
   const workbench = source("src/main.jsx");
-  const workspace = componentSource(workbench, "AgentWorkspace", "statusLabel");
+  const workspace = componentSource(workbench, "AgentWorkspace", "currentRuntimeSource");
   assert.match(workspace, /isTauri,\n/);
   assert.equal(workspace.includes("isTauriRuntime()"), false);
   assert.match(workbench, /isTauri=\{isTauriRuntime\(\)\}/);
@@ -1335,16 +1477,135 @@ test("keeps pure chat routing outside the Tauri command assembly", () => {
   assert.match(routing, /#\[cfg\(test\)\]/);
 });
 
+test("keeps Provider chat transport and SSE result normalization outside Tauri commands", () => {
+  const app = source("src-tauri/src/runtime/app.rs");
+  const stream = source("src-tauri/src/runtime/chat_stream.rs");
+  assert.doesNotMatch(app, /async fn generate_provider_chat\(/);
+  assert.doesNotMatch(app, /consume_openai_sse_deltas/);
+  assert.doesNotMatch(app, /streaming_reply_prefix/);
+  assert.match(app, /use crate::runtime::chat_stream::generate_provider_chat/);
+  assert.match(stream, /pub async fn generate_provider_chat/);
+  assert.match(stream, /post_chat_completion/);
+  assert.match(stream, /FnMut\(String, usize\)/);
+});
+
+test("keeps Provider status projection in the Provider runtime domain", () => {
+  const app = source("src-tauri/src/runtime/app.rs");
+  const provider = source("src-tauri/src/runtime/provider.rs");
+  assert.match(app, /status as provider_status_projection/);
+  assert.doesNotMatch(app, /struct ProviderProfileStatus/);
+  assert.doesNotMatch(app, /fn provider_status_source\(/);
+  assert.match(provider, /pub struct ProviderStatus/);
+  assert.match(provider, /pub fn status<F>/);
+  assert.match(provider, /pub fn status_source/);
+  assert.match(provider, /status_projection_uses_credential_presence/);
+});
+
+test("keeps Provider profile mutation policy outside the Tauri command adapter", () => {
+  const app = source("src-tauri/src/runtime/app.rs");
+  const provider = source("src-tauri/src/runtime/provider.rs");
+  assert.match(app, /profile_from_input\(/);
+  assert.match(app, /save_provider_config_profile\(&existing, profile, input.enabled\)/);
+  assert.match(app, /delete_provider_config_profile\(&existing, &input.profile_id\)/);
+  assert.doesNotMatch(app, /每个连接必须使用独立的 Key 保存变量/);
+  assert.doesNotMatch(app, /let profile_id = if input\.profile_id/);
+  assert.match(provider, /pub fn profile_from_input/);
+  assert.match(provider, /pub fn save_profile/);
+  assert.match(provider, /pub fn delete_profile/);
+  assert.match(provider, /profile_mutation_policy_keeps_keys_isolated/);
+});
+
+test("keeps Provider catalog probe transport outside the Tauri command adapter", () => {
+  const app = source("src-tauri/src/runtime/app.rs");
+  const provider = source("src-tauri/src/runtime/provider.rs");
+  assert.match(app, /provider::probe_catalog_with_credential\(/);
+  assert.doesNotMatch(app, /probe_model_catalog\(/);
+  assert.doesNotMatch(app, /get_models\(api_base, &api_key, Duration::from_secs\(30\)\)/);
+  assert.match(provider, /pub async fn probe_model_catalog/);
+  assert.match(provider, /pub async fn probe_catalog_with_credential/);
+  assert.match(provider, /model_catalog_probe_rejects_missing_connection_inputs/);
+});
+
+test("keeps Provider request preflight and failover in the Provider domain", () => {
+  const app = source("src-tauri/src/runtime/app.rs");
+  const provider = source("src-tauri/src/runtime/provider.rs");
+  assert.match(app, /provider::prepare_for_request\(/);
+  assert.match(app, /sync_hermes_runtime_config\(&result\.0\)/);
+  assert.doesNotMatch(app, /ordered_profile_candidates\(configured\)/);
+  assert.doesNotMatch(app, /fn record_provider_failure\(/);
+  assert.doesNotMatch(app, /未找到可用 profile/);
+  assert.match(provider, /pub async fn prepare_for_request/);
+  assert.match(provider, /pub fn record_failure/);
+  assert.match(provider, /preflight_switches_after_a_quota_failure_and_records_both_profiles/);
+});
+
+test("keeps Provider credential policy and Hermes config persistence outside Tauri commands", () => {
+  const app = source("src-tauri/src/runtime/app.rs");
+  const provider = source("src-tauri/src/runtime/provider.rs");
+  assert.doesNotMatch(app, /API Key Env 只能使用大写字母/);
+  assert.doesNotMatch(app, /async fn test_provider_config\(/);
+  assert.doesNotMatch(app, /fn current_unix_timestamp\(/);
+  assert.match(provider, /pub fn save_secret_and_enable/);
+  assert.match(provider, /pub fn resolve_credential/);
+  assert.match(provider, /pub async fn test_connection_with_credential/);
+  assert.match(provider, /pub fn sync_hermes_runtime_config/);
+});
+
 test("keeps read-only planning outside the Tauri command assembly", () => {
   const app = source("src-tauri/src/runtime/app.rs");
   const planning = source("src-tauri/src/runtime/planning.rs");
+  const planCommand = app.slice(
+    app.indexOf("async fn generate_readonly_plan("),
+    app.indexOf("#[tauri::command]\nfn list_desktop_tasks"),
+  );
   assert.match(app, /use crate::runtime::planning/);
+  assert.match(app, /planning::generate_plan\(/);
   assert.doesNotMatch(app, /struct PlanContext/);
   assert.doesNotMatch(app, /fn build_local_readonly_plan\(/);
   assert.doesNotMatch(app, /fn generate_provider_plan\(/);
+  assert.doesNotMatch(planCommand, /prepare_provider_for_request\(/);
+  assert.doesNotMatch(planCommand, /record_failure\(/);
   assert.match(planning, /pub fn build_local_readonly_plan/);
+  assert.match(planning, /pub async fn generate_plan/);
   assert.match(planning, /pub async fn generate_provider_plan/);
+  assert.match(planning, /prepare_for_request\(/);
+  assert.match(planning, /PROVIDER_FALLBACK/);
   assert.match(planning, /#\[cfg\(test\)\]/);
+});
+
+test("keeps image attachment input limits in the planning domain", () => {
+  const app = source("src-tauri/src/runtime/app.rs");
+  const planning = source("src-tauri/src/runtime/planning.rs");
+  assert.match(app, /sanitize_image_attachments\(input\.attachments\)/);
+  assert.equal(app.includes('mime_type.starts_with("image/")'), false);
+  assert.equal(app.includes("4_000_000"), false);
+  assert.match(planning, /pub fn sanitize_image_attachments/);
+  assert.match(planning, /const MAX_IMAGE_ATTACHMENTS: usize = 4/);
+  assert.match(planning, /const MAX_IMAGE_DATA_URL_BYTES: usize = 4_000_000/);
+});
+
+test("keeps the complete governed Patch Draft lifecycle in the Patch domain", () => {
+  const app = source("src-tauri/src/runtime/app.rs");
+  const patchDraft = source("src-tauri/src/runtime/patch_draft.rs");
+  const draftCommand = app.slice(
+    app.indexOf("async fn generate_patch_draft("),
+    app.indexOf("#[tauri::command]\nfn apply_patch_draft"),
+  );
+  assert.match(app, /patch_draft::generate_draft\(/);
+  assert.doesNotMatch(draftCommand, /prepare_provider_for_request\(/);
+  assert.doesNotMatch(draftCommand, /generate_hermes_draft\(/);
+  assert.doesNotMatch(draftCommand, /generate_provider_draft\(/);
+  assert.doesNotMatch(draftCommand, /local_placeholder_draft\(/);
+  assert.doesNotMatch(app, /fn generate_provider_patch_draft\(/);
+  assert.doesNotMatch(app, /fn generate_hermes_structured_patch_draft\(/);
+  assert.match(patchDraft, /pub async fn generate_draft\(/);
+  assert.match(patchDraft, /pub async fn generate_provider_draft\(/);
+  assert.match(patchDraft, /pub async fn generate_hermes_draft\(/);
+  assert.match(patchDraft, /prepare_for_request\(/);
+  assert.match(patchDraft, /DRAFT_RETRY/);
+  assert.match(patchDraft, /HERMES_FALLBACK/);
+  assert.match(patchDraft, /post_chat_completion\(/);
+  assert.match(patchDraft, /normalize_hermes_unified_diff\(&draft\.diff, contexts\)/);
 });
 
 test("keeps local chat content outside the Tauri command assembly", () => {
@@ -1388,12 +1649,66 @@ test("keeps Workspace registry persistence outside the Tauri command assembly", 
   assert.match(workspace, /pub fn registry_project_summaries/);
 });
 
+test("keeps Workspace registry mutations and path preview outside the Tauri command assembly", () => {
+  const app = source("src-tauri/src/runtime/app.rs");
+  const workspace = source("src-tauri/src/runtime/workspace.rs");
+  for (const helper of [
+    "register_project",
+    "preview_project_path",
+    "switch_registry_project",
+    "rename_registry_project",
+    "relocate_registry_project",
+    "remove_registry_project",
+  ]) {
+    assert.match(workspace, new RegExp(`pub fn ${helper}\\(`));
+  }
+  assert.match(app, /register_project\(&app_root, &mut registry, &input.path, &input.access_mode\)/);
+  assert.match(app, /workspace::preview_project_path\(&input.path\)/);
+  assert.match(app, /switch_workspace_project\(&app_root, &mut registry, &input.id\)/);
+  assert.match(app, /rename_workspace_project\(&app_root, &mut registry, &input.id, &input.name\)/);
+  assert.match(app, /relocate_workspace_project\(&app_root, &mut registry, &input.id, &input.path\)/);
+  assert.match(app, /remove_workspace_project\(&app_root, &mut registry, &id\)/);
+});
+
 test("keeps Workspace facts projection outside the Tauri command assembly", () => {
   const app = source("src-tauri/src/runtime/app.rs");
   const workspace = source("src-tauri/src/runtime/workspace.rs");
   assert.doesNotMatch(app, /fn build_workspace_facts_preview\(/);
   assert.match(workspace, /pub fn build_workspace_facts_preview/);
   assert.match(app, /workspace::build_workspace_facts_preview/);
+});
+
+test("keeps shared project name and stage projection in the Workspace domain", () => {
+  const app = source("src-tauri/src/runtime/app.rs");
+  const workspace = source("src-tauri/src/runtime/workspace.rs");
+  assert.doesNotMatch(app, /let state = read_json\(root\.join\(STATE_PATH\)\);/);
+  assert.match(app, /workspace::project_runtime_context\(&root, &current_project.name\)/);
+  assert.match(workspace, /pub struct ProjectRuntimeContext/);
+  assert.match(workspace, /pub fn project_runtime_context/);
+});
+
+test("keeps bounded engineering file previews in the Workspace domain", () => {
+  const app = source("src-tauri/src/runtime/app.rs");
+  const workspace = source("src-tauri/src/runtime/workspace.rs");
+  assert.doesNotMatch(app, /struct EngineeringFilePreview/);
+  assert.match(app, /workspace::read_engineering_file\(/);
+  assert.match(workspace, /pub struct EngineeringFilePreview/);
+  assert.match(workspace, /pub fn read_engineering_file/);
+  assert.match(workspace, /MAX_PREVIEW_BYTES/);
+});
+
+test("keeps Workspace snapshot, queue, and run-record projection outside the Tauri command assembly", () => {
+  const app = source("src-tauri/src/runtime/app.rs");
+  const workspace = source("src-tauri/src/runtime/workspace.rs");
+  for (const helper of ["count_run_records", "recommendation_queue", "task_backlog_queue", "goal_stack_from_validation"]) {
+    assert.doesNotMatch(app, new RegExp(`fn ${helper}\\(`));
+  }
+  assert.doesNotMatch(app, /struct WorkspaceSnapshot/);
+  assert.match(app, /build_workspace_snapshot\(&root, &current_project, &registry\)/);
+  assert.match(workspace, /pub fn count_run_records/);
+  assert.match(workspace, /pub fn workspace_queue/);
+  assert.match(workspace, /pub fn build_workspace_snapshot/);
+  assert.match(workspace, /pub struct WorkspaceSnapshot/);
 });
 
 test("keeps terminal session, cache, and trace behavior outside the Tauri command assembly", () => {
@@ -1407,6 +1722,171 @@ test("keeps terminal session, cache, and trace behavior outside the Tauri comman
   assert.match(terminal, /pub fn save_image/);
   assert.match(terminal, /pub fn record_native_trace/);
   assert.match(terminal, /#\[cfg\(test\)\]/);
+});
+
+test("keeps Workspace file watching outside the Tauri command assembly", () => {
+  const app = source("src-tauri/src/runtime/app.rs");
+  const watcher = source("src-tauri/src/runtime/workspace_watcher.rs");
+  assert.doesNotMatch(app, /struct WorkspaceWatcherState/);
+  assert.doesNotMatch(app, /fn should_ignore_watch_path\(/);
+  assert.doesNotMatch(app, /fn watch_event_should_refresh\(/);
+  assert.match(app, /workspace_watcher::start\(app, state, PathBuf::from\(&current_project.path\)\)/);
+  assert.match(watcher, /pub struct WorkspaceWatcherState/);
+  assert.match(watcher, /pub fn should_ignore_path/);
+  assert.match(watcher, /pub fn event_should_refresh/);
+  assert.match(watcher, /workspace:\/\/files-changed/);
+});
+
+test("keeps Agent read-tool argument validation and dispatch in the Agent Tools domain", () => {
+  const app = source("src-tauri/src/runtime/app.rs");
+  const tools = source("src-tauri/src/runtime/agent_tools.rs");
+  const hermesExecution = source(
+    "src-tauri/src/runtime/hermes_execution.rs",
+  );
+  assert.doesNotMatch(app, /match input\.name\.trim\(\)/);
+  assert.match(app, /agent_tools::execute_read_tool\(&root, &input.name, &input.arguments\)/);
+  assert.doesNotMatch(app, /agent_tools::execute_hermes_read_tool\(root, name, &args\)/);
+  assert.doesNotMatch(app, /fn hermes_read_tool_observation\(/);
+  assert.match(tools, /pub fn execute_read_tool/);
+  assert.match(tools, /pub fn execute_hermes_read_tool/);
+  assert.match(tools, /Native Core 只接受已登记的只读 Agent Tool/);
+  assert.match(hermesExecution, /execute_hermes_read_tool\(root, name, &args\)/);
+});
+
+test("keeps Hermes ACP child-process and structured-loop mechanics outside Tauri commands", () => {
+  const app = source("src-tauri/src/runtime/app.rs");
+  const hermesExecution = source(
+    "src-tauri/src/runtime/hermes_execution.rs",
+  );
+  assert.match(app, /hermes_execution::\{run_structured_loop, HermesAgentLoopResult\}/);
+  assert.match(app, /run_structured_loop\(/);
+  assert.doesNotMatch(app, /fn run_hermes_acp_structured_loop\(/);
+  assert.doesNotMatch(app, /fn run_hermes_acp_prompt\(/);
+  assert.doesNotMatch(app, /fn generate_hermes_patch_draft\(/);
+  assert.doesNotMatch(app, /HERMES_ACP: structured tool loop/);
+  assert.match(hermesExecution, /pub fn run_structured_loop\(/);
+  assert.match(hermesExecution, /Command::new\(program\)/);
+  assert.match(hermesExecution, /execute_hermes_read_tool\(root, name, &args\)/);
+  assert.match(hermesExecution, /validate_unified_diff_authorized/);
+});
+
+test("keeps Agent Run model-stage persistence outside the Hermes command adapter", () => {
+  const app = source("src-tauri/src/runtime/app.rs");
+  const runs = source("src-tauri/src/runtime/agent_runs.rs");
+  const hermesCommand = app.slice(
+    app.indexOf("async fn run_hermes_agent("),
+    app.indexOf("#[tauri::command]\nfn get_provider_status"),
+  );
+  assert.match(app, /agent_runs::prepare_model_run\(/);
+  assert.match(app, /agent_runs::settle_model_run\(/);
+  assert.doesNotMatch(app, /Hermes 正在读取上下文并形成结果/);
+  assert.doesNotMatch(app, /OmniDesk 已执行上一受控工具，结果如下/);
+  assert.doesNotMatch(hermesCommand, /resume-approval/);
+  assert.doesNotMatch(hermesCommand, /checkpoint\.next_action/);
+  assert.match(runs, /pub fn prepare_model_run/);
+  assert.match(runs, /pub fn settle_model_run/);
+  assert.match(runs, /Agent Run 不属于当前项目，拒绝继续/);
+  assert.match(runs, /Hermes 开始生成受控草稿/);
+  assert.match(runs, /resume-approval/);
+});
+
+test("keeps goal identifier normalization in the Goals domain", () => {
+  const app = source("src-tauri/src/runtime/app.rs");
+  const goals = source("src-tauri/src/runtime/goals.rs");
+  assert.doesNotMatch(app, /fn goal_id_from_title\(/);
+  assert.match(app, /goals::id_from_title\(input.title.trim\(\), &now\)/);
+  assert.match(goals, /pub fn id_from_title/);
+});
+
+test("keeps guarded check execution and audit evidence in the Execution domain", () => {
+  const app = source("src-tauri/src/runtime/app.rs");
+  const execution = source("src-tauri/src/runtime/execution.rs");
+  assert.doesNotMatch(app, /struct GuardedCheckResult/);
+  assert.match(app, /execution::run_guarded_check\(/);
+  assert.match(execution, /pub struct GuardedCheckResult/);
+  assert.match(execution, /pub fn run_guarded_check/);
+  assert.match(execution, /append_audit\(/);
+});
+
+test("keeps approved Patch Apply validation, Git execution, and evidence in the Execution domain", () => {
+  const app = source("src-tauri/src/runtime/app.rs");
+  const execution = source("src-tauri/src/runtime/execution.rs");
+  const applyCommand = app.slice(
+    app.indexOf("fn apply_patch_draft("),
+    app.indexOf("fn write_run_summary("),
+  );
+  assert.match(applyCommand, /execution::apply_patch_draft\(&root, &draft/);
+  assert.doesNotMatch(applyCommand, /validate_apply_diff_paths\(diff\)/);
+  assert.doesNotMatch(applyCommand, /validate_unified_diff_authorized\(diff/);
+  assert.doesNotMatch(applyCommand, /run_git_apply\(root, diff/);
+  assert.match(execution, /pub struct ApplyPatchResult/);
+  assert.match(execution, /pub fn apply_patch_draft/);
+  assert.match(execution, /validate_apply_diff_paths\(diff\)/);
+  assert.match(execution, /validate_unified_diff_authorized\(diff, &allowed_files\)/);
+  assert.match(execution, /run_git_apply\(root, diff, true\)/);
+  assert.match(execution, /append_audit\(\s*root,\s*"patch-apply"/);
+});
+
+test("keeps goal-validation suite composition in the Goals domain", () => {
+  const app = source("src-tauri/src/runtime/app.rs");
+  const goals = source("src-tauri/src/runtime/goals.rs");
+  const execution = source("src-tauri/src/runtime/execution.rs");
+  assert.doesNotMatch(app, /let check_ids = \["web-build", "cargo-check", "runtime"\]/);
+  assert.match(app, /goals::run_validation\(/);
+  assert.match(goals, /pub fn run_validation/);
+  assert.match(goals, /execute_guarded_check\(root, check_id\)/);
+  assert.match(execution, /pub\(crate\) fn execute_guarded_check/);
+});
+
+test("keeps native recovery fixture construction in the Agent Run domain", () => {
+  const app = source("src-tauri/src/runtime/app.rs");
+  const runs = source("src-tauri/src/runtime/agent_runs.rs");
+  assert.doesNotMatch(app, /Native WebDriver multi-file recovery fixture created/);
+  assert.match(app, /agent_runs::seed_native_recovery_run\(&app_root, project.id, &timestamp\)/);
+  assert.match(runs, /pub fn seed_native_recovery_run/);
+  assert.match(runs, /"native-recovery-approval"/);
+  assert.match(runs, /"docs\/TESTING\.md"/);
+  assert.match(runs, /Do not execute tools/);
+});
+
+test("keeps approved-tool state transitions in the Agent Run domain", () => {
+  const app = source("src-tauri/src/runtime/app.rs");
+  const runs = source("src-tauri/src/runtime/agent_runs.rs");
+  const execution = source("src-tauri/src/runtime/execution.rs");
+  assert.match(app, /execution::execute_approved_agent_tool\(/);
+  for (const transition of [
+    "begin_approved_tool",
+    "settle_approved_tool",
+    "fail_approved_tool",
+  ]) {
+    assert.doesNotMatch(app, new RegExp(`agent_runs::${transition}\\(`));
+    assert.match(execution, new RegExp(`agent_runs::${transition}\\(`));
+    assert.match(runs, new RegExp(`pub fn ${transition}\\(`));
+  }
+  for (const ownedState of [
+    "正在执行已批准工具",
+    "已批准工具执行失败",
+    "resume-apply-approval",
+    "resume-check-approval",
+    "tool-failed",
+    "checkpoint.tool_result = Some",
+  ]) {
+    assert.equal(app.includes(ownedState), false);
+  }
+});
+
+test("keeps system application launches and clipboard access outside the Tauri command assembly", () => {
+  const app = source("src-tauri/src/runtime/app.rs");
+  const integration = source("src-tauri/src/runtime/system_integration.rs");
+  assert.doesNotMatch(app, /Command::new\("explorer"/);
+  assert.doesNotMatch(app, /Command::new\("pbcopy"/);
+  assert.match(app, /system_integration::open_project_folder/);
+  assert.match(app, /system_integration::open_native_terminal/);
+  assert.match(app, /system_integration::copy_text_to_clipboard/);
+  assert.match(integration, /pub fn open_project_folder/);
+  assert.match(integration, /pub fn open_native_terminal/);
+  assert.match(integration, /pub fn copy_text_to_clipboard/);
+  assert.match(integration, /fn require_directory/);
 });
 
 test("keeps state transaction recovery and namespace activation together", () => {
@@ -1427,4 +1907,171 @@ test("keeps task workflow presentation helpers outside the Workbench entrypoint"
   assert.match(workbench, /task-workflow-presentation/);
   assert.match(presentation, /export function taskStatusLabel/);
   assert.match(presentation, /export function checksForPlan/);
+});
+
+test("keeps current-goal rendering and decomposition dialog outside the Workbench entrypoint", () => {
+  const workbench = source("src/main.jsx");
+  const engineeringFile = source("src/components/workbench/engineering-file-tab.jsx");
+  const panel = source("src/components/workbench/current-goal-panel.jsx");
+  assert.match(engineeringFile, /import \{ CurrentGoalPanel \} from "\.\/current-goal-panel"/);
+  assert.doesNotMatch(workbench, /function currentGoalNextAction\(/);
+  assert.doesNotMatch(workbench, /function CurrentGoalPanel\(/);
+  assert.match(panel, /export function CurrentGoalPanel/);
+  assert.match(panel, /resolveWorkspaceGoal/);
+  assert.equal(panel.includes("runtime-api"), false);
+});
+
+test("keeps goal validation and local-state presentation outside the Workbench entrypoint", () => {
+  const workbench = source("src/main.jsx");
+  const engineeringFile = source("src/components/workbench/engineering-file-tab.jsx");
+  const panels = source(
+    "src/components/workbench/goal-validation-panels.jsx",
+  );
+  for (const name of [
+    "AcceptanceCriteriaPanel",
+    "GoalHistoryPanel",
+    "ValidationReportPanel",
+    "RunRecordsPanel",
+    "LocalProjectStatePanel",
+    "RuleSourceButtons",
+  ]) {
+    assert.match(engineeringFile, new RegExp(`<${name}`));
+    assert.doesNotMatch(workbench, new RegExp(`function ${name}\\(`));
+    assert.match(panels, new RegExp(`export function ${name}`));
+  }
+  assert.match(panels, /resolveWorkspaceGoal/);
+  assert.match(panels, /displayStateRelativePath/);
+  assert.equal(panels.includes("runtime-api"), false);
+  assert.equal(panels.includes("desktop-task-client"), false);
+});
+
+test("keeps preview chat projection outside the Workbench entrypoint", () => {
+  const workbench = source("src/main.jsx");
+  const projection = source("src/lib/preview-chat-projection.js");
+  assert.doesNotMatch(workbench, /function previewChatResult\(/);
+  assert.doesNotMatch(workbench, /function loadingLabelForMessageKind\(/);
+  assert.doesNotMatch(workbench, /function loadingEventsForMessageKind\(/);
+  assert.doesNotMatch(workbench, /function localStatusReply\(/);
+  assert.doesNotMatch(workbench, /function conversationDiagnosticForResult\(/);
+  assert.match(workbench, /preview-chat-projection/);
+  assert.match(projection, /export function previewChatResult/);
+  assert.match(projection, /export function loadingEventsForMessageKind/);
+  assert.match(projection, /export function agentEventsForMessageKind/);
+  assert.match(projection, /export function localStatusReply/);
+  assert.match(projection, /export function conversationDiagnosticForResult/);
+  assert.equal(projection.includes("runtime-api"), false);
+});
+
+test("keeps provider model presentation outside the Workbench entrypoint", () => {
+  const workbench = source("src/main.jsx");
+  const presentation = source("src/lib/provider-presentation.js");
+  for (const helper of ["compactModelLabel", "providerModelKey", "modelAvailabilityKey", "providerModelHealth", "catalogModelsForProvider"]) {
+    assert.doesNotMatch(workbench, new RegExp(`function ${helper}\\(`));
+    assert.match(presentation, new RegExp(`export function ${helper}`));
+  }
+  assert.equal(presentation.includes("runtime-api"), false);
+});
+
+test("keeps conversation list preview projection outside the Workbench entrypoint", () => {
+  const workbench = source("src/main.jsx");
+  const list = source("src/lib/conversation-list.js");
+  assert.doesNotMatch(workbench, /function visibleConversationPreview\(/);
+  assert.doesNotMatch(workbench, /function isLowSignalConversationText\(/);
+  assert.match(workbench, /visibleConversationPreview/);
+  assert.match(list, /export function visibleConversationPreview/);
+  assert.match(list, /export function isLowSignalConversationText/);
+  assert.equal(list.includes("runtime-api"), false);
+});
+
+test("keeps goal and task projection outside the Workbench entrypoint", () => {
+  const workbench = source("src/main.jsx");
+  const presentation = source("src/lib/goal-presentation.js");
+  for (const helper of ["goalStatusLabel", "goalValidationStatusFromActiveGoal", "goalMetaFromStatus", "goalStatusLabelText", "compactGoalTitle", "progressFromTodos", "taskDisplayStatus", "snapshotQueueTodos", "projectProfileItems", "taskSubtasks"]) {
+    assert.doesNotMatch(workbench, new RegExp(`function ${helper}\\(`));
+    assert.match(presentation, new RegExp(`export function ${helper}`));
+  }
+  assert.equal(presentation.includes("runtime-api"), false);
+});
+
+test("keeps workspace tab projection outside the Workbench entrypoint", () => {
+  const workbench = source("src/main.jsx");
+  const presentation = source("src/lib/workspace-tab-presentation.js");
+  for (const helper of ["workspaceFileTabId", "workspaceFileTabTitle", "topicPayloadFromOutline"]) {
+    assert.doesNotMatch(workbench, new RegExp(`function ${helper}\\(`));
+    assert.match(presentation, new RegExp(`export function ${helper}`));
+  }
+  assert.equal(presentation.includes("runtime-api"), false);
+});
+
+test("keeps governance presentation outside the Workbench entrypoint", () => {
+  const workbench = source("src/main.jsx");
+  const presentation = source("src/lib/governance-presentation.js");
+  for (const helper of ["statusLabel", "actionLabel", "governanceFileStatusLabel", "governanceFileHealthLabel", "governanceFileHealthSummary", "governanceStatusSummaryText"]) {
+    assert.doesNotMatch(workbench, new RegExp(`function ${helper}\\(`));
+    assert.match(presentation, new RegExp(`export function ${helper}`));
+  }
+  assert.equal(presentation.includes("runtime-api"), false);
+});
+
+test("keeps Preview project profile projection outside the Workbench entrypoint", () => {
+  const workbench = source("src/main.jsx");
+  const previewClient = source("src/lib/workspace-preview-client.js");
+  const presentation = source("src/lib/project-profile-presentation.js");
+  assert.doesNotMatch(workbench, /function profileFieldText\(/);
+  assert.doesNotMatch(workbench, /function previewProjectProfile\(/);
+  assert.doesNotMatch(workbench, /project-profile-presentation/);
+  assert.match(previewClient, /from "\.\/project-profile-presentation\.js"/);
+  assert.match(previewClient, /previewProjectProfile\(/);
+  assert.match(presentation, /export function profileFieldText/);
+  assert.match(presentation, /export function previewProjectProfile/);
+  assert.equal(presentation.includes("runtime-api"), false);
+});
+
+test("keeps task record creation outside the Workbench entrypoint", () => {
+  const workbench = source("src/main.jsx");
+  const factory = source("src/lib/task-record-factory.js");
+  assert.doesNotMatch(workbench, /function createTaskFromPlan\(/);
+  assert.match(workbench, /task-record-factory/);
+  assert.match(factory, /export function createTaskFromPlan/);
+  assert.equal(factory.includes("runtime-api"), false);
+});
+
+test("keeps Preview planning projection outside the Workbench entrypoint", () => {
+  const workbench = source("src/main.jsx");
+  const projection = source("src/lib/preview-chat-projection.js");
+  assert.doesNotMatch(workbench, /function buildPreviewPlan\(/);
+  assert.match(workbench, /buildPreviewPlan/);
+  assert.match(projection, /export function buildPreviewPlan/);
+  assert.equal(projection.includes("runtime-api"), false);
+});
+
+test("keeps conversation message projection outside the Workbench entrypoint", () => {
+  const workbench = source("src/main.jsx");
+  const projection = source("src/lib/conversation-message-projection.js");
+  for (const helper of ["isActionRequestMessage", "actionPromptsForMessage", "profilePatchesFromMessage"]) {
+    assert.doesNotMatch(workbench, new RegExp(`function ${helper}\\(`));
+    assert.match(projection, new RegExp(`export function ${helper}`));
+  }
+  assert.equal(projection.includes("runtime-api"), false);
+});
+
+test("keeps Workspace refresh-failure persistence outside the Workbench entrypoint", () => {
+  const workbench = source("src/main.jsx");
+  const store = source("src/lib/workspace-fact-refresh-store.js");
+  const facts = source("src/components/workbench/workspace-facts-preview.jsx");
+  assert.doesNotMatch(workbench, /function factRefreshFailureStorageKey\(/);
+  assert.match(facts, /workspace-fact-refresh-store/);
+  assert.match(store, /export function writeFactRefreshFailure/);
+});
+
+test("keeps the Workbench capability catalog and topic surfaces outside the entrypoint", () => {
+  const workbench = source("src/main.jsx");
+  const catalog = source("src/lib/workbench-catalog.js");
+  assert.match(workbench, /workbench-catalog/);
+  assert.doesNotMatch(workbench, /const dedicatedSurfaceByTopic/);
+  assert.doesNotMatch(workbench, /const capabilityLabels/);
+  assert.match(catalog, /export const dedicatedSurfaceByTopic/);
+  assert.match(catalog, /export const capabilityLabels/);
+  assert.match(catalog, /export const chatStarterPrompts/);
+  assert.equal(catalog.includes("runtime-api"), false);
 });

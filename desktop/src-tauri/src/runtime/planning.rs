@@ -1,10 +1,18 @@
+#[cfg(not(test))]
+use crate::runtime::provider::sync_hermes_runtime_config;
 use crate::runtime::provider::{
-    chat_completion_content, post_chat_completion, read_secret, require_success, ProviderConfig,
+    chat_completion_content, post_chat_completion, prepare_for_request, read_secret,
+    record_failure, require_success, ProviderConfig,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use std::collections::HashSet;
 use std::path::PathBuf;
 use std::time::Duration;
+use tokio_util::sync::CancellationToken;
+
+const MAX_IMAGE_ATTACHMENTS: usize = 4;
+const MAX_IMAGE_DATA_URL_BYTES: usize = 4_000_000;
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -29,6 +37,18 @@ pub struct PlanAttachment {
     pub data_url: String,
 }
 
+pub fn sanitize_image_attachments(attachments: Vec<PlanAttachment>) -> Vec<PlanAttachment> {
+    attachments
+        .into_iter()
+        .filter(|attachment| {
+            attachment.mime_type.starts_with("image/")
+                && attachment.data_url.starts_with("data:image/")
+                && attachment.data_url.len() < MAX_IMAGE_DATA_URL_BYTES
+        })
+        .take(MAX_IMAGE_ATTACHMENTS)
+        .collect()
+}
+
 pub struct PlanContext {
     pub task: String,
     pub attachments: Vec<PlanAttachment>,
@@ -36,6 +56,62 @@ pub struct PlanContext {
     pub stage: String,
     pub root: PathBuf,
     pub provider: ProviderConfig,
+}
+
+/// Inputs for one read-only planning request. The command adapter owns request
+/// registration and cleanup; this domain owns local fallback, Provider
+/// selection, cancellation handling, and failure evidence.
+pub struct GeneratePlanInput<'a> {
+    pub app_root: &'a std::path::Path,
+    pub context: PlanContext,
+    pub cancellation: Option<CancellationToken>,
+}
+
+pub async fn generate_plan(input: GeneratePlanInput<'_>) -> Result<ReadonlyPlan, String> {
+    let mut context = input.context;
+    if !context.provider.enabled {
+        return Ok(build_local_readonly_plan(context));
+    }
+    let configured_provider = context.provider.clone();
+    let (provider, provider_switch_note) =
+        match prepare_for_request(input.app_root, &configured_provider, &HashSet::new()).await {
+            Ok(result) => result,
+            Err(error) => {
+                let mut plan = build_local_readonly_plan(context);
+                plan.trace
+                    .push(format!("PROVIDER_PRECHECK_FAILED: {error}"));
+                return Ok(plan);
+            }
+        };
+    #[cfg(not(test))]
+    if provider.active_profile_id != configured_provider.active_profile_id {
+        sync_hermes_runtime_config(&provider)?;
+    }
+    context.provider = provider;
+    let provider_result = if let Some(token) = input.cancellation {
+        tokio::select! {
+            _ = token.cancelled() => Err("请求已取消".to_string()),
+            result = generate_provider_plan(&context) => result,
+        }
+    } else {
+        generate_provider_plan(&context).await
+    };
+    match provider_result {
+        Ok(mut plan) => {
+            if !provider_switch_note.is_empty() {
+                plan.trace
+                    .push(format!("PROVIDER_SWITCH: {provider_switch_note}"));
+            }
+            Ok(plan)
+        }
+        Err(error) if error == "请求已取消" => Err(error),
+        Err(error) => {
+            record_failure(input.app_root, &context.provider, &error)?;
+            let mut plan = build_local_readonly_plan(context);
+            plan.trace.push(format!("PROVIDER_FALLBACK: {error}"));
+            Ok(plan)
+        }
+    }
 }
 
 pub fn build_local_readonly_plan(context: PlanContext) -> ReadonlyPlan {
@@ -254,5 +330,47 @@ mod tests {
             .checks
             .iter()
             .any(|item| item == "npm --prefix desktop run web:build"));
+    }
+
+    #[test]
+    fn image_attachments_share_one_bounded_input_contract() {
+        let attachment = |name: &str, mime_type: &str, data_url: String| PlanAttachment {
+            name: name.to_string(),
+            mime_type: mime_type.to_string(),
+            data_url,
+        };
+        let mut attachments = vec![
+            attachment(
+                "text.txt",
+                "text/plain",
+                "data:text/plain;base64,eA==".to_string(),
+            ),
+            attachment(
+                "fake.png",
+                "image/png",
+                "https://example.test/image.png".to_string(),
+            ),
+            attachment(
+                "large.png",
+                "image/png",
+                format!(
+                    "data:image/png;base64,{}",
+                    "a".repeat(MAX_IMAGE_DATA_URL_BYTES)
+                ),
+            ),
+        ];
+        attachments.extend((0..6).map(|index| {
+            attachment(
+                &format!("image-{index}.png"),
+                "image/png",
+                "data:image/png;base64,eA==".to_string(),
+            )
+        }));
+
+        let sanitized = sanitize_image_attachments(attachments);
+
+        assert_eq!(sanitized.len(), MAX_IMAGE_ATTACHMENTS);
+        assert_eq!(sanitized[0].name, "image-0.png");
+        assert_eq!(sanitized[3].name, "image-3.png");
     }
 }
