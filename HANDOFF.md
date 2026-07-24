@@ -16,8 +16,7 @@ depends_on: [PROJECT.md, AGENTS.md, docs/ARCHITECTURE.md, docs/TESTING.md]
 
 - 产品核心：`desktop/` 中的 Tauri + React + Local Agent Runtime。它在用户授权范围内处理项目、对话、Patch、审批、检查、恢复与证据。
 - 状态根：`.omnidesk/` 是唯一活动状态根，分为 `data`、`runtime`、`cache`、`evidence`。历史 `.project-os/` 只能通过显式、非破坏性迁移导入，不能作为运行时回退。
-- 当前分支：`main`，最近提交为 `008e662 refactor: converge omnidesk runtime ownership`，该提交已推送到 `origin/main`。
-- 当前工作树包含结构化追问表单、任务归属与此前文件治理的未提交改动；不得 reset、覆盖或拆分归属不明的内容。
+- 当前分支：`main`，最近提交为 `d2edf9a chore(docs): refresh repository file inventory`，已推送到 `origin/main`；工作树干净。
 - 受控边界不可放松：Patch 写入与检查各自独立审批；恢复不能自动重放；Provider 成功不等于任务成功；Preview 只读，不执行写入、终端、检查或恢复。
 
 ## 最近完成
@@ -30,6 +29,7 @@ depends_on: [PROJECT.md, AGENTS.md, docs/ARCHITECTURE.md, docs/TESTING.md]
 - `main.jsx` 只保留 controller 与 surface 装配；Workbench 默认值、Preview 只读投影与 Workspace transport 已下沉。样式入口按 theme、workspace、conversation、terminal、provider rail 分域。
 - 最新本地回归已通过：Desktop Node `548/548`、Runtime Rust `147/147`、Patch Normalizer `7/7`、Web build（首屏 `797.45 KiB / 800 KiB`）、离线 Eval 与原生 WebDriver smoke。
 - 受保护真实 Eval [30071780488](https://github.com/lijinmei915/project-os-starter/actions/runs/30071780488) 已通过：13/13 case 成功，任务成功率 `100%`、Patch 可应用率 `91.7%`、检查通过率 `100%`、恢复成功率 `100%`。`ask-user-resume` artifact 证明首次模型返回 `ask_user`、checkpoint 持久化、交互审批为 0、回答后同 Run 续接、Patch 独立审批并通过检查。
+- `复杂任务执行基础 v1` 已通过受保护真实 Eval [30081697947](https://github.com/lijinmei915/project-os-starter/actions/runs/30081697947)：13/13 标准 case 成功，另有隔离 worktree 证明源工程干净、diff 未变、二次审批合并、源工程验证和 worktree 清理；本地完整回归通过 Node `555/555`、Rust `157/157`、Patch Normalizer `7/7`。
 
 ## 风险与注意
 
@@ -42,5 +42,5 @@ depends_on: [PROJECT.md, AGENTS.md, docs/ARCHITECTURE.md, docs/TESTING.md]
 
 ## 下一步建议
 
-1. 将已通过完整本地回归的真实 13-case 报告作为新基线提交；后续候选报告不得删除已登记 case 或降低四项门槛。
-2. 取得用户明确确认后才能提交或推送当前工作树。
+1. 根据真实 `ask-user-resume` trace 决定是否扩展字段 widget；不要因此把普通聊天迁入复杂 Agent 循环。
+2. 降低多文件 Patch 的模型输出波动，但不得放宽四文件授权、Patch 规范化、独立审批或 trace 门槛。

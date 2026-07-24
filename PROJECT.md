@@ -71,15 +71,13 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 - Workspace 的事实新鲜度、能力、记忆与档案记录，以及前端对话、摘要、项目记忆和事实投影，现统一新写入 `omnidesk.*`；读取旧 `project-os.*` 仅生成带 `schemaMigration` 的内存投影。Provider 凭据配置仍隔离，未做泛化迁移。
 - `styles.css` 已收口为有序入口，领域规则拆到 `styles/theme|workspace|conversation|terminal|provider-rail.css`；构建与边界测试约束入口顺序和 Owner。
 - 执行 allowlist、Patch Draft 可应用性/授权校验、Git Apply、已批准工具调度与项目绑定、输出截断、审计和任务摘要已归属 `runtime/execution.rs`；Agent Run 的模型阶段创建/恢复校验、running checkpoint、工具结果续接，以及模型完成后的审批/终态/证据收束已归属 `runtime/agent_runs.rs`。`app.rs` 仅保留项目权限解析、Tauri 命令适配、Provider/Hermes transport 与生命周期编排，当前 2261 行。无 Runtime 消费者的旧 schema 已完成独立确认与退役，当前 14 份 schema 均有 Desktop 消费者证据。
+- `复杂任务执行基础 v1` 已完成：Hermes 启动前建立有界只读 Context Pack；确认任务可选择临时 detached worktree，Patch 与检查先在其中运行，源工程合并仍需第二次独立审批与干净源/diff/授权复核；原生终端实时保存脱敏、截断的会话证据，重启后的旧会话明确记录为中断。
+- 受保护真实 Eval [`30081697947`](https://github.com/lijinmei915/project-os-starter/actions/runs/30081697947) 已通过：13/13 标准 case 成功，任务成功率 100%、Patch 可应用率 91.7%、检查通过率 100%、恢复成功率 100%。独立 `isolated-worktree` trace 证明源工程干净、批准 diff 与 worktree 一致、二次审批完成、合并结果通过验证且临时 worktree 已清理。
 
-正在做：
+当前重点：
 
-- `复杂任务执行基础 v1` 已开始：Hermes 启动前会建立有界只读 Context Pack，按任务关键词选择候选源码片段并将输入写入 Run 证据；该上下文不扩大文件授权，Patch 前仍必须显式读取目标文件。
-- 确认任务可选择隔离工作区：仅在干净 Git 项目中创建临时 detached worktree，Patch 与检查先在其中完成；源工程写入仍需独立的“合并隔离改动”审批，并在合并前复核源工程未变、diff 未变和文件授权。
-- 原生终端会话实时保存脱敏、截断的会话证据（状态、命令计数、末条命令摘要和输出尾部）；旧 generation 的缓冲输出不能覆盖新会话，重启后旧会话明确标为已中断，不伪称可恢复交互进程。
-- 受保护 Agent Eval 在既有 13-case 基线外增加隔离工作区真实证明：真实模型 Patch 只在 worktree 内应用和检查，第二次审批后才合并回干净源工程；该证据单独上传，未运行前不覆盖已提交基线。
 - 保持普通闲聊为轻量 Provider 链路；只有确认执行的任务进入 Hermes 工具循环，避免两条链路重复扩展复杂能力。
-- 准备在受保护环境以真实 Provider trace 验证模型主动追问后的完整任务完成率。
+- 保持多文件 Patch 的授权、规范化和 trace 门槛，并继续降低模型输出波动。
 
 当前风险：
 
