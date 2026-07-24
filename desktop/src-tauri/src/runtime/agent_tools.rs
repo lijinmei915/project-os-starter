@@ -139,6 +139,132 @@ pub fn search_project(root: &Path, relative: &str, query: &str) -> Result<Value,
     )
 }
 
+/// Builds a small, deterministic read-only context package before an Agent
+/// starts reasoning. It is deliberately not an authorization mechanism: a
+/// model must still call `read_file` before it can request a patch for a file.
+pub fn build_task_context(root: &Path, task_text: &str) -> Result<Value, String> {
+    const MAX_FILES_SCANNED: usize = 300;
+    const MAX_CANDIDATES: usize = 6;
+    const MAX_FILE_BYTES: u64 = 128 * 1024;
+    const MAX_EXCERPT_CHARS: usize = 3_500;
+    const MAX_TOTAL_CHARS: usize = 14_000;
+
+    let root = canonical_root(root)?;
+    let keywords = context_keywords(task_text);
+    let mut queue = VecDeque::from([root.clone()]);
+    let mut files = Vec::<(PathBuf, String, usize)>::new();
+    let mut scanned = 0usize;
+
+    while let Some(directory) = queue.pop_front() {
+        let mut entries = fs::read_dir(&directory)
+            .map_err(|err| err.to_string())?
+            .filter_map(Result::ok)
+            .collect::<Vec<_>>();
+        entries.sort_by_key(|entry| entry.file_name());
+        for entry in entries {
+            let path = entry.path();
+            if is_ignored_under_root(&root, &path) {
+                continue;
+            }
+            let Ok(canonical) = path.canonicalize() else {
+                continue;
+            };
+            if !canonical.starts_with(&root) {
+                continue;
+            }
+            if canonical.is_dir() {
+                queue.push_back(canonical);
+                continue;
+            }
+            if !canonical.is_file()
+                || canonical
+                    .metadata()
+                    .map(|metadata| metadata.len() > MAX_FILE_BYTES)
+                    .unwrap_or(true)
+            {
+                continue;
+            }
+            scanned += 1;
+            if scanned > MAX_FILES_SCANNED {
+                break;
+            }
+            let Ok(content) = fs::read_to_string(&canonical) else {
+                continue;
+            };
+            let relative = relative_path(&root, &canonical);
+            let score = context_score(&relative, &content, &keywords);
+            files.push((canonical, content, score));
+        }
+        if scanned > MAX_FILES_SCANNED {
+            break;
+        }
+    }
+
+    files.sort_by(|left, right| {
+        right
+            .2
+            .cmp(&left.2)
+            .then_with(|| relative_path(&root, &left.0).cmp(&relative_path(&root, &right.0)))
+    });
+
+    let mut remaining = MAX_TOTAL_CHARS;
+    let mut excerpts = Vec::new();
+    for (path, content, score) in files.into_iter().take(MAX_CANDIDATES) {
+        if remaining == 0 {
+            break;
+        }
+        let excerpt = content
+            .chars()
+            .take(MAX_EXCERPT_CHARS.min(remaining))
+            .collect::<String>();
+        remaining = remaining.saturating_sub(excerpt.chars().count());
+        excerpts.push(json!({
+            "path": relative_path(&root, &path),
+            "score": score,
+            "content": excerpt,
+            "truncated": content.chars().count() > MAX_EXCERPT_CHARS,
+        }));
+    }
+    Ok(json!({
+        "summary": format!("已准备 {} 个候选源码片段", excerpts.len()),
+        "keywords": keywords,
+        "filesScanned": scanned.min(MAX_FILES_SCANNED),
+        "truncated": scanned > MAX_FILES_SCANNED,
+        "excerpts": excerpts,
+        "guardrail": "这些只读片段不构成文件写入授权；修改前仍须调用 read_file 并请求独立审批。",
+    }))
+}
+
+fn context_keywords(task_text: &str) -> Vec<String> {
+    const STOP_WORDS: &[&str] = &[
+        "about", "after", "agent", "and", "before", "check", "code", "continue", "file", "for",
+        "from", "into", "need", "only", "project", "read", "task", "that", "the", "then", "this",
+        "with", "任务", "继续", "工程", "文件", "检查", "修改", "完成", "需要",
+    ];
+    let mut words = task_text
+        .split(|ch: char| !ch.is_alphanumeric() && ch != '_' && ch != '-' && ch != '.' && ch != '/')
+        .map(|word| word.trim().to_lowercase())
+        .filter(|word| word.chars().count() >= 3 && !STOP_WORDS.contains(&word.as_str()))
+        .collect::<Vec<_>>();
+    words.sort();
+    words.dedup();
+    words.truncate(12);
+    words
+}
+
+fn context_score(path: &str, content: &str, keywords: &[String]) -> usize {
+    let path_lower = path.to_lowercase();
+    let content_lower = content.to_lowercase();
+    let mut score = usize::from(matches!(path, "README.md" | "Cargo.toml" | "package.json"));
+    for keyword in keywords {
+        if path_lower.contains(keyword) {
+            score += 8;
+        }
+        score += content_lower.matches(keyword).take(4).count() * 2;
+    }
+    score
+}
+
 pub fn git_status(root: &Path) -> Result<Value, String> {
     let output = Command::new("git")
         .args(["status", "--short", "--untracked-files=normal"])
@@ -331,6 +457,43 @@ mod tests {
             execute_hermes_read_tool(&root, "read_file", &json!({ "path": "README.md" })).is_ok()
         );
         assert!(execute_hermes_read_tool(&root, "shell", &json!({})).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn task_context_is_bounded_deterministic_and_hides_runtime_or_secret_files() {
+        let root = test_root("context-pack");
+        fs::create_dir_all(root.join("src")).unwrap();
+        fs::create_dir_all(root.join(".omnidesk/data")).unwrap();
+        fs::write(
+            root.join("src/session.rs"),
+            "pub fn resume_agent_session() { /* resume task */ }\n",
+        )
+        .unwrap();
+        fs::write(root.join("README.md"), "# Demo\nAgent session notes\n").unwrap();
+        fs::write(root.join(".env.local"), "API_KEY=do-not-read\n").unwrap();
+        fs::write(
+            root.join(".omnidesk/data/state.json"),
+            "{\"secret\":true}\n",
+        )
+        .unwrap();
+
+        let context = build_task_context(&root, "resume the agent session safely").unwrap();
+        let excerpts = context["excerpts"].as_array().unwrap();
+        let paths = excerpts
+            .iter()
+            .filter_map(|item| item["path"].as_str())
+            .collect::<Vec<_>>();
+        assert!(
+            paths.contains(&"src/session.rs"),
+            "context paths: {paths:?}"
+        );
+        assert!(!paths.iter().any(|path| path.starts_with(".omnidesk")));
+        assert!(!paths.iter().any(|path| path.starts_with(".env")));
+        assert_eq!(
+            context["guardrail"].as_str(),
+            Some("这些只读片段不构成文件写入授权；修改前仍须调用 read_file 并请求独立审批。")
+        );
         fs::remove_dir_all(root).unwrap();
     }
 }

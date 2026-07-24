@@ -66,6 +66,18 @@ for (const result of results) {
       fail("ask-user-resume must prove persisted user input, zero interaction approvals, and a separately approved patch");
     }
   }
+
+  if (caseId === "isolated-worktree") {
+    const isolation = trace?.isolation;
+    if (isolation?.sourceCleanBeforeIntegration !== true
+      || isolation?.approvedDiffMatchesWorktree !== true
+      || isolation?.approvalRequired !== true
+      || isolation?.result?.status !== "completed"
+      || isolation?.sourceVerified !== true
+      || isolation?.worktreeRemoved !== true) {
+      fail("isolated-worktree must prove clean source, independent integration approval, exact diff, source verification, and cleanup");
+    }
+  }
 }
 
 process.stdout.write(`${JSON.stringify({ cases: results.length, status: "passed", traceDirectory })}\n`);

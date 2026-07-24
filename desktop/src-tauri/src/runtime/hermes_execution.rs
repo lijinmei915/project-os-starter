@@ -1,4 +1,4 @@
-use crate::runtime::agent_tools::execute_hermes_read_tool;
+use crate::runtime::agent_tools::{build_task_context, execute_hermes_read_tool};
 use crate::runtime::hermes_protocol::{
     acp_program, custom_provider_key_env, extract_structured_envelope, wait_for_response,
     write_request,
@@ -45,6 +45,7 @@ pub fn run_structured_loop(
     cancellation: Option<&CancellationToken>,
 ) -> Result<HermesAgentLoopResult, String> {
     let program = acp_program().ok_or_else(|| "未检测到 hermes-acp".to_string())?;
+    let initial_context = build_task_context(root, prompt)?;
     let mut command = Command::new(program);
     command
         .current_dir(root)
@@ -93,8 +94,15 @@ pub fn run_structured_loop(
         let _ = stderr_tx.send(output);
     });
     let deadline = Instant::now() + ACP_TIMEOUT;
-    let mut trace = vec!["HERMES_ACP: structured tool loop".to_string()];
-    let mut observations = Vec::new();
+    let mut trace = vec![
+        "HERMES_ACP: structured tool loop".to_string(),
+        "CONTEXT_PACK: bounded read-only project context prepared".to_string(),
+    ];
+    let mut observations = vec![json!({
+        "name": "initial_context",
+        "success": true,
+        "data": initial_context,
+    })];
     let mut authorized_patch_files = HashSet::<String>::new();
     let mut envelope_retry_used = false;
     let mut result = (|| -> Result<HermesAgentLoopResult, String> {
@@ -132,7 +140,10 @@ pub fn run_structured_loop(
             .and_then(Value::as_str)
             .ok_or_else(|| "Hermes ACP 没有返回 sessionId".to_string())?
             .to_string();
-        let instruction = format!("{}\n\nYou are a governed executor. Return ONLY JSON. For project context use {{\"type\":\"tool_call\",\"name\":\"read_file|list_files|search_project|git_status\",\"arguments\":{{...}}}}. If a required product decision is missing, return {{\"type\":\"tool_call\",\"name\":\"ask_user\",\"arguments\":{{\"title\":\"...\",\"description\":\"...\",\"fields\":[{{\"id\":\"...\",\"type\":\"single-choice|multi-choice|text|confirm\",\"label\":\"...\",\"required\":true,\"options\":[{{\"value\":\"...\",\"label\":\"...\"}}]}}],\"actions\":[{{\"id\":\"submit\",\"label\":\"提交\"}},{{\"id\":\"skip\",\"label\":\"跳过\"}}]}}}}. Ask only for information necessary to continue; this does not grant permission to write files or run checks. To request a project modification or an allowlisted check, return apply_patch or run_check with arguments; OmniDesk will pause for independent approval before executing it. When enough context is available return {{\"type\":\"final\",\"result\":{{...}}}}. Never call tools directly.", prompt);
+        let initial_context_text = observations
+            .first()
+            .expect("initial context observation exists");
+        let instruction = format!("{}\n\nInitial read-only project context: {}\n\nYou are a governed executor. Return ONLY JSON. The initial context is informational only and does not authorize a patch: before requesting apply_patch, explicitly call read_file for every file you intend to modify. For project context use {{\"type\":\"tool_call\",\"name\":\"read_file|list_files|search_project|git_status\",\"arguments\":{{...}}}}. If a required product decision is missing, return {{\"type\":\"tool_call\",\"name\":\"ask_user\",\"arguments\":{{\"title\":\"...\",\"description\":\"...\",\"fields\":[{{\"id\":\"...\",\"type\":\"single-choice|multi-choice|text|confirm\",\"label\":\"...\",\"required\":true,\"options\":[{{\"value\":\"...\",\"label\":\"...\"}}]}}],\"actions\":[{{\"id\":\"submit\",\"label\":\"提交\"}},{{\"id\":\"skip\",\"label\":\"跳过\"}}]}}}}. Ask only for information necessary to continue; this does not grant permission to write files or run checks. To request a project modification or an allowlisted check, return apply_patch or run_check with arguments; OmniDesk will pause for independent approval before executing it. When enough context is available return {{\"type\":\"final\",\"result\":{{...}}}}. Never call tools directly.", prompt, initial_context_text);
         let mut next_prompt = instruction;
         for step in 0..max_steps.max(1) {
             if cancellation.is_some_and(CancellationToken::is_cancelled) {

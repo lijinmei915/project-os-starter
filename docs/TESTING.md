@@ -157,7 +157,7 @@ CI 文件：
 
 - Desktop Node、Web build、bundle、原生 smoke、Runtime Rust 与离线 Eval 基线
 - tracked state/manifest JSON、frontmatter、文档结构和密钥安全
-- Desktop PR 校验 `desktop/evals/agent-eval-report.json` 完整覆盖 12 个 case，且任务成功率、Patch 可应用率、检查通过率不低于已提交基线。
+- Desktop PR 校验 `desktop/evals/agent-eval-report.json` 完整覆盖已登记的 13 个基线 case，且任务成功率、Patch 可应用率、检查通过率不低于已提交基线。
 
 说明：
 - CI 与 `tests/run-tests.sh` 覆盖同一产品边界，但分别面向 GitHub 与本地执行环境；二者都不执行旧 CLI、installer 或 AI 工程报告链。
@@ -170,7 +170,7 @@ CI 文件：
 npm --prefix desktop run check:agent-eval
 ```
 
-`.github/workflows/agent-eval.yml` 在受保护的 `agent-eval` environment 中按日或手动运行。它需要 `OMNIDESK_AGENT_EVAL_KEY` secret 与 `OMNIDESK_AGENT_EVAL_MODEL` variable，执行所有已登记 case、保留真实 trace，并拒绝任务成功率、Patch 可应用率、检查通过率或恢复成功率回退。真实 Provider Eval 强制提供 `--trace-dir`：suite 会把 trace 复制到 `.omnidesk/evidence/agent-eval/<run-id>/traces/`，并将 `results.json` 中的 trace 引用写成相对 artifact 路径。`goal-rebind` 必须证明四份授权文件均实际变更；`interrupted-run` 必须记录网络不可用分类、未接受 Provider 响应和恢复后的原审批；`ask-user-resume` 必须证明追问持久化、交互审批为零、回答后恢复同一 Run，并以独立审批完成 Patch。报告没有真实 trace 时不能替代该门槛。
+`.github/workflows/agent-eval.yml` 在受保护的 `agent-eval` environment 中按日或手动运行。它需要 `OMNIDESK_AGENT_EVAL_KEY` secret 与 `OMNIDESK_AGENT_EVAL_MODEL` variable，执行所有已登记 case、保留真实 trace，并拒绝任务成功率、Patch 可应用率、检查通过率或恢复成功率回退。真实 Provider Eval 强制提供 `--trace-dir`：suite 会把 trace 复制到 `.omnidesk/evidence/agent-eval/<run-id>/traces/`，并将 `results.json` 中的 trace 引用写成相对 artifact 路径。`goal-rebind` 必须证明四份授权文件均实际变更；`interrupted-run` 必须记录网络不可用分类、未接受 Provider 响应和恢复后的原审批；`ask-user-resume` 必须证明追问持久化、交互审批为零、回答后恢复同一 Run，并以独立审批完成 Patch。工作流还独立运行 `isolated-worktree` 真实证明：模型 Patch 必须先在临时 detached worktree 应用并通过检查，源工程在第二次审批前保持干净，批准 diff 必须与当前 worktree diff 完全一致，合并后源工程通过验证且 worktree 被清理。该证明不修改已提交基线，报告没有真实 trace 时不能替代任一门槛。
 
 ---
 

@@ -13,6 +13,7 @@
     "test": "node --test tests/*.test.mjs",
     "eval:agent": "node scripts/run-agent-eval.mjs",
     "eval:agent:suite": "node scripts/run-agent-eval-suite.mjs",
+    "eval:agent:isolated": "node scripts/run-agent-eval-hermes-cli.mjs --case isolated-worktree",
     "check:agent-eval": "node scripts/check-agent-eval-report.mjs",
     "test:smoke": "playwright test --config playwright.config.mjs",
     "test:native": "node scripts/run-native-webdriver-smoke.mjs",

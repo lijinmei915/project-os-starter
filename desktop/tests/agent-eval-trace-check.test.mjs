@@ -16,6 +16,7 @@ function writeFixture(root, traceOverrides = {}) {
     { caseId: "goal-rebind", execution: { tracePath: "/ignored" } },
     { caseId: "interrupted-run", execution: { tracePath: "/ignored" } },
     { caseId: "ask-user-resume", execution: { tracePath: "/ignored" } },
+    { caseId: "isolated-worktree", execution: { tracePath: "/ignored" } },
   ];
   fs.writeFileSync(path.join(root, "results.json"), JSON.stringify({ results }));
   fs.writeFileSync(path.join(traces, "failed-check-repair.trace.json"), JSON.stringify({ initialCheck: { exitCode: 1, success: false }, ...traceOverrides.failed }));
@@ -43,6 +44,17 @@ function writeFixture(root, traceOverrides = {}) {
     applyResult: { status: "completed" },
     ...traceOverrides.askUser,
   }));
+  fs.writeFileSync(path.join(traces, "isolated-worktree.trace.json"), JSON.stringify({
+    isolation: {
+      sourceCleanBeforeIntegration: true,
+      approvedDiffMatchesWorktree: true,
+      approvalRequired: true,
+      result: { status: "completed" },
+      sourceVerified: true,
+      worktreeRemoved: true,
+    },
+    ...traceOverrides.isolated,
+  }));
   return { results: path.join(root, "results.json"), traces };
 }
 
@@ -67,6 +79,12 @@ test("requires failure and authorization evidence for real repair and multi-file
     const invalidInteraction = writeFixture(path.join(root, "invalid-interaction"), { askUser: { interaction: { status: "awaiting-user-input", persisted: true, approvalCount: 1, interaction: { kind: "ask_user" }, response: { answers: { density: "compact" } } } } });
     assert.throws(
       () => execFileSync(process.execPath, [checker, "--results", invalidInteraction.results, "--trace-dir", invalidInteraction.traces], { stdio: "pipe" }),
+      /Agent Eval trace evidence invalid/,
+    );
+
+    const invalidIsolation = writeFixture(path.join(root, "invalid-isolation"), { isolated: { isolation: { sourceCleanBeforeIntegration: true, approvedDiffMatchesWorktree: false, approvalRequired: true, result: { status: "completed" }, sourceVerified: true, worktreeRemoved: true } } });
+    assert.throws(
+      () => execFileSync(process.execPath, [checker, "--results", invalidIsolation.results, "--trace-dir", invalidIsolation.traces], { stdio: "pipe" }),
       /Agent Eval trace evidence invalid/,
     );
   } finally {

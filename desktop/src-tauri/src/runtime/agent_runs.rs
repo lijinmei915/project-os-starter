@@ -61,6 +61,8 @@ pub struct PersistedAgentRun {
     #[serde(default)]
     pub repair_attempt: usize,
     #[serde(default)]
+    pub isolation: Option<crate::runtime::isolated_workspace::IsolatedWorkspace>,
+    #[serde(default)]
     pub evidence: Vec<Value>,
     #[serde(default)]
     pub interactions: Vec<Value>,
@@ -78,6 +80,7 @@ pub struct PrepareModelRunInput {
     pub conversation_id: String,
     pub task_id: String,
     pub resume_existing: bool,
+    pub isolation: Option<crate::runtime::isolated_workspace::IsolatedWorkspace>,
 }
 
 pub struct PreparedModelRun {
@@ -504,7 +507,7 @@ pub fn prepare_model_run(
         }
         run
     } else {
-        let run = new_hermes_run_with_context(
+        let mut run = new_hermes_run_with_context(
             input.run_id,
             input.request_id,
             input.project_id,
@@ -515,6 +518,7 @@ pub fn prepare_model_run(
             input.task_id,
             timestamp,
         );
+        run.isolation = input.isolation;
         persist(root, &run)?;
         run
     };
@@ -529,7 +533,12 @@ pub fn prepare_model_run(
             )
         })
         .unwrap_or_default();
-    let execution_prompt = format!("{}{}", base_run.prompt, continuation);
+    let isolation_instruction = if base_run.isolation.is_some() {
+        "\n\n当前任务运行在隔离 Git 工作区。Patch 和检查只作用于隔离副本；在返回 final 前必须请求并通过适用的受控检查。通过检查后，OmniDesk 会单独请求用户确认是否将已验证 diff 合并回原工程。不要声称改动已经进入原工程。"
+    } else {
+        ""
+    };
+    let execution_prompt = format!("{}{}{}", base_run.prompt, continuation, isolation_instruction);
     let mut run = base_run;
     run.status = "running".to_string();
     run.revision += 1;
@@ -648,7 +657,7 @@ pub fn begin_approved_tool(
         .get("arguments")
         .cloned()
         .unwrap_or_else(|| json!({}));
-    run.status = if name == "apply_patch" {
+    run.status = if matches!(name.as_str(), "apply_patch" | "integrate_worktree") {
         "applying"
     } else {
         "verifying"
@@ -660,7 +669,7 @@ pub fn begin_approved_tool(
     run.checkpoint.phase = run.status.clone();
     run.checkpoint.context_summary = run.summary.clone();
     run.checkpoint.last_confirmation = Some(approval);
-    run.checkpoint.next_action = if name == "apply_patch" {
+    run.checkpoint.next_action = if matches!(name.as_str(), "apply_patch" | "integrate_worktree") {
         "resume-apply-approval".to_string()
     } else {
         "resume-check-approval".to_string()
@@ -697,6 +706,8 @@ pub fn settle_approved_tool(
     result: Value,
     timestamp: &str,
 ) {
+    let integration_succeeded = name == "integrate_worktree"
+        && result.get("success").and_then(Value::as_bool) == Some(true);
     let check_failed =
         name == "run_check" && result.get("success").and_then(Value::as_bool) == Some(false);
     if name == "run_check" {
@@ -713,7 +724,11 @@ pub fn settle_approved_tool(
             }
         }
     }
-    if check_failed && run.checkpoint.remaining_repair_budget == 0 {
+    if integration_succeeded {
+        run.status = "succeeded".to_string();
+        run.checkpoint.next_action = "none".to_string();
+        run.summary = "隔离工作区改动已在独立审批后合并到当前工程。".to_string();
+    } else if check_failed && run.checkpoint.remaining_repair_budget == 0 {
         run.status = "failed".to_string();
         run.checkpoint.next_action = "none".to_string();
         run.summary = "检查仍未通过，已达到两轮修复上限。".to_string();
@@ -823,6 +838,7 @@ pub fn new_hermes_run_with_context(
         approval: None,
         approval_token,
         repair_attempt: 0,
+        isolation: None,
         interactions: Vec::new(),
         checkpoint: AgentRunCheckpoint {
             phase: "queued".to_string(),
@@ -1035,6 +1051,7 @@ mod tests {
                 conversation_id: String::new(),
                 task_id: String::new(),
                 resume_existing: false,
+                isolation: None,
             },
             "now",
         )
@@ -1060,6 +1077,7 @@ mod tests {
                 conversation_id: String::new(),
                 task_id: String::new(),
                 resume_existing: true,
+                isolation: None,
             },
             "later",
         )
@@ -1102,6 +1120,7 @@ mod tests {
                 conversation_id: String::new(),
                 task_id: String::new(),
                 resume_existing: true,
+                isolation: None,
             },
             "later",
         )
@@ -1231,6 +1250,39 @@ mod tests {
         assert_eq!(run.checkpoint.allowed_files, vec!["src/lib.rs"]);
         assert_eq!(run.evidence.last().unwrap()["phase"], "applying");
         assert!(begin_approved_tool(&mut run, "approval-token", "later").is_err());
+    }
+
+    #[test]
+    fn approved_isolated_integration_settles_as_a_terminal_success() {
+        let mut run = new_hermes_run(
+            "run-integrate-worktree".to_string(),
+            "request-1".to_string(),
+            "project-1".to_string(),
+            "merge isolated changes".to_string(),
+            20,
+            String::new(),
+            "now",
+        );
+        run.status = "awaiting-approval".to_string();
+        run.approval = Some(json!({
+            "token": "integration-token",
+            "status": "approved",
+            "name": "integrate_worktree",
+            "arguments": { "allowedFiles": ["src/lib.rs"], "diff": "diff" }
+        }));
+
+        let (name, _) = begin_approved_tool(&mut run, "integration-token", "later").unwrap();
+        assert_eq!(name, "integrate_worktree");
+        assert_eq!(run.status, "applying");
+        settle_approved_tool(
+            &mut run,
+            "integrate_worktree",
+            &json!({ "allowedFiles": ["src/lib.rs"] }),
+            json!({ "success": true }),
+            "done",
+        );
+        assert_eq!(run.status, "succeeded");
+        assert_eq!(run.checkpoint.next_action, "none");
     }
 
     #[test]
@@ -1416,7 +1468,7 @@ mod tests {
         assert!(submit_interaction(&root, "run-interaction", &form_id, "submit", json!({ "scope": "personal" }), "conflict").is_err());
         let resumed = prepare_model_run(&root, PrepareModelRunInput {
             run_id: "run-interaction".to_string(), request_id: String::new(), project_id: "project-1".to_string(),
-            prompt: String::new(), max_steps: 4, approval_token: String::new(), conversation_id: String::new(), task_id: String::new(), resume_existing: true,
+            prompt: String::new(), max_steps: 4, approval_token: String::new(), conversation_id: String::new(), task_id: String::new(), resume_existing: true, isolation: None,
         }, "continue").unwrap();
         assert!(resumed.execution_prompt.contains("ask_user_result"));
         let completed = settle_model_run(&root, resumed.run, ModelRunCompletion {

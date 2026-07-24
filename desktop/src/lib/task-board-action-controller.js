@@ -120,12 +120,15 @@ export function createTaskBoardActionController(deps) {
         reload();
       } catch (error) { setMutationError(actionError(error)); }
     },
-    startTaskFromDialog: async () => {
+    startTaskFromDialog: async ({ isolate = false } = {}) => {
       const task = taskActionDialog?.task;
       if (!task) return;
       try {
         setTaskModelPreflight(true);
         if (!await onEnsureModelAvailable?.()) return setMutationError("当前模型实时检测不可用，任务没有开始。请更新 Key 或切换连接后重试。");
+        if (task.executionMode !== (isolate ? "isolated" : "direct")) {
+          await saveDesktopTask({ ...task, executionMode: isolate ? "isolated" : "direct", updatedAt: new Date().toISOString() });
+        }
         if (await onMarkTaskWaiting?.(task.id) === false) return setMutationError("任务未能开始，请检查当前状态。");
         setTaskActionDialog(null);
         selectTask(task.id);

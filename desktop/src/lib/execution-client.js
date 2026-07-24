@@ -38,6 +38,7 @@ export function runHermesAgent(prompt, requestId = "", maxSteps = 20, approvalTo
       approvalToken,
       conversationId: String(context?.conversationId || ""),
       maxSteps,
+      isolate: Boolean(context?.isolate),
       prompt,
       requestId,
       taskId: String(context?.taskId || ""),
@@ -70,7 +71,7 @@ export async function approveHermesAgent(run) {
   await invokeRuntimeCommand("execute_approved_agent_tool", { input: { id: approved.id, token: approved.approvalToken } });
   const updated = (await listAgentRuns()).find((item) => item.id === approved.id);
   if (!updated) throw new Error("已执行工具的 Agent Run 未找到。");
-  if (updated.status === "failed") return updated;
+  if (updated.status !== "queued") return updated;
   return invokeRuntimeCommand("continue_agent_run", { input: { id: updated.id } });
 }
 

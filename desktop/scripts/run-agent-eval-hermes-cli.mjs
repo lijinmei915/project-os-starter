@@ -173,6 +173,17 @@ const patchCases = Object.freeze({
       return spawnSync(process.execPath, ["--test", "math.test.mjs"], { cwd: fixture, encoding: "utf8" });
     },
   },
+  "isolated-worktree": {
+    isolated: true,
+    files: { "feature.js": "export function label() {\n  return \"before\";\n}\n" },
+    prompt: "Return only a unified diff that changes feature.js so label returns `after`. Do not change the function signature. Do not use tools, do not explain, and do not use markdown fences.",
+    verify(fixture) {
+      return fs.readFileSync(path.join(fixture, "feature.js"), "utf8").includes('return "after";');
+    },
+    check(fixture) {
+      return spawnSync(process.execPath, ["--check", "feature.js"], { cwd: fixture, encoding: "utf8" });
+    },
+  },
 });
 
 function seedFixture(caseId, definition) {
@@ -182,6 +193,16 @@ function seedFixture(caseId, definition) {
   execFileSync("git", ["add", "."], { cwd: fixture });
   execFileSync("git", ["-c", "user.name=OmniDesk Eval", "-c", "user.email=eval@omnidesk.local", "commit", "-qm", "seed fixture"], { cwd: fixture });
   return fixture;
+}
+
+function createIsolatedFixture(caseId, definition) {
+  const source = seedFixture(caseId, definition);
+  const worktree = fs.mkdtempSync(path.join(os.tmpdir(), `omnidesk-eval-${caseId}-worktree-`));
+  fs.rmSync(worktree, { force: true, recursive: true });
+  const baseHead = String(runGit(source, ["rev-parse", "HEAD"]).stdout || "").trim();
+  const created = runGit(source, ["worktree", "add", "--detach", worktree, baseHead]);
+  if (created.status !== 0) throw new Error(String(created.stderr || created.stdout || "无法创建隔离工作区").trim());
+  return { source, worktree, baseHead };
 }
 
 function runGit(fixture, args, input = "") {
@@ -217,7 +238,8 @@ function normalizeWithDesktopRuntime(diff, contexts) {
 
 async function runPatchCase(caseId, definition) {
   const started = Date.now();
-  const fixture = seedFixture(caseId, definition);
+  const isolation = definition.isolated ? createIsolatedFixture(caseId, definition) : null;
+  const fixture = isolation?.worktree || seedFixture(caseId, definition);
   const rawOutputPath = path.join(fixture, "raw-model-output.txt");
   const usagePath = path.join(fixture, "usage.json");
   const interactionOutputPath = path.join(fixture, "interaction-model-output.txt");
@@ -326,6 +348,48 @@ async function runPatchCase(caseId, definition) {
       fixtureCheckError = error instanceof Error ? error.message : String(error);
     }
   }
+  let integration = null;
+  if (isolation && applied && fixtureCheckPassed) {
+    const approvedDiff = String(runGit(fixture, ["diff", "--binary", "--no-ext-diff", "HEAD", "--"]).stdout || "");
+    const sourceStatus = runGit(isolation.source, ["status", "--porcelain", "--untracked-files=normal"]);
+    const currentDiff = String(runGit(fixture, ["diff", "--binary", "--no-ext-diff", "HEAD", "--"]).stdout || "");
+    const canIntegrate = sourceStatus.status === 0 && !String(sourceStatus.stdout || "").trim() && approvedDiff && approvedDiff === currentDiff;
+    const integrationGateway = createToolGateway({
+      accessMode: "controlled",
+      projectRoot: isolation.source,
+      handlers: {
+        apply_patch: async ({ arguments: input }) => {
+          const check = runGit(isolation.source, ["apply", "--check"], input.diff);
+          if (check.status !== 0) throw new Error(String(check.stderr || check.stdout || "git apply --check failed").trim());
+          const apply = runGit(isolation.source, ["apply"], input.diff);
+          if (apply.status !== 0) throw new Error(String(apply.stderr || apply.stdout || "git apply failed").trim());
+          return { summary: "隔离改动已合并。" };
+        },
+      },
+    });
+    let integrationResult = { status: "not-requested", stderr: "" };
+    if (canIntegrate) {
+      const prepared = integrationGateway.prepare({ arguments: { diff: approvedDiff }, id: `eval-${caseId}:integrate`, name: "apply_patch", requestedAt: new Date().toISOString(), runId: `eval-${caseId}` });
+      if (prepared.status === "awaiting-approval") {
+        approvalCount += 1;
+        try { integrationResult = await awaitGateway(integrationGateway, prepared); }
+        catch (error) { integrationResult = { status: "failed", stderr: error instanceof Error ? error.message : String(error) }; }
+      } else integrationResult = { status: prepared.status, stderr: prepared.reason || "集成未进入审批。" };
+    }
+    const sourceVerified = integrationResult.status === "completed" && definition.verify(isolation.source);
+    integration = {
+      sourceRoot: isolation.source,
+      worktreeRoot: isolation.worktree,
+      baseHead: isolation.baseHead,
+      sourceCleanBeforeIntegration: sourceStatus.status === 0 && !String(sourceStatus.stdout || "").trim(),
+      approvedDiffMatchesWorktree: Boolean(approvedDiff && approvedDiff === currentDiff),
+      approvalRequired: true,
+      result: integrationResult,
+      sourceVerified,
+    };
+    const removed = runGit(isolation.source, ["worktree", "remove", "--force", isolation.worktree]);
+    integration.worktreeRemoved = removed.status === 0 && !fs.existsSync(isolation.worktree);
+  }
   let usage = {};
   try { usage = JSON.parse(fs.readFileSync(usagePath, "utf8")); } catch { /* evidence is still recorded */ }
   const trace = {
@@ -350,12 +414,14 @@ async function runPatchCase(caseId, definition) {
     gitDiffCheck: { exitCode: gitDiffCheck.status, stderr: String(gitDiffCheck.stderr || "").slice(0, 4000) },
     fixtureCheckPassed,
     fixtureCheckError,
+    isolation: integration,
     usage: { apiCalls: Number(usage.api_calls || 0), completed: Boolean(usage.completed), estimatedCostUsd: Number(usage.estimated_cost_usd || 0), model: String(usage.model || "") },
   };
   fs.writeFileSync(tracePath, `${JSON.stringify(trace, null, 2)}\n`);
   return {
     caseId,
     success: model.status === 0 && fixtureCheckPassed && changedFilesAuthorized && changedRequiredFiles && (!initialCheck || !initialCheck.success)
+      && (!definition.isolated || (integration?.result?.status === "completed" && integration.sourceVerified && integration.worktreeRemoved))
       && (!definition.interaction || (interactionEvidence?.persisted === true && interactionEvidence?.status === "awaiting-user-input" && interactionEvidence?.approvalCount === 0)),
     patchApplicable: normalization.ok && applyResult.status === "completed",
     rawPatchApplicable: rawApplyCheck.status === 0,

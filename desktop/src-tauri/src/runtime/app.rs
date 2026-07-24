@@ -268,6 +268,8 @@ struct RunHermesAgentInput {
     conversation_id: String,
     #[serde(default)]
     task_id: String,
+    #[serde(default)]
+    isolate: bool,
 }
 
 fn default_agent_max_steps() -> usize {
@@ -1326,6 +1328,7 @@ async fn continue_agent_run(
             run_id: run.id.clone(),
             conversation_id: run.conversation_id.clone(),
             task_id: run.task_id.clone(),
+            isolate: false,
         },
         runtime_requests,
     )
@@ -1340,10 +1343,10 @@ async fn run_hermes_agent(
     let app_root = find_workspace_root()?;
     let mut registry = load_or_seed_registry(&app_root)?;
     let current_project = current_registry_project(&mut registry, &app_root)?;
-    let root = PathBuf::from(&current_project.path);
+    let source_root = PathBuf::from(&current_project.path);
     let provider = load_or_seed_provider_config(&app_root)?;
     sync_hermes_runtime_config(&provider)?;
-    let api_key = read_secret_from_env_or_dotenv(&root, &provider.api_key_env)
+    let api_key = read_secret_from_env_or_dotenv(&source_root, &provider.api_key_env)
         .ok_or_else(|| format!("环境变量或 .env.local 中未设置 {}", provider.api_key_env))?;
     let request_id = input.request_id.trim().to_string();
     let run_id = if !input.run_id.trim().is_empty() {
@@ -1355,6 +1358,11 @@ async fn run_hermes_agent(
         )
     } else {
         format!("agent-{request_id}")
+    };
+    let isolation = if input.run_id.trim().is_empty() && input.isolate {
+        Some(crate::runtime::isolated_workspace::create(&source_root, &run_id)?)
+    } else {
+        None
     };
     let now = current_timestamp_string();
     let prepared = crate::runtime::agent_runs::prepare_model_run(
@@ -1369,20 +1377,27 @@ async fn run_hermes_agent(
             conversation_id: input.conversation_id.clone(),
             task_id: input.task_id.clone(),
             resume_existing: !input.run_id.trim().is_empty(),
+            isolation,
         },
         &now,
     )?;
     let execution_prompt = prepared.execution_prompt;
     let running_run = prepared.run;
+    let execution_root = running_run
+        .isolation
+        .as_ref()
+        .map(|workspace| crate::runtime::isolated_workspace::execution_root(workspace, &source_root))
+        .transpose()?
+        .unwrap_or_else(|| source_root.clone());
     let token = if request_id.is_empty() {
         None
     } else {
         Some(runtime_requests.start(&request_id))
     };
     let cancellation = token.clone();
-    let result = tauri::async_runtime::spawn_blocking(move || {
+    let mut result = tauri::async_runtime::spawn_blocking(move || {
         run_structured_loop(
-            &root,
+            &execution_root,
             &api_key,
             &provider.api_base,
             &provider.api_key_env,
@@ -1393,7 +1408,7 @@ async fn run_hermes_agent(
     })
     .await
     .map_err(|err| format!("Hermes worker 中断: {err}"))?;
-    let status = match result.as_ref() {
+    let mut status = match result.as_ref() {
         Ok(value) if value.status == "awaiting-approval" => "awaiting-approval",
         Ok(value) if value.status == "awaiting-user-input" => "awaiting-user-input",
         Ok(value) if value.status == "succeeded" => "succeeded",
@@ -1403,11 +1418,11 @@ async fn run_hermes_agent(
     }
     .to_string();
     let step = result.as_ref().ok().map(|value| value.step);
-    let summary = result
+    let mut summary = result
         .as_ref()
         .map(|value| value.summary.clone())
         .unwrap_or_else(|error| error.to_string());
-    let approval = result
+    let mut approval = result
         .as_ref()
         .ok()
         .and_then(|value| value.approval.clone());
@@ -1415,7 +1430,7 @@ async fn run_hermes_agent(
         .as_ref()
         .ok()
         .and_then(|value| value.interaction.clone());
-    let evidence_details = result
+    let mut evidence_details = result
         .as_ref()
         .map(|value| {
             json!({
@@ -1426,6 +1441,45 @@ async fn run_hermes_agent(
             })
         })
         .unwrap_or_else(|error| json!({ "error": error.to_string() }));
+    if status == "succeeded" {
+        if let Some(workspace) = running_run.isolation.as_ref() {
+            let diff = crate::runtime::isolated_workspace::integration_diff(workspace, &source_root)?;
+            if !diff.trim().is_empty() && running_run.checkpoint.completed_check_ids.is_empty() {
+                status = "failed".to_string();
+                summary = "隔离工作区已有改动，但尚未完成受控检查；拒绝合并回当前工程。".to_string();
+            } else if !diff.trim().is_empty() {
+                let token = format!(
+                    "hermes-integration-{}-{}",
+                    running_run.step + 1,
+                    crate::runtime::provider::current_unix_timestamp()
+                );
+                status = "awaiting-approval".to_string();
+                summary = "隔离工作区的验证改动已就绪，请确认是否合并到当前工程。".to_string();
+                approval = Some(json!({
+                    "id": format!("{}:integration", running_run.id),
+                    "name": "integrate_worktree",
+                    "arguments": {
+                        "diff": diff,
+                        "allowedFiles": running_run.checkpoint.allowed_files,
+                    },
+                    "reason": "将隔离工作区的已验证改动合并到当前工程",
+                    "toolCallId": format!("{}:integration", running_run.id),
+                    "status": "pending",
+                    "token": token,
+                }));
+            }
+            evidence_details["isolation"] = json!({
+                "id": workspace.id,
+                "baseHead": workspace.base_head,
+                "sourceRoot": workspace.source_root,
+            });
+        }
+    }
+    if let Ok(loop_result) = result.as_mut() {
+        loop_result.status = status.clone();
+        loop_result.summary = summary.clone();
+        loop_result.approval = approval.clone();
+    }
     crate::runtime::agent_runs::settle_model_run(
         &app_root,
         running_run,
@@ -1679,6 +1733,15 @@ fn stop_terminal_session(
     input: crate::runtime::terminal::StopTerminalSessionInput,
 ) -> Result<(), String> {
     crate::runtime::terminal::stop_session(&state, input)
+}
+
+#[tauri::command]
+fn list_terminal_evidence(
+) -> Result<Vec<crate::runtime::terminal::TerminalSessionEvidence>, String> {
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let current_project = current_registry_project(&mut registry, &app_root)?;
+    crate::runtime::terminal::list_evidence(Path::new(&current_project.path))
 }
 
 #[cfg(feature = "webdriver")]
@@ -2279,6 +2342,7 @@ pub fn run() {
             write_terminal_session,
             resize_terminal_session,
             stop_terminal_session,
+            list_terminal_evidence,
             #[cfg(feature = "webdriver")]
             record_native_terminal_trace,
             #[cfg(feature = "webdriver")]

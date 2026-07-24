@@ -64,6 +64,7 @@ export function useTerminalSession({ isTauri, terminalClient }) {
   const [terminalTextBySession, setTerminalTextBySession] = useState({});
   const [terminalChunksBySession, setTerminalChunksBySession] = useState({});
   const [terminalError, setTerminalError] = useState("");
+  const [terminalEvidence, setTerminalEvidence] = useState([]);
 
   const lastTerminalPromptRef = useRef({});
   const terminalTextBySessionRef = useRef(terminalTextBySession);
@@ -76,6 +77,18 @@ export function useTerminalSession({ isTauri, terminalClient }) {
 
   useEffect(() => { terminalTextBySessionRef.current = terminalTextBySession; }, [terminalTextBySession]);
   useEffect(() => { terminalSessionsRef.current = terminalSessions; }, [terminalSessions]);
+
+  const refreshTerminalEvidence = useCallback(async () => {
+    if (!isTauri) { setTerminalEvidence([]); return; }
+    try {
+      const records = await terminalClient.listTerminalEvidence();
+      setTerminalEvidence(Array.isArray(records) ? records : []);
+    } catch {
+      setTerminalEvidence([]);
+    }
+  }, [isTauri, terminalClient]);
+
+  useEffect(() => { void refreshTerminalEvidence(); }, [refreshTerminalEvidence]);
 
   const resetTerminalSessionState = useCallback(() => {
     setTerminalLogs([]);
@@ -104,6 +117,7 @@ export function useTerminalSession({ isTauri, terminalClient }) {
       }
       traceNativeTerminalStage("terminal-session.start-before");
       const session = await terminalClient.startTerminalSession({ sessionId, cols: 120, rows: 32 });
+      void refreshTerminalEvidence();
       traceNativeTerminalStage("terminal-session.start-complete");
       terminalGenerationBySessionRef.current = { ...terminalGenerationBySessionRef.current, [sessionId]: Number(session.generation || 0) };
       setTerminalSessions((current) => [...current.filter((item) => (item.sessionId || item.session_id || item.id) !== sessionId), session]);
@@ -116,7 +130,7 @@ export function useTerminalSession({ isTauri, terminalClient }) {
       setTerminalError(err instanceof Error ? err.message : String(err));
       return false;
     }
-  }, [isTauri, terminalClient]);
+  }, [isTauri, refreshTerminalEvidence, terminalClient]);
 
   useEffect(() => {
     if (!isTauri) {
@@ -234,12 +248,13 @@ export function useTerminalSession({ isTauri, terminalClient }) {
     if (!sessionId || sessionId === "main") return false;
     try {
       if (isTauri) await terminalClient.stopTerminalSession({ sessionId });
+      void refreshTerminalEvidence();
       const next = closeTerminalSessionState({ activeSessionId: activeTerminalSessionId, chunksBySession: terminalChunksBySession, sessionId, sessions: terminalSessions, textBySession: terminalTextBySession });
       setTerminalSessions(next.sessions); setTerminalTextBySession(next.textBySession); setTerminalChunksBySession(next.chunksBySession); setActiveTerminalSessionId(next.activeSessionId);
       clearTerminalSessionRefs({ lastTerminalPromptRef, terminalClearRequestedRef, terminalGenerationBySessionRef, terminalInputBufferRef, terminalLastOutputRef, terminalPassthroughRef }, sessionId);
       return true;
     } catch (err) { setTerminalError(err instanceof Error ? err.message : String(err)); return false; }
-  }, [activeTerminalSessionId, isTauri, terminalChunksBySession, terminalSessions, terminalTextBySession, terminalClient]);
+  }, [activeTerminalSessionId, isTauri, refreshTerminalEvidence, terminalChunksBySession, terminalSessions, terminalTextBySession, terminalClient]);
 
   const appendContextToTerminal = useCallback(async (lines) => {
     window.dispatchEvent(new Event("omnidesk:open-terminal"));
@@ -267,6 +282,6 @@ export function useTerminalSession({ isTauri, terminalClient }) {
     openNativeTerminal: async () => { try { await terminalClient.openNativeTerminal(); setTerminalError(""); return true; } catch (err) { setTerminalError(err instanceof Error ? err.message : String(err)); return false; } },
     resetTerminalSessionState, resizeTerminalSession, restartTerminalSession: () => startTerminalSession(activeTerminalSessionId, { activate: true, reset: true }),
     setActiveTerminalSessionId, setTerminalLogs, setTerminalRunningId, terminalChunks: terminalChunksBySession[activeTerminalSessionId] || [], terminalError,
-    terminalLogs, terminalRunningId, terminalSession, terminalSessions, terminalText: terminalTextBySession[activeTerminalSessionId] || "", writeTerminalData,
+    terminalEvidence, terminalLogs, terminalRunningId, terminalSession, terminalSessions, terminalText: terminalTextBySession[activeTerminalSessionId] || "", writeTerminalData,
   };
 }

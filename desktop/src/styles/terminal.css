@@ -1720,3 +1720,64 @@ button.goalTodoButton:hover {
   }
 }
 
+.terminalEvidence {
+  margin: 0 10px 8px;
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--desktop-surface-panel);
+}
+
+.terminalEvidence summary {
+  padding: 7px 9px;
+  color: var(--desktop-text-secondary);
+  cursor: pointer;
+  font-size: var(--desktop-text-meta);
+}
+
+.terminalEvidenceList {
+  display: grid;
+  gap: 6px;
+  padding: 0 8px 8px;
+}
+
+.terminalEvidenceList article {
+  display: grid;
+  gap: 3px;
+  padding: 7px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--desktop-state-disabled-bg);
+}
+
+.terminalEvidenceList article > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.terminalEvidenceList strong,
+.terminalEvidenceList span,
+.terminalEvidenceList p,
+.terminalEvidenceList pre {
+  overflow-wrap: anywhere;
+}
+
+.terminalEvidenceList strong {
+  color: var(--desktop-text-primary);
+  font-size: var(--desktop-text-meta);
+}
+
+.terminalEvidenceList span,
+.terminalEvidenceList p {
+  margin: 0;
+  color: var(--desktop-text-tertiary);
+  font-size: var(--desktop-text-caption);
+}
+
+.terminalEvidenceList pre {
+  max-height: 100px;
+  margin: 2px 0 0;
+  white-space: pre-wrap;
+  color: var(--desktop-text-muted);
+  font: inherit;
+  font-size: var(--desktop-text-caption);
+}

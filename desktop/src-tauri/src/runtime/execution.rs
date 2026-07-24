@@ -283,13 +283,32 @@ pub fn execute_approved_agent_tool(
         crate::runtime::agent_runs::begin_approved_tool(&mut run, approval_token, timestamp)?;
     crate::runtime::agent_runs::persist(app_root, &run)?;
 
-    let result = execute_approved_tool(
-        project_root,
-        project_access_mode,
-        &name,
-        &arguments,
-        timestamp,
-    );
+    let result = if name == "integrate_worktree" {
+        integrate_isolated_workspace(
+            project_root,
+            project_access_mode,
+            run.isolation.as_ref(),
+            &arguments,
+            timestamp,
+        )
+    } else {
+        let execution_root = run
+            .isolation
+            .as_ref()
+            .map(|workspace| {
+                crate::runtime::isolated_workspace::execution_root(workspace, project_root)
+            })
+            .transpose();
+        execution_root.and_then(|execution_root| {
+            execute_approved_tool(
+                execution_root.as_deref().unwrap_or(project_root),
+                project_access_mode,
+                &name,
+                &arguments,
+                timestamp,
+            )
+        })
+    };
     let result = match result {
         Ok(result) => result,
         Err(error) => {
@@ -307,6 +326,52 @@ pub fn execute_approved_agent_tool(
     );
     crate::runtime::agent_runs::persist(app_root, &run)?;
     Ok(result)
+}
+
+fn integrate_isolated_workspace(
+    project_root: &Path,
+    project_access_mode: &str,
+    workspace: Option<&crate::runtime::isolated_workspace::IsolatedWorkspace>,
+    arguments: &Value,
+    timestamp: &str,
+) -> Result<Value, String> {
+    if project_access_mode != "controlled" {
+        return Err("当前项目未授权受控修改。".to_string());
+    }
+    let workspace = workspace.ok_or_else(|| "Agent Run 没有可合并的隔离工作区。".to_string())?;
+    crate::runtime::isolated_workspace::ensure_source_clean(project_root)?;
+    let approved_diff = arguments
+        .get("diff")
+        .and_then(Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| "隔离合并审批缺少 diff。".to_string())?;
+    let current_diff = crate::runtime::isolated_workspace::integration_diff(workspace, project_root)?;
+    if current_diff != approved_diff {
+        return Err("隔离工作区在审批后发生变化；请重新生成合并审批。".to_string());
+    }
+    let allowed_files = arguments
+        .get("allowedFiles")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let draft = json!({ "diff": approved_diff, "allowedFiles": allowed_files });
+    let applied = apply_patch_draft(project_root, &draft, timestamp)?;
+    let cleanup = crate::runtime::isolated_workspace::remove(workspace, project_root)
+        .err()
+        .unwrap_or_default();
+    Ok(json!({
+        "success": true,
+        "message": "隔离工作区改动已合并到当前工程。",
+        "apply": applied,
+        "cleanupWarning": cleanup,
+        "workspaceId": workspace.id,
+    }))
 }
 
 fn execute_approved_tool(
@@ -351,6 +416,7 @@ fn execute_approved_tool(
             serde_json::to_value(run_guarded_check(project_root, check_id, timestamp)?)
                 .map_err(|err| err.to_string())
         }
+        "integrate_worktree" => Err("隔离合并只能通过绑定 Agent Run 的执行入口。".to_string()),
         _ => Err(format!("不允许执行审批工具：{name}")),
     }
 }
@@ -503,6 +569,34 @@ mod tests {
             .unwrap();
         assert!(output.status.success());
         root
+    }
+
+    fn commit_initial_file(root: &Path, relative: &str, content: &str) {
+        let configured = Command::new("git")
+            .args(["config", "user.email", "test@example.invalid"])
+            .current_dir(root)
+            .output()
+            .unwrap();
+        assert!(configured.status.success());
+        let configured = Command::new("git")
+            .args(["config", "user.name", "OmniDesk Test"])
+            .current_dir(root)
+            .output()
+            .unwrap();
+        assert!(configured.status.success());
+        std::fs::write(root.join(relative), content).unwrap();
+        let added = Command::new("git")
+            .args(["add", relative])
+            .current_dir(root)
+            .output()
+            .unwrap();
+        assert!(added.status.success());
+        let committed = Command::new("git")
+            .args(["commit", "-m", "initial"])
+            .current_dir(root)
+            .output()
+            .unwrap();
+        assert!(committed.status.success());
     }
 
     fn persist_approved_patch_run(root: &Path, run_id: &str, project_id: &str) {
@@ -676,6 +770,57 @@ mod tests {
             std::fs::read_to_string(root.join("action-smoke.md")).unwrap(),
             "before\n"
         );
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn isolated_workspace_diff_requires_a_fresh_approval_before_source_merge() {
+        let root = initialize_git_directory("isolated-merge");
+        commit_initial_file(&root, "README.md", "before\n");
+        crate::runtime::state_namespace::ensure_active_state_namespace(&root).unwrap();
+        let workspace = crate::runtime::isolated_workspace::create(&root, "run-isolated").unwrap();
+        let isolated = crate::runtime::isolated_workspace::execution_root(&workspace, &root).unwrap();
+        std::fs::write(isolated.join("README.md"), "after\n").unwrap();
+        let approved = crate::runtime::isolated_workspace::integration_diff(&workspace, &root).unwrap();
+        let arguments = json!({ "diff": approved, "allowedFiles": ["README.md"] });
+
+        let result = integrate_isolated_workspace(
+            &root,
+            "controlled",
+            Some(&workspace),
+            &arguments,
+            "now",
+        )
+        .unwrap();
+        assert_eq!(result["success"], true);
+        assert_eq!(std::fs::read_to_string(root.join("README.md")).unwrap(), "after\n");
+        assert!(!Path::new(&workspace.root).exists());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn isolated_workspace_rejects_a_stale_integration_diff() {
+        let root = initialize_git_directory("isolated-stale-merge");
+        commit_initial_file(&root, "README.md", "before\n");
+        crate::runtime::state_namespace::ensure_active_state_namespace(&root).unwrap();
+        let workspace = crate::runtime::isolated_workspace::create(&root, "run-isolated-stale").unwrap();
+        let isolated = crate::runtime::isolated_workspace::execution_root(&workspace, &root).unwrap();
+        std::fs::write(isolated.join("README.md"), "after\n").unwrap();
+        let approved = crate::runtime::isolated_workspace::integration_diff(&workspace, &root).unwrap();
+        std::fs::write(isolated.join("README.md"), "changed-after-approval\n").unwrap();
+        let arguments = json!({ "diff": approved, "allowedFiles": ["README.md"] });
+
+        let error = integrate_isolated_workspace(
+            &root,
+            "controlled",
+            Some(&workspace),
+            &arguments,
+            "now",
+        )
+        .unwrap_err();
+        assert!(error.contains("审批后发生变化"));
+        assert_eq!(std::fs::read_to_string(root.join("README.md")).unwrap(), "before\n");
+        crate::runtime::isolated_workspace::remove(&workspace, &root).unwrap();
         std::fs::remove_dir_all(root).unwrap();
     }
 

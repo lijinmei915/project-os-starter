@@ -5,6 +5,7 @@ export const writeTerminalSession = (input) => invokeRuntimeCommand("write_termi
 export const resizeTerminalSession = (input) => invokeRuntimeCommand("resize_terminal_session", { input });
 export const startTerminalSession = (input) => invokeRuntimeCommand("start_terminal_session", { input });
 export const stopTerminalSession = (input) => invokeRuntimeCommand("stop_terminal_session", { input });
+export const listTerminalEvidence = () => invokeRuntimeCommand("list_terminal_evidence", {});
 export const openNativeTerminal = () => invokeRuntimeCommand("open_native_terminal", {});
 export const saveTerminalImage = (input) => invokeRuntimeCommand("save_terminal_image", { input });
 

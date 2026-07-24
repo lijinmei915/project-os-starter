@@ -269,6 +269,7 @@ function AgentWorkspace({
   terminalSessions,
   activeTerminalSessionId,
   terminalError,
+  terminalEvidence,
   onSaveTerminalImage,
   loading,
   error,
@@ -575,7 +576,7 @@ function AgentWorkspace({
                 presentation={{ agentTopicPresentation, dedicatedSurfaceByTopic, taskStatuses, workspaceRouteById }}
               /></TabsContent>}
         tabs={workspaceTabs}
-        terminal={{ activeSessionId: activeTerminalSessionId, chunks: terminalChunks, draftRequest: terminalDraftRequest, error: terminalError, logs: terminalLogs, onCloseTerminalSession, onNewTerminalSession, onOpenNativeTerminal, onRestartTerminalSession, onResizeTerminalSession, onRunCheck: onRunTerminalCheck, onSaveTerminalImage, onSelectTerminalSession, onWriteTerminalData, runningId: terminalRunningId, session: terminalSession, sessions: terminalSessions, text: terminalText }}
+        terminal={{ activeSessionId: activeTerminalSessionId, chunks: terminalChunks, draftRequest: terminalDraftRequest, error: terminalError, evidence: terminalEvidence, logs: terminalLogs, onCloseTerminalSession, onNewTerminalSession, onOpenNativeTerminal, onRestartTerminalSession, onResizeTerminalSession, onRunCheck: onRunTerminalCheck, onSaveTerminalImage, onSelectTerminalSession, onWriteTerminalData, runningId: terminalRunningId, session: terminalSession, sessions: terminalSessions, text: terminalText }}
         trace={snapshot.trace}
       />
 
@@ -668,7 +669,7 @@ function App() {
   const [projectActionError, setProjectActionError] = useState("");
   const [agentRuns, setAgentRuns] = useState([]);
   const { applyError, applyLoading, handoffError, handoffLoading, patchError, patchLoading, planError, planLoading, runnerError, runnerLoadingId, setApplyError, setApplyLoading, setHandoffError, setHandoffLoading, setPatchError, setPatchLoading, setPlanError, setPlanLoading, setRunnerError, setRunnerLoadingId } = useExecutionSession();
-  const { activeTerminalSessionId, appendContextToTerminal, appendTerminalLog, closeTerminalSession, newTerminalSession, openNativeTerminal, resetTerminalSessionState, resizeTerminalSession, restartTerminalSession, setActiveTerminalSessionId, setTerminalRunningId, terminalChunks, terminalError, terminalLogs, terminalRunningId, terminalSession, terminalSessions, terminalText, writeTerminalData } = useTerminalSession({
+  const { activeTerminalSessionId, appendContextToTerminal, appendTerminalLog, closeTerminalSession, newTerminalSession, openNativeTerminal, resetTerminalSessionState, resizeTerminalSession, restartTerminalSession, setActiveTerminalSessionId, setTerminalRunningId, terminalChunks, terminalError, terminalEvidence, terminalLogs, terminalRunningId, terminalSession, terminalSessions, terminalText, writeTerminalData } = useTerminalSession({
     isTauri: isTauriRuntime(),
     terminalClient,
   });
@@ -908,6 +909,7 @@ function App() {
       }
       const result = await executionClient.runHermesAgent(prompt, requestId, 20, "", {
         conversationId: agentRunConversationId(activeConversationId, task),
+        isolate: task?.executionMode === "isolated",
         taskId: task.id,
       });
       await refreshAgentRuns();
@@ -1172,6 +1174,7 @@ function App() {
           terminalSessions={terminalSessions}
           activeTerminalSessionId={activeTerminalSessionId}
           terminalError={terminalError}
+          terminalEvidence={terminalEvidence}
           onSaveTerminalImage={terminalClient.saveTerminalImage}
           loading={loading}
           error={error}

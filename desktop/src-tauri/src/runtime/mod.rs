@@ -10,6 +10,7 @@ pub mod execution;
 pub mod goals;
 pub mod hermes_execution;
 pub mod hermes_protocol;
+pub mod isolated_workspace;
 pub mod provider;
 pub mod repository;
 pub mod state_namespace;

@@ -80,6 +80,7 @@ Workbench UI
 
 ```txt
 任务与授权文件
+  -> 有界只读 Context Pack（项目摘要、候选源码、显式读取）
   -> 计划
   -> Patch 草稿和本地校验
   -> 独立写入审批
@@ -120,6 +121,7 @@ Agent Run 已持久化 attempt、审批、观察、request checkpoint、当前�
 | `tasks` | 任务状态、文件授权、Patch/检查结果和任务所有权 |
 | `goals` | 目标、任务索引、验收、归档、恢复和合并 |
 | `agent_runs` | 有界运行、attempt、审批、恢复和最终态 |
+| `agent_tools` | 受控项目读取、上下文包和只读工具参数边界 |
 | `provider` | Provider 配置、密钥隔离、预检和失败分类 |
 | `patch` | unified diff 归一化、授权路径、hunk 和上下文校验 |
 | `execution` | 受控写入、检查、审计和执行结果 |
@@ -148,6 +150,8 @@ Provider 密钥继续存放在受保护的环境文件或系统密钥能力中�
 - 新产品能力只能进入 Desktop Runtime，不得进入冻结的旧 CLI 或安装脚本。
 - Preview 永远不能成为隐藏的写入或命令执行后门。
 - 所有工程写入和检查都必须独立审批。
+- Agent 启动前可使用有界的只读 Context Pack；它不得读取密钥或 Runtime 状态，也不构成 Patch 文件授权。
 - 状态迁移必须先复制校验，再切换读取，最后清理旧源。
 - Eval 必须保留真实执行证据，不能用手写成功结果替代 Provider 或 Runtime trace。
-- 终端持久化若实施，必须是用户可见的独立 session 能力，默认不落盘完整终端输出。
+- 终端作为用户可见的独立 session 能力运行；它只落盘脱敏、截断的会话证据（状态、命令计数、最后命令摘要、输出尾部），绝不保存完整屏幕或交互进程状态。重启会将运行中会话标为中断。
+- 任务可显式选择隔离 worktree。Runtime 只在干净 Git 根目录创建 detached worktree；模型 Patch 与检查在隔离根执行，源工程保持不变。Runtime 用第二个 `integrate_worktree` 内部审批复核源工程干净、批准 diff 与当前 diff 完全一致且仍符合授权文件集，才把 Patch 合并回源工程并清理 worktree。该内部步骤不暴露给模型作为可自由调用的工具。

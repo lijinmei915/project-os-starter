@@ -39,6 +39,16 @@ test("does not start a task when the required model is unavailable", async () =>
   ]);
 });
 
+test("records an explicit isolated execution choice before starting a task", async () => {
+  const waited = [];
+  const { actions, calls } = controller({
+    onMarkTaskWaiting: async (id) => { waited.push(id); return true; },
+  });
+  await actions.startTaskFromDialog({ isolate: true });
+  assert.equal(calls.find(([name]) => name === "save")?.[1].executionMode, "isolated");
+  assert.deepEqual(waited, ["task-1"]);
+});
+
 test("stops rerunning task checks after the first failure", async () => {
   const checked = [];
   const { actions } = controller({ onRunGuardedCheck: async (_taskId, checkId) => {

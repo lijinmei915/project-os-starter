@@ -83,6 +83,7 @@ export function TerminalDock({
   chunks,
   session,
   sessions = [],
+  evidence = [],
   error,
 }) {
   const [terminalDraft, setTerminalDraft] = useState("");
@@ -466,6 +467,7 @@ export function TerminalDock({
           <button type="button" onClick={() => window.dispatchEvent(new Event("omnidesk:open-conversation"))}>返回对话调整</button>
         </div>
       ) : null}
+      {evidence.length ? <details className="terminalEvidence"><summary>会话记录</summary><div className="terminalEvidenceList">{evidence.slice(0, 6).map((record) => <article key={`${record.sessionId}-${record.generation}`}><div><strong>{record.sessionId || "terminal"}</strong><span>{record.status === "running" ? "运行中" : record.endReason === "runtime-restarted" ? "应用重启后已中断" : "已停止"}</span></div><p>{record.commandCount ? `已提交 ${record.commandCount} 条命令` : "尚未记录命令"}{record.lastCommandSummary ? ` · ${record.lastCommandSummary}` : ""}</p>{record.outputTail ? <pre>{record.outputTail}</pre> : null}</article>)}</div></details> : null}
       <div className="terminalComposer" role="region" aria-label="终端输入">
         {terminalImageAttachments.length ? (
           <div className="terminalImageAttachment" title={terminalImageAttachments.map((image) => image.path).join("\n")}>

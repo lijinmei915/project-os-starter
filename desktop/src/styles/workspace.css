@@ -2141,6 +2141,42 @@ body.isResizingSidebar {
   white-space: pre-wrap;
 }
 
+.taskIsolationToggle {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: var(--space-8);
+  align-items: start;
+  padding: var(--space-10);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--desktop-text-secondary);
+  cursor: pointer;
+}
+
+.taskIsolationToggle input {
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: var(--desktop-accent);
+}
+
+.taskIsolationToggle span {
+  display: grid;
+  gap: 2px;
+}
+
+.taskIsolationToggle strong {
+  color: var(--desktop-text-primary);
+  font-size: var(--desktop-text-small);
+}
+
+.taskIsolationToggle small {
+  color: var(--desktop-text-tertiary);
+  font-size: var(--desktop-text-meta);
+  line-height: 1.45;
+}
+
 .taskActionDialogContent > .taskCreateActions {
   position: sticky;
   bottom: -14px;
