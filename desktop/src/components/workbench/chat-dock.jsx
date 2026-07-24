@@ -13,7 +13,7 @@ export function ChatDock({
       ? `补充「${taskContext.title || "当前任务"}」的要求，或调整下一步...`
       : "问项目情况、描述想法，或说要改什么...";
   const takeoverHint = processing
-    ? "任务进行中 · 输入补充要求可调整方向，输入“停止”可取消当前任务"
+    ? "进行中 · 发送将重启；输入“停止”可取消"
     : null;
   return (
     <section className="chatDock" aria-label="对话输入">

@@ -20,7 +20,6 @@ export function AgentWorkspaceConversationCanvas({
   phase,
   starterPrompts,
   streamingReply,
-  submittingInteractionId,
   tasks,
   turns,
 }) {
@@ -49,7 +48,6 @@ export function AgentWorkspaceConversationCanvas({
           pendingTurn={pendingTurn}
           phase={phase}
           streamingReply={streamingReply}
-          submittingInteractionId={submittingInteractionId}
           tasks={tasks}
           turns={turns}
         />

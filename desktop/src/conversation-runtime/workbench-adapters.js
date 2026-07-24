@@ -7,6 +7,7 @@ export function createConversationActionAdapters({ generatePlan, isRequestActive
       requestId,
       task,
     }),
+    startAgent: ({ task } = {}) => runAction?.({ id: "confirm-active-task", task, taskId: task?.id }),
     runCheck: ({ action = {}, requestId } = {}) => runAction?.({
       ...action,
       requestId,

@@ -74,14 +74,23 @@ export async function approveHermesAgent(run) {
   return invokeRuntimeCommand("continue_agent_run", { input: { id: updated.id } });
 }
 
-export async function submitAgentInteraction(run, { action = "submit", answers = {} } = {}) {
+export function continueHermesAgent(run) {
+  if (!run?.id) throw new Error("缺少需要继续的 Agent Run。");
+  return invokeRuntimeCommand("continue_agent_run", { input: { id: run.id } });
+}
+
+export function acceptAgentInteraction(run, { action = "submit", answers = {} } = {}) {
   if (!run?.id || !run?.checkpoint?.interaction?.id) throw new Error("缺少待提交的追问表单。");
-  const accepted = await invokeRuntimeCommand("submit_agent_interaction", {
+  return invokeRuntimeCommand("submit_agent_interaction", {
     input: { action, answers, formId: run.checkpoint.interaction.id, id: run.id },
   });
+}
+
+export async function submitAgentInteraction(run, response = {}) {
+  const accepted = await acceptAgentInteraction(run, response);
   if (accepted.status !== "queued") return accepted;
   try {
-    return await invokeRuntimeCommand("continue_agent_run", { input: { id: accepted.id } });
+    return await continueHermesAgent(accepted);
   } catch (error) {
     return { ...accepted, continuationError: error instanceof Error ? error.message : String(error) };
   }

@@ -37,6 +37,15 @@ test("routes explicit modifications to a read-only patch draft", () => {
   assert.equal(conversationActionDecision("当前有什么检查问题"), null);
 });
 
+test("routes an explicit missing decision through Hermes instead of drafting a patch", () => {
+  assert.deepEqual(conversationActionDecision("请调整界面，但我还没决定紧凑还是舒适，请先通过选项表单询问我"), {
+    action: { id: "start-agent", task: "请调整界面，但我还没决定紧凑还是舒适，请先通过选项表单询问我" },
+    confirmation: "none",
+    mode: "execute",
+    risk: "read-only-agent",
+  });
+});
+
 test("keeps plan questions out of the execution route", () => {
   assert.equal(conversationActionDecision("当前计划是什么"), null);
   assert.equal(conversationActionDecision("这个方案有什么风险"), null);
@@ -316,6 +325,9 @@ test("adapts Workbench plan, patch, and check services for the action executor",
 
   await adapters.runCheck({ action: { checkId: "runtime", id: "run-check" }, requestId: "request-check" });
   assert.deepEqual(calls[1], { checkId: "runtime", id: "run-check", requestId: "request-check" });
+
+  await adapters.startAgent({ task: { id: "task-agent" } });
+  assert.deepEqual(calls[2], { id: "confirm-active-task", task: { id: "task-agent" }, taskId: "task-agent" });
 });
 
 test("projects a generated plan through the runtime executor", async () => {
@@ -364,6 +376,27 @@ test("keeps a preview patch draft read-only in the runtime executor", async () =
   assert.equal(result.requestStatus, "succeeded");
   assert.equal(result.turn.pendingAction, null);
   assert.deepEqual(result.turn.actions, [{ id: "open-topic", label: "查看改动草稿", target: "execution", taskId: "task-2" }]);
+});
+
+test("starts Hermes directly when an engineering request needs a user decision", async () => {
+  let startedTask = null;
+  const task = { id: "task-question" };
+  const result = await executeConversationActionRequest({
+    action: { id: "start-agent", task: "先用表单询问我" },
+    adapters: {
+      generatePlan: async () => ({ status: "succeeded", task, taskId: task.id }),
+      startAgent: async ({ task: nextTask }) => {
+        startedTask = nextTask;
+        return true;
+      },
+    },
+    context: { input: "先用表单询问我", requestId: "request-question", startedAt: 100 },
+    now: () => 200,
+  });
+  assert.equal(startedTask, task);
+  assert.equal(result.requestStatus, "succeeded");
+  assert.equal(result.turn.taskId, task.id);
+  assert.match(result.turn.text, /当前对话中询问/);
 });
 
 test("requires confirmation for an applicable patch in the runtime executor", async () => {

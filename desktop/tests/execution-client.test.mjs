@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildApprovedAgentContinuationPrompt, generatePatchDraft, runGuardedCheck, runHermesAgent, submitAgentInteraction } from "../src/lib/execution-client.js";
+import { acceptAgentInteraction, buildApprovedAgentContinuationPrompt, continueHermesAgent, generatePatchDraft, runGuardedCheck, runHermesAgent, submitAgentInteraction } from "../src/lib/execution-client.js";
 
 test("continues an approved Agent Run with the controlled tool outcome", () => {
   const prompt = buildApprovedAgentContinuationPrompt(
@@ -46,6 +46,11 @@ test("binds Hermes runs to their conversation and submits a persisted user inter
       () => submitAgentInteraction({ id: "run-1", checkpoint: { interaction: { id: "ask-user-1" } } }, { answers: { scope: "team" } }),
       /桌面 App/,
     );
+    await assert.rejects(
+      () => acceptAgentInteraction({ id: "run-1", checkpoint: { interaction: { id: "ask-user-1" } } }, { answers: { scope: "team" } }),
+      /桌面 App/,
+    );
+    await assert.rejects(() => continueHermesAgent({ id: "run-1" }), /桌面 App/);
     assert.equal(requests.length, 0);
   } finally {
     globalThis.fetch = originalFetch;

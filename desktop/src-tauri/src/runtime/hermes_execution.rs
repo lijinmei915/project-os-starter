@@ -96,6 +96,7 @@ pub fn run_structured_loop(
     let mut trace = vec!["HERMES_ACP: structured tool loop".to_string()];
     let mut observations = Vec::new();
     let mut authorized_patch_files = HashSet::<String>::new();
+    let mut envelope_retry_used = false;
     let mut result = (|| -> Result<HermesAgentLoopResult, String> {
         write_request(
             &mut stdin,
@@ -153,7 +154,57 @@ pub fn run_structured_loop(
                 &mut agent_text,
                 cancellation,
             )?;
-            let envelope = extract_structured_envelope(&agent_text)?;
+            let parsed = extract_structured_envelope(&agent_text);
+            let invalid_reason = match &parsed {
+                Ok(value)
+                    if matches!(
+                        value.get("type").and_then(Value::as_str),
+                        Some("final" | "tool_call")
+                    ) =>
+                {
+                    None
+                }
+                Ok(_) => Some("Hermes 返回未知 envelope 类型".to_string()),
+                Err(error) => Some(error.clone()),
+            };
+            let envelope = if let Some(reason) = invalid_reason {
+                if envelope_retry_used {
+                    return Err(reason);
+                }
+                envelope_retry_used = true;
+                trace.push(format!("HERMES_STEP: {} envelope retry", step + 1));
+                write_request(
+                    &mut stdin,
+                    request_id + 1,
+                    "session/prompt",
+                    json!({
+                        "sessionId": session_id,
+                        "prompt": [{
+                            "type": "text",
+                            "text": "Your previous response did not match the required envelope. Return exactly one JSON object now. Its type must be either `tool_call` with name and arguments, or `final` with result. Do not explain, do not use markdown fences, and do not perform any operation outside that JSON response."
+                        }]
+                    }),
+                )?;
+                let mut corrected_text = String::new();
+                wait_for_response(
+                    &lines_rx,
+                    &mut stdin,
+                    request_id + 1,
+                    deadline,
+                    &mut corrected_text,
+                    cancellation,
+                )?;
+                let corrected = extract_structured_envelope(&corrected_text)?;
+                if !matches!(
+                    corrected.get("type").and_then(Value::as_str),
+                    Some("final" | "tool_call")
+                ) {
+                    return Err("Hermes 纠正后仍返回未知 envelope 类型".to_string());
+                }
+                corrected
+            } else {
+                parsed.expect("validated envelope")
+            };
             let kind = envelope.get("type").and_then(Value::as_str).unwrap_or("");
             if kind == "final" {
                 trace.push(format!("HERMES_STEP: {} final", step + 1));
@@ -168,9 +219,7 @@ pub fn run_structured_loop(
                     trace,
                 });
             }
-            if kind != "tool_call" {
-                return Err("Hermes 返回未知 envelope 类型".to_string());
-            }
+            debug_assert_eq!(kind, "tool_call");
             let name = envelope.get("name").and_then(Value::as_str).unwrap_or("");
             let mut args = envelope
                 .get("arguments")
@@ -178,10 +227,8 @@ pub fn run_structured_loop(
                 .unwrap_or_else(|| json!({}));
             trace.push(format!("HERMES_STEP: {} tool {}", step + 1, name));
             if name == "ask_user" {
-                let interaction = crate::runtime::agent_runs::validate_ask_user_interaction(
-                    &args,
-                    step + 1,
-                )?;
+                let interaction =
+                    crate::runtime::agent_runs::validate_ask_user_interaction(&args, step + 1)?;
                 return Ok(HermesAgentLoopResult {
                     status: "awaiting-user-input".to_string(),
                     summary: "需要你确认一个关键选择后才能继续。".to_string(),

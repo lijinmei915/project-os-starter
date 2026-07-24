@@ -65,7 +65,6 @@ export function ConversationTranscript({
   loading,
   onTurnAction,
   onSubmitInteraction,
-  submittingInteractionId,
   pendingTurn,
   phase,
   streamingReply,
@@ -135,7 +134,7 @@ export function ConversationTranscript({
 
       {interactions.map(({ interaction, run }) => (
         <ConversationMessage key={`interaction-${run.id}-${interaction.id}`} role="assistant">
-          <AgentUserFormCard interaction={interaction} onSubmit={(response) => onSubmitInteraction?.(run, response)} submitting={submittingInteractionId === run.id} />
+          <AgentUserFormCard interaction={interaction} onSubmit={(response) => onSubmitInteraction?.(run, response)} runStatus={run.status} />
         </ConversationMessage>
       ))}
 

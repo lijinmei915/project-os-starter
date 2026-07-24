@@ -214,6 +214,44 @@ async function executePatchAction(action, adapters, context, emitProgress, now) 
   };
 }
 
+async function executeAgentAction(action, adapters, context, emitProgress, now) {
+  emitProgress({ events: planProgressEvents("context"), label: "读取项目上下文" });
+  const outcome = await adapters.generatePlan(planInput(action, context, ({ detail = "", label, stage }) => {
+    emitProgress({ events: planProgressEvents(stage, detail), label });
+  }));
+  const status = requestStatus(outcome?.status);
+  if (status !== "succeeded" || !outcome?.task) {
+    return {
+      handled: true,
+      requestStatus: status,
+      turn: {
+        ...turnBase(context, "agent-plan-failed", now),
+        events: planningAgentEvents("failed", outcome?.message || "计划生成失败。"),
+        outcome: status,
+        text: "这次没有生成可执行任务，Agent 未启动。",
+      },
+    };
+  }
+  emitProgress({ events: executionReadyAgentEvents(), label: "启动 Agent" });
+  const started = await adapters.startAgent?.({ task: outcome.task });
+  return {
+    handled: true,
+    requestStatus: started ? "succeeded" : "failed",
+    turn: {
+      ...turnBase(context, started ? "agent-started" : "agent-start-failed", now),
+      diagnostic: started ? null : {
+        detail: "任务已保存，但 Hermes Agent 没有成功启动。",
+        label: "Agent 启动失败",
+        message: "请检查模型连接后重试。",
+      },
+      events: executionReadyAgentEvents(),
+      outcome: started ? "awaiting-confirmation" : "failed",
+      taskId: outcome.taskId || outcome.task.id,
+      text: started ? "任务已交给 Agent；如缺少必要信息，会在当前对话中询问你。" : "任务已保存，但 Agent 没有成功启动。",
+    },
+  };
+}
+
 async function executeCheckAction(action, adapters, context, emitProgress, now) {
   const check = guardedCheckCapability(action.checkId);
   if (!check) return { handled: false, requestStatus: "failed", turn: null };
@@ -274,6 +312,7 @@ export async function executeConversationActionRequest({ action, adapters = {}, 
   try {
     const result = await executeRegisteredConversationAction(action, {
       "generate-plan": (nextAction) => executePlanAction(nextAction, adapters, context, emitProgress, now),
+      "start-agent": (nextAction) => executeAgentAction(nextAction, adapters, context, emitProgress, now),
       "generate-patch": (nextAction) => executePatchAction(nextAction, adapters, context, emitProgress, now),
       "run-check": (nextAction) => executeCheckAction(nextAction, adapters, context, emitProgress, now),
     });

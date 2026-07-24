@@ -7,20 +7,23 @@ function initialAnswers(fields) {
   return Object.fromEntries((fields || []).map((field) => [field.id, field.type === "multi-choice" ? [] : field.type === "confirm" ? false : ""]));
 }
 
-function answerSummary(interaction) {
+function answerSummary(interaction, runStatus) {
   const response = interaction?.response;
   if (!response) return "";
   if (response.action === "skip") return "已跳过";
+  if (["queued", "running"].includes(runStatus)) return "AI 正在继续";
+  if (runStatus === "failed") return "继续失败";
   return "已提交";
 }
 
-export function AgentUserFormCard({ interaction, onSubmit, submitting = false }) {
+export function AgentUserFormCard({ interaction, onSubmit, runStatus = "" }) {
   const fields = Array.isArray(interaction?.fields) ? interaction.fields : [];
   const [answers, setAnswers] = useState(() => initialAnswers(fields));
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
   const submitted = interaction?.status === "submitted";
   const submit = async (action) => {
-    if (submitted || submitting) return;
+    if (submitted || saving) return;
     if (action === "submit") {
       const missing = fields.find((field) => field.required && (Array.isArray(answers[field.id]) ? !answers[field.id].length : field.type === "confirm" ? !answers[field.id] : !String(answers[field.id] || "").trim()));
       if (missing) {
@@ -29,7 +32,8 @@ export function AgentUserFormCard({ interaction, onSubmit, submitting = false })
       }
     }
     setError("");
-    await onSubmit?.({ action, answers });
+    setSaving(true);
+    try { await onSubmit?.({ action, answers }); } finally { setSaving(false); }
   };
   const renderedAnswers = useMemo(() => interaction?.response?.answers || {}, [interaction]);
 
@@ -37,7 +41,7 @@ export function AgentUserFormCard({ interaction, onSubmit, submitting = false })
     <section className="conversationUserForm" aria-label={interaction?.title || "需要确认"}>
       <header>
         <div><strong>{interaction?.title || "需要确认"}</strong>{interaction?.description ? <p>{interaction.description}</p> : null}</div>
-        <span>{submitted ? answerSummary(interaction) : "等待你的回答"}</span>
+        <span>{saving ? "正在保存回答" : submitted ? answerSummary(interaction, runStatus) : "等待你的回答"}</span>
       </header>
       <div className="conversationUserFormFields">
         {fields.map((field) => (
@@ -58,7 +62,7 @@ export function AgentUserFormCard({ interaction, onSubmit, submitting = false })
         ))}
       </div>
       {error ? <p className="conversationUserFormError">{error}</p> : null}
-      {!submitted ? <footer><Button disabled={submitting} onClick={() => submit("submit")} size="sm" type="button" variant="primary">{submitting ? "正在提交" : "提交"}</Button><Button disabled={submitting} onClick={() => submit("skip")} size="sm" type="button" variant="ghost">跳过</Button></footer> : null}
+      {!submitted ? <footer><Button disabled={saving} onClick={() => submit("submit")} size="sm" type="button" variant="primary">{saving ? "正在保存" : "提交"}</Button><Button disabled={saving} onClick={() => submit("skip")} size="sm" type="button" variant="ghost">跳过</Button></footer> : null}
     </section>
   );
 }

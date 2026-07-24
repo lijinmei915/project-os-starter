@@ -88,6 +88,7 @@ import { actionLabel, designImplementationTopics, governanceFileHealthLabel, gov
 import { createTaskFromPlan as createTaskRecordFromPlan } from "./lib/task-record-factory";
 import { actionPromptsForMessage, isActionRequestMessage, profilePatchesFromMessage } from "./lib/conversation-message-projection";
 import { agentEventsForMessageKind as agentEventsForMessageKindProjection, buildPreviewPlan, conversationDiagnosticForResult, loadingEventsForMessageKind as loadingEventsForMessageKindProjection, loadingLabelForMessageKind, localStatusReply as localStatusReplyProjection, previewChatResult as previewChatResultProjection } from "./lib/preview-chat-projection";
+import { activeAgentRunForTask, agentRunConversationId, agentRunsForConversation } from "./lib/task-state";
 import { applyPendingConversationPatch } from "./lib/conversation-patch-apply";
 import { createProviderActionController } from "./lib/provider-action-controller";
 import { createConversationActionController } from "./lib/conversation-action-controller";
@@ -361,10 +362,8 @@ function AgentWorkspace({
   });
   const composerRef = React.useRef(null);
   const pendingApplyRequestRef = React.useRef(false);
-  const [submittingInteractionId, setSubmittingInteractionId] = useState("");
   const useAssistantUiPoc = assistantUiPocEnabled(window.location.search);
-  const interactions = agentRuns
-    .filter((run) => run.conversationId === activeConversationId)
+  const interactions = agentRunsForConversation(agentRuns, activeConversationId, activeTask?.id || activeConversationTaskId)
     .flatMap((run) => {
       const history = Array.isArray(run.interactions) ? run.interactions : [];
       const active = run.checkpoint?.interaction;
@@ -507,7 +506,7 @@ function AgentWorkspace({
       <WorkspaceTabStrip onCloseTab={closeWorkspaceTab} tabs={workspaceTabs} />
 
       <AgentWorkspaceConversationCanvas
-        assistantUi={useAssistantUiPoc ? <React.Suspense fallback={<AgentProcessingStatus label="载入对话 POC" running />}><AssistantUiConversationPoc isRunning={chatLoading || Boolean(pendingTurn)} onAction={handleAssistantUiAction} turns={chatTurns} /></React.Suspense> : null}
+        assistantUi={useAssistantUiPoc ? <React.Suspense fallback={<AgentProcessingStatus label="载入对话 POC" running />}><AssistantUiConversationPoc interactions={interactions} isRunning={chatLoading || Boolean(pendingTurn)} onAction={handleAssistantUiAction} onSubmitInteraction={onSubmitAgentInteraction} turns={chatTurns} /></React.Suspense> : null}
         chatLoading={chatLoading}
         chatLoadingEvents={chatLoadingEvents}
         chatLoadingLabel={chatLoadingLabel}
@@ -519,16 +518,12 @@ function AgentWorkspace({
         isEmpty={isConversationEmpty}
         loading={loading}
         onTurnAction={(action, turn) => handleConversationTurnAction(action, turn, { projectExecution: true })}
-        onSubmitInteraction={async (run, response) => {
-          setSubmittingInteractionId(run.id);
-          try { await onSubmitAgentInteraction?.(run, response); } finally { setSubmittingInteractionId(""); }
-        }}
+        onSubmitInteraction={onSubmitAgentInteraction}
         onUseStarterPrompt={useStarterPrompt}
         pendingTurn={pendingTurn}
         phase={snapshot.phase}
         starterPrompts={chatStarterPrompts}
         streamingReply={streamingReply}
-        submittingInteractionId={submittingInteractionId}
         tasks={tasks}
         turns={chatTurns}
       />
@@ -688,6 +683,12 @@ function App() {
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const { beginSidebarResize, leftWidth, rightWidth } = useSidebarLayout();
+  const refreshAgentRuns = async () => {
+    const records = await executionClient.listAgentRuns();
+    const scoped = (Array.isArray(records) ? records : []).filter((item) => !snapshot?.currentProjectId || item.projectId === snapshot.currentProjectId);
+    setAgentRuns(scoped);
+    return scoped;
+  };
 
   useEffect(() => {
     let active = true;
@@ -704,8 +705,7 @@ function App() {
   const resumeAgentRun = async (run) => {
     try {
       const result = await executionClient.resumeHermesAgent(run);
-      const records = await executionClient.listAgentRuns();
-      setAgentRuns((Array.isArray(records) ? records : []).filter((item) => !snapshot?.currentProjectId || item.projectId === snapshot.currentProjectId));
+      await refreshAgentRuns();
       return result;
     } catch (error_) {
       showToast(error_ instanceof Error ? error_.message : String(error_));
@@ -716,8 +716,7 @@ function App() {
   const approveAgentRun = async (run) => {
     try {
       const result = await executionClient.approveHermesAgent(run);
-      const records = await executionClient.listAgentRuns();
-      setAgentRuns((Array.isArray(records) ? records : []).filter((item) => !snapshot?.currentProjectId || item.projectId === snapshot.currentProjectId));
+      await refreshAgentRuns();
       return result;
     } catch (error_) {
       showToast(error_ instanceof Error ? error_.message : String(error_));
@@ -727,10 +726,14 @@ function App() {
 
   const submitAgentInteraction = async (run, response) => {
     try {
-      const result = await executionClient.submitAgentInteraction(run, response);
-      const records = await executionClient.listAgentRuns();
-      setAgentRuns((Array.isArray(records) ? records : []).filter((item) => !snapshot?.currentProjectId || item.projectId === snapshot.currentProjectId));
-      if (result?.continuationError) showToast(`回答已保存，但 Agent 继续失败：${result.continuationError}`);
+      const result = await executionClient.acceptAgentInteraction(run, response);
+      await refreshAgentRuns();
+      if (result?.status === "queued") {
+        void executionClient.continueHermesAgent(result).then(refreshAgentRuns).catch(async (error_) => {
+          await refreshAgentRuns().catch(() => setAgentRuns([]));
+          showToast(`回答已保存，但 Agent 继续失败：${error_ instanceof Error ? error_.message : String(error_)}`);
+        });
+      }
       return result;
     } catch (error_) {
       showToast(error_ instanceof Error ? error_.message : String(error_));
@@ -897,12 +900,17 @@ function App() {
       "先读取完成任务所需的最小工程上下文。若缺少会实质影响实现结果的必要参数，调用 ask_user；不要用普通文本猜测。用户回答不代表允许写文件或运行检查。需要写入或检查时分别请求独立审批。",
     ].filter(Boolean).join("\n");
     try {
+      const scopedRecords = await refreshAgentRuns();
+      const existingRun = activeAgentRunForTask(scopedRecords, task.id);
+      if (existingRun) {
+        showToast(existingRun.status === "awaiting-user-input" ? "等待回答。" : "任务运行中。");
+        return true;
+      }
       const result = await executionClient.runHermesAgent(prompt, requestId, 20, "", {
-        conversationId: task.conversationId || activeConversationId,
+        conversationId: agentRunConversationId(activeConversationId, task),
         taskId: task.id,
       });
-      const records = await executionClient.listAgentRuns();
-      setAgentRuns((Array.isArray(records) ? records : []).filter((item) => !snapshot?.currentProjectId || item.projectId === snapshot.currentProjectId));
+      await refreshAgentRuns();
       return ["awaiting-user-input", "awaiting-approval", "succeeded"].includes(result?.status);
     } catch (error_) {
       const message = error_ instanceof Error ? error_.message : String(error_);

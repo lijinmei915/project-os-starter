@@ -8,7 +8,19 @@ import {
 } from "@assistant-ui/react";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { AgentUserFormCard } from "./agent-user-form-card";
 import { normalizeAssistantUiTurns, turnToAssistantMessage } from "../../lib/assistant-ui-adapter";
+
+function assistantUiMessage(turn, index) {
+  if (!turn.agentInteraction) return turnToAssistantMessage(turn, index);
+  const { interaction, run } = turn.agentInteraction;
+  return {
+    id: turn.id,
+    role: "assistant",
+    status: { type: "complete", reason: "stop" },
+    content: [{ type: "tool-call", toolCallId: interaction.id, toolName: "ask_user", args: { interaction, run }, result: interaction.status === "submitted" ? interaction.response : undefined }],
+  };
+}
 
 function TextPart({ text }) {
   return <div>{text}</div>;
@@ -42,7 +54,7 @@ function StageGoalPart({ args, onAction, result, status }) {
   );
 }
 
-function AssistantMessage({ stageGoalRenderer }) {
+function AssistantMessage({ toolRenderers }) {
   const role = useMessage((state) => state.role);
   return (
     <MessagePrimitive.Root className={`conversationMessage conversationMessage-${role}`}>
@@ -50,7 +62,7 @@ function AssistantMessage({ stageGoalRenderer }) {
         <div className="conversationBubble">
           <MessagePrimitive.Parts components={{
             Text: TextPart,
-            tools: { by_name: { stage_goal: stageGoalRenderer } },
+            tools: { by_name: toolRenderers },
           }} />
         </div>
       </div>
@@ -58,11 +70,13 @@ function AssistantMessage({ stageGoalRenderer }) {
   );
 }
 
-export function AssistantUiConversationPoc({ isRunning = false, onAction, turns = [] }) {
+export function AssistantUiConversationPoc({ interactions = [], isRunning = false, onAction, onSubmitInteraction, turns = [] }) {
   const stageGoalRenderer = useMemo(() => (props) => <StageGoalPart {...props} onAction={onAction} />, [onAction]);
-  const messages = useMemo(() => normalizeAssistantUiTurns(turns), [turns]);
+  const askUserRenderer = useMemo(() => ({ args }) => <AgentUserFormCard interaction={args.interaction} onSubmit={(response) => onSubmitInteraction?.(args.run, response)} runStatus={args.run.status} />, [onSubmitInteraction]);
+  const toolRenderers = useMemo(() => ({ ask_user: askUserRenderer, stage_goal: stageGoalRenderer }), [askUserRenderer, stageGoalRenderer]);
+  const messages = useMemo(() => [...normalizeAssistantUiTurns(turns), ...interactions.map(({ interaction, run }) => ({ agentInteraction: { interaction, run }, id: `interaction-${run.id}-${interaction.id}` }))], [interactions, turns]);
   const runtime = useExternalStoreRuntime({
-    convertMessage: turnToAssistantMessage,
+    convertMessage: assistantUiMessage,
     isRunning,
     messages,
     onNew: async () => {},
@@ -71,7 +85,7 @@ export function AssistantUiConversationPoc({ isRunning = false, onAction, turns 
     <AssistantRuntimeProvider runtime={runtime}>
       <ThreadPrimitive.Root className="conversation assistantUiConversationPoc" role="log" aria-live="polite">
         <ThreadPrimitive.Viewport autoScroll className="assistantUiConversationViewport">
-          <ThreadPrimitive.Messages components={{ Message: () => <AssistantMessage stageGoalRenderer={stageGoalRenderer} /> }} />
+          <ThreadPrimitive.Messages components={{ Message: () => <AssistantMessage toolRenderers={toolRenderers} /> }} />
           {isRunning ? <div className="assistantUiRunning" role="status">正在处理当前请求...</div> : null}
         </ThreadPrimitive.Viewport>
       </ThreadPrimitive.Root>

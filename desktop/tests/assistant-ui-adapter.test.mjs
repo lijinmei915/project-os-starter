@@ -29,6 +29,14 @@ test("maps stage goals to a typed assistant-ui tool part", () => {
   assert.equal(message.content[0].result, undefined);
 });
 
+test("maps ask_user interactions to a typed assistant-ui tool part", () => {
+  const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const component = fs.readFileSync(path.join(desktopRoot, "src/components/workbench/assistant-ui-conversation-poc.jsx"), "utf8");
+  assert.match(component, /toolName: "ask_user"/);
+  assert.match(component, /ask_user: askUserRenderer/);
+  assert.match(component, /<AgentUserFormCard/);
+});
+
 test("keeps the assistant-ui renderer behind an explicit POC flag", () => {
   assert.equal(assistantUiPocEnabled("?conversationUi=assistant"), true);
   assert.equal(assistantUiPocEnabled(""), false);

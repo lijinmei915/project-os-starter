@@ -440,9 +440,9 @@ export function ChatComposer({
             <Mic aria-hidden="true" strokeWidth={2.25} />
           </button>
         <button
-          className={`chatComposerSend${sending ? " sending" : ""}`}
+          className={`chatComposerSend${sending && !hasTakeoverInput ? " sending" : ""}${hasTakeoverInput ? " takeover" : ""}`}
           type="button"
-          aria-label={hasTakeoverInput ? "提交新要求" : sending ? "停止生成" : "发送"}
+          aria-label={hasTakeoverInput ? "发送新要求" : sending ? "停止生成" : "发送"}
           aria-busy={sending}
           disabled={isDisabled}
           onClick={hasTakeoverInput ? onSubmit : sending ? onStop : onSubmit}

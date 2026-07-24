@@ -49,7 +49,7 @@ export function createConversationActionController({
         return true;
       },
       "confirm-active-task": async (nextAction) => {
-        const task = tasks.find((item) => item.id === (nextAction.taskId || activeTaskId));
+        const task = nextAction.task || tasks.find((item) => item.id === (nextAction.taskId || activeTaskId));
         if (!task) return false;
         if (task.status !== taskStatuses.running) {
           const feedbackKey = `confirm-task-${task.id}`;
