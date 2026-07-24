@@ -53,6 +53,28 @@ test("does not start a task when the model is unavailable", async () => {
   assert.equal(started, false);
 });
 
+test("starts a conversation-bound Hermes run before changing the task status", async () => {
+  const calls = [];
+  const runChatAction = createController({
+    markTaskWaiting: async () => { calls.push("task-status"); return true; },
+    onEnsureModelAvailable: async () => true,
+    startHermesAgent: async (task) => { calls.push(`agent:${task.id}`); return true; },
+  });
+  assert.equal(await runChatAction({ taskId: "task-1", type: "confirm-active-task" }), true);
+  assert.deepEqual(calls, ["agent:task-1", "task-status"]);
+});
+
+test("keeps the task unchanged when Hermes cannot start", async () => {
+  let statusChanged = false;
+  const runChatAction = createController({
+    markTaskWaiting: async () => { statusChanged = true; return true; },
+    onEnsureModelAvailable: async () => true,
+    startHermesAgent: async () => false,
+  });
+  assert.equal(await runChatAction({ taskId: "task-1", type: "confirm-active-task" }), false);
+  assert.equal(statusChanged, false);
+});
+
 test("routes a failed task to the repair-task workflow", async () => {
   const calls = [];
   const runChatAction = createController({ createRepairTask: async (taskId) => { calls.push(taskId); return true; } });

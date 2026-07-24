@@ -2022,6 +2022,7 @@ fn goal_stack_from_validation(
             "completedAt": completed_at,
             "validationStatus": report_status,
             "summary": if stack_status == "done" { "目标已确认完成。" } else { "当前目标。" },
+            "decompositionTaskIds": [],
             "taskIds": []
         }]
     })

@@ -1,6 +1,6 @@
 {
   "schemaVersion": "omnidesk.repository-file-inventory.v1",
-  "generatedAt": "2026-07-22T16:45:50.705Z",
+  "generatedAt": "2026-07-24T04:17:57.136Z",
   "sourceOfTruth": "git ls-files --cached --others --exclude-standard",
   "scope": "受版本控制文件及准备纳入版本控制的非忽略工作树文件；忽略的本地运行数据和构建输出不在本账本内。",
   "reviewContract": {
@@ -24,7 +24,7 @@
     "rule": "没有消费者证据的文件不自动删除；必须由对应 Owner 审核并通过验证后才能退役。"
   },
   "totals": {
-    "files": 542,
+    "files": 543,
     "byKind": {
       "repository": 2,
       "ci": 2,
@@ -34,7 +34,7 @@
       "native": 65,
       "runtime": 26,
       "eval-support": 8,
-      "frontend": 253,
+      "frontend": 254,
       "test": 117,
       "documentation": 19,
       "documentation-data": 5,
@@ -44,7 +44,7 @@
     "classified": 0,
     "candidates": 0,
     "inProgress": 2,
-    "reviewed": 540
+    "reviewed": 541
   },
   "files": [
     {
@@ -119,8 +119,10 @@
         "desktop/src/components/workbench/agent-config-surface-panel.jsx",
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
         "desktop/src/lib/agent-topic-cards.js",
+        "desktop/src/lib/preview-chat-projection.js",
         "desktop/src/workspace-outline.js",
         "desktop/tests/agent-topic-asset-capability.test.mjs",
+        "desktop/tests/governance-presentation.test.mjs",
         "desktop/vite.config.js"
       ],
       "moduleConsumers": [],
@@ -136,8 +138,9 @@
       "path": "HANDOFF.md",
       "kind": "root-document",
       "owner": "Documentation Governance",
-      "bytes": 276325,
+      "bytes": 4514,
       "pathMentions": [
+        "desktop/src/components/workbench/current-goal-panel.jsx",
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
         "desktop/src/lib/agent-topic-cards.js",
         "desktop/src/lib/agent-topic-runtime-capability.js",
@@ -188,7 +191,7 @@
       "path": "PROJECT.md",
       "kind": "root-document",
       "owner": "Documentation Governance",
-      "bytes": 10186,
+      "bytes": 10672,
       "pathMentions": [
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
         "desktop/src/lib/agent-topic-runtime-capability.js",
@@ -491,7 +494,7 @@
       "path": "desktop/scripts/run-native-webdriver-smoke.mjs",
       "kind": "desktop-support",
       "owner": "Desktop Platform",
-      "bytes": 12502,
+      "bytes": 15997,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -1456,6 +1459,7 @@
         "desktop/src/components/workbench/agent-config-surface-panel.jsx",
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
         "desktop/src/lib/agent-topic-cards.js",
+        "desktop/src/lib/governance-presentation.js",
         "desktop/src/workspace-outline.js"
       ],
       "moduleConsumers": [],
@@ -1471,7 +1475,7 @@
       "path": "desktop/src-tauri/src/runtime/agent_runs.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 36936,
+      "bytes": 56068,
       "pathMentions": [
         "desktop/src/lib/agent-topic-agent-config.js",
         "desktop/src/workspace-outline.js"
@@ -1479,6 +1483,7 @@
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/app.rs",
         "desktop/src-tauri/src/runtime/execution.rs",
+        "desktop/src-tauri/src/runtime/hermes_execution.rs",
         "desktop/src-tauri/src/runtime/mod.rs",
         "desktop/src-tauri/src/runtime/tasks.rs"
       ],
@@ -1513,7 +1518,7 @@
       "path": "desktop/src-tauri/src/runtime/app.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 78120,
+      "bytes": 80463,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/main.rs",
@@ -1643,7 +1648,7 @@
       "path": "desktop/src-tauri/src/runtime/goals.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 46094,
+      "bytes": 49824,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/app.rs",
@@ -1662,7 +1667,7 @@
       "path": "desktop/src-tauri/src/runtime/hermes_execution.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 9926,
+      "bytes": 11335,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/app.rs",
@@ -1869,7 +1874,7 @@
       "path": "desktop/src-tauri/src/runtime/tasks.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 22062,
+      "bytes": 22370,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/app.rs",
@@ -1926,7 +1931,7 @@
       "path": "desktop/src-tauri/src/runtime/workspace.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 99678,
+      "bytes": 99718,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/app.rs",
@@ -2013,7 +2018,7 @@
       "path": "desktop/src/agent-runtime/contract.js",
       "kind": "eval-support",
       "owner": "Agent Reliability",
-      "bytes": 11075,
+      "bytes": 11613,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/agent-runtime/events.js",
@@ -2054,7 +2059,7 @@
       "path": "desktop/src/agent-runtime/events.js",
       "kind": "eval-support",
       "owner": "Agent Reliability",
-      "bytes": 3405,
+      "bytes": 3505,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/agent-runtime/index.js"
@@ -2209,7 +2214,6 @@
         "desktop/src/components/workbench/agent-topic-task-groups.jsx",
         "desktop/src/components/workbench/assistant-ui-conversation-poc.jsx",
         "desktop/src/components/workbench/component-governance-panel.jsx",
-        "desktop/src/components/workbench/conversation-history-item.jsx",
         "desktop/src/components/workbench/conversation-transcript.jsx",
         "desktop/src/components/workbench/current-goal-panel.jsx",
         "desktop/src/components/workbench/current-progress-panel.jsx",
@@ -2248,6 +2252,7 @@
         "desktop/src/components/workbench/agent-topic-task-detail.jsx",
         "desktop/src/components/workbench/agent-topic-task-dialogs.jsx",
         "desktop/src/components/workbench/agent-topic-task-groups.jsx",
+        "desktop/src/components/workbench/agent-user-form-card.jsx",
         "desktop/src/components/workbench/assistant-ui-conversation-poc.jsx",
         "desktop/src/components/workbench/component-governance-panel.jsx",
         "desktop/src/components/workbench/current-goal-panel.jsx",
@@ -2339,6 +2344,7 @@
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/components/workbench/agent-topic-task-dialogs.jsx",
+        "desktop/src/components/workbench/agent-user-form-card.jsx",
         "desktop/src/components/workbench/project-access-dialogs.jsx",
         "desktop/src/components/workbench/provider-advanced-settings.jsx",
         "desktop/src/components/workbench/provider-form-fields.jsx",
@@ -2361,6 +2367,7 @@
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/components/workbench/agent-topic-task-dialogs.jsx",
+        "desktop/src/components/workbench/agent-user-form-card.jsx",
         "desktop/src/components/workbench/component-governance-panel.jsx",
         "desktop/src/components/workbench/project-access-dialogs.jsx",
         "desktop/src/components/workbench/project-memory-panel.jsx",
@@ -2444,7 +2451,7 @@
       "path": "desktop/src/components/ui/section-title.jsx",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 2395,
+      "bytes": 2445,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/components/workbench/project-sidebar.jsx",
@@ -2706,6 +2713,23 @@
       "decisionEvidence": "manual-review-rule:workbench-surfaces-and-hooks"
     },
     {
+      "path": "desktop/src/components/workbench/agent-user-form-card.jsx",
+      "kind": "frontend",
+      "owner": "Workbench",
+      "bytes": 4114,
+      "pathMentions": [],
+      "moduleConsumers": [
+        "desktop/src/components/workbench/conversation-transcript.jsx"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
+      "decision": "keep",
+      "rationale": "Desktop Workbench 的领域 Surface、可组合视图与交互 hooks；Runtime 调用必须经注入的 domain client，保持 main.jsx 仅做装配。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop test && npm --prefix desktop run web:build；domain-boundaries.test.mjs 约束 Owner 边界。",
+      "decisionEvidence": "manual-review-rule:workbench-surfaces-and-hooks"
+    },
+    {
       "path": "desktop/src/components/workbench/agent-workspace-auxiliary-tabs.jsx",
       "kind": "frontend",
       "owner": "Workbench",
@@ -2726,7 +2750,7 @@
       "path": "desktop/src/components/workbench/agent-workspace-conversation-canvas.jsx",
       "kind": "frontend",
       "owner": "Workbench",
-      "bytes": 1427,
+      "bytes": 1741,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/main.jsx"
@@ -2862,7 +2886,7 @@
       "path": "desktop/src/components/workbench/conversation-history-item.jsx",
       "kind": "frontend",
       "owner": "Workbench",
-      "bytes": 2323,
+      "bytes": 2198,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/components/workbench/right-rail.jsx"
@@ -2879,7 +2903,7 @@
       "path": "desktop/src/components/workbench/conversation-transcript.jsx",
       "kind": "frontend",
       "owner": "Workbench",
-      "bytes": 7149,
+      "bytes": 7693,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/components/workbench/agent-workspace-conversation-canvas.jsx"
@@ -3357,7 +3381,7 @@
       "path": "desktop/src/components/workbench/right-rail.jsx",
       "kind": "frontend",
       "owner": "Workbench",
-      "bytes": 19528,
+      "bytes": 19869,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/main.jsx"
@@ -3767,7 +3791,7 @@
       "path": "desktop/src/components/workbench/use-conversation-session.js",
       "kind": "frontend",
       "owner": "Workbench",
-      "bytes": 698,
+      "bytes": 1136,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/main.jsx"
@@ -3852,7 +3876,7 @@
       "path": "desktop/src/components/workbench/use-governance-task-actions.js",
       "kind": "frontend",
       "owner": "Workbench",
-      "bytes": 4656,
+      "bytes": 4700,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/main.jsx"
@@ -3886,7 +3910,7 @@
       "path": "desktop/src/components/workbench/use-plan-action.js",
       "kind": "frontend",
       "owner": "Workbench",
-      "bytes": 2404,
+      "bytes": 2438,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/main.jsx"
@@ -4209,7 +4233,7 @@
       "path": "desktop/src/components/workbench/use-workspace-goal-actions.js",
       "kind": "frontend",
       "owner": "Workbench",
-      "bytes": 5215,
+      "bytes": 5863,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/main.jsx"
@@ -5040,7 +5064,7 @@
       "path": "desktop/src/lib/conversation-action-controller.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 5922,
+      "bytes": 6165,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/main.jsx",
@@ -5112,7 +5136,7 @@
       "path": "desktop/src/lib/conversation-list.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 3261,
+      "bytes": 2980,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/lib/right-rail-view-model.js",
@@ -5414,7 +5438,7 @@
       "path": "desktop/src/lib/execution-client.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 3004,
+      "bytes": 3810,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/main.jsx",
@@ -5871,7 +5895,7 @@
       "path": "desktop/src/lib/right-rail-view-model.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 5061,
+      "bytes": 5097,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/components/workbench/right-rail.jsx",
@@ -5889,7 +5913,7 @@
       "path": "desktop/src/lib/runtime-api.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 2686,
+      "bytes": 2841,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/components/workbench/terminal-dock.jsx",
@@ -5919,7 +5943,7 @@
       "path": "desktop/src/lib/runtime-operation-contract.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 4012,
+      "bytes": 4117,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/lib/runtime-api.js",
@@ -6106,7 +6130,7 @@
       "path": "desktop/src/lib/task-lifecycle-controller.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 5951,
+      "bytes": 5969,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/main.jsx",
@@ -6185,7 +6209,7 @@
       "path": "desktop/src/lib/task-record-factory.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 1240,
+      "bytes": 1179,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/main.jsx",
@@ -6310,7 +6334,7 @@
       "path": "desktop/src/lib/workbench-defaults.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 5316,
+      "bytes": 5348,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/lib/workspace-preview-client.js",
@@ -6352,6 +6376,7 @@
       "moduleConsumers": [
         "desktop/src/components/workbench/current-goal-panel.jsx",
         "desktop/src/components/workbench/goal-validation-panels.jsx",
+        "desktop/src/components/workbench/use-workspace-goal-actions.js",
         "desktop/src/lib/right-rail-view-model.js",
         "desktop/src/main.jsx",
         "desktop/tests/workspace-context.test.mjs"
@@ -6421,7 +6446,7 @@
       "path": "desktop/src/lib/workspace-goal-client.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 2701,
+      "bytes": 3060,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/lib/workspace-runtime-bridge.js",
@@ -6568,7 +6593,7 @@
       "path": "desktop/src/main.jsx",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 51626,
+      "bytes": 55061,
       "pathMentions": [
         "desktop/src-tauri/src/runtime/workspace.rs",
         "desktop/src/lib/agent-topic-cards.js"
@@ -6700,6 +6725,7 @@
       "bytes": 201,
       "pathMentions": [
         "desktop/src/lib/agent-topic-cards.js",
+        "desktop/src/lib/governance-presentation.js",
         "desktop/src/workspace-outline.js"
       ],
       "moduleConsumers": [],
@@ -6732,7 +6758,7 @@
       "path": "desktop/src/styles/conversation.css",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 29949,
+      "bytes": 31495,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/styles.css"
@@ -6800,7 +6826,7 @@
       "path": "desktop/src/styles/workspace.css",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 108439,
+      "bytes": 108676,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/styles.css"
@@ -6964,7 +6990,7 @@
       "path": "desktop/tests/agent-runtime-contract.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 5647,
+      "bytes": 6273,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -7114,7 +7140,7 @@
       "path": "desktop/tests/conversation-action-controller.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 2724,
+      "bytes": 3705,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -7189,7 +7215,7 @@
       "path": "desktop/tests/conversation-list.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 1724,
+      "bytes": 1742,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -7519,7 +7545,7 @@
       "path": "desktop/tests/execution-client.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 1262,
+      "bytes": 2123,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -7969,7 +7995,7 @@
       "path": "desktop/tests/right-rail-view-model.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 2426,
+      "bytes": 3543,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -8269,7 +8295,7 @@
       "path": "desktop/tests/task-record-factory.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 1928,
+      "bytes": 2298,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -8359,7 +8385,7 @@
       "path": "desktop/tests/use-workspace-goal-actions.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 701,
+      "bytes": 761,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -8479,7 +8505,7 @@
       "path": "desktop/tests/workspace-goal-client.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 836,
+      "bytes": 1289,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -8636,6 +8662,7 @@
         "desktop/src-tauri/src/runtime/workspace.rs",
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
         "desktop/src/lib/agent-topic-cards.js",
+        "desktop/src/lib/governance-presentation.js",
         "desktop/src/workspace-outline.js",
         "desktop/vite.config.js"
       ],
@@ -8763,7 +8790,7 @@
       "path": "docs/LESSONS.md",
       "kind": "documentation",
       "owner": "Documentation Governance",
-      "bytes": 87582,
+      "bytes": 90198,
       "pathMentions": [
         "desktop/src/components/workbench/project-memory-panel.jsx",
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
@@ -8818,7 +8845,7 @@
       "path": "docs/PROJECT_MEMORY_AND_RUNNER.md",
       "kind": "documentation",
       "owner": "Documentation Governance",
-      "bytes": 2664,
+      "bytes": 2779,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -8869,6 +8896,7 @@
       "pathMentions": [
         "desktop/scripts/run-native-webdriver-smoke.mjs",
         "desktop/src-tauri/src/runtime/workspace.rs",
+        "desktop/src/components/workbench/goal-validation-panels.jsx",
         "desktop/src/workspace-outline.js",
         "desktop/vite.config.js"
       ],
@@ -8950,7 +8978,7 @@
       "path": "docs/data/schema-contract-inventory.json",
       "kind": "documentation-data",
       "owner": "Documentation Governance",
-      "bytes": 13614,
+      "bytes": 13670,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -9025,7 +9053,7 @@
       "path": "schemas/agent-run.schema.json",
       "kind": "schema",
       "owner": "Runtime Contracts",
-      "bytes": 1940,
+      "bytes": 2066,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -9319,7 +9347,6 @@
       "bytes": 1192,
       "pathMentions": [
         "AGENTS.md",
-        "HANDOFF.md",
         "INSTALL.md",
         "README.md",
         "docs/BACKEND.md",

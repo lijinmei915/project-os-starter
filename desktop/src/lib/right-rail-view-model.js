@@ -38,11 +38,10 @@ export function buildRightRailViewModel({
     snapshot,
     tasks,
   });
-  const activeGoalTaskIds = new Set(Array.isArray(activeGoal?.taskIds) ? activeGoal.taskIds : []);
+  const activeGoalTaskIds = new Set(Array.isArray(activeGoal?.decompositionTaskIds) ? activeGoal.decompositionTaskIds : []);
   const belongsToActiveGoal = (item) => {
-    if (!activeGoal?.id) return true;
-    if (item.goalId) return item.goalId === activeGoal.id;
-    return activeGoalTaskIds.size ? activeGoalTaskIds.has(item.id) : true;
+    if (!activeGoal?.id) return false;
+    return item.goalId === activeGoal.id && activeGoalTaskIds.has(item.id);
   };
   const visibleTasks = collapseDuplicateOpenTasks(tasks.filter((task) => !isNoiseTask(task) && belongsToActiveGoal(task)));
   const snapshotTodos = collapseDuplicateOpenTasks(
@@ -78,13 +77,14 @@ export function buildRightRailViewModel({
 
   return {
     activeGoal,
-    activeConversationCount: conversations.filter((conversation) => !conversation.archivedAt).length,
+    activeConversationCount: conversations.filter((conversation) => !conversation.archivedAt && !conversation.taskId).length,
     conversationGroups: groupConversations(conversations),
     currentPhaseTodos,
     doneCount,
     futurePhaseTodos: visibleGoalTodos.filter((todo) => !dialogueTaskIds.has(todo.id)),
     goalIsDraft: activeGoal?.status === "draft",
     goalIsPlanned: activeGoal?.status === "planned" && !goalTodos.length,
+    hasGoalProgress: goalTodos.length > 0,
     goalMeta: runningCount || (activeGoal?.status === "planned" && goalTodos.length)
       ? "进行中"
       : goalMetaFromStatus(activeGoal?.status || validationStatus, validationReportStatus, goalTodos, snapshot.phase, { phaseLabel, taskStatuses }),

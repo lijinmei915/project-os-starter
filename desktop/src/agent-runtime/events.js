@@ -5,6 +5,7 @@ const runEventProjection = Object.freeze({
   [agentRunStatuses.queued]: [conversationEventTypes.inputAccepted, "input", "pending"],
   [agentRunStatuses.running]: [conversationEventTypes.requestProgress, "execution", "running"],
   [agentRunStatuses.awaitingApproval]: [conversationEventTypes.approvalRequired, "approval", "pending"],
+  [agentRunStatuses.awaitingUserInput]: [conversationEventTypes.inputAccepted, "input", "pending"],
   [agentRunStatuses.applying]: [conversationEventTypes.requestProgress, "execution", "running"],
   [agentRunStatuses.verifying]: [conversationEventTypes.requestProgress, "execution", "running"],
   [agentRunStatuses.succeeded]: [conversationEventTypes.requestCompleted, "result", "completed"],

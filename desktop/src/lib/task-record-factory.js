@@ -1,11 +1,9 @@
 export function createTaskFromPlan(plan, taskText, snapshot = {}, options = {}, {
-  activeGoalFromSnapshot,
   now = () => new Date(),
   taskIdForRequest,
   taskStatuses,
 }) {
   const title = taskText?.trim() || plan?.summary || "未命名任务";
-  const activeGoal = activeGoalFromSnapshot(snapshot);
   const fallbackId = `${now().getTime()}-${Math.random().toString(16).slice(2)}`;
   const id = taskIdForRequest(options.requestId, fallbackId);
   const createdAt = now();
@@ -23,8 +21,9 @@ export function createTaskFromPlan(plan, taskText, snapshot = {}, options = {}, 
       startedAt: options.startedAt || now().toISOString(),
       taskId: id,
     } : null,
-    goalId: activeGoal?.id || "",
-    goalTitle: activeGoal?.shortTitle || activeGoal?.title || "",
+    goalId: options.goalId || "",
+    goalTitle: options.goalTitle || "",
+    origin: options.origin || "conversation",
     projectName: snapshot.projectName,
     projectPath: snapshot.currentProjectPath || "",
     plan,

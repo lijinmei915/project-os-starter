@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { groupConversations, isLowSignalConversationText, visibleConversationPreview } from "../src/lib/conversation-list.js";
 
-test("groups task conversations before general conversations", () => {
+test("keeps task-bound conversations out of the general history list", () => {
   const groups = groupConversations([
     { id: "general", title: "风险讨论", updatedAt: "2026-07-18T09:00:00Z" },
     { id: "task", taskId: "task-1", title: "修复发送", updatedAt: "2026-07-18T10:00:00Z" },
   ], { now: Date.parse("2026-07-18T11:00:00Z") });
-  assert.deepEqual(groups.map((group) => group.label), ["任务对话", "今天"]);
-  assert.equal(groups[0].items[0].id, "task");
+  assert.deepEqual(groups.map((group) => group.label), ["今天"]);
+  assert.deepEqual(groups[0].items.map((item) => item.id), ["general"]);
 });
 
 test("keeps archived conversations out of the history list", () => {

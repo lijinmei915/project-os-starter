@@ -29,6 +29,8 @@ pub struct HermesAgentLoopResult {
     pub result: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub approval: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub interaction: Option<Value>,
     pub observations: Vec<Value>,
     pub trace: Vec<String>,
 }
@@ -129,7 +131,7 @@ pub fn run_structured_loop(
             .and_then(Value::as_str)
             .ok_or_else(|| "Hermes ACP 没有返回 sessionId".to_string())?
             .to_string();
-        let instruction = format!("{}\n\nYou are a governed executor. Return ONLY JSON. For project context use {{\"type\":\"tool_call\",\"name\":\"read_file|list_files|search_project|git_status\",\"arguments\":{{...}}}}. To request a project modification or an allowlisted check, return apply_patch or run_check with arguments; OmniDesk will pause for independent approval before executing it. When enough context is available return {{\"type\":\"final\",\"result\":{{...}}}}. Never call tools directly.", prompt);
+        let instruction = format!("{}\n\nYou are a governed executor. Return ONLY JSON. For project context use {{\"type\":\"tool_call\",\"name\":\"read_file|list_files|search_project|git_status\",\"arguments\":{{...}}}}. If a required product decision is missing, return {{\"type\":\"tool_call\",\"name\":\"ask_user\",\"arguments\":{{\"title\":\"...\",\"description\":\"...\",\"fields\":[{{\"id\":\"...\",\"type\":\"single-choice|multi-choice|text|confirm\",\"label\":\"...\",\"required\":true,\"options\":[{{\"value\":\"...\",\"label\":\"...\"}}]}}],\"actions\":[{{\"id\":\"submit\",\"label\":\"提交\"}},{{\"id\":\"skip\",\"label\":\"跳过\"}}]}}}}. Ask only for information necessary to continue; this does not grant permission to write files or run checks. To request a project modification or an allowlisted check, return apply_patch or run_check with arguments; OmniDesk will pause for independent approval before executing it. When enough context is available return {{\"type\":\"final\",\"result\":{{...}}}}. Never call tools directly.", prompt);
         let mut next_prompt = instruction;
         for step in 0..max_steps.max(1) {
             if cancellation.is_some_and(CancellationToken::is_cancelled) {
@@ -161,6 +163,7 @@ pub fn run_structured_loop(
                     step: step + 1,
                     result: envelope.get("result").cloned(),
                     approval: None,
+                    interaction: None,
                     observations,
                     trace,
                 });
@@ -174,6 +177,22 @@ pub fn run_structured_loop(
                 .cloned()
                 .unwrap_or_else(|| json!({}));
             trace.push(format!("HERMES_STEP: {} tool {}", step + 1, name));
+            if name == "ask_user" {
+                let interaction = crate::runtime::agent_runs::validate_ask_user_interaction(
+                    &args,
+                    step + 1,
+                )?;
+                return Ok(HermesAgentLoopResult {
+                    status: "awaiting-user-input".to_string(),
+                    summary: "需要你确认一个关键选择后才能继续。".to_string(),
+                    step: step + 1,
+                    result: None,
+                    approval: None,
+                    interaction: Some(interaction),
+                    observations,
+                    trace,
+                });
+            }
             if matches!(name, "apply_patch" | "run_check") {
                 if name == "apply_patch" {
                     let diff = args
@@ -192,6 +211,7 @@ pub fn run_structured_loop(
                     step: step + 1,
                     result: None,
                     approval: Some(approval),
+                    interaction: None,
                     observations,
                     trace,
                 });
@@ -218,6 +238,7 @@ pub fn run_structured_loop(
             step: max_steps.max(1),
             result: None,
             approval: None,
+            interaction: None,
             observations,
             trace,
         })

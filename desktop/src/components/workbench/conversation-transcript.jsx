@@ -3,6 +3,7 @@ import { conversationTextForDisplay } from "../../conversation-runtime";
 import { Badge } from "../ui/badge";
 import { PatchDraft, ReadonlyPlan } from "./plan-views";
 import { AgentProcessingStatus, Conversation, ConversationMessage } from "./conversation";
+import { AgentUserFormCard } from "./agent-user-form-card";
 
 function agentEventsForTurn(turn) {
   return Array.isArray(turn?.events) ? turn.events : [];
@@ -57,10 +58,14 @@ export function ConversationTranscript({
   chatLoadingEvents,
   chatLoadingLabel,
   chatStartedAt,
+  interactions = [],
+  conversationId,
   conversationState,
   error,
   loading,
   onTurnAction,
+  onSubmitInteraction,
+  submittingInteractionId,
   pendingTurn,
   phase,
   streamingReply,
@@ -68,7 +73,7 @@ export function ConversationTranscript({
   turns,
 }) {
   return (
-    <Conversation data-runtime-state={conversationState}>
+    <Conversation data-conversation-id={conversationId} data-runtime-state={conversationState}>
       {turns.map((turn, turnIndex) => (
       <ConversationMessage key={turn.id} role={turn.role}>
         {shouldShowAgentTimeline(turn) ? (
@@ -125,6 +130,12 @@ export function ConversationTranscript({
             </div>
           ) : null}
           <Attachments attachments={turn.attachments} />
+        </ConversationMessage>
+      ))}
+
+      {interactions.map(({ interaction, run }) => (
+        <ConversationMessage key={`interaction-${run.id}-${interaction.id}`} role="assistant">
+          <AgentUserFormCard interaction={interaction} onSubmit={(response) => onSubmitInteraction?.(run, response)} submitting={submittingInteractionId === run.id} />
         </ConversationMessage>
       ))}
 

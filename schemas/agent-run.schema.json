@@ -12,7 +12,7 @@
     "taskId": { "type": "string" },
     "projectId": { "type": "string", "minLength": 1 },
     "executorId": { "type": "string", "minLength": 1 },
-    "status": { "enum": ["queued", "running", "awaiting-approval", "applying", "verifying", "succeeded", "failed", "cancelled", "interrupted"] },
+    "status": { "enum": ["queued", "running", "awaiting-approval", "awaiting-user-input", "applying", "verifying", "succeeded", "failed", "cancelled", "interrupted"] },
     "step": { "type": "integer", "minimum": 0 },
     "maxSteps": { "type": "integer", "minimum": 1 },
     "attempt": { "type": "integer", "minimum": 0 },
@@ -24,13 +24,17 @@
     "approvalToken": { "type": "string" },
     "summary": { "type": "string" },
     "repairAttempt": { "type": "integer", "minimum": 0 },
+    "interactions": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
     "evidence": {
       "type": "array",
       "items": {
         "type": "object",
         "required": ["phase", "recordedAt"],
         "properties": {
-          "phase": { "enum": ["draft", "approval", "apply", "check", "repair", "result"] },
+          "phase": { "enum": ["draft", "approval", "interaction", "apply", "check", "repair", "result"] },
           "recordedAt": { "type": "string", "format": "date-time" },
           "summary": { "type": "string" },
           "details": { "type": "object" }

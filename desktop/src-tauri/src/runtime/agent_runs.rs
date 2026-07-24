@@ -20,6 +20,8 @@ pub struct AgentRunCheckpoint {
     #[serde(default)]
     pub tool_result: Option<Value>,
     #[serde(default)]
+    pub interaction: Option<Value>,
+    #[serde(default)]
     pub allowed_files: Vec<String>,
     #[serde(default)]
     pub completed_check_ids: Vec<String>,
@@ -61,6 +63,8 @@ pub struct PersistedAgentRun {
     #[serde(default)]
     pub evidence: Vec<Value>,
     #[serde(default)]
+    pub interactions: Vec<Value>,
+    #[serde(default)]
     pub checkpoint: AgentRunCheckpoint,
 }
 
@@ -71,6 +75,8 @@ pub struct PrepareModelRunInput {
     pub prompt: String,
     pub max_steps: usize,
     pub approval_token: String,
+    pub conversation_id: String,
+    pub task_id: String,
     pub resume_existing: bool,
 }
 
@@ -84,7 +90,79 @@ pub struct ModelRunCompletion {
     pub summary: String,
     pub step: Option<usize>,
     pub approval: Option<Value>,
+    pub interaction: Option<Value>,
     pub evidence_details: Value,
+}
+
+const INTERACTION_SCHEMA_VERSION: &str = "omnidesk.interaction.v0.1";
+
+pub fn validate_ask_user_interaction(arguments: &Value, step: usize) -> Result<Value, String> {
+    let object = arguments
+        .as_object()
+        .ok_or_else(|| "ask_user 参数必须是对象。".to_string())?;
+    let bounded_text = |key: &str, minimum: usize, maximum: usize| -> Result<String, String> {
+        let value = object.get(key).and_then(Value::as_str).unwrap_or("").trim();
+        if value.chars().count() < minimum || value.chars().count() > maximum {
+            return Err(format!("ask_user 的 {key} 长度不合法。"));
+        }
+        Ok(value.to_string())
+    };
+    let title = bounded_text("title", 1, 80)?;
+    let description = bounded_text("description", 0, 240)?;
+    let fields = object
+        .get("fields")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "ask_user 缺少 fields。".to_string())?;
+    if fields.is_empty() || fields.len() > 6 {
+        return Err("ask_user 的 fields 数量必须在 1 到 6 之间。".to_string());
+    }
+    let mut ids = std::collections::HashSet::new();
+    let mut normalized_fields = Vec::new();
+    for field in fields {
+        let field = field.as_object().ok_or_else(|| "ask_user field 必须是对象。".to_string())?;
+        let id = field.get("id").and_then(Value::as_str).unwrap_or("").trim();
+        if id.is_empty() || id.len() > 48 || !id.chars().all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '-') || !ids.insert(id.to_string()) {
+            return Err("ask_user field id 必须唯一且仅含字母、数字、- 或 _。".to_string());
+        }
+        let kind = field.get("type").and_then(Value::as_str).unwrap_or("");
+        if !matches!(kind, "single-choice" | "multi-choice" | "text" | "confirm") {
+            return Err("ask_user field type 不受支持。".to_string());
+        }
+        let label = field.get("label").and_then(Value::as_str).unwrap_or("").trim();
+        if label.is_empty() || label.chars().count() > 100 {
+            return Err("ask_user field label 长度不合法。".to_string());
+        }
+        let required = field.get("required").and_then(Value::as_bool).unwrap_or(false);
+        let mut normalized = json!({ "id": id, "type": kind, "label": label, "required": required });
+        if matches!(kind, "single-choice" | "multi-choice") {
+            let options = field.get("options").and_then(Value::as_array).ok_or_else(|| "选择题缺少 options。".to_string())?;
+            if options.is_empty() || options.len() > 12 {
+                return Err("选择题选项数量必须在 1 到 12 之间。".to_string());
+            }
+            let mut values = std::collections::HashSet::new();
+            let mut normalized_options = Vec::new();
+            for option in options {
+                let value = option.get("value").and_then(Value::as_str).unwrap_or("").trim();
+                let label = option.get("label").and_then(Value::as_str).unwrap_or("").trim();
+                if value.is_empty() || value.len() > 80 || label.is_empty() || label.chars().count() > 100 || !values.insert(value.to_string()) {
+                    return Err("ask_user 选项不合法或重复。".to_string());
+                }
+                normalized_options.push(json!({ "value": value, "label": label }));
+            }
+            normalized["options"] = Value::Array(normalized_options);
+        }
+        normalized_fields.push(normalized);
+    }
+    Ok(json!({
+        "id": format!("ask-user-{step}"),
+        "kind": "ask_user",
+        "schemaVersion": INTERACTION_SCHEMA_VERSION,
+        "title": title,
+        "description": description,
+        "fields": normalized_fields,
+        "actions": [{ "id": "submit", "label": "提交" }, { "id": "skip", "label": "跳过" }],
+        "status": "pending",
+    }))
 }
 
 pub fn append_evidence(
@@ -179,6 +257,7 @@ pub fn recover_stale(root: &Path, timestamp: &str) -> Result<(), String> {
                 tool_name: run.checkpoint.tool_name.clone(),
                 tool_arguments: run.checkpoint.tool_arguments.clone(),
                 tool_result: run.checkpoint.tool_result.clone(),
+                interaction: run.checkpoint.interaction.clone(),
                 allowed_files: run.checkpoint.allowed_files.clone(),
                 completed_check_ids: run.checkpoint.completed_check_ids.clone(),
                 remaining_repair_budget: run.checkpoint.remaining_repair_budget,
@@ -255,6 +334,151 @@ pub fn approve(root: &Path, id: &str, timestamp: &str) -> Result<PersistedAgentR
     })
 }
 
+pub fn submit_interaction(
+    root: &Path,
+    id: &str,
+    form_id: &str,
+    action: &str,
+    answers: Value,
+    timestamp: &str,
+) -> Result<PersistedAgentRun, String> {
+    Repository::new(root).transaction_with("submit-agent-interaction", |repository| {
+        let mut run = load_from_repository(repository, id)
+            .map_err(|_| "没有找到对应的 Agent Run。".to_string())?;
+        let interaction = run
+            .checkpoint
+            .interaction
+            .clone()
+            .ok_or_else(|| "该 Agent Run 没有等待中的用户追问。".to_string())?;
+        if interaction.get("kind").and_then(Value::as_str) != Some("ask_user")
+            || interaction.get("id").and_then(Value::as_str) != Some(form_id)
+        {
+            return Err("表单不属于当前 Agent Run。".to_string());
+        }
+        if !matches!(action, "submit" | "skip") {
+            return Err("ask_user 只支持提交或跳过。".to_string());
+        }
+        let normalized_answers = validate_interaction_answers(&interaction, action, &answers)?;
+        let response = json!({ "action": action, "answers": normalized_answers });
+        if interaction.get("status").and_then(Value::as_str) == Some("submitted") {
+            if interaction.get("response") == Some(&response) {
+                return Ok((run, Vec::new()));
+            }
+            return Err("该表单已经提交，不能改写原回答。".to_string());
+        }
+        if run.status != "awaiting-user-input" {
+            return Err(format!("当前状态为 {}，不能提交表单。", run.status));
+        }
+        let mut submitted = interaction;
+        submitted["status"] = json!("submitted");
+        submitted["response"] = response.clone();
+        submitted["submittedAt"] = json!(timestamp);
+        if let Some(index) = run.interactions.iter().position(|item| item.get("id") == Some(&json!(form_id))) {
+            run.interactions[index] = submitted.clone();
+        } else {
+            run.interactions.push(submitted.clone());
+        }
+        run.status = "queued".to_string();
+        run.revision += 1;
+        run.updated_at = timestamp.to_string();
+        run.summary = if action == "skip" {
+            "已跳过追问，等待 Agent 根据该选择继续。".to_string()
+        } else {
+            "已提交追问回答，等待 Agent 继续。".to_string()
+        };
+        run.checkpoint.phase = "queued".to_string();
+        run.checkpoint.context_summary = run.summary.clone();
+        run.checkpoint.next_action = "resume-user-input".to_string();
+        run.checkpoint.tool_name = "ask_user".to_string();
+        run.checkpoint.tool_arguments = json!({ "formId": form_id });
+        run.checkpoint.tool_result = Some(json!({
+            "type": "ask_user_result",
+            "formId": form_id,
+            "action": action,
+            "answers": normalized_answers,
+        }));
+        run.checkpoint.interaction = Some(submitted);
+        let summary = run.summary.clone();
+        append_evidence(
+            &mut run,
+            "interaction",
+            summary,
+            json!({ "formId": form_id, "action": action, "answers": normalized_answers }),
+            timestamp,
+        );
+        Ok((run.clone(), vec![mutation(&run)?]))
+    })
+}
+
+fn validate_interaction_answers(interaction: &Value, action: &str, answers: &Value) -> Result<Value, String> {
+    if action == "skip" {
+        return Ok(json!({}));
+    }
+    let answers = answers
+        .as_object()
+        .ok_or_else(|| "表单回答必须是对象。".to_string())?;
+    let fields = interaction
+        .get("fields")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "表单定义损坏。".to_string())?;
+    let mut normalized = serde_json::Map::new();
+    for field in fields {
+        let id = field.get("id").and_then(Value::as_str).unwrap_or("");
+        let kind = field.get("type").and_then(Value::as_str).unwrap_or("");
+        let required = field.get("required").and_then(Value::as_bool).unwrap_or(false);
+        let value = answers.get(id);
+        if value.is_none() || value == Some(&Value::Null) {
+            if required {
+                return Err(format!("请完成「{}」。", field.get("label").and_then(Value::as_str).unwrap_or(id)));
+            }
+            continue;
+        }
+        let value = value.expect("checked above");
+        let normalized_value = match kind {
+            "text" => {
+                let text = value.as_str().unwrap_or("").trim();
+                if text.chars().count() > 800 || (required && text.is_empty()) {
+                    return Err(format!("「{}」回答不合法。", id));
+                }
+                Value::String(text.to_string())
+            }
+            "confirm" => Value::Bool(value.as_bool().ok_or_else(|| format!("「{}」必须确认或取消。", id))?),
+            "single-choice" => {
+                let choice = value.as_str().ok_or_else(|| format!("「{}」必须选择一个选项。", id))?;
+                validate_interaction_option(field, choice)?;
+                Value::String(choice.to_string())
+            }
+            "multi-choice" => {
+                let choices = value.as_array().ok_or_else(|| format!("「{}」必须选择选项。", id))?;
+                let mut unique = std::collections::HashSet::new();
+                let mut result = Vec::new();
+                for choice in choices {
+                    let choice = choice.as_str().ok_or_else(|| format!("「{}」选项不合法。", id))?;
+                    validate_interaction_option(field, choice)?;
+                    if unique.insert(choice.to_string()) {
+                        result.push(Value::String(choice.to_string()));
+                    }
+                }
+                if required && result.is_empty() {
+                    return Err(format!("请完成「{}」。", id));
+                }
+                Value::Array(result)
+            }
+            _ => return Err("表单字段类型损坏。".to_string()),
+        };
+        normalized.insert(id.to_string(), normalized_value);
+    }
+    Ok(Value::Object(normalized))
+}
+
+fn validate_interaction_option(field: &Value, choice: &str) -> Result<(), String> {
+    let valid = field
+        .get("options")
+        .and_then(Value::as_array)
+        .is_some_and(|options| options.iter().any(|option| option.get("value").and_then(Value::as_str) == Some(choice)));
+    if valid { Ok(()) } else { Err("表单选项不属于当前问题。".to_string()) }
+}
+
 /// Creates or resumes a persisted Agent Run at the model boundary. This
 /// consumes neither a write/check approval nor a provider request; callers
 /// retain ownership of model transport and cancellation.
@@ -280,13 +504,15 @@ pub fn prepare_model_run(
         }
         run
     } else {
-        let run = new_hermes_run(
+        let run = new_hermes_run_with_context(
             input.run_id,
             input.request_id,
             input.project_id,
             input.prompt,
             input.max_steps,
             input.approval_token,
+            input.conversation_id,
+            input.task_id,
             timestamp,
         );
         persist(root, &run)?;
@@ -298,7 +524,7 @@ pub fn prepare_model_run(
         .as_ref()
         .map(|result| {
             format!(
-                "\n\nOmniDesk 已执行上一受控工具，结果如下。不要重复这个操作；保留授权文件范围，若仍需写入或检查，先请求新的独立审批。\n{}",
+                "\n\nOmniDesk 已记录上一操作或用户回答，结果如下。不要重复这个操作；用户回答不代表写入或检查授权。若仍需写入或检查，先请求新的独立审批。\n{}",
                 serde_json::to_string(result).unwrap_or_else(|_| "null".to_string())
             )
         })
@@ -344,11 +570,29 @@ pub fn settle_model_run(
     run.updated_at = timestamp.to_string();
     run.summary = completion.summary;
     run.approval = completion.approval;
+    let mut interaction = completion.interaction;
+    if let Some(value) = interaction.as_mut() {
+        value["id"] = json!(format!(
+            "ask-user-{}-{}-{}",
+            run.id,
+            run.revision + 1,
+            completion.step.unwrap_or(run.step)
+        ));
+        value["requestedAt"] = json!(timestamp);
+        if let Some(index) = run.interactions.iter().position(|item| item.get("id") == value.get("id")) {
+            run.interactions[index] = value.clone();
+        } else {
+            run.interactions.push(value.clone());
+        }
+    }
+    run.checkpoint.interaction = interaction;
     run.checkpoint.phase = run.status.clone();
     run.checkpoint.context_summary = run.summary.clone();
     run.checkpoint.last_confirmation = run.approval.clone();
     run.checkpoint.next_action = if run.status == "awaiting-approval" {
         "resume-approval".to_string()
+    } else if run.status == "awaiting-user-input" {
+        "await-user-input".to_string()
     } else if matches!(run.status.as_str(), "failed" | "cancelled" | "succeeded") {
         "none".to_string()
     } else {
@@ -356,6 +600,8 @@ pub fn settle_model_run(
     };
     let evidence_phase = if run.status == "awaiting-approval" {
         "approval"
+    } else if run.status == "awaiting-user-input" {
+        "interaction"
     } else {
         "result"
     };
@@ -523,6 +769,7 @@ pub fn fail_approved_tool(run: &mut PersistedAgentRun, name: &str, error: &str, 
     );
 }
 
+#[cfg(any(test, feature = "webdriver"))]
 pub fn new_hermes_run(
     id: String,
     request_id: String,
@@ -532,12 +779,36 @@ pub fn new_hermes_run(
     approval_token: String,
     timestamp: &str,
 ) -> PersistedAgentRun {
+    new_hermes_run_with_context(
+        id,
+        request_id,
+        project_id,
+        prompt,
+        max_steps,
+        approval_token,
+        String::new(),
+        String::new(),
+        timestamp,
+    )
+}
+
+pub fn new_hermes_run_with_context(
+    id: String,
+    request_id: String,
+    project_id: String,
+    prompt: String,
+    max_steps: usize,
+    approval_token: String,
+    conversation_id: String,
+    task_id: String,
+    timestamp: &str,
+) -> PersistedAgentRun {
     PersistedAgentRun {
         schema_version: AGENT_RUN_SCHEMA_VERSION.to_string(),
         id,
         request_id,
-        conversation_id: String::new(),
-        task_id: String::new(),
+        conversation_id,
+        task_id,
         project_id,
         executor_id: "hermes-acp".to_string(),
         status: "queued".to_string(),
@@ -552,6 +823,7 @@ pub fn new_hermes_run(
         approval: None,
         approval_token,
         repair_attempt: 0,
+        interactions: Vec::new(),
         checkpoint: AgentRunCheckpoint {
             phase: "queued".to_string(),
             context_summary: "Agent Run 已创建。".to_string(),
@@ -560,6 +832,7 @@ pub fn new_hermes_run(
             tool_name: String::new(),
             tool_arguments: json!({}),
             tool_result: None,
+            interaction: None,
             allowed_files: Vec::new(),
             completed_check_ids: Vec::new(),
             remaining_repair_budget: default_remaining_repair_budget(),
@@ -625,6 +898,56 @@ pub fn seed_native_recovery_run(
     );
     persist(root, &run)?;
     Ok(run)
+}
+
+#[cfg(feature = "webdriver")]
+pub fn seed_native_interaction_run(
+    root: &Path,
+    project_id: String,
+    conversation_id: String,
+    timestamp: &str,
+) -> Result<PersistedAgentRun, String> {
+    let run = new_hermes_run_with_context(
+        "native-interaction-run".to_string(),
+        "native-interaction-request".to_string(),
+        project_id,
+        "Native WebDriver ask_user fixture. Do not execute project tools.".to_string(),
+        4,
+        String::new(),
+        conversation_id,
+        "native-interaction-task".to_string(),
+        timestamp,
+    );
+    let interaction = validate_ask_user_interaction(
+        &json!({
+            "title": "确认数据范围",
+            "description": "继续任务前需要确认一个关键选择。",
+            "fields": [{
+                "id": "scope",
+                "type": "single-choice",
+                "label": "数据范围",
+                "required": true,
+                "options": [
+                    { "value": "personal", "label": "个人" },
+                    { "value": "team", "label": "团队" }
+                ]
+            }]
+        }),
+        1,
+    )?;
+    settle_model_run(
+        root,
+        run,
+        ModelRunCompletion {
+            status: "awaiting-user-input".to_string(),
+            summary: "原生追问夹具等待用户回答。".to_string(),
+            step: Some(1),
+            approval: None,
+            interaction: Some(interaction),
+            evidence_details: json!({ "fixture": true, "approvalCreated": false }),
+        },
+        timestamp,
+    )
 }
 
 #[cfg(test)]
@@ -709,6 +1032,8 @@ mod tests {
                 prompt: "update the project".to_string(),
                 max_steps: 4,
                 approval_token: String::new(),
+                conversation_id: String::new(),
+                task_id: String::new(),
                 resume_existing: false,
             },
             "now",
@@ -732,6 +1057,8 @@ mod tests {
                 prompt: String::new(),
                 max_steps: 4,
                 approval_token: String::new(),
+                conversation_id: String::new(),
+                task_id: String::new(),
                 resume_existing: true,
             },
             "later",
@@ -772,6 +1099,8 @@ mod tests {
                 prompt: String::new(),
                 max_steps: 4,
                 approval_token: String::new(),
+                conversation_id: String::new(),
+                task_id: String::new(),
                 resume_existing: true,
             },
             "later",
@@ -809,6 +1138,7 @@ mod tests {
                 summary: "等待独立 Patch 审批。".to_string(),
                 step: Some(2),
                 approval: Some(json!({ "token": "approval-1", "name": "apply_patch" })),
+                interaction: None,
                 evidence_details: json!({ "trace": ["draft-ready"] }),
             },
             "later",
@@ -857,6 +1187,7 @@ mod tests {
                     summary: format!("{status} result"),
                     step: Some(3),
                     approval: None,
+                    interaction: None,
                     evidence_details: json!({ "status": status }),
                 },
                 "later",
@@ -1031,5 +1362,83 @@ mod tests {
         ));
         assert!(load(&root, "../outside").is_err());
         assert!(load(&root, "nested/run").is_err());
+    }
+
+    #[test]
+    fn ask_user_contract_rejects_unbounded_or_unsafe_fields() {
+        assert!(validate_ask_user_interaction(&json!({
+            "title": "Need a choice",
+            "description": "",
+            "fields": [{ "id": "../scope", "type": "single-choice", "label": "Scope", "options": [{ "value": "one", "label": "One" }] }]
+        }), 1).is_err());
+        assert!(validate_ask_user_interaction(&json!({
+            "title": "Need a choice",
+            "description": "",
+            "fields": [{ "id": "scope", "type": "single-choice", "label": "Scope", "options": [] }]
+        }), 1).is_err());
+    }
+
+    #[test]
+    fn user_interaction_survives_recovery_and_accepts_only_one_answer() {
+        let root = std::env::temp_dir().join(format!(
+            "omnidesk-agent-interaction-{}",
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        let interaction = validate_ask_user_interaction(&json!({
+            "title": "确认范围",
+            "description": "开始前需要这个选择。",
+            "fields": [{
+                "id": "scope", "type": "single-choice", "label": "数据范围", "required": true,
+                "options": [{ "value": "personal", "label": "个人" }, { "value": "team", "label": "团队" }]
+            }]
+        }), 2).unwrap();
+        let run = new_hermes_run_with_context(
+            "run-interaction".to_string(), "request-1".to_string(), "project-1".to_string(),
+            "build dashboard".to_string(), 4, String::new(), "conversation-1".to_string(), String::new(), "now",
+        );
+        let waiting = settle_model_run(&root, run, ModelRunCompletion {
+            status: "awaiting-user-input".to_string(), summary: "等待用户确认。".to_string(), step: Some(2),
+            approval: None, interaction: Some(interaction.clone()), evidence_details: json!({ "trace": ["ask-user"] }),
+        }, "later").unwrap();
+        assert_eq!(waiting.checkpoint.next_action, "await-user-input");
+        let form_id = waiting.checkpoint.interaction.as_ref().unwrap()["id"].as_str().unwrap().to_string();
+        assert_eq!(waiting.interactions.len(), 1);
+        recover_stale(&root, "restart").unwrap();
+        assert_eq!(load(&root, "run-interaction").unwrap().status, "awaiting-user-input");
+
+        let submitted = submit_interaction(&root, "run-interaction", &form_id, "submit", json!({ "scope": "team" }), "answer").unwrap();
+        assert_eq!(submitted.status, "queued");
+        assert_eq!(submitted.checkpoint.next_action, "resume-user-input");
+        assert_eq!(submitted.checkpoint.tool_result.as_ref().unwrap()["answers"]["scope"], "team");
+        assert_eq!(submitted.interactions[0]["status"], "submitted");
+        let same = submit_interaction(&root, "run-interaction", &form_id, "submit", json!({ "scope": "team" }), "again").unwrap();
+        assert_eq!(same.revision, submitted.revision);
+        assert!(submit_interaction(&root, "run-interaction", &form_id, "submit", json!({ "scope": "personal" }), "conflict").is_err());
+        let resumed = prepare_model_run(&root, PrepareModelRunInput {
+            run_id: "run-interaction".to_string(), request_id: String::new(), project_id: "project-1".to_string(),
+            prompt: String::new(), max_steps: 4, approval_token: String::new(), conversation_id: String::new(), task_id: String::new(), resume_existing: true,
+        }, "continue").unwrap();
+        assert!(resumed.execution_prompt.contains("ask_user_result"));
+        let completed = settle_model_run(&root, resumed.run, ModelRunCompletion {
+            status: "succeeded".to_string(), summary: "done".to_string(), step: Some(3), approval: None,
+            interaction: None, evidence_details: json!({ "result": true }),
+        }, "done").unwrap();
+        assert_eq!(completed.interactions[0]["status"], "submitted");
+
+        let skipped_run = new_hermes_run_with_context(
+            "run-interaction-skip".to_string(), "request-2".to_string(), "project-1".to_string(),
+            "build another dashboard".to_string(), 4, String::new(), "conversation-1".to_string(), String::new(), "now",
+        );
+        let skipped_waiting = settle_model_run(&root, skipped_run, ModelRunCompletion {
+            status: "awaiting-user-input".to_string(), summary: "等待用户确认。".to_string(), step: Some(1),
+            approval: None, interaction: Some(interaction), evidence_details: json!({ "trace": ["ask-user"] }),
+        }, "later").unwrap();
+        let skipped_form_id = skipped_waiting.checkpoint.interaction.as_ref().unwrap()["id"].as_str().unwrap();
+        let skipped = submit_interaction(&root, "run-interaction-skip", skipped_form_id, "skip", json!({ "scope": "invalid-is-ignored" }), "skipped").unwrap();
+        assert_eq!(skipped.status, "queued");
+        assert_eq!(skipped.checkpoint.tool_result.as_ref().unwrap()["action"], "skip");
+        assert_eq!(skipped.checkpoint.tool_result.as_ref().unwrap()["answers"], json!({}));
+        assert!(skipped.approval.is_none());
+        std::fs::remove_dir_all(root).unwrap();
     }
 }

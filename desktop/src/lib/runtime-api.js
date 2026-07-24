@@ -44,6 +44,9 @@ export async function invokePreviewCommand(command, payload) {
   if (command === "approve_agent_run") {
     throw new Error("浏览器预览不能批准 Hermes 运行，请在桌面 App 窗口里使用。");
   }
+  if (command === "submit_agent_interaction") {
+    throw new Error("浏览器预览不能提交 Agent 追问，请在桌面 App 窗口里使用。");
+  }
   if (command === "execute_approved_agent_tool") {
     throw new Error("浏览器预览不能执行已批准工具，请在桌面 App 窗口里使用。");
   }

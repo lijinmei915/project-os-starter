@@ -13,6 +13,8 @@ use_when: "AI 要修改项目记忆、任务恢复、Agent Run 或执行证据�
 > 什么时候更新：记忆检索、Agent Run 状态、审批或检查闭环变化时。
 > 不要写什么：旧 Project OS 后台 runner、模板回写或跨工具流程。
 
+系统分层见 [架构说明](ARCHITECTURE.md)，验证与真实 Eval 证据见 [测试与发布](TESTING.md)。
+
 ## 核心结论
 
 项目记忆帮助模型理解已确认的工程上下文；Agent Run 负责一次有界任务的计划、草稿、审批、检查、修复和证据。两者都由 Desktop Runtime 持久化，不能由浏览器 Preview 或 Provider 响应直接改写。

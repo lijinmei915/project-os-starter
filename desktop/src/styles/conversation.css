@@ -434,6 +434,33 @@
   background: var(--desktop-state-accent-bg-hover);
 }
 
+.conversationUserForm {
+  width: min(560px, 100%);
+  border: 1px solid var(--desktop-border-default);
+  border-radius: var(--radius);
+  background: var(--desktop-surface-panel);
+  padding: var(--desktop-space-md);
+}
+
+.conversationUserForm > header,
+.conversationUserForm > footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--desktop-space-md);
+}
+
+.conversationUserForm header strong { color: var(--desktop-text-primary); }
+.conversationUserForm header p { margin: 4px 0 0; color: var(--desktop-text-soft); font-size: var(--desktop-text-small); line-height: 1.45; }
+.conversationUserForm header > span { flex: 0 0 auto; color: var(--desktop-text-muted); font-size: var(--desktop-text-meta); }
+.conversationUserFormFields { display: grid; gap: var(--desktop-space-md); margin-top: var(--desktop-space-md); }
+.conversationUserFormOptions { display: grid; gap: 6px; }
+.conversationUserFormOption { display: inline-flex; align-items: center; gap: 7px; width: fit-content; color: var(--desktop-text-secondary); font-size: var(--desktop-text-small); cursor: pointer; }
+.conversationUserFormOption input { accent-color: var(--desktop-accent); }
+.conversationUserForm > footer { justify-content: flex-start; align-items: center; margin-top: var(--desktop-space-md); }
+.conversationUserFormError { margin: var(--desktop-space-sm) 0 0; color: var(--desktop-danger); font-size: var(--desktop-text-small); }
+.conversationUserFormAnswer { color: var(--desktop-text-soft); font-size: var(--desktop-text-small); }
+
 .conversationReferences {
   width: fit-content;
   margin-top: var(--desktop-space-md);
@@ -1500,4 +1527,3 @@
   font-size: 11px;
   font-weight: var(--desktop-font-semibold);
 }
-

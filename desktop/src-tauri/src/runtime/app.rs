@@ -264,6 +264,10 @@ struct RunHermesAgentInput {
     approval_token: String,
     #[serde(default)]
     run_id: String,
+    #[serde(default)]
+    conversation_id: String,
+    #[serde(default)]
+    task_id: String,
 }
 
 fn default_agent_max_steps() -> usize {
@@ -288,6 +292,23 @@ struct ResumeAgentRunInput {
 #[serde(rename_all = "camelCase")]
 struct ApproveAgentRunInput {
     id: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SubmitAgentInteractionInput {
+    id: String,
+    form_id: String,
+    action: String,
+    #[serde(default)]
+    answers: Value,
+}
+
+#[cfg(feature = "webdriver")]
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SeedNativeInteractionInput {
+    conversation_id: String,
 }
 
 #[derive(Deserialize)]
@@ -1247,6 +1268,21 @@ fn approve_agent_run(input: ApproveAgentRunInput) -> Result<PersistedAgentRun, S
 }
 
 #[tauri::command]
+fn submit_agent_interaction(
+    input: SubmitAgentInteractionInput,
+) -> Result<PersistedAgentRun, String> {
+    let app_root = find_workspace_root()?;
+    crate::runtime::agent_runs::submit_interaction(
+        &app_root,
+        &input.id,
+        &input.form_id,
+        &input.action,
+        input.answers,
+        &current_timestamp_string(),
+    )
+}
+
+#[tauri::command]
 fn execute_approved_agent_tool(input: ExecuteApprovedAgentToolInput) -> Result<Value, String> {
     let app_root = find_workspace_root()?;
     let mut registry = load_or_seed_registry(&app_root)?;
@@ -1273,7 +1309,7 @@ async fn continue_agent_run(
     if run.status != "queued"
         || !matches!(
             run.checkpoint.next_action.as_str(),
-            "resume-model" | "resume-repair-draft" | "resume-stage"
+            "resume-model" | "resume-repair-draft" | "resume-stage" | "resume-user-input"
         )
     {
         return Err(format!(
@@ -1288,6 +1324,8 @@ async fn continue_agent_run(
             max_steps: run.max_steps,
             approval_token: String::new(),
             run_id: run.id.clone(),
+            conversation_id: run.conversation_id.clone(),
+            task_id: run.task_id.clone(),
         },
         runtime_requests,
     )
@@ -1328,6 +1366,8 @@ async fn run_hermes_agent(
             prompt: input.prompt.clone(),
             max_steps: input.max_steps,
             approval_token: input.approval_token.clone(),
+            conversation_id: input.conversation_id.clone(),
+            task_id: input.task_id.clone(),
             resume_existing: !input.run_id.trim().is_empty(),
         },
         &now,
@@ -1355,6 +1395,7 @@ async fn run_hermes_agent(
     .map_err(|err| format!("Hermes worker 中断: {err}"))?;
     let status = match result.as_ref() {
         Ok(value) if value.status == "awaiting-approval" => "awaiting-approval",
+        Ok(value) if value.status == "awaiting-user-input" => "awaiting-user-input",
         Ok(value) if value.status == "succeeded" => "succeeded",
         Ok(_) => "failed",
         Err(error) if error.contains("取消") => "cancelled",
@@ -1370,6 +1411,10 @@ async fn run_hermes_agent(
         .as_ref()
         .ok()
         .and_then(|value| value.approval.clone());
+    let interaction = result
+        .as_ref()
+        .ok()
+        .and_then(|value| value.interaction.clone());
     let evidence_details = result
         .as_ref()
         .map(|value| {
@@ -1377,6 +1422,7 @@ async fn run_hermes_agent(
                 "step": value.step,
                 "trace": value.trace,
                 "observations": value.observations,
+                "interaction": value.interaction,
             })
         })
         .unwrap_or_else(|error| json!({ "error": error.to_string() }));
@@ -1388,6 +1434,7 @@ async fn run_hermes_agent(
             summary,
             step,
             approval,
+            interaction,
             evidence_details,
         },
         &current_timestamp_string(),
@@ -1658,6 +1705,30 @@ fn read_native_agent_run_for_recovery(
 ) -> Result<crate::runtime::agent_runs::PersistedAgentRun, String> {
     let app_root = find_workspace_root()?;
     crate::runtime::agent_runs::load(&app_root, "native-recovery-run")
+}
+
+#[cfg(feature = "webdriver")]
+#[tauri::command]
+fn seed_native_agent_interaction(
+    input: SeedNativeInteractionInput,
+) -> Result<crate::runtime::agent_runs::PersistedAgentRun, String> {
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let project = current_registry_project(&mut registry, &app_root)?;
+    crate::runtime::agent_runs::seed_native_interaction_run(
+        &app_root,
+        project.id,
+        input.conversation_id,
+        &current_timestamp_string(),
+    )
+}
+
+#[cfg(feature = "webdriver")]
+#[tauri::command]
+fn read_native_agent_interaction(
+) -> Result<crate::runtime::agent_runs::PersistedAgentRun, String> {
+    let app_root = find_workspace_root()?;
+    crate::runtime::agent_runs::load(&app_root, "native-interaction-run")
 }
 
 fn find_workspace_root() -> Result<PathBuf, String> {
@@ -2199,6 +2270,7 @@ pub fn run() {
             resume_agent_run,
             continue_agent_run,
             approve_agent_run,
+            submit_agent_interaction,
             execute_approved_agent_tool,
             run_guarded_check,
             get_hermes_executor_status,
@@ -2212,7 +2284,11 @@ pub fn run() {
             #[cfg(feature = "webdriver")]
             seed_native_agent_run_for_recovery,
             #[cfg(feature = "webdriver")]
-            read_native_agent_run_for_recovery
+            read_native_agent_run_for_recovery,
+            #[cfg(feature = "webdriver")]
+            seed_native_agent_interaction,
+            #[cfg(feature = "webdriver")]
+            read_native_agent_interaction
         ])
         .run(tauri::generate_context!())
         .expect("failed to run OmniDesk");

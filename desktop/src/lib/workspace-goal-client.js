@@ -6,17 +6,25 @@ async function withPreviewSnapshot(operation, loadWorkspaceSnapshot) {
   return loadWorkspaceSnapshot();
 }
 
+function requiredGoalId(goalId, action) {
+  const value = String(goalId || "").trim();
+  if (!value) throw new Error(`没有可${action}的当前目标。请先建立或切换目标。`);
+  return value;
+}
+
 export async function runGoalValidation({ goalId, loadWorkspaceSnapshot }) {
+  const currentGoalId = requiredGoalId(goalId, "验收");
   return withPreviewSnapshot(invokeWorkspaceOperation({
-    input: { goalId },
+    input: { goalId: currentGoalId },
     previewCommand: "run_goal_validation",
     tauriCommand: "run_goal_validation",
   }), loadWorkspaceSnapshot);
 }
 
 export async function signOffGoalValidation({ goalId, loadWorkspaceSnapshot }) {
+  const currentGoalId = requiredGoalId(goalId, "确认完成");
   return withPreviewSnapshot(invokeWorkspaceOperation({
-    input: { goalId },
+    input: { goalId: currentGoalId },
     previewCommand: "sign_off_goal_validation",
     tauriCommand: "sign_off_goal_validation",
   }), loadWorkspaceSnapshot);

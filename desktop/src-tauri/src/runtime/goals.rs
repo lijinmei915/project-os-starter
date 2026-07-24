@@ -23,6 +23,7 @@ fn load_or_seed(repository: &Repository, project_name: &str) -> Value {
                 "projectName": project_name,
                 "status": "active",
                 "summary": "当前推进中的目标。",
+                "decompositionTaskIds": [],
                 "taskIds": []
             }]
         })
@@ -167,7 +168,7 @@ pub fn create(
         object.insert("updatedAt".to_string(), Value::String(timestamp.to_string()));
         let items = object.entry("goals".to_string()).or_insert_with(|| Value::Array(Vec::new())).as_array_mut().ok_or_else(|| "目标数据格式错误。".to_string())?;
         if items.iter().any(|goal| goal.get("id").and_then(Value::as_str) == Some(id.as_str())) { return Err("目标 id 已存在。".to_string()); }
-        items.insert(0, json!({"id": id, "parentProjectGoalId": parent_id, "title": title, "shortTitle": compact_title(title), "projectName": project_name, "status": "draft", "createdAt": timestamp, "summary": if summary.trim().is_empty() { "目标草案，等待确认。" } else { summary.trim() }, "taskIds": []}));
+        items.insert(0, json!({"id": id, "parentProjectGoalId": parent_id, "title": title, "shortTitle": compact_title(title), "projectName": project_name, "status": "draft", "createdAt": timestamp, "summary": if summary.trim().is_empty() { "目标草案，等待确认。" } else { summary.trim() }, "decompositionTaskIds": [], "taskIds": []}));
         add_to_project_goal(&mut project_goals, &parent_id, items[0]["id"].as_str().unwrap_or(""), timestamp);
         Ok(((), vec![JsonMutation::upsert(GOALS_PATH, goals), JsonMutation::upsert(PROJECT_GOALS_PATH, project_goals)]))
     })
@@ -336,6 +337,10 @@ pub fn confirm_decomposition(
         object.insert(
             "taskIds".to_string(),
             Value::Array(merged.into_iter().map(Value::String).collect()),
+        );
+        object.insert(
+            "decompositionTaskIds".to_string(),
+            Value::Array(task_ids.into_iter().map(Value::String).collect()),
         );
         object.insert(
             "decomposedAt".to_string(),
@@ -538,6 +543,17 @@ pub fn merge(
                     .collect()
             })
             .unwrap_or_default();
+        let decomposition_task_ids: Vec<String> = source
+            .get("decompositionTaskIds")
+            .and_then(Value::as_array)
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_string)
+                    .collect()
+            })
+            .unwrap_or_default();
         let mut mutations = Vec::new();
         for (relative, mut task) in crate::runtime::tasks::list_repository_records(repository)? {
             if task.get("goalId").and_then(Value::as_str) != Some(source_id) {
@@ -584,6 +600,26 @@ pub fn merge(
                         "taskIds".to_string(),
                         Value::Array(ids.into_iter().map(Value::String).collect()),
                     );
+                    let mut decomposition_ids = object
+                        .get("decompositionTaskIds")
+                        .and_then(Value::as_array)
+                        .map(|items| {
+                            items
+                                .iter()
+                                .filter_map(Value::as_str)
+                                .map(str::to_string)
+                                .collect::<Vec<_>>()
+                        })
+                        .unwrap_or_default();
+                    for id in &decomposition_task_ids {
+                        if !decomposition_ids.contains(id) {
+                            decomposition_ids.push(id.clone());
+                        }
+                    }
+                    object.insert(
+                        "decompositionTaskIds".to_string(),
+                        Value::Array(decomposition_ids.into_iter().map(Value::String).collect()),
+                    );
                     object.insert(
                         "updatedAt".to_string(),
                         Value::String(timestamp.to_string()),
@@ -595,6 +631,7 @@ pub fn merge(
                         Value::String(target_id.to_string()),
                     );
                     object.insert("taskIds".to_string(), Value::Array(Vec::new()));
+                    object.insert("decompositionTaskIds".to_string(), Value::Array(Vec::new()));
                     object.insert(
                         "updatedAt".to_string(),
                         Value::String(timestamp.to_string()),
@@ -839,6 +876,11 @@ pub fn rebind_task(goals: &mut Value, task_id: &str, goal_id: &str, timestamp: &
             Value::String(timestamp.to_string()),
         );
         if let Some(items) = object.get_mut("goals").and_then(Value::as_array_mut) {
+            let was_decomposition_task = items.iter().any(|goal| {
+                goal.get("decompositionTaskIds")
+                    .and_then(Value::as_array)
+                    .is_some_and(|ids| ids.iter().any(|id| id.as_str() == Some(task_id)))
+            });
             for goal in items {
                 let Some(goal_object) = goal.as_object_mut() else {
                     continue;
@@ -866,6 +908,31 @@ pub fn rebind_task(goals: &mut Value, task_id: &str, goal_id: &str, timestamp: &
                     "taskIds".to_string(),
                     Value::Array(ids.into_iter().map(Value::String).collect()),
                 );
+                if was_decomposition_task {
+                    let mut decomposition_ids = goal_object
+                        .get("decompositionTaskIds")
+                        .and_then(Value::as_array)
+                        .map(|values| {
+                            values
+                                .iter()
+                                .filter_map(Value::as_str)
+                                .filter(|id| *id != task_id)
+                                .map(str::to_string)
+                                .collect::<Vec<_>>()
+                        })
+                        .unwrap_or_default();
+                    if goal_object.get("id").and_then(Value::as_str) == Some(goal_id)
+                        && !goal_id.is_empty()
+                    {
+                        decomposition_ids.push(task_id.to_string());
+                    }
+                    decomposition_ids.sort();
+                    decomposition_ids.dedup();
+                    goal_object.insert(
+                        "decompositionTaskIds".to_string(),
+                        Value::Array(decomposition_ids.into_iter().map(Value::String).collect()),
+                    );
+                }
                 goal_object.insert(
                     "updatedAt".to_string(),
                     Value::String(timestamp.to_string()),
@@ -884,10 +951,15 @@ mod tests {
 
     #[test]
     fn rebinds_a_task_without_leaving_stale_goal_indexes() {
-        let mut goals = json!({ "goals": [{ "id": "a", "taskIds": ["task-1"] }, { "id": "b", "taskIds": [] }] });
+        let mut goals = json!({ "goals": [
+            { "id": "a", "decompositionTaskIds": ["task-1"], "taskIds": ["task-1"] },
+            { "id": "b", "decompositionTaskIds": [], "taskIds": [] }
+        ] });
         rebind_task(&mut goals, "task-1", "b", "now");
         assert_eq!(goals["goals"][0]["taskIds"], json!([]));
         assert_eq!(goals["goals"][1]["taskIds"], json!(["task-1"]));
+        assert_eq!(goals["goals"][0]["decompositionTaskIds"], json!([]));
+        assert_eq!(goals["goals"][1]["decompositionTaskIds"], json!(["task-1"]));
     }
 
     #[test]
@@ -973,6 +1045,10 @@ mod tests {
         let goals = Repository::new(&root).read_json(GOALS_PATH).unwrap();
         assert_eq!(goals["goals"][0]["status"], "queued");
         assert_eq!(goals["goals"][0]["taskIds"], json!(["task-a", "task-b"]));
+        assert_eq!(
+            goals["goals"][0]["decompositionTaskIds"],
+            json!(["task-a", "task-b"])
+        );
         assert_eq!(goals["activeGoalId"], "goal-1");
     }
 
@@ -1021,7 +1097,7 @@ mod tests {
         let task_dir = crate::runtime::tasks::directory(&root);
         fs::create_dir_all(&task_dir).unwrap();
         fs::create_dir_all(root.join(".omnidesk/data")).unwrap();
-        fs::write(root.join(GOALS_PATH), r#"{"activeGoalId":"source","goals":[{"id":"source","status":"planned","taskIds":["task-1"]},{"id":"target","title":"Target","status":"planned","taskIds":[]}]}"#).unwrap();
+        fs::write(root.join(GOALS_PATH), r#"{"activeGoalId":"source","goals":[{"id":"source","status":"planned","decompositionTaskIds":["task-1"],"taskIds":["task-1"]},{"id":"target","title":"Target","status":"planned","decompositionTaskIds":[],"taskIds":[]}]}"#).unwrap();
         fs::write(
             root.join(PROJECT_GOALS_PATH),
             r#"{"projectGoals":[{"id":"parent","stageGoalIds":["source","target"]}]}"#,
@@ -1037,7 +1113,9 @@ mod tests {
         let goals = repository.read_json(GOALS_PATH).unwrap();
         assert_eq!(goals["activeGoalId"], "target");
         assert_eq!(goals["goals"][0]["status"], "merged");
+        assert_eq!(goals["goals"][0]["decompositionTaskIds"], json!([]));
         assert_eq!(goals["goals"][1]["taskIds"], json!(["task-1"]));
+        assert_eq!(goals["goals"][1]["decompositionTaskIds"], json!(["task-1"]));
         let task: Value =
             serde_json::from_str(&fs::read_to_string(task_dir.join("task-1.json")).unwrap())
                 .unwrap();

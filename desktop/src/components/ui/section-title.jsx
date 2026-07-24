@@ -18,7 +18,7 @@ export function SectionTitle({ actions, className, collapseControl, inlineAction
   );
 
   return (
-    <div className={cn("uiSectionTitle", canToggle && "uiSectionTitle-toggle", className)}>
+    <div className={cn("uiSectionTitle", canToggle && "uiSectionTitle-toggle", inlineAction && "uiSectionTitle-hasInlineAction", className)}>
       {canToggle ? (
         <button
           className="uiSectionTitleMain uiSectionTitleButton"

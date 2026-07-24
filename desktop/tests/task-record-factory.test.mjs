@@ -3,13 +3,12 @@ import test from "node:test";
 import { createTaskFromPlan } from "../src/lib/task-record-factory.js";
 
 const dependencies = {
-  activeGoalFromSnapshot: () => ({ id: "goal-1", shortTitle: "治理收口" }),
   now: () => new Date("2026-07-22T08:05:00.000Z"),
   taskIdForRequest: (requestId, fallback) => requestId ? `request-${requestId}` : fallback,
   taskStatuses: { planned: "planned" },
 };
 
-test("creates a request-bound task record with goal and project ownership", () => {
+test("creates a request-bound conversation task without implicitly inheriting the active goal", () => {
   const task = createTaskFromPlan({ summary: "修复对话" }, "修复对话", {
     currentProjectId: "project-1",
     currentProjectPath: "/tmp/project-1",
@@ -27,13 +26,25 @@ test("creates a request-bound task record with goal and project ownership", () =
     conversationId: "conversation-1",
     requestId: "req-1",
     requestTrace: { outcome: "pending", requestId: "req-1", startedAt: "2026-07-22T08:05:00.000Z", taskId: "request-req-1" },
-    goalId: "goal-1",
-    goalTitle: "治理收口",
+    goalId: "",
+    goalTitle: "",
+    origin: "conversation",
     projectName: "OmniDesk",
     projectPath: "/tmp/project-1",
     plan: { summary: "修复对话" },
     runs: [],
   });
+});
+
+test("binds a task only when its source explicitly supplies goal ownership", () => {
+  const task = createTaskFromPlan({ summary: "实现拆解" }, "实现拆解", {}, {
+    goalId: "goal-1",
+    goalTitle: "治理收口",
+    origin: "goal-decomposition",
+  }, dependencies);
+  assert.equal(task.goalId, "goal-1");
+  assert.equal(task.goalTitle, "治理收口");
+  assert.equal(task.origin, "goal-decomposition");
 });
 
 test("uses plan summary and a bounded title when no explicit task text exists", () => {

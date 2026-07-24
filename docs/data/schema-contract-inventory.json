@@ -1,6 +1,6 @@
 {
   "schemaVersion": "omnidesk.schema-contract-inventory.v1",
-  "generatedAt": "2026-07-22T11:56:44.010Z",
+  "generatedAt": "2026-07-24T04:17:46.405Z",
   "sourceOfTruth": "schemas/*.json plus git grep consumer evidence",
   "totals": {
     "contracts": 14,
@@ -48,7 +48,6 @@
         "schemas/conversation.schema.json"
       ],
       "versionConsumers": [
-        "HANDOFF.md",
         "desktop/src-tauri/src/runtime/chat_runtime.rs",
         "desktop/src/conversation-runtime/event-contract.js",
         "desktop/tests/schema-identity.test.mjs",
@@ -114,7 +113,6 @@
       "title": "OmniDesk Project Capabilities",
       "schemaVersion": "omnidesk.project-capabilities.v0.1",
       "pathConsumers": [
-        "HANDOFF.md",
         "docs/data/repository-file-inventory.json",
         "docs/data/repository-file-review.json",
         "docs/data/schema-contract-inventory.json"
@@ -179,7 +177,7 @@
       "title": "",
       "schemaVersion": "omnidesk.project-overview-contract.v0.1",
       "pathConsumers": [
-        "HANDOFF.md",
+        "desktop/src/components/workbench/workspace-facts-preview.jsx",
         "desktop/tests/fact-slot-acceptance.test.mjs",
         "desktop/tests/project-overview-contract.test.mjs",
         "desktop/tests/slot-runtime.test.mjs",
@@ -191,6 +189,7 @@
         "docs/data/schema-contract-inventory.json"
       ],
       "runtimeConsumers": [
+        "desktop/src/components/workbench/workspace-facts-preview.jsx",
         "desktop/tests/fact-slot-acceptance.test.mjs",
         "desktop/tests/project-overview-contract.test.mjs",
         "desktop/tests/slot-runtime.test.mjs"
@@ -318,7 +317,6 @@
       "title": "Workspace Facts",
       "schemaVersion": "omnidesk.workspace-facts.v0.1",
       "pathConsumers": [
-        "HANDOFF.md",
         "desktop/src-tauri/src/runtime/workspace.rs",
         "docs/data/repository-file-inventory.json",
         "docs/data/repository-file-review.json",

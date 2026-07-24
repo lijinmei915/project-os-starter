@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 
 test("keeps Workspace goal validation, confirmation, and decomposition behind injected clients", async () => {
   const source = await readFile(new URL("../src/components/workbench/use-workspace-goal-actions.js", import.meta.url), "utf8");
+  assert.match(source, /resolveWorkspaceGoal\(snapshot\)/);
   assert.match(source, /goalClient\.runGoalValidation/);
   assert.match(source, /goalClient\.signOffGoalValidation/);
   assert.match(source, /goalClient\.confirmGoalDecomposition/);

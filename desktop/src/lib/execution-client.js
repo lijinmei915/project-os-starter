@@ -32,8 +32,17 @@ export function executeAgentReadTool(name, arguments_ = {}) {
   return invokeRuntimeCommand("execute_agent_read_tool", { input: { name, arguments: arguments_ } });
 }
 
-export function runHermesAgent(prompt, requestId = "", maxSteps = 20, approvalToken = "") {
-  return invokeRuntimeCommand("run_hermes_agent", { input: { approvalToken, maxSteps, prompt, requestId } });
+export function runHermesAgent(prompt, requestId = "", maxSteps = 20, approvalToken = "", context = {}) {
+  return invokeRuntimeCommand("run_hermes_agent", {
+    input: {
+      approvalToken,
+      conversationId: String(context?.conversationId || ""),
+      maxSteps,
+      prompt,
+      requestId,
+      taskId: String(context?.taskId || ""),
+    },
+  });
 }
 
 // Kept for older callers; the live approval flow now continues by run id so it
@@ -63,4 +72,17 @@ export async function approveHermesAgent(run) {
   if (!updated) throw new Error("已执行工具的 Agent Run 未找到。");
   if (updated.status === "failed") return updated;
   return invokeRuntimeCommand("continue_agent_run", { input: { id: updated.id } });
+}
+
+export async function submitAgentInteraction(run, { action = "submit", answers = {} } = {}) {
+  if (!run?.id || !run?.checkpoint?.interaction?.id) throw new Error("缺少待提交的追问表单。");
+  const accepted = await invokeRuntimeCommand("submit_agent_interaction", {
+    input: { action, answers, formId: run.checkpoint.interaction.id, id: run.id },
+  });
+  if (accepted.status !== "queued") return accepted;
+  try {
+    return await invokeRuntimeCommand("continue_agent_run", { input: { id: accepted.id } });
+  } catch (error) {
+    return { ...accepted, continuationError: error instanceof Error ? error.message : String(error) };
+  }
 }

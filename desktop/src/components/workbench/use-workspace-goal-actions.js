@@ -1,3 +1,5 @@
+import { resolveWorkspaceGoal } from "../../lib/workspace-context";
+
 // Coordinates Workspace goal mutations while keeping persistence and model clients injected.
 export function useWorkspaceGoalActions({
   applySnapshot,
@@ -22,35 +24,49 @@ export function useWorkspaceGoalActions({
   updateWorkspaceGoal,
 }) {
   const validateGoal = async () => {
+    const goalId = String(resolveWorkspaceGoal(snapshot)?.id || "").trim();
+    if (!goalId) {
+      showToast("没有可验收的当前目标。请先建立或切换目标。", "warning");
+      return false;
+    }
     const feedbackKey = "validate-goal";
     beginActionFeedback(feedbackKey, "正在验证目标...");
     setValidatingGoal(true);
     setError("");
     try {
-      applySnapshot(await goalClient.runGoalValidation({ goalId: snapshot?.goals?.activeGoalId, loadWorkspaceSnapshot }));
+      applySnapshot(await goalClient.runGoalValidation({ goalId, loadWorkspaceSnapshot }));
       finishActionFeedback(feedbackKey, "success", "目标验收已完成。");
+      return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setError(message);
       finishActionFeedback(feedbackKey, "failed", `目标验收失败：${message}`);
+      return false;
     } finally {
       setValidatingGoal(false);
     }
   };
 
   const signOffGoal = async () => {
+    const goalId = String(resolveWorkspaceGoal(snapshot)?.id || "").trim();
+    if (!goalId) {
+      showToast("没有可确认完成的当前目标。请先建立或切换目标。", "warning");
+      return false;
+    }
     const feedbackKey = "signoff-goal";
     beginActionFeedback(feedbackKey, "正在确认完成...");
     setSigningGoal(true);
     setError("");
     try {
-      applySnapshot(await goalClient.signOffGoalValidation({ goalId: snapshot?.goals?.activeGoalId, loadWorkspaceSnapshot }));
+      applySnapshot(await goalClient.signOffGoalValidation({ goalId, loadWorkspaceSnapshot }));
       setGoalRefinementMode(false);
       finishActionFeedback(feedbackKey, "success", "目标已确认完成。");
+      return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setError(message);
       finishActionFeedback(feedbackKey, "failed", `确认完成失败：${message}`);
+      return false;
     } finally {
       setSigningGoal(false);
     }
@@ -95,6 +111,9 @@ export function useWorkspaceGoalActions({
       for (const item of draftItems) {
         const plan = buildPreviewPlan({ task: item.title }, snapshot);
         const task = createTaskFromPlan({ ...plan, summary: item.detail, steps: [item.detail, ...plan.steps] }, item.title, snapshot, {
+          goalId: goal.id,
+          goalTitle: goal.shortTitle || goal.title || "",
+          origin: "goal-decomposition",
           requestId: `goal-decomposition:${goal.id}:${item.id}`,
         });
         createdTasks.push(await persistTask({ ...task, status: taskStatuses.waitingApproval }, { durable: true }));

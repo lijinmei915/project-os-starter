@@ -30,6 +30,7 @@ test("creates an immutable bounded Agent Run", () => {
   assert.equal(value.maxSteps, 20);
   assert.equal(value.attempt, 0);
   assert.equal(value.revision, 0);
+  assert.deepEqual(value.interactions, []);
   assert.equal(Object.isFrozen(value), true);
 });
 
@@ -69,6 +70,14 @@ test("enforces legal Agent Run transitions and step budget", () => {
   assert.throws(() => transitionAgentRun(waiting, agentRunStatuses.succeeded), /illegal agent run transition/);
   const exhausted = createAgentRun({ executorId: "hermes-acp", id: "run-2", maxSteps: 1, projectId: "project-1", requestId: "request-2", status: agentRunStatuses.running, step: 1 });
   assert.throws(() => transitionAgentRun(exhausted, agentRunStatuses.verifying), /step budget exhausted/);
+});
+
+test("keeps user input waiting separate from write approval and restart recovery", () => {
+  const running = transitionAgentRun(run(), agentRunStatuses.running, "2026-07-18T00:00:01.000Z");
+  const waiting = transitionAgentRun(running, agentRunStatuses.awaitingUserInput, "2026-07-18T00:00:02.000Z");
+  assert.equal(recoverAgentRun(waiting, "2026-07-18T00:00:03.000Z"), waiting);
+  assert.equal(agentRunConversationEvent(waiting).phase, "input");
+  assert.equal(transitionAgentRun(waiting, agentRunStatuses.queued, "2026-07-18T00:00:04.000Z").status, agentRunStatuses.queued);
 });
 
 test("requires approval for write and execute tools but not read tools", () => {

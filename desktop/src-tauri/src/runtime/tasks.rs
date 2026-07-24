@@ -353,10 +353,12 @@ pub fn delete(root: &Path, id: &str, timestamp: &str) -> Result<(), String> {
             if collection_key == "goals" {
                 if let Some(goals) = document.get_mut("goals").and_then(Value::as_array_mut) {
                     for goal in goals {
-                        if let Some(task_ids) =
-                            goal.get_mut("taskIds").and_then(Value::as_array_mut)
-                        {
-                            task_ids.retain(|task_id| task_id.as_str() != Some(id));
+                        for field in ["taskIds", "decompositionTaskIds"] {
+                            if let Some(task_ids) =
+                                goal.get_mut(field).and_then(Value::as_array_mut)
+                            {
+                                task_ids.retain(|task_id| task_id.as_str() != Some(id));
+                            }
                         }
                     }
                 }
@@ -452,7 +454,7 @@ mod tests {
         fs::write(conversation_dir.join("conversation-1.json"), r#"{"schemaVersion":"project-os.desktop-conversation.v0.1","id":"conversation-1","taskId":"task-1"}"#).unwrap();
         fs::write(
             root.join(GOALS_PATH),
-            r#"{"goals":[{"id":"goal-1","taskIds":["task-1"]}]}"#,
+            r#"{"goals":[{"id":"goal-1","decompositionTaskIds":["task-1"],"taskIds":["task-1"]}]}"#,
         )
         .unwrap();
         fs::write(root.join(BACKLOG_PATH), r#"{"items":[{"id":"task-1"}]}"#).unwrap();
@@ -461,6 +463,10 @@ mod tests {
         assert!(!conversation_dir.join("conversation-1.json").exists());
         assert_eq!(
             read_json(&root.join(GOALS_PATH)).unwrap()["goals"][0]["taskIds"],
+            serde_json::json!([])
+        );
+        assert_eq!(
+            read_json(&root.join(GOALS_PATH)).unwrap()["goals"][0]["decompositionTaskIds"],
             serde_json::json!([])
         );
     }

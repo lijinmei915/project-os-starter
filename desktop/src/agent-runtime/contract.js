@@ -4,6 +4,7 @@ export const agentRunStatuses = Object.freeze({
   queued: "queued",
   running: "running",
   awaitingApproval: "awaiting-approval",
+  awaitingUserInput: "awaiting-user-input",
   applying: "applying",
   verifying: "verifying",
   succeeded: "succeeded",
@@ -33,14 +34,15 @@ const finalStatuses = new Set(agentRunFinalStatuses);
 
 const runTransitions = Object.freeze({
   [agentRunStatuses.queued]: [agentRunStatuses.running, agentRunStatuses.cancelled, agentRunStatuses.interrupted],
-  [agentRunStatuses.running]: [agentRunStatuses.awaitingApproval, agentRunStatuses.applying, agentRunStatuses.verifying, agentRunStatuses.succeeded, agentRunStatuses.failed, agentRunStatuses.cancelled, agentRunStatuses.interrupted],
+  [agentRunStatuses.running]: [agentRunStatuses.awaitingApproval, agentRunStatuses.awaitingUserInput, agentRunStatuses.applying, agentRunStatuses.verifying, agentRunStatuses.succeeded, agentRunStatuses.failed, agentRunStatuses.cancelled, agentRunStatuses.interrupted],
   [agentRunStatuses.awaitingApproval]: [agentRunStatuses.running, agentRunStatuses.applying, agentRunStatuses.failed, agentRunStatuses.cancelled, agentRunStatuses.interrupted],
+  [agentRunStatuses.awaitingUserInput]: [agentRunStatuses.queued, agentRunStatuses.failed, agentRunStatuses.cancelled],
   [agentRunStatuses.applying]: [agentRunStatuses.verifying, agentRunStatuses.succeeded, agentRunStatuses.failed, agentRunStatuses.cancelled, agentRunStatuses.interrupted],
   [agentRunStatuses.verifying]: [agentRunStatuses.running, agentRunStatuses.succeeded, agentRunStatuses.failed, agentRunStatuses.cancelled, agentRunStatuses.interrupted],
   [agentRunStatuses.interrupted]: [agentRunStatuses.queued, agentRunStatuses.awaitingApproval, agentRunStatuses.failed, agentRunStatuses.cancelled],
 });
 
-const agentRunKeys = new Set(["schemaVersion", "id", "requestId", "conversationId", "taskId", "projectId", "executorId", "status", "step", "maxSteps", "attempt", "revision", "createdAt", "updatedAt", "summary", "prompt", "approval", "approvalToken", "repairAttempt", "evidence", "checkpoint"]);
+const agentRunKeys = new Set(["schemaVersion", "id", "requestId", "conversationId", "taskId", "projectId", "executorId", "status", "step", "maxSteps", "attempt", "revision", "createdAt", "updatedAt", "summary", "prompt", "approval", "approvalToken", "repairAttempt", "evidence", "interactions", "checkpoint"]);
 
 function required(value, name) {
   const text = String(value || "").trim();
@@ -64,6 +66,7 @@ function checkpoint(input = {}, status = agentRunStatuses.queued) {
     toolName: String(value.toolName || ""),
     toolArguments: value.toolArguments && typeof value.toolArguments === "object" && !Array.isArray(value.toolArguments) ? value.toolArguments : {},
     toolResult: value.toolResult === undefined ? null : value.toolResult,
+    interaction: value.interaction && typeof value.interaction === "object" && !Array.isArray(value.interaction) ? value.interaction : null,
     allowedFiles: Array.isArray(value.allowedFiles) ? value.allowedFiles.map(String) : [],
     completedCheckIds: Array.isArray(value.completedCheckIds) ? value.completedCheckIds.map(String) : [],
     remainingRepairBudget: Number.isInteger(value.remainingRepairBudget) && value.remainingRepairBudget >= 0 ? value.remainingRepairBudget : 2,
@@ -92,6 +95,7 @@ export function createAgentRun(input = {}) {
     approvalToken: String(input.approvalToken || ""),
     repairAttempt: Number.isInteger(input.repairAttempt) && input.repairAttempt >= 0 ? input.repairAttempt : 0,
     evidence: Array.isArray(input.evidence) ? input.evidence : [],
+    interactions: Array.isArray(input.interactions) ? input.interactions : [],
     checkpoint: checkpoint(input.checkpoint, input.status || agentRunStatuses.queued),
   };
   assertAgentRun(run);
@@ -134,6 +138,7 @@ export function assertAgentRun(value) {
   for (const key of ["summary", "prompt", "approvalToken"]) if (key in value && typeof value[key] !== "string") throw new Error("agent run text metadata must be strings");
   if ("approval" in value && value.approval !== null && (!value.approval || typeof value.approval !== "object" || Array.isArray(value.approval))) throw new Error("agent run approval must be an object or null");
   if (!Array.isArray(value.evidence)) throw new Error("agent run evidence must be an array");
+  if (!Array.isArray(value.interactions)) throw new Error("agent run interactions must be an array");
   const currentCheckpoint = value.checkpoint;
   if (!currentCheckpoint || typeof currentCheckpoint !== "object" || Array.isArray(currentCheckpoint)) throw new Error("agent run checkpoint must be an object");
   for (const key of ["phase", "contextSummary", "nextAction", "toolName"]) if (typeof currentCheckpoint[key] !== "string") throw new Error("agent run checkpoint text metadata must be strings");

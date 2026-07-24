@@ -233,6 +233,50 @@ try {
     throw new Error(`原生测试构建没有写入终端启动阶段记录：${JSON.stringify({ runtimeIdentity, startupLocalTrace, startupTrace })}`);
   }
 
+  currentStage = "创建结构化追问夹具";
+  const conversationId = await script("return document.querySelector('[data-conversation-id]')?.dataset.conversationId || ''");
+  if (!conversationId) throw new Error("原生对话没有暴露稳定的 conversationId。");
+  const interactionRun = await invokeNative("seed_native_agent_interaction", { input: { conversationId } });
+  if (interactionRun?.status !== "awaiting-user-input" || interactionRun?.approval != null
+    || interactionRun?.checkpoint?.interaction?.kind !== "ask_user") {
+    throw new Error(`原生追问夹具没有进入安全等待态：${JSON.stringify(interactionRun)}`);
+  }
+  await script("window.dispatchEvent(new Event('omnidesk:agent-runs-changed')); return true");
+  currentStage = "提交对话内结构化追问";
+  const teamOption = await waitForElement('.conversationUserForm input[type="radio"][value="team"]');
+  await request(`/session/${sessionId}/element/${teamOption}/click`, { method: "POST" });
+  const formSubmit = await waitForElement(".conversationUserForm .uiButton-primary");
+  await request(`/session/${sessionId}/element/${formSubmit}/click`, { method: "POST" });
+  const interactionDeadline = Date.now() + 15_000;
+  let submittedInteraction;
+  while (Date.now() < interactionDeadline) {
+    submittedInteraction = await invokeNative("read_native_agent_interaction");
+    if (submittedInteraction?.interactions?.[0]?.status === "submitted") break;
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  const persistedForm = submittedInteraction?.interactions?.[0];
+  if (persistedForm?.response?.answers?.scope !== "team" || submittedInteraction?.approval != null
+    || submittedInteraction?.checkpoint?.toolResult?.type !== "ask_user_result") {
+    throw new Error(`结构化追问没有持久化回答或错误创建了审批：${JSON.stringify(submittedInteraction)}`);
+  }
+  const sameReply = await invokeNative("submit_agent_interaction", { input: {
+    action: "submit", answers: { scope: "team" }, formId: persistedForm.id, id: submittedInteraction.id,
+  } });
+  if (sameReply?.revision !== submittedInteraction.revision) throw new Error("相同表单回答没有保持幂等。");
+  let conflictingReplyRejected = false;
+  try {
+    await invokeNative("submit_agent_interaction", { input: {
+      action: "submit", answers: { scope: "personal" }, formId: persistedForm.id, id: submittedInteraction.id,
+    } });
+  } catch (error) {
+    conflictingReplyRejected = String(error).includes("已经提交");
+  }
+  if (!conflictingReplyRejected) throw new Error("冲突的重复表单回答没有被拒绝。");
+
+  currentStage = "重建等待中的追问用于重启恢复";
+  const pendingBeforeRestart = await invokeNative("seed_native_agent_interaction", { input: { conversationId } });
+  if (pendingBeforeRestart?.status !== "awaiting-user-input") throw new Error("无法创建重启恢复追问夹具。");
+
   currentStage = "创建恢复夹具";
   const seeded = await invokeNative("seed_native_agent_run_for_recovery");
   const expectedAuthorizedFiles = ["README.md", "AGENTS.md", "PROJECT.md", "docs/TESTING.md"];
@@ -248,6 +292,13 @@ try {
   await openSession();
   currentStage = "等待重启后的窗口渲染";
   await waitForElement('textarea[aria-label="任务输入"]');
+  const restoredForm = await waitForElement('.conversationUserForm input[type="radio"][value="team"]');
+  if (!restoredForm) throw new Error("重启后没有恢复对话内的待回答表单。");
+  const restoredInteraction = await invokeNative("read_native_agent_interaction");
+  if (restoredInteraction?.status !== "awaiting-user-input" || restoredInteraction?.approval != null
+    || restoredInteraction?.checkpoint?.interaction?.status !== "pending") {
+    throw new Error(`重启后追问状态不正确：${JSON.stringify(restoredInteraction)}`);
+  }
   currentStage = "验证恢复审批";
   const interrupted = await invokeNative("read_native_agent_run_for_recovery");
   if (interrupted?.status !== "interrupted" || interrupted?.checkpoint?.nextAction !== "resume-approval"
@@ -290,7 +341,7 @@ try {
     }
   }
 
-  console.log(`原生 WebDriver smoke 通过：可定位并驱动输入与发送状态，重启后恢复原审批${diagnoseTerminal ? "，并完成终端诊断" : ""}；未提交消息，未写入工程文件。`);
+  console.log(`原生 WebDriver smoke 通过：可提交持久化 ask_user 表单、验证幂等并在重启后恢复表单与原审批${diagnoseTerminal ? "，并完成终端诊断" : ""}；未写入工程文件。`);
 } catch (error) {
   failure = error instanceof Error ? error : new Error(String(error));
   console.error(`原生 WebDriver smoke 失败（${currentStage}）：${failure.message}`);

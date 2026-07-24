@@ -34,6 +34,7 @@ export function usePlanAction({
         commandInput,
         createTask: (plan) => createTaskFromPlan(plan, commandInput.displayTask || commandInput.task, {
           conversationId: commandInput.conversationId || activeConversationId,
+          origin: "conversation",
           requestId,
           startedAt: commandInput.startedAt,
         }),

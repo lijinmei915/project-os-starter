@@ -50,7 +50,7 @@ export function createTaskLifecycleController({
         id: `manual-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
         title: taskTitle, status: taskStatuses.planned, createdAt, updatedAt: createdAt,
         projectId: snapshot.currentProjectId || "", projectName: snapshot.projectName || "", projectPath: snapshot.currentProjectPath || "",
-        goalId: goal?.id || "", goalTitle: goal?.shortTitle || goal?.title || "", runs: [],
+        goalId: goal?.id || "", goalTitle: goal?.shortTitle || goal?.title || "", origin: "manual", runs: [],
         plan: {
           task: taskTitle, projectName: snapshot.projectName || "", mode: "manual-task",
           summary: String(summary || "").trim() || `推进任务：${taskTitle}`,

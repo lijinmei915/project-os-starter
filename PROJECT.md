@@ -1,7 +1,7 @@
 ---
 layer: knowledge
 type: status
-last_verified: 2026-07-23
+last_verified: 2026-07-24
 teaches: "OmniDesk 当前产品内核、阶段、可靠性基线和唯一下一步"
 use_when: "AI 需要判断 OmniDesk 当前状态、架构边界或下一步工作时"
 depends_on: [AGENTS.md, docs/ARCHITECTURE.md, docs/PRODUCT_PLAN.md]
@@ -18,7 +18,7 @@ depends_on: [AGENTS.md, docs/ARCHITECTURE.md, docs/PRODUCT_PLAN.md]
 - 项目名：`OmniDesk`
 - 产品形态：基于 `Tauri + React + Local Agent Runtime` 的本地 AI 工程工作台
 - 唯一产品核心：`desktop/` 内的 OmniDesk Desktop Runtime
-- 当前阶段：`OmniDesk 仓库文件治理与架构收敛 v1`
+- 当前阶段：`OmniDesk 结构化追问表单闭环 v1`
 
 OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生成计划和 Patch 草稿、执行独立审批、运行检查、有限修复并保存可审计证据。它不是 Project OS 安装器、AI 工程评分工具或跨工具模板分发产品。
 
@@ -42,9 +42,11 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 
 - 对话 SSE 流式输出、请求级取消、新请求接管和迟到结果拒绝。
 - Agent Run 持久化、独立审批、Patch 应用、检查、最多两轮修复，以及工具边界的阶段 checkpoint 恢复。
+- Agent 缺少关键参数时可通过标准 `ask_user` interaction 暂停：请求、回答和跳过结果均持久化到 Agent Run；对话内按 schema 渲染单选、多选、文本与确认表单，提交后从 checkpoint 重新请求同一任务。
+- `ask_user` 与 Patch/Check 审批严格隔离：回答不会创建、消费或替代工程审批；相同回答幂等，冲突重复回答拒绝，桌面应用重启后仍可恢复待回答表单。
 - Workspace、Conversation、Task、Goal、Provider、Execution 的 Runtime 模块与 Repository 事务边界。
 - 正式 12-case Eval：任务成功率 100%、Patch 可应用率 90.9%、检查通过率 100%、恢复成功率 100%。
-- 当前工作树回归：Desktop Node 540/540、Runtime Rust 142/142、Patch Normalizer 7/7、原生 WebDriver smoke；Web build 与 790.80 KiB/800 KiB 首屏软预算通过。
+- 当前工作树回归：Desktop Node 547/547、Runtime Rust 147/147、Patch Normalizer 7/7、原生 WebDriver smoke；Web build 与 797.45 KiB/800 KiB 首屏软预算通过。
 - `.omnidesk/` v1 四分区 schema、非破坏性迁移器和启动激活已接入生产 Runtime：支持幂等复制、冲突拒绝、符号链接跳过和 legacy 回退。
 - Repository、Workspace、Provider、Task、Conversation、Agent Run 与 Preview 均按分区直接读写；文件树和 Agent 读取工具隐藏 Runtime 状态目录与可能遗留的旧目录。
 - Desktop Runtime 已停止编译旧 `governance` bridge，不再暴露 `run_project_os_action`，受控检查只执行 Desktop Node、Web build 与 Cargo 检查；浏览器 Preview 的事实刷新只重新读取只读 snapshot。
@@ -72,9 +74,8 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 
 正在做：
 
-- 按文件账本收口根目录、文档 SSOT 与失效旧入口。
-- 治理 schema、兼容命名和状态契约，明确保留、迁移与退役条件。
-- 在保持 Runtime 行为与真实 Eval 门槛的前提下，按领域拆分前端与 Runtime 聚合文件。
+- 保持普通闲聊为轻量 Provider 链路；只有确认执行的任务进入 Hermes 工具循环，避免两条链路重复扩展复杂能力。
+- 准备在受保护环境以真实 Provider trace 验证模型主动追问后的完整任务完成率。
 
 当前风险：
 
@@ -84,5 +85,5 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 
 ## 下一步重点
 
-1. 在独立确认后归档并压缩 `HANDOFF.md` 的历史流水，只保留当前接手摘要；不得丢失可追溯证据。
-2. 审核其余 schema、生成物与前端 Owner；每个批次通过对应本地回归、原生 smoke 与受保护 Eval 门槛。
+1. 在受保护环境运行真实 Provider Eval，验证模型实际调用 `ask_user` 后能继续完成 Patch、审批与检查闭环；本地测试不得伪造该 trace。
+2. 根据真实 trace 决定是否扩展字段 widget；在证据不足前不把普通聊天迁入复杂 Agent 循环。

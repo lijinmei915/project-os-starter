@@ -173,7 +173,6 @@ const localStatusReply = (input) => localStatusReplyProjection({
 const goalPresentationDependencies = { phaseLabel, taskStatuses };
 const goalStatusLabel = (todos, fallbackPhase) => goalStatusLabelProjection(todos, fallbackPhase, goalPresentationDependencies);
 const createTaskFromPlan = (plan, taskText, snapshot, options = {}) => createTaskRecordFromPlan(plan, taskText, snapshot, options, {
-  activeGoalFromSnapshot,
   taskIdForRequest,
   taskStatuses,
 });
@@ -344,6 +343,7 @@ function AgentWorkspace({
   onGetHermesExecutorStatus,
   onApproveAgentRun,
   onResumeAgentRun,
+  onSubmitAgentInteraction,
 }) {
   const [taskInput, setTaskInput] = useState("");
   const { addImageFiles, attachmentError, attachments, clearAttachments, removeAttachment } = useChatAttachments({ readFileAsDataUrl });
@@ -361,8 +361,18 @@ function AgentWorkspace({
   });
   const composerRef = React.useRef(null);
   const pendingApplyRequestRef = React.useRef(false);
-  const isConversationEmpty = !chatTurns.length && !activeTask && !readonlyPlan && !loading && !error && !pendingTurn && !chatLoading;
+  const [submittingInteractionId, setSubmittingInteractionId] = useState("");
   const useAssistantUiPoc = assistantUiPocEnabled(window.location.search);
+  const interactions = agentRuns
+    .filter((run) => run.conversationId === activeConversationId)
+    .flatMap((run) => {
+      const history = Array.isArray(run.interactions) ? run.interactions : [];
+      const active = run.checkpoint?.interaction;
+      const records = active && !history.some((item) => item.id === active.id) ? [...history, active] : history;
+      return records.map((interaction) => ({ interaction, run }));
+    })
+    .sort((left, right) => String(left.interaction.requestedAt || "").localeCompare(String(right.interaction.requestedAt || "")));
+  const isConversationEmpty = !chatTurns.length && !activeTask && !readonlyPlan && !loading && !error && !pendingTurn && !chatLoading && !interactions.length;
   const providerHealth = providerModelHealth(provider, composerModelAvailability);
   const {
     activeTaskPosition,
@@ -502,16 +512,23 @@ function AgentWorkspace({
         chatLoadingEvents={chatLoadingEvents}
         chatLoadingLabel={chatLoadingLabel}
         chatStartedAt={chatStartedAt}
+        interactions={interactions}
+        conversationId={activeConversationId}
         conversationState={conversationRuntime.state}
         error={error}
         isEmpty={isConversationEmpty}
         loading={loading}
         onTurnAction={(action, turn) => handleConversationTurnAction(action, turn, { projectExecution: true })}
+        onSubmitInteraction={async (run, response) => {
+          setSubmittingInteractionId(run.id);
+          try { await onSubmitAgentInteraction?.(run, response); } finally { setSubmittingInteractionId(""); }
+        }}
         onUseStarterPrompt={useStarterPrompt}
         pendingTurn={pendingTurn}
         phase={snapshot.phase}
         starterPrompts={chatStarterPrompts}
         streamingReply={streamingReply}
+        submittingInteractionId={submittingInteractionId}
         tasks={tasks}
         turns={chatTurns}
       />
@@ -674,12 +691,14 @@ function App() {
 
   useEffect(() => {
     let active = true;
-    executionClient.listAgentRuns().then((runs) => {
+    const refresh = () => executionClient.listAgentRuns().then((runs) => {
       if (!active) return;
       const records = Array.isArray(runs) ? runs : [];
       setAgentRuns(records.filter((run) => !snapshot?.currentProjectId || run.projectId === snapshot.currentProjectId));
     }).catch(() => { if (active) setAgentRuns([]); });
-    return () => { active = false; };
+    refresh();
+    window.addEventListener("omnidesk:agent-runs-changed", refresh);
+    return () => { active = false; window.removeEventListener("omnidesk:agent-runs-changed", refresh); };
   }, [snapshot?.currentProjectId, snapshot?.currentProjectPath, source]);
 
   const resumeAgentRun = async (run) => {
@@ -699,6 +718,19 @@ function App() {
       const result = await executionClient.approveHermesAgent(run);
       const records = await executionClient.listAgentRuns();
       setAgentRuns((Array.isArray(records) ? records : []).filter((item) => !snapshot?.currentProjectId || item.projectId === snapshot.currentProjectId));
+      return result;
+    } catch (error_) {
+      showToast(error_ instanceof Error ? error_.message : String(error_));
+      return null;
+    }
+  };
+
+  const submitAgentInteraction = async (run, response) => {
+    try {
+      const result = await executionClient.submitAgentInteraction(run, response);
+      const records = await executionClient.listAgentRuns();
+      setAgentRuns((Array.isArray(records) ? records : []).filter((item) => !snapshot?.currentProjectId || item.projectId === snapshot.currentProjectId));
+      if (result?.continuationError) showToast(`回答已保存，但 Agent 继续失败：${result.continuationError}`);
       return result;
     } catch (error_) {
       showToast(error_ instanceof Error ? error_.message : String(error_));
@@ -854,6 +886,32 @@ function App() {
     withTimeout,
   });
 
+  const startHermesTaskAgent = async (task) => {
+    const rawRequestId = `task-${task.id}-${Date.now()}`;
+    const requestId = rawRequestId.replace(/[^a-zA-Z0-9_-]/g, "-");
+    const plan = task.plan || {};
+    const prompt = [
+      `继续执行任务：${task.title || plan.task || "未命名任务"}`,
+      plan.summary ? `任务摘要：${plan.summary}` : "",
+      Array.isArray(plan.steps) && plan.steps.length ? `计划步骤：${plan.steps.join("；")}` : "",
+      "先读取完成任务所需的最小工程上下文。若缺少会实质影响实现结果的必要参数，调用 ask_user；不要用普通文本猜测。用户回答不代表允许写文件或运行检查。需要写入或检查时分别请求独立审批。",
+    ].filter(Boolean).join("\n");
+    try {
+      const result = await executionClient.runHermesAgent(prompt, requestId, 20, "", {
+        conversationId: task.conversationId || activeConversationId,
+        taskId: task.id,
+      });
+      const records = await executionClient.listAgentRuns();
+      setAgentRuns((Array.isArray(records) ? records : []).filter((item) => !snapshot?.currentProjectId || item.projectId === snapshot.currentProjectId));
+      return ["awaiting-user-input", "awaiting-approval", "succeeded"].includes(result?.status);
+    } catch (error_) {
+      const message = error_ instanceof Error ? error_.message : String(error_);
+      setError(message);
+      showToast(message);
+      return false;
+    }
+  };
+
   const runChatAction = createConversationActionController({
     activeTaskId,
     applySnapshot,
@@ -875,6 +933,7 @@ function App() {
     selectTask: (...args) => selectTask(...args),
     setError,
     setSelectedEngineeringFile,
+    startHermesAgent: startHermesTaskAgent,
     stopPlanGeneration,
     taskStatuses,
     tasks,
@@ -1091,6 +1150,7 @@ function App() {
           agentRuns={agentRuns}
           onApproveAgentRun={approveAgentRun}
           onResumeAgentRun={resumeAgentRun}
+          onSubmitAgentInteraction={submitAgentInteraction}
           activeConversationTaskId={activeConversationTaskId}
           selectedEngineeringFile={selectedEngineeringFile}
           activeConversationId={activeConversationId}

@@ -58,7 +58,7 @@ export function RightRail({
   const {
     activeConversationCount, activeGoal, conversationGroups, currentPhaseTodos,
     futurePhaseTodos, goalIsDraft, goalIsPlanned, goalMeta, goalNeedsVerification,
-    goalSignedOff, goalSteps, goalTitle, goalVerified, hasActiveWorkGoal, profileItems,
+    goalSignedOff, goalSteps, goalTitle, goalVerified, hasActiveWorkGoal, hasGoalProgress, profileItems,
     progressValue, todoMeta, useDialoguePhaseGroups, validationCriteria, visibleGoalTodos,
   } = buildRightRailViewModel({
     activeConversationId, activeTaskId, conversations, isNoiseTask, planLoading, snapshot,
@@ -91,9 +91,9 @@ export function RightRail({
     return (
       <aside className="right right-collapsed" aria-label="右侧状态栏已折叠">
         <div className="collapsedRail collapsedRail-right">
-          <Tooltip content={`目标 ${progressValue}%`}>
-            <button className="collapsedRailItem active" type="button" onClick={onToggleCollapsed} aria-label={`目标 ${progressValue}%`}>
-              <span className="collapsedProgress">{progressValue}</span>
+          <Tooltip content={hasGoalProgress ? `目标 ${progressValue}%` : "目标等待拆解"}>
+            <button className="collapsedRailItem active" type="button" onClick={onToggleCollapsed} aria-label={hasGoalProgress ? `目标 ${progressValue}%` : "目标等待拆解"}>
+              <span className="collapsedProgress">{hasGoalProgress ? progressValue : "-"}</span>
             </button>
           </Tooltip>
           <Tooltip content={`任务 ${todoMeta}`}>
@@ -124,14 +124,18 @@ export function RightRail({
                     <em>{viewingCompletedGoal ? "已完成" : goalMeta}</em>
                   </strong>
                 </div>
-                <div className="goalProgressBar" aria-hidden="true">
-                  <span style={{ width: `${progressValue}%` }} />
-                </div>
-                <div className="goalSteps">
-                  {goalSteps.map((step) => (
-                    <span key={step}>{step}</span>
-                  ))}
-                </div>
+                {hasGoalProgress ? (
+                  <>
+                    <div className="goalProgressBar" aria-hidden="true">
+                      <span style={{ width: `${progressValue}%` }} />
+                    </div>
+                    <div className="goalSteps">
+                      {goalSteps.map((step) => (
+                        <span key={step}>{step}</span>
+                      ))}
+                    </div>
+                  </>
+                ) : null}
                 {viewingCompletedGoal ? (
                   <div className="goalVerifyNotice">
                     <span>这是已完成目标的历史记录。</span>
@@ -197,8 +201,8 @@ export function RightRail({
                         </Dialog>
                       </div>
                     ) : (
-                      <button type="button" onClick={onValidateGoal} disabled={validatingGoal}>
-                        {validatingGoal ? "验证中" : "验证目标"}
+                      <button type="button" onClick={onValidateGoal} disabled={validatingGoal || !activeGoal?.id}>
+                        {validatingGoal ? "验证中" : activeGoal?.id ? "验证目标" : "未选择目标"}
                       </button>
                     )}
                   </div>
@@ -380,7 +384,7 @@ export function RightRail({
         <Dialog open={historyManagementOpen} onOpenChange={setHistoryManagementOpen}>
           <DialogContent title="历史管理" description="这里只显示已归档对话；归档可恢复，永久删除的对话不会保留记录。">
             <div className="conversationHistoryManagement">
-              {conversations.filter((conversation) => conversation.archivedAt).map((conversation) => (
+              {conversations.filter((conversation) => conversation.archivedAt && !conversation.taskId).map((conversation) => (
                 <ConversationHistoryItem
                   active={false}
                   conversation={conversation}

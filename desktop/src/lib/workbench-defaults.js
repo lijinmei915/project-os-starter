@@ -54,6 +54,7 @@ export const fallbackSnapshot = {
       status: "done",
       validationStatus: "passed",
       summary: "Desktop v0.1 目标验收已通过并确认完成。",
+      decompositionTaskIds: [],
       taskIds: [],
     }],
   },

@@ -3,7 +3,6 @@ import { Archive, RotateCcw, X } from "lucide-react";
 import { Panel } from "../ui/panel";
 import { Tooltip } from "../ui/tooltip";
 import { formatConversationUpdatedAt } from "../../lib/conversation-presentation";
-import { Badge } from "../ui/badge";
 
 export function ConversationHistoryItem({ conversation, active, onArchiveConversation, onDeleteConversation, onRestoreConversation, onSelectConversation }) {
   return (
@@ -18,7 +17,6 @@ export function ConversationHistoryItem({ conversation, active, onArchiveConvers
           <div className="conversationHistoryHead">
             <div className="conversationHistoryTitle">
               <strong>{conversation.title}</strong>
-              {conversation.taskId ? <Badge variant="info">任务对话</Badge> : null}
             </div>
             <span>{formatConversationUpdatedAt(conversation.updatedAt)}</span>
           </div>

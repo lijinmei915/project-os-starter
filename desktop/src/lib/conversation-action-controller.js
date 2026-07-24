@@ -6,7 +6,7 @@ export function createConversationActionController({
   activeTaskId, applySnapshot, beginActionFeedback, confirmWorkspaceGoal, createWorkspaceGoal,
   executeGuardedCheck, executePatchApply, executePatchDraft, executeRegisteredConversationAction,
   finishActionFeedback, generatePlan, markTaskWaiting, selectEngineeringFile, selectTask,
-  createRepairTask, generatePatchDraft, onEnsureModelAvailable, runGuardedCheck, setError, setSelectedEngineeringFile, stopPlanGeneration, taskStatuses, tasks, topicPayloadFromOutline,
+  createRepairTask, generatePatchDraft, onEnsureModelAvailable, runGuardedCheck, setError, setSelectedEngineeringFile, startHermesAgent, stopPlanGeneration, taskStatuses, tasks, topicPayloadFromOutline,
 }) {
   return async function runChatAction(action) {
     return executeRegisteredConversationAction(action, {
@@ -59,6 +59,10 @@ export function createConversationActionController({
             if (onEnsureModelAvailable && !await onEnsureModelAvailable()) {
               setError("当前模型不可用，任务没有开始。请更新 Key 或切换连接后重试。");
               finishActionFeedback(feedbackKey, "failed", "模型不可用，任务未启动。");
+              return false;
+            }
+            if (startHermesAgent && !await startHermesAgent(task)) {
+              finishActionFeedback(feedbackKey, "failed", "Agent 没有成功启动，任务状态未改变。");
               return false;
             }
             if (await markTaskWaiting(task.id) === false) {

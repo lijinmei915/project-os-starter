@@ -19,7 +19,7 @@ export function useGovernanceTaskActions({ activeConversationId, snapshot, desig
       task: statusTitle,
       trace: [`GOVERNANCE_FILE_STATUS: ${status || "all"}`, `GOVERNANCE_FILE_COUNT: ${fileList.length}`],
     };
-    const task = createTaskFromPlan(plan, statusTitle, snapshot, { conversationId: activeConversationId });
+    const task = createTaskFromPlan(plan, statusTitle, snapshot, { conversationId: activeConversationId, origin: "governance" });
     await persistTask({ ...task, governanceFileStatus: status, governanceFiles: actionableFiles });
     showToast(`已生成治理文件任务：${statusTitle}`, "success");
     return true;
@@ -43,7 +43,7 @@ export function useGovernanceTaskActions({ activeConversationId, snapshot, desig
       task: taskTitle,
       trace: [`DESIGN_GOVERNANCE_TOPIC: ${topic?.id || "design-implementation"}`, `DESIGN_GOVERNANCE_FILE_COUNT: ${fileList.length}`],
     };
-    const task = createTaskFromPlan(plan, taskTitle, snapshot, { conversationId: activeConversationId });
+    const task = createTaskFromPlan(plan, taskTitle, snapshot, { conversationId: activeConversationId, origin: "governance" });
     await persistTask({ ...task, designGovernanceFiles: actionableFiles, designGovernanceTopic: topic?.id || "design-implementation" });
     showToast(`已生成设计实现治理任务：${taskTitle}`, "success");
     return true;
