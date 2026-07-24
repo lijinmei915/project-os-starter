@@ -1,19 +1,19 @@
 {
   "schemaVersion": "omnidesk.agent-eval-report.v0.1",
-  "generatedAt": "2026-07-19T15:51:16.394Z",
+  "generatedAt": "2026-07-24T06:22:19.188Z",
   "status": "complete",
   "totals": {
-    "cases": 12,
-    "completed": 12,
+    "cases": 13,
+    "completed": 13,
     "missing": 0
   },
   "metrics": {
     "taskSuccessRate": 1,
-    "patchApplicableRate": 0.9090909090909091,
+    "patchApplicableRate": 0.9166666666666666,
     "checkPassRate": 1,
     "recoverySuccessRate": 1,
-    "approvalCount": 10,
-    "averageDurationMs": 6684,
+    "approvalCount": 11,
+    "averageDurationMs": 17475,
     "totalCostUsd": 0
   },
   "cases": [
@@ -30,18 +30,18 @@
         "caseId": "readme-copy",
         "success": true,
         "patchApplicable": true,
-        "rawPatchApplicable": false,
+        "rawPatchApplicable": true,
         "normalizedPatchApplicable": true,
         "checksPassed": true,
         "recovered": false,
         "approvalCount": 1,
-        "durationMs": 7629,
+        "durationMs": 23683,
         "costUsd": 0,
         "execution": {
           "executor": "hermes-cli",
-          "fixture": "/var/folders/gr/6sznz66n75l_wwbvzngnyctr0000gn/T/omnidesk-eval-readme-copy-L98hSy",
-          "executedAt": "2026-07-19T15:49:54.489Z",
-          "tracePath": "/var/folders/gr/6sznz66n75l_wwbvzngnyctr0000gn/T/omnidesk-eval-readme-copy-L98hSy/trace.json"
+          "fixture": "/tmp/omnidesk-eval-readme-copy-0xfZ0M",
+          "executedAt": "2026-07-24T06:18:55.027Z",
+          "tracePath": "traces/readme-copy.trace.json"
         }
       }
     },
@@ -63,13 +63,13 @@
         "checksPassed": true,
         "recovered": false,
         "approvalCount": 1,
-        "durationMs": 7289,
+        "durationMs": 18613,
         "costUsd": 0,
         "execution": {
           "executor": "hermes-cli",
-          "fixture": "/var/folders/gr/6sznz66n75l_wwbvzngnyctr0000gn/T/omnidesk-eval-json-schema-field-MW3tFU",
-          "executedAt": "2026-07-19T15:50:01.823Z",
-          "tracePath": "/var/folders/gr/6sznz66n75l_wwbvzngnyctr0000gn/T/omnidesk-eval-json-schema-field-MW3tFU/trace.json"
+          "fixture": "/tmp/omnidesk-eval-json-schema-field-fxuBc7",
+          "executedAt": "2026-07-24T06:19:13.681Z",
+          "tracePath": "traces/json-schema-field.trace.json"
         }
       }
     },
@@ -91,13 +91,13 @@
         "checksPassed": true,
         "recovered": false,
         "approvalCount": 1,
-        "durationMs": 7636,
+        "durationMs": 16872,
         "costUsd": 0,
         "execution": {
           "executor": "hermes-cli",
-          "fixture": "/var/folders/gr/6sznz66n75l_wwbvzngnyctr0000gn/T/omnidesk-eval-react-copy-cidFG1",
-          "executedAt": "2026-07-19T15:50:09.505Z",
-          "tracePath": "/var/folders/gr/6sznz66n75l_wwbvzngnyctr0000gn/T/omnidesk-eval-react-copy-cidFG1/trace.json"
+          "fixture": "/tmp/omnidesk-eval-react-copy-RGVldQ",
+          "executedAt": "2026-07-24T06:19:30.594Z",
+          "tracePath": "traces/react-copy.trace.json"
         }
       }
     },
@@ -119,13 +119,13 @@
         "checksPassed": true,
         "recovered": false,
         "approvalCount": 1,
-        "durationMs": 8288,
+        "durationMs": 16681,
         "costUsd": 0,
         "execution": {
           "executor": "hermes-cli",
-          "fixture": "/var/folders/gr/6sznz66n75l_wwbvzngnyctr0000gn/T/omnidesk-eval-css-token-z6duJw",
-          "executedAt": "2026-07-19T15:50:17.838Z",
-          "tracePath": "/var/folders/gr/6sznz66n75l_wwbvzngnyctr0000gn/T/omnidesk-eval-css-token-z6duJw/trace.json"
+          "fixture": "/tmp/omnidesk-eval-css-token-NFsvR5",
+          "executedAt": "2026-07-24T06:19:47.316Z",
+          "tracePath": "traces/css-token.trace.json"
         }
       }
     },
@@ -147,13 +147,13 @@
         "checksPassed": true,
         "recovered": false,
         "approvalCount": 1,
-        "durationMs": 7531,
+        "durationMs": 13663,
         "costUsd": 0,
         "execution": {
           "executor": "hermes-cli",
-          "fixture": "/var/folders/gr/6sznz66n75l_wwbvzngnyctr0000gn/T/omnidesk-eval-rust-guard-YfCy5I",
-          "executedAt": "2026-07-19T15:50:25.409Z",
-          "tracePath": "/var/folders/gr/6sznz66n75l_wwbvzngnyctr0000gn/T/omnidesk-eval-rust-guard-YfCy5I/trace.json"
+          "fixture": "/tmp/omnidesk-eval-rust-guard-7CYNoB",
+          "executedAt": "2026-07-24T06:20:01.022Z",
+          "tracePath": "traces/rust-guard.trace.json"
         }
       }
     },
@@ -175,20 +175,20 @@
         "checksPassed": true,
         "recovered": false,
         "approvalCount": 1,
-        "durationMs": 6678,
+        "durationMs": 17609,
         "costUsd": 0,
         "execution": {
           "executor": "hermes-cli",
-          "fixture": "/var/folders/gr/6sznz66n75l_wwbvzngnyctr0000gn/T/omnidesk-eval-test-regression-XZ2jgE",
-          "executedAt": "2026-07-19T15:50:32.129Z",
-          "tracePath": "/var/folders/gr/6sznz66n75l_wwbvzngnyctr0000gn/T/omnidesk-eval-test-regression-XZ2jgE/trace.json"
+          "fixture": "/tmp/omnidesk-eval-test-regression-OfEXbS",
+          "executedAt": "2026-07-24T06:20:18.672Z",
+          "tracePath": "traces/test-regression.trace.json"
         }
       }
     },
     {
       "id": "goal-rebind",
       "category": "transaction",
-      "task": "将任务从旧目标改绑到新目标",
+      "task": "在四份关联文件中将任务从旧目标改绑到新目标",
       "expected": [
         "patch",
         "apply",
@@ -204,13 +204,13 @@
         "checksPassed": true,
         "recovered": false,
         "approvalCount": 1,
-        "durationMs": 14740,
+        "durationMs": 33537,
         "costUsd": 0,
         "execution": {
           "executor": "hermes-cli",
-          "fixture": "/var/folders/gr/6sznz66n75l_wwbvzngnyctr0000gn/T/omnidesk-eval-goal-rebind-Sskla4",
-          "executedAt": "2026-07-19T15:50:46.908Z",
-          "tracePath": "/var/folders/gr/6sznz66n75l_wwbvzngnyctr0000gn/T/omnidesk-eval-goal-rebind-Sskla4/trace.json"
+          "fixture": "/tmp/omnidesk-eval-goal-rebind-E5Y9YZ",
+          "executedAt": "2026-07-24T06:20:52.249Z",
+          "tracePath": "traces/goal-rebind.trace.json"
         }
       }
     },
@@ -233,13 +233,13 @@
         "checksPassed": true,
         "recovered": false,
         "approvalCount": 1,
-        "durationMs": 7021,
+        "durationMs": 17384,
         "costUsd": 0,
         "execution": {
           "executor": "hermes-cli",
-          "fixture": "/var/folders/gr/6sznz66n75l_wwbvzngnyctr0000gn/T/omnidesk-eval-conversation-archive-yjSRn1",
-          "executedAt": "2026-07-19T15:50:53.972Z",
-          "tracePath": "/var/folders/gr/6sznz66n75l_wwbvzngnyctr0000gn/T/omnidesk-eval-conversation-archive-yjSRn1/trace.json"
+          "fixture": "/tmp/omnidesk-eval-conversation-archive-HS7CCp",
+          "executedAt": "2026-07-24T06:21:09.673Z",
+          "tracePath": "traces/conversation-archive.trace.json"
         }
       }
     },
@@ -256,18 +256,49 @@
         "caseId": "provider-validation",
         "success": true,
         "patchApplicable": true,
-        "rawPatchApplicable": true,
+        "rawPatchApplicable": false,
         "normalizedPatchApplicable": true,
         "checksPassed": true,
         "recovered": false,
         "approvalCount": 1,
-        "durationMs": 6867,
+        "durationMs": 18155,
         "costUsd": 0,
         "execution": {
           "executor": "hermes-cli",
-          "fixture": "/var/folders/gr/6sznz66n75l_wwbvzngnyctr0000gn/T/omnidesk-eval-provider-validation-VsBFOr",
-          "executedAt": "2026-07-19T15:51:00.878Z",
-          "tracePath": "/var/folders/gr/6sznz66n75l_wwbvzngnyctr0000gn/T/omnidesk-eval-provider-validation-VsBFOr/trace.json"
+          "fixture": "/tmp/omnidesk-eval-provider-validation-GbxCKx",
+          "executedAt": "2026-07-24T06:21:27.872Z",
+          "tracePath": "traces/provider-validation.trace.json"
+        }
+      }
+    },
+    {
+      "id": "ask-user-resume",
+      "category": "interaction",
+      "task": "缺少必要决策时结构化追问，回答后继续同一任务",
+      "expected": [
+        "interaction",
+        "resume",
+        "patch",
+        "apply",
+        "check",
+        "approval"
+      ],
+      "result": {
+        "caseId": "ask-user-resume",
+        "success": true,
+        "patchApplicable": true,
+        "rawPatchApplicable": true,
+        "normalizedPatchApplicable": true,
+        "checksPassed": true,
+        "recovered": true,
+        "approvalCount": 1,
+        "durationMs": 28794,
+        "costUsd": 0,
+        "execution": {
+          "executor": "hermes-cli",
+          "fixture": "/tmp/omnidesk-eval-ask-user-resume-2Nxq6X",
+          "executedAt": "2026-07-24T06:21:56.707Z",
+          "tracePath": "traces/ask-user-resume.trace.json"
         }
       }
     },
@@ -285,20 +316,20 @@
         "checksPassed": true,
         "recovered": false,
         "approvalCount": 0,
-        "durationMs": 2,
+        "durationMs": 1,
         "costUsd": 0,
         "execution": {
           "executor": "omnidesk-tool-gateway",
-          "fixture": "/var/folders/gr/6sznz66n75l_wwbvzngnyctr0000gn/T/omnidesk-eval-unsafe-path-l45Ew3",
-          "executedAt": "2026-07-19T15:51:00.918Z",
-          "tracePath": "/var/folders/gr/6sznz66n75l_wwbvzngnyctr0000gn/T/omnidesk-eval-unsafe-path-l45Ew3/unsafe-path-trace.json"
+          "fixture": "/tmp/omnidesk-eval-unsafe-path-Q1t4tW",
+          "executedAt": "2026-07-24T06:21:56.746Z",
+          "tracePath": "traces/unsafe-path.trace.json"
         }
       }
     },
     {
       "id": "interrupted-run",
       "category": "recovery",
-      "task": "中断中的 Agent Run 恢复后继续完成",
+      "task": "Provider 网络传输中断后，Agent Run 重启并恢复原审批",
       "expected": [
         "resume",
         "patch",
@@ -312,13 +343,13 @@
         "checksPassed": true,
         "recovered": true,
         "approvalCount": 0,
-        "durationMs": 1,
+        "durationMs": 2,
         "costUsd": 0,
         "execution": {
           "executor": "omnidesk-runtime",
-          "fixture": "/var/folders/gr/6sznz66n75l_wwbvzngnyctr0000gn/T/omnidesk-eval-interrupted-run-1mYK01",
-          "executedAt": "2026-07-19T15:51:00.959Z",
-          "tracePath": "/var/folders/gr/6sznz66n75l_wwbvzngnyctr0000gn/T/omnidesk-eval-interrupted-run-1mYK01/trace.json"
+          "fixture": "/tmp/omnidesk-eval-interrupted-run-t3CqzH",
+          "executedAt": "2026-07-24T06:21:56.788Z",
+          "tracePath": "traces/interrupted-run.trace.json"
         }
       }
     },
@@ -341,13 +372,13 @@
         "checksPassed": true,
         "recovered": false,
         "approvalCount": 1,
-        "durationMs": 6522,
+        "durationMs": 22180,
         "costUsd": 0,
         "execution": {
           "executor": "hermes-cli",
-          "fixture": "/var/folders/gr/6sznz66n75l_wwbvzngnyctr0000gn/T/omnidesk-eval-failed-check-repair-IHvtXq",
-          "executedAt": "2026-07-19T15:51:07.522Z",
-          "tracePath": "/var/folders/gr/6sznz66n75l_wwbvzngnyctr0000gn/T/omnidesk-eval-failed-check-repair-IHvtXq/trace.json"
+          "fixture": "/tmp/omnidesk-eval-failed-check-repair-7MiG3d",
+          "executedAt": "2026-07-24T06:22:19.011Z",
+          "tracePath": "traces/failed-check-repair.trace.json"
         }
       }
     }

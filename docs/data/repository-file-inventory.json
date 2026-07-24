@@ -1,6 +1,6 @@
 {
   "schemaVersion": "omnidesk.repository-file-inventory.v1",
-  "generatedAt": "2026-07-24T06:08:50.181Z",
+  "generatedAt": "2026-07-24T06:25:25.976Z",
   "sourceOfTruth": "git ls-files --cached --others --exclude-standard",
   "scope": "受版本控制文件及准备纳入版本控制的非忽略工作树文件；忽略的本地运行数据和构建输出不在本账本内。",
   "reviewContract": {
@@ -138,7 +138,7 @@
       "path": "HANDOFF.md",
       "kind": "root-document",
       "owner": "Documentation Governance",
-      "bytes": 4324,
+      "bytes": 4540,
       "pathMentions": [
         "desktop/src/components/workbench/current-goal-panel.jsx",
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
@@ -191,7 +191,7 @@
       "path": "PROJECT.md",
       "kind": "root-document",
       "owner": "Documentation Governance",
-      "bytes": 10658,
+      "bytes": 10786,
       "pathMentions": [
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
         "desktop/src/lib/agent-topic-runtime-capability.js",
@@ -275,7 +275,7 @@
       "path": "desktop/evals/agent-eval-report.json",
       "kind": "eval",
       "owner": "Agent Reliability",
-      "bytes": 11115,
+      "bytes": 10759,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -8907,7 +8907,7 @@
       "path": "docs/TESTING.md",
       "kind": "documentation",
       "owner": "Documentation Governance",
-      "bytes": 9059,
+      "bytes": 9226,
       "pathMentions": [
         "desktop/scripts/run-native-webdriver-smoke.mjs",
         "desktop/src-tauri/src/runtime/workspace.rs",

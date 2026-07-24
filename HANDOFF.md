@@ -28,18 +28,19 @@ depends_on: [PROJECT.md, AGENTS.md, docs/ARCHITECTURE.md, docs/TESTING.md]
 - 旧 Project OS CLI、installer、模板、adapter、routing skill、评分与报告入口已从生产路径退役；旧命名只保留在迁移、兼容读取、路径隔离或回归夹具中。
 - `runtime/app.rs` 已收束为 Tauri command adapter、Provider/Hermes transport 与生命周期编排。Agent Run、Patch Draft、Planning、Execution、Provider、Chat Stream、Terminal、Workspace watcher 与系统集成都各有 Runtime Owner。
 - `main.jsx` 只保留 controller 与 surface 装配；Workbench 默认值、Preview 只读投影与 Workspace transport 已下沉。样式入口按 theme、workspace、conversation、terminal、provider rail 分域。
-- 最新本地回归已通过：Desktop Node `547/547`、Runtime Rust `147/147`、Patch Normalizer `7/7`、Web build（首屏 `797.45 KiB / 800 KiB`）、离线 Eval 与原生 WebDriver smoke。
-- 受保护真实 Eval [29995146279](https://github.com/lijinmei915/project-os-starter/actions/runs/29995146279) 已通过：12/12 case 成功，任务成功率 `100%`、Patch 可应用率 `90.9%`、检查通过率 `100%`、恢复成功率 `100%`。artifact 包含每个 case 的相对 trace、原始模型输出与 usage；基线比较无回退。
+- 最新本地回归已通过：Desktop Node `548/548`、Runtime Rust `147/147`、Patch Normalizer `7/7`、Web build（首屏 `797.45 KiB / 800 KiB`）、离线 Eval 与原生 WebDriver smoke。
+- 受保护真实 Eval [30071780488](https://github.com/lijinmei915/project-os-starter/actions/runs/30071780488) 已通过：13/13 case 成功，任务成功率 `100%`、Patch 可应用率 `91.7%`、检查通过率 `100%`、恢复成功率 `100%`。`ask-user-resume` artifact 证明首次模型返回 `ask_user`、checkpoint 持久化、交互审批为 0、回答后同 Run 续接、Patch 独立审批并通过检查。
 
 ## 风险与注意
 
 - 活跃 Provider 请求无法从中断 token 续传；重启后只能从最近持久化阶段重新请求模型，并保留中断证据。
 - 终端会话与屏幕输出仍为内存态；Runtime 重启会终止会话，不能伪称可恢复。
 - 真实 Provider Eval 仅能在受保护 GitHub Environment `agent-eval` 运行；本地或普通 CI 只能运行离线契约与基线检查，不能伪造真实 trace。
+- 真实模型 Eval 存在输出波动：`30071465241` 的 `goal-rebind` 未完成四文件规范化而被门槛拒绝，失败 artifact 已保留；不得通过放宽授权或 trace 校验消除波动。
 - 修改 Runtime、状态、Agent 执行或跨入口时，必须运行 `bash tests/run-tests.sh`；原生窗口改动还要运行 `npm --prefix desktop run test:native`。
 - 删除、覆盖、提交、推送和发布前必须取得用户确认。不要恢复或清理工作树中不属于当前改动的内容。
 
 ## 下一步建议
 
-1. 在受保护 `agent-eval` 环境运行真实 Provider Eval，验证模型实际追问和回答后的完整执行率；不得以 fixture 代替真实 trace。
+1. 将已通过完整本地回归的真实 13-case 报告作为新基线提交；后续候选报告不得删除已登记 case 或降低四项门槛。
 2. 取得用户明确确认后才能提交或推送当前工作树。

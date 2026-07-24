@@ -32,7 +32,7 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 - 状态事务：Runtime Repository 使用 schema、锁和原子事务维护跨实体一致性。
 - 浏览器 Preview：仅用于只读预览和 UI 验证，不执行文件写入、终端或受控检查。
 - 当前状态根：`.omnidesk/` 是唯一物理状态根；旧 `.project-os/` 已迁移、归档并删除。Runtime 与 Preview 仅接受 native `.omnidesk/data|runtime|cache|evidence` 路径；历史导入由迁移器单独处理。
-- 评测：`desktop/evals/` 保存固定 12-case 基线；最新受保护 Provider Eval `29890989675` 已产生并上传真实报告与 artifact-relative trace。
+- 评测：`desktop/evals/` 保存已登记 13-case 基线；最新受保护 Provider Eval `30071780488` 已产生并上传真实报告与 artifact-relative trace。
 
 详细模块边界见 `docs/ARCHITECTURE.md`，测试与发布门槛见 `docs/TESTING.md`。
 
@@ -45,8 +45,8 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 - Agent 缺少关键参数时可通过标准 `ask_user` interaction 暂停：请求、回答和跳过结果均持久化到 Agent Run；对话内按 schema 渲染单选、多选、文本与确认表单，提交后从 checkpoint 重新请求同一任务。
 - `ask_user` 与 Patch/Check 审批严格隔离：回答不会创建、消费或替代工程审批；相同回答幂等，冲突重复回答拒绝，桌面应用重启后仍可恢复待回答表单。
 - Workspace、Conversation、Task、Goal、Provider、Execution 的 Runtime 模块与 Repository 事务边界。
-- 正式 12-case Eval：任务成功率 100%、Patch 可应用率 90.9%、检查通过率 100%、恢复成功率 100%。
-- 当前工作树回归：Desktop Node 547/547、Runtime Rust 147/147、Patch Normalizer 7/7、原生 WebDriver smoke；Web build 与 797.45 KiB/800 KiB 首屏软预算通过。
+- 正式 13-case Eval：任务成功率 100%、Patch 可应用率 91.7%、检查通过率 100%、恢复成功率 100%。新增 `ask-user-resume` 真实证明模型结构化追问、checkpoint 持久化、零交互审批、回答后同 Run 续接、独立 Patch 审批与检查。
+- 当前工作树回归：Desktop Node 548/548、Runtime Rust 147/147、Patch Normalizer 7/7、原生 WebDriver smoke；Web build 与 797.45 KiB/800 KiB 首屏软预算通过。
 - `.omnidesk/` v1 四分区 schema、非破坏性迁移器和启动激活已接入生产 Runtime：支持幂等复制、冲突拒绝、符号链接跳过和 legacy 回退。
 - Repository、Workspace、Provider、Task、Conversation、Agent Run 与 Preview 均按分区直接读写；文件树和 Agent 读取工具隐藏 Runtime 状态目录与可能遗留的旧目录。
 - Desktop Runtime 已停止编译旧 `governance` bridge，不再暴露 `run_project_os_action`，受控检查只执行 Desktop Node、Web build 与 Cargo 检查；浏览器 Preview 的事实刷新只重新读取只读 snapshot。
@@ -85,5 +85,5 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 
 ## 下一步重点
 
-1. 在受保护环境运行真实 Provider Eval，验证模型实际调用 `ask_user` 后能继续完成 Patch、审批与检查闭环；本地测试不得伪造该 trace。
-2. 根据真实 trace 决定是否扩展字段 widget；在证据不足前不把普通聊天迁入复杂 Agent 循环。
+1. 根据真实 `ask-user-resume` trace 决定是否扩展字段 widget；在证据不足前不把普通聊天迁入复杂 Agent 循环。
+2. 降低多文件 Patch case 的模型输出波动，但不得放宽四文件授权、Patch 规范化或 trace 门槛。

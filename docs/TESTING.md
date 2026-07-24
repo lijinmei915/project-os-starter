@@ -104,7 +104,7 @@ bash tests/run-tests.sh
 - frontmatter、文档结构与密钥安全
 - Desktop Node 契约回归
 - Web build 与 800 KiB 首屏预算
-- 离线 12-case Eval 基线结构与不回退检查
+- 离线已登记 Agent Eval 基线结构与不回退检查
 - Agent Run checkpoint 与审批恢复的离线契约证据
 - Tauri Runtime Rust 与 Patch Normalizer 回归
 
@@ -170,7 +170,7 @@ CI 文件：
 npm --prefix desktop run check:agent-eval
 ```
 
-`.github/workflows/agent-eval.yml` 在受保护的 `agent-eval` environment 中按日或手动运行。它需要 `OMNIDESK_AGENT_EVAL_KEY` secret 与 `OMNIDESK_AGENT_EVAL_MODEL` variable，执行 12-case suite、保留真实 trace，并拒绝成功率、Patch 可应用率或检查通过率回退。真实 Provider Eval 强制提供 `--trace-dir`：suite 会把 trace 复制到 `.omnidesk/evidence/agent-eval/<run-id>/traces/`，并将 `results.json` 中的 trace 引用写成相对 artifact 路径。`goal-rebind` 必须证明四份授权文件均实际变更；`interrupted-run` 必须记录网络不可用分类、未接受 Provider 响应和恢复后的原审批。报告没有真实 trace 时不能替代该门槛。
+`.github/workflows/agent-eval.yml` 在受保护的 `agent-eval` environment 中按日或手动运行。它需要 `OMNIDESK_AGENT_EVAL_KEY` secret 与 `OMNIDESK_AGENT_EVAL_MODEL` variable，执行所有已登记 case、保留真实 trace，并拒绝任务成功率、Patch 可应用率、检查通过率或恢复成功率回退。真实 Provider Eval 强制提供 `--trace-dir`：suite 会把 trace 复制到 `.omnidesk/evidence/agent-eval/<run-id>/traces/`，并将 `results.json` 中的 trace 引用写成相对 artifact 路径。`goal-rebind` 必须证明四份授权文件均实际变更；`interrupted-run` 必须记录网络不可用分类、未接受 Provider 响应和恢复后的原审批；`ask-user-resume` 必须证明追问持久化、交互审批为零、回答后恢复同一 Run，并以独立审批完成 Patch。报告没有真实 trace 时不能替代该门槛。
 
 ---
 
