@@ -55,6 +55,17 @@ for (const result of results) {
     }
     if (changed.some((file) => !authorized.includes(file))) fail("goal-rebind changed a file outside its authorization");
   }
+
+  if (caseId === "ask-user-resume") {
+    if (trace?.interaction?.status !== "awaiting-user-input"
+      || trace?.interaction?.persisted !== true
+      || trace?.interaction?.approvalCount !== 0
+      || trace?.interaction?.interaction?.kind !== "ask_user"
+      || trace?.interaction?.response?.answers?.density !== "compact"
+      || trace?.applyResult?.status !== "completed") {
+      fail("ask-user-resume must prove persisted user input, zero interaction approvals, and a separately approved patch");
+    }
+  }
 }
 
 process.stdout.write(`${JSON.stringify({ cases: results.length, status: "passed", traceDirectory })}\n`);

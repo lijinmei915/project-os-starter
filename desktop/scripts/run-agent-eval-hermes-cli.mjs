@@ -146,6 +146,20 @@ const patchCases = Object.freeze({
       return spawnSync(process.execPath, ["--check", "provider.js"], { cwd: fixture, encoding: "utf8" });
     },
   },
+  "ask-user-resume": {
+    files: { "settings.js": "export const density = \"comfortable\";\n" },
+    prompt: "The requested interface density is missing, so you must ask the user before editing. Return only one JSON object with type `tool_call`, name `ask_user`, and arguments containing title, description, fields, and actions. Use exactly one required `single-choice` field with id `density` and options `compact` and `comfortable`. Do not return a patch yet, do not use tools, and do not explain.",
+    interaction: {
+      response: { action: "submit", answers: { density: "compact" } },
+      followup: "The user selected `compact`. Continue the same task and return only a unified diff that changes settings.js density from `comfortable` to `compact`. Do not use tools, do not explain, and do not use markdown fences.",
+    },
+    verify(fixture) {
+      return fs.readFileSync(path.join(fixture, "settings.js"), "utf8").includes('density = "compact"');
+    },
+    check(fixture) {
+      return spawnSync(process.execPath, ["--check", "settings.js"], { cwd: fixture, encoding: "utf8" });
+    },
+  },
   "failed-check-repair": {
     files: {
       "math.js": "export function add(left, right) {\n  return left - right;\n}\n",
@@ -206,6 +220,8 @@ async function runPatchCase(caseId, definition) {
   const fixture = seedFixture(caseId, definition);
   const rawOutputPath = path.join(fixture, "raw-model-output.txt");
   const usagePath = path.join(fixture, "usage.json");
+  const interactionOutputPath = path.join(fixture, "interaction-model-output.txt");
+  const interactionUsagePath = path.join(fixture, "interaction-usage.json");
   const tracePath = path.join(fixture, "trace.json");
   const initialCheck = caseId === "failed-check-repair"
     ? summarizeFixtureCheck(definition.check(fixture))
@@ -213,8 +229,40 @@ async function runPatchCase(caseId, definition) {
   const contextText = Object.entries(definition.files)
     .map(([file, content]) => `\n--- AUTHORIZED FILE: ${file} ---\n${content}`)
     .join("\n");
-  const prompt = `${definition.prompt}\n\nThe following is the complete authorized file context. Use it exactly; do not invent lines or paths:${contextText}`;
+  const initialPrompt = `${definition.prompt}\n\nThe following is the complete authorized file context. Use it exactly; do not invent lines or paths:${contextText}`;
   const provider = providerEnvironment();
+  let prompt = initialPrompt;
+  let interactionEvidence = null;
+  if (definition.interaction) {
+    const interactionModel = spawnSync("hermes", ["--provider", provider.provider, "--model", provider.model, "-z", initialPrompt, "--usage-file", interactionUsagePath], {
+      cwd: fixture,
+      encoding: "utf8",
+      env: provider.env,
+      timeout: 90_000,
+    });
+    const interactionRaw = String(interactionModel.stdout || "").trim();
+    fs.writeFileSync(interactionOutputPath, `${interactionRaw}\n`);
+    const interaction = parseAskUserEnvelope(interactionRaw);
+    const runId = `eval-${caseId}`;
+    const checkpointPath = path.join(fixture, "agent-run-checkpoint.json");
+    const checkpoint = interaction
+      ? { runId, status: "awaiting-user-input", approval: null, interaction, response: definition.interaction.response }
+      : null;
+    if (checkpoint) fs.writeFileSync(checkpointPath, `${JSON.stringify(checkpoint, null, 2)}\n`);
+    interactionEvidence = {
+      model: { exitCode: interactionModel.status, signal: interactionModel.signal, stderr: String(interactionModel.stderr || "").slice(0, 4000) },
+      rawOutputPath: interactionOutputPath,
+      usagePath: interactionUsagePath,
+      checkpointPath,
+      runId,
+      status: checkpoint?.status || "invalid",
+      interaction,
+      response: definition.interaction.response,
+      approvalCount: 0,
+      persisted: Boolean(checkpoint && fs.existsSync(checkpointPath)),
+    };
+    prompt = `${definition.interaction.followup}\n\nPersisted ask_user result for the same Agent Run:\n${JSON.stringify({ runId, interactionId: interaction?.id || "", ...definition.interaction.response })}\n\nThe following is the complete authorized file context. Use it exactly; do not invent lines or paths:${contextText}`;
+  }
   const model = spawnSync("hermes", ["--provider", provider.provider, "--model", provider.model, "-z", prompt, "--usage-file", usagePath], {
     cwd: fixture,
     encoding: "utf8",
@@ -284,6 +332,8 @@ async function runPatchCase(caseId, definition) {
     caseId,
     fixture,
     prompt,
+    initialPrompt,
+    interaction: interactionEvidence,
     model: { exitCode: model.status, signal: model.signal, stderr: String(model.stderr || "").slice(0, 4000) },
     rawOutputPath,
     usagePath,
@@ -305,7 +355,8 @@ async function runPatchCase(caseId, definition) {
   fs.writeFileSync(tracePath, `${JSON.stringify(trace, null, 2)}\n`);
   return {
     caseId,
-    success: model.status === 0 && fixtureCheckPassed && changedFilesAuthorized && changedRequiredFiles && (!initialCheck || !initialCheck.success),
+    success: model.status === 0 && fixtureCheckPassed && changedFilesAuthorized && changedRequiredFiles && (!initialCheck || !initialCheck.success)
+      && (!definition.interaction || (interactionEvidence?.persisted === true && interactionEvidence?.status === "awaiting-user-input" && interactionEvidence?.approvalCount === 0)),
     patchApplicable: normalization.ok && applyResult.status === "completed",
     rawPatchApplicable: rawApplyCheck.status === 0,
     normalizedPatchApplicable: normalization.ok && applyResult.status === "completed",
@@ -315,6 +366,29 @@ async function runPatchCase(caseId, definition) {
     durationMs: Date.now() - started,
     costUsd: Number(usage.estimated_cost_usd || 0),
     execution: { executor: "hermes-cli", fixture, executedAt: new Date().toISOString(), tracePath },
+  };
+}
+
+function parseAskUserEnvelope(raw) {
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  if (start < 0 || end <= start) return null;
+  let envelope;
+  try { envelope = JSON.parse(raw.slice(start, end + 1)); } catch { return null; }
+  if (envelope?.type !== "tool_call" || envelope?.name !== "ask_user") return null;
+  const fields = envelope.arguments?.fields;
+  if (!Array.isArray(fields) || fields.length !== 1) return null;
+  const field = fields[0];
+  const options = Array.isArray(field?.options) ? field.options.map((item) => typeof item === "string" ? item : item?.value) : [];
+  if (field?.id !== "density" || field?.type !== "single-choice" || field?.required !== true
+    || !options.includes("compact") || !options.includes("comfortable")) return null;
+  return {
+    id: "ask-user-resume:1",
+    kind: "ask_user",
+    title: String(envelope.arguments?.title || ""),
+    description: String(envelope.arguments?.description || ""),
+    fields,
+    actions: Array.isArray(envelope.arguments?.actions) ? envelope.arguments.actions : [],
   };
 }
 

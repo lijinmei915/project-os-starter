@@ -41,6 +41,11 @@ function copyEvidence(caseId, result) {
       const source = String(trace[field] || "").trim();
       if (source && fs.existsSync(source)) fs.copyFileSync(source, path.join(traceDirectory, `${caseId}.${suffix}`));
     }
+    const interaction = trace.interaction;
+    for (const [field, suffix] of [["rawOutputPath", "interaction-model-output.txt"], ["usagePath", "interaction-usage.json"]]) {
+      const source = String(interaction?.[field] || "").trim();
+      if (source && fs.existsSync(source)) fs.copyFileSync(source, path.join(traceDirectory, `${caseId}.${suffix}`));
+    }
   } catch {
     // The trace itself remains the authoritative artifact when optional detail files are absent.
   }
