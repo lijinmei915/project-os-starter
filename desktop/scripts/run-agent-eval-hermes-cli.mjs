@@ -240,9 +240,11 @@ async function runPatchCase(caseId, definition) {
   const started = Date.now();
   const isolation = definition.isolated ? createIsolatedFixture(caseId, definition) : null;
   const fixture = isolation?.worktree || seedFixture(caseId, definition);
-  // A detached worktree is deleted after integration. Keep evidence beside its
-  // source fixture so the uploaded trace survives that deliberate cleanup.
-  const evidenceFixture = isolation?.source || fixture;
+  // A detached worktree is deleted after integration. Its source must remain
+  // clean until merge, so keep isolated-case evidence outside both trees.
+  const evidenceFixture = isolation
+    ? fs.mkdtempSync(path.join(os.tmpdir(), `omnidesk-eval-${caseId}-evidence-`))
+    : fixture;
   const rawOutputPath = path.join(evidenceFixture, "raw-model-output.txt");
   const usagePath = path.join(evidenceFixture, "usage.json");
   const interactionOutputPath = path.join(evidenceFixture, "interaction-model-output.txt");
