@@ -1136,3 +1136,11 @@ use_when: "AI 即将做类似操作前检查是否有已知的坑、或犯错后
 **根本原因**：用户回答属于交互输入，不是文件写入或检查授权；Hermes ACP 子进程也会在一次请求结束时退出，不能被当作可持久等待的会话。
 
 **加了什么规则**：`ask_user` 必须作为独立 interaction 持久化在 Agent Run checkpoint 中。提交或跳过后只保存受校验的 ToolResult，再从 checkpoint 重新请求模型；相同表单和相同回答幂等，冲突回答拒绝。表单回答不得生成或消费 Patch / Check approval，`awaiting-user-input` 是安全等待态，重启时保留而不标记为中断。普通聊天未接入 Hermes 前不得宣称自动支持该能力。
+
+### 2026-07-24 新增 Eval case 时不能遗漏派生指标语义
+
+**现象**：`ask-user-resume` 已真实完成 checkpoint 续接，但 runner 沿用普通 Patch case 的 `recovered: false`，把恢复成功率错误降为 50%；发布门槛又未比较恢复率，因此工作流仍显示通过。
+
+**根本原因**：新增 case 只校验了交互证据，没有同步审计聚合指标的分母和回退指标集合。
+
+**加了什么规则**：新增或改变 Eval case 的 `expected` 能力时，必须逐项核对对应结果布尔值和聚合分母；发布门槛同时禁止任务成功率、Patch 可应用率、检查通过率与恢复成功率回退。错误指标的真实 artifact 保留作证据，但不能提升为基线。

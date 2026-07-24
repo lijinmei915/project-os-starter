@@ -28,7 +28,7 @@ for (const item of baselineCases) if (!candidateIds.has(item.id)) throw new Erro
 for (const item of cases) if (!candidateIds.has(item.id)) throw new Error(`candidate Agent Eval 缺少当前 case：${item.id}`);
 for (const item of candidateCases) if (!currentIds.has(item.id)) throw new Error(`candidate Agent Eval 包含未登记 case：${item.id}`);
 
-for (const metric of ["taskSuccessRate", "patchApplicableRate", "checkPassRate"]) {
+for (const metric of ["taskSuccessRate", "patchApplicableRate", "checkPassRate", "recoverySuccessRate"]) {
   const before = Number(baseline.metrics?.[metric]);
   const after = Number(candidate.metrics?.[metric]);
   if (!Number.isFinite(before) || !Number.isFinite(after)) throw new Error(`Agent Eval 缺少指标：${metric}`);

@@ -361,7 +361,7 @@ async function runPatchCase(caseId, definition) {
     rawPatchApplicable: rawApplyCheck.status === 0,
     normalizedPatchApplicable: normalization.ok && applyResult.status === "completed",
     checksPassed: fixtureCheckPassed,
-    recovered: false,
+    recovered: Boolean(definition.interaction),
     approvalCount,
     durationMs: Date.now() - started,
     costUsd: Number(usage.estimated_cost_usd || 0),

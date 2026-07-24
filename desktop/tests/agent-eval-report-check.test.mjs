@@ -27,7 +27,7 @@ function report(ids) {
     schemaVersion: "omnidesk.agent-eval-report.v0.1",
     status: "complete",
     totals: { cases: ids.length, completed: ids.length, missing: 0 },
-    metrics: { taskSuccessRate: 1, patchApplicableRate: 1, checkPassRate: 1 },
+    metrics: { taskSuccessRate: 1, patchApplicableRate: 1, checkPassRate: 1, recoverySuccessRate: 1 },
     cases: ids.map((id) => ({ id, expected: ["patch", "check"], result: result(id) })),
   };
 }

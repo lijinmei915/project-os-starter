@@ -39,7 +39,7 @@ jobs:
           printf '%s' '{"diff":"--- README.md\n+++ README.md\n@@ -1 +1 @@\n-before\n+after\n","contexts":[{"path":"README.md","content":"before\n"}]}' \
             | cargo run --quiet --manifest-path desktop/src-tauri/Cargo.toml --bin omnidesk-patch-normalizer \
             | node -e 'let body=""; process.stdin.on("data", (chunk) => body += chunk).on("end", () => { const result = JSON.parse(body); if (!result.normalizedDiff.includes("+after")) process.exit(1); })'
-      - name: Run the 12-case real evaluation
+      - name: Run the registered real evaluation suite
         env:
           OMNIDESK_AGENT_EVAL_KEY: ${{ secrets.OMNIDESK_AGENT_EVAL_KEY }}
           OMNIDESK_AGENT_EVAL_API_BASE: ${{ vars.OMNIDESK_AGENT_EVAL_API_BASE }}
