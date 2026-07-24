@@ -1,6 +1,6 @@
 {
   "schemaVersion": "omnidesk.repository-file-inventory.v1",
-  "generatedAt": "2026-07-24T08:42:43.279Z",
+  "generatedAt": "2026-07-24T09:02:52.816Z",
   "sourceOfTruth": "git ls-files --cached --others --exclude-standard",
   "scope": "受版本控制文件及准备纳入版本控制的非忽略工作树文件；忽略的本地运行数据和构建输出不在本账本内。",
   "reviewContract": {
@@ -215,7 +215,8 @@
       "bytes": 2282,
       "pathMentions": [
         "desktop/src-tauri/src/runtime/app.rs",
-        "desktop/src-tauri/src/runtime/execution.rs"
+        "desktop/src-tauri/src/runtime/execution.rs",
+        "desktop/src-tauri/src/runtime/isolated_workspace.rs"
       ],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -419,7 +420,7 @@
       "path": "desktop/scripts/run-agent-eval-hermes-cli.mjs",
       "kind": "eval",
       "owner": "Agent Reliability",
-      "bytes": 28941,
+      "bytes": 29193,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",

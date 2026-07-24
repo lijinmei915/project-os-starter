@@ -240,11 +240,14 @@ async function runPatchCase(caseId, definition) {
   const started = Date.now();
   const isolation = definition.isolated ? createIsolatedFixture(caseId, definition) : null;
   const fixture = isolation?.worktree || seedFixture(caseId, definition);
-  const rawOutputPath = path.join(fixture, "raw-model-output.txt");
-  const usagePath = path.join(fixture, "usage.json");
-  const interactionOutputPath = path.join(fixture, "interaction-model-output.txt");
-  const interactionUsagePath = path.join(fixture, "interaction-usage.json");
-  const tracePath = path.join(fixture, "trace.json");
+  // A detached worktree is deleted after integration. Keep evidence beside its
+  // source fixture so the uploaded trace survives that deliberate cleanup.
+  const evidenceFixture = isolation?.source || fixture;
+  const rawOutputPath = path.join(evidenceFixture, "raw-model-output.txt");
+  const usagePath = path.join(evidenceFixture, "usage.json");
+  const interactionOutputPath = path.join(evidenceFixture, "interaction-model-output.txt");
+  const interactionUsagePath = path.join(evidenceFixture, "interaction-usage.json");
+  const tracePath = path.join(evidenceFixture, "trace.json");
   const initialCheck = caseId === "failed-check-repair"
     ? summarizeFixtureCheck(definition.check(fixture))
     : null;
