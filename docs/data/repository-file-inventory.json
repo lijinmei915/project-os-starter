@@ -1,6 +1,6 @@
 {
   "schemaVersion": "omnidesk.repository-file-inventory.v1",
-  "generatedAt": "2026-07-25T17:18:28.577Z",
+  "generatedAt": "2026-07-25T17:44:27.793Z",
   "sourceOfTruth": "git ls-files --cached --others --exclude-standard",
   "scope": "受版本控制文件及准备纳入版本控制的非忽略工作树文件；忽略的本地运行数据和构建输出不在本账本内。",
   "reviewContract": {
@@ -2356,7 +2356,7 @@
       "path": "desktop/src/agent-runtime/mcp-evaluation.js",
       "kind": "eval-support",
       "owner": "Agent Reliability",
-      "bytes": 4517,
+      "bytes": 4719,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/scripts/run-third-party-mcp-eval.mjs",
@@ -8105,7 +8105,7 @@
       "path": "desktop/tests/mcp-evaluation.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 4089,
+      "bytes": 4260,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",

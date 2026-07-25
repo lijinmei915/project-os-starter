@@ -15,12 +15,17 @@ export function validateInstalledMcpPackage({
 }) {
   requireValue(packageManifest?.name === expectedName, `MCP Eval requires ${expectedName}`);
   requireValue(packageManifest?.version === expectedVersion, `MCP Eval requires ${expectedName}@${expectedVersion}`);
-  const packageSuffix = `/node_modules/${expectedName}`;
+  const relativePackageKey = `node_modules/${expectedName}`;
+  const nestedPackageSuffix = `/${relativePackageKey}`;
   const installedEntry = Object.entries(packageLock?.packages || {}).find(([key, value]) => (
-    String(key).replaceAll("\\", "/").endsWith(packageSuffix)
+    (String(key).replaceAll("\\", "/") === relativePackageKey
+      || String(key).replaceAll("\\", "/").endsWith(nestedPackageSuffix))
       && value?.version === expectedVersion
   ))?.[1];
-  requireValue(installedEntry, `MCP Eval lock metadata is missing ${expectedName}@${expectedVersion}`);
+  requireValue(
+    installedEntry,
+    `MCP Eval lock metadata is missing ${expectedName}@${expectedVersion}; expected ${relativePackageKey} or a nested equivalent`,
+  );
   requireValue(installedEntry.integrity === expectedIntegrity, "MCP Eval installed package integrity does not match the pinned artifact");
   return installedEntry;
 }

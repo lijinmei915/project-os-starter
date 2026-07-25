@@ -47,31 +47,44 @@ function result() {
 
 const options = { expectedContent: "proof.txt", expectedToolName: "list_directory", projectId: "project-a" };
 
-test("accepts only the pinned installed MCP package artifact", () => {
+function validatePackage(packageKey, integrity = PACKAGE_INTEGRITY) {
   const packageManifest = { name: PACKAGE_NAME, version: PACKAGE_VERSION };
   const packageLock = {
     packages: {
-      "../../tmp/eval/node_modules/@modelcontextprotocol/server-filesystem": {
+      [packageKey]: {
         version: PACKAGE_VERSION,
-        integrity: PACKAGE_INTEGRITY,
+        integrity,
       },
     },
   };
-  assert.equal(validateInstalledMcpPackage({
+  return validateInstalledMcpPackage({
     packageManifest,
     packageLock,
     expectedName: PACKAGE_NAME,
     expectedVersion: PACKAGE_VERSION,
     expectedIntegrity: PACKAGE_INTEGRITY,
-  }).integrity, PACKAGE_INTEGRITY);
-  packageLock.packages["../../tmp/eval/node_modules/@modelcontextprotocol/server-filesystem"].integrity = "sha512-other";
-  assert.throws(() => validateInstalledMcpPackage({
-    packageManifest,
-    packageLock,
-    expectedName: PACKAGE_NAME,
-    expectedVersion: PACKAGE_VERSION,
-    expectedIntegrity: PACKAGE_INTEGRITY,
-  }), /integrity/);
+  });
+}
+
+test("accepts npm install-level relative MCP package lock keys", () => {
+  assert.equal(
+    validatePackage("node_modules/@modelcontextprotocol/server-filesystem").integrity,
+    PACKAGE_INTEGRITY,
+  );
+});
+
+test("accepts nested MCP package lock keys", () => {
+  assert.equal(
+    validatePackage("../../tmp/eval/node_modules/@modelcontextprotocol/server-filesystem").integrity,
+    PACKAGE_INTEGRITY,
+  );
+});
+
+test("rejects an installed MCP package with the wrong integrity", () => {
+  assert.throws(
+    () => validatePackage("node_modules/@modelcontextprotocol/server-filesystem", "sha512-other"),
+    /integrity/,
+  );
 });
 
 test("accepts a project-bound third-party MCP run with two governed approvals", () => {
