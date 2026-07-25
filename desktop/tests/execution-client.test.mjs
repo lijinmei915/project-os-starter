@@ -1,7 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { acceptAgentInteraction, buildApprovedAgentContinuationPrompt, continueHermesAgent, generatePatchDraft, runGuardedCheck, runHermesAgent, submitAgentInteraction } from "../src/lib/execution-client.js";
+import { acceptAgentInteraction, buildApprovedAgentContinuationPrompt, cancelAgentRun, continueHermesAgent, exportAgentRunTimeline, generatePatchDraft, getAgentToolRegistry, getMcpDiscoveryEvidence, getMcpServerRegistry, projectScheduledAgentRuns, removeMcpServer, requestMcpCall, requestMcpDiscovery, runGuardedCheck, runHermesAgent, saveMcpServer, submitAgentInteraction } from "../src/lib/execution-client.js";
+
+test("projects persisted scheduler position onto its Agent Run", () => {
+  const runs = projectScheduledAgentRuns(
+    [{ id: "run-a", status: "queued" }, { id: "run-b", status: "running" }],
+    { entries: [{ runId: "run-a", status: "queued", queuePosition: 2 }] },
+  );
+  assert.equal(runs[0].scheduler.queuePosition, 2);
+  assert.equal(runs[1].scheduler, null);
+});
 
 test("continues an approved Agent Run with the controlled tool outcome", () => {
   const prompt = buildApprovedAgentContinuationPrompt(
@@ -51,6 +60,15 @@ test("binds Hermes runs to their conversation and submits a persisted user inter
       /桌面 App/,
     );
     await assert.rejects(() => continueHermesAgent({ id: "run-1" }), /桌面 App/);
+    await assert.rejects(() => cancelAgentRun({ id: "run-1" }), /桌面 App/);
+    await assert.rejects(() => exportAgentRunTimeline({ id: "run-1" }), /桌面 App/);
+    await assert.rejects(() => getAgentToolRegistry(), /桌面 App/);
+    await assert.rejects(() => getMcpServerRegistry(), /桌面 App/);
+    await assert.rejects(() => getMcpDiscoveryEvidence("fixture"), /桌面 App/);
+    await assert.rejects(() => saveMcpServer({ id: "fixture" }), /桌面 App/);
+    await assert.rejects(() => removeMcpServer("fixture"), /桌面 App/);
+    await assert.rejects(() => requestMcpDiscovery("fixture"), /桌面 App/);
+    await assert.rejects(() => requestMcpCall("fixture", "lookup", { query: "docs" }), /桌面 App/);
     assert.equal(requests.length, 0);
   } finally {
     globalThis.fetch = originalFetch;

@@ -13,6 +13,7 @@ export const conversationEventTypes = Object.freeze({
   toolCompleted: "tool.completed",
   toolFailed: "tool.failed",
   requestProgress: "request.progress",
+  requestQueued: "request.queued",
   requestCompleted: "request.completed",
   requestFailed: "request.failed",
   requestCancelled: "request.cancelled",

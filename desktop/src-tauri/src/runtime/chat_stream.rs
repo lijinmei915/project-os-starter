@@ -4,11 +4,16 @@ use crate::runtime::chat_content::{
 use crate::runtime::chat_routing::{is_question_like_message, should_create_plan_for_message};
 use crate::runtime::planning::PlanAttachment;
 use crate::runtime::provider::{
-    chat_completion_content, post_streaming_chat_completion, read_secret, require_success,
-    ProviderConfig,
+    post_streaming_chat_completion, read_secret, require_success, ProviderConfig,
+};
+use crate::runtime::provider_tools::{
+    add_conversation_tools, engineering_task_from_calls, non_streaming_message,
+    record_provider_tool_capability, should_fallback_from_native_tools, tool_call_fragments,
+    ProviderToolCall, ProviderToolMode,
 };
 use futures_util::StreamExt;
 use serde_json::{json, Value};
+use std::collections::BTreeMap;
 use std::path::Path;
 use std::time::Duration;
 
@@ -88,7 +93,7 @@ where
         project_evidence,
     );
     let user_content = provider_user_content(reply_prompt, attachments);
-    let payload = json!({
+    let mut payload = json!({
         "model": provider.model,
         "messages": [
             {
@@ -103,13 +108,50 @@ where
         "temperature": 0.45,
         "stream": true
     });
+    let compatibility_payload = payload.clone();
+    let mut provider_tool_mode = add_conversation_tools(root, provider, &mut payload);
     let response = tokio::time::timeout(
         FIRST_RESPONSE_TIMEOUT,
         post_streaming_chat_completion(provider, &api_key, &payload, FIRST_RESPONSE_TIMEOUT),
     )
     .await
     .map_err(|_| ChatStreamError::new("模型等待首个响应超时"))??;
-    let response = require_success(response, "provider").await?;
+    let response = match require_success(response, "provider").await {
+        Ok(response) => response,
+        Err(error)
+            if provider_tool_mode == ProviderToolMode::NativeFunctionCalling
+                && should_fallback_from_native_tools(&error) =>
+        {
+            record_provider_tool_capability(
+                root,
+                provider,
+                ProviderToolMode::CompatibilityKeyword,
+                "explicit-tool-rejection",
+            )?;
+            provider_tool_mode = ProviderToolMode::CompatibilityKeyword;
+            let fallback = tokio::time::timeout(
+                FIRST_RESPONSE_TIMEOUT,
+                post_streaming_chat_completion(
+                    provider,
+                    &api_key,
+                    &compatibility_payload,
+                    FIRST_RESPONSE_TIMEOUT,
+                ),
+            )
+            .await
+            .map_err(|_| ChatStreamError::new("模型等待兼容响应超时"))??;
+            require_success(fallback, "provider compatibility fallback").await?
+        }
+        Err(error) => return Err(ChatStreamError::new(error)),
+    };
+    if provider_tool_mode == ProviderToolMode::NativeFunctionCalling {
+        record_provider_tool_capability(
+            root,
+            provider,
+            ProviderToolMode::NativeFunctionCalling,
+            "request-accepted-tools",
+        )?;
+    }
 
     let is_sse = response
         .headers()
@@ -117,13 +159,20 @@ where
         .and_then(|value| value.to_str().ok())
         .map(|value| value.contains("text/event-stream"))
         .unwrap_or(false);
-    let content = if !is_sse {
-        tokio::time::timeout(STREAM_IDLE_TIMEOUT, chat_completion_content(response))
+    let (content, tool_calls) = if !is_sse {
+        let response: Value = tokio::time::timeout(STREAM_IDLE_TIMEOUT, response.json())
             .await
-            .map_err(|_| ChatStreamError::new("模型响应读取超时"))??
+            .map_err(|_| ChatStreamError::new("模型响应读取超时"))?
+            .map_err(|error| ChatStreamError::new(error.to_string()))?;
+        let output = non_streaming_message(&response);
+        if output.0.is_empty() && output.1.is_empty() {
+            return Err(ChatStreamError::new("provider 返回空内容"));
+        }
+        output
     } else {
         let mut content = String::new();
         let mut pending = String::new();
+        let mut tool_call_parts = BTreeMap::<usize, ProviderToolCall>::new();
         let mut stream_mode = StreamMode::Unknown;
         let mut stream = response.bytes_stream();
         loop {
@@ -136,7 +185,13 @@ where
             let chunk =
                 chunk.map_err(|err| ChatStreamError::with_partial(err.to_string(), &content))?;
             let chunk = String::from_utf8_lossy(&chunk);
-            for delta in consume_openai_sse_deltas(&mut pending, &chunk) {
+            let delta = consume_openai_sse_parts(&mut pending, &chunk);
+            for fragment in delta.tool_call_fragments {
+                let call = tool_call_parts.entry(fragment.index).or_default();
+                call.name.push_str(&fragment.name);
+                call.arguments.push_str(&fragment.arguments);
+            }
+            for delta in delta.content {
                 content.push_str(&delta);
                 match stream_mode {
                     StreamMode::Unknown => {
@@ -156,19 +211,22 @@ where
                 }
             }
         }
-        if content.trim().is_empty() {
+        let tool_calls = tool_call_parts.into_values().collect::<Vec<_>>();
+        if content.trim().is_empty() && tool_calls.is_empty() {
             return Err(ChatStreamError::new("provider 流式返回空内容"));
         }
         if stream_mode == StreamMode::LegacyCandidate {
             let visible = visible_chat_content(&content)?.0;
             on_delta(visible.clone(), visible.chars().count());
         }
-        content
+        (content, tool_calls)
     };
     Ok(build_chat_result(
         &content,
         message,
         !attachments.is_empty(),
+        provider_tool_mode,
+        &tool_calls,
     )?)
 }
 
@@ -213,9 +271,27 @@ fn build_chat_result(
     content: &str,
     message: &str,
     has_attachments: bool,
+    provider_tool_mode: ProviderToolMode,
+    tool_calls: &[ProviderToolCall],
 ) -> Result<ChatWithModelResult, String> {
-    let (reply, response_mode) = visible_chat_content(content)?;
-    let should_create_plan = should_create_plan_for_message(message, has_attachments);
+    let native_task = engineering_task_from_calls(tool_calls)?.is_some();
+    let (reply, content_mode) = if content.trim().is_empty() && native_task {
+        ("已识别为工程任务，正在准备执行计划。".to_string(), "text")
+    } else {
+        visible_chat_content(content)?
+    };
+    let should_create_plan = match provider_tool_mode {
+        ProviderToolMode::NativeFunctionCalling => native_task,
+        ProviderToolMode::CompatibilityKeyword => {
+            should_create_plan_for_message(message, has_attachments)
+        }
+    };
+    let response_mode = match (provider_tool_mode, native_task, content_mode) {
+        (_, _, "legacy-json") => "legacy-json",
+        (ProviderToolMode::NativeFunctionCalling, true, _) => "native-function-call",
+        (ProviderToolMode::NativeFunctionCalling, false, _) => "native-text",
+        (ProviderToolMode::CompatibilityKeyword, _, _) => "compatibility-keyword",
+    };
     Ok(ChatWithModelResult {
         reply,
         should_create_plan,
@@ -238,8 +314,18 @@ fn build_chat_result(
 /// Consumes complete SSE lines only, preserving unfinished transport chunks
 /// for the next read so a split Provider JSON envelope cannot be corrupted.
 pub fn consume_openai_sse_deltas(pending: &mut String, chunk: &str) -> Vec<String> {
+    consume_openai_sse_parts(pending, chunk).content
+}
+
+struct ProviderStreamDelta {
+    content: Vec<String>,
+    tool_call_fragments: Vec<crate::runtime::provider_tools::ProviderToolCallFragment>,
+}
+
+fn consume_openai_sse_parts(pending: &mut String, chunk: &str) -> ProviderStreamDelta {
     pending.push_str(chunk);
-    let mut deltas = Vec::new();
+    let mut content = Vec::new();
+    let mut tools = Vec::new();
     while let Some(index) = pending.find('\n') {
         let line = pending[..index].trim().to_string();
         pending.drain(..=index);
@@ -259,10 +345,14 @@ pub fn consume_openai_sse_deltas(pending: &mut String, chunk: &str) -> Vec<Strin
             .and_then(Value::as_str)
             .unwrap_or("");
         if !delta.is_empty() {
-            deltas.push(delta.to_string());
+            content.push(delta.to_string());
         }
+        tools.extend(tool_call_fragments(&event));
     }
-    deltas
+    ProviderStreamDelta {
+        content,
+        tool_call_fragments: tools,
+    }
 }
 
 #[cfg(test)]
@@ -289,11 +379,18 @@ mod tests {
 
     #[test]
     fn accepts_natural_text_without_json_parsing() {
-        let result = build_chat_result("这是自然文本回答。", "这是什么", false).unwrap();
+        let result = build_chat_result(
+            "这是自然文本回答。",
+            "这是什么",
+            false,
+            ProviderToolMode::CompatibilityKeyword,
+            &[],
+        )
+        .unwrap();
         assert_eq!(result.reply, "这是自然文本回答。");
         assert_eq!(result.intent, "question");
         assert!(!result.should_create_plan);
-        assert_eq!(result.response_mode, "text");
+        assert_eq!(result.response_mode, "compatibility-keyword");
     }
 
     #[test]
@@ -323,13 +420,95 @@ mod tests {
             r#"{"reply":"兼容回答","shouldCreatePlan":false,"intent":"chat"}"#,
             "帮我修复这个问题",
             false,
+            ProviderToolMode::CompatibilityKeyword,
+            &[],
         )
         .unwrap();
         assert_eq!(result.reply, "兼容回答");
         assert_eq!(result.intent, "task");
         assert!(result.should_create_plan);
         assert_eq!(result.response_mode, "legacy-json");
-        assert!(build_chat_result("   ", "你好", false).is_err());
+        assert!(build_chat_result(
+            "   ",
+            "你好",
+            false,
+            ProviderToolMode::CompatibilityKeyword,
+            &[],
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn native_function_call_replaces_keyword_task_routing() {
+        let result = build_chat_result(
+            "",
+            "please do it",
+            false,
+            ProviderToolMode::NativeFunctionCalling,
+            &[ProviderToolCall {
+                name: "start_engineering_task".to_string(),
+                arguments: r#"{"task":"please do it"}"#.to_string(),
+            }],
+        )
+        .unwrap();
+        assert!(result.should_create_plan);
+        assert_eq!(result.intent, "task");
+        assert_eq!(result.response_mode, "native-function-call");
+
+        let question = build_chat_result(
+            "这是解释。",
+            "帮我解释这个实现",
+            false,
+            ProviderToolMode::NativeFunctionCalling,
+            &[],
+        )
+        .unwrap();
+        assert!(!question.should_create_plan);
+        assert_eq!(question.response_mode, "native-text");
+    }
+
+    #[test]
+    fn native_function_call_requires_valid_structured_arguments() {
+        let result = build_chat_result(
+            "",
+            "please do it",
+            false,
+            ProviderToolMode::NativeFunctionCalling,
+            &[ProviderToolCall {
+                name: "start_engineering_task".to_string(),
+                arguments: r#"{"task":7}"#.to_string(),
+            }],
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn accumulates_streamed_native_tool_call_fragments_by_index() {
+        let mut pending = String::new();
+        let first = consume_openai_sse_parts(
+            &mut pending,
+            "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"name\":\"start_\"}}]}}]}\n\n",
+        );
+        let second = consume_openai_sse_parts(
+            &mut pending,
+            "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"name\":\"engineering_task\"}}]}}]}\n\n",
+        );
+        assert_eq!(
+            first.tool_call_fragments,
+            vec![crate::runtime::provider_tools::ProviderToolCallFragment {
+                index: 0,
+                name: "start_".to_string(),
+                arguments: String::new(),
+            }]
+        );
+        assert_eq!(
+            second.tool_call_fragments,
+            vec![crate::runtime::provider_tools::ProviderToolCallFragment {
+                index: 0,
+                name: "engineering_task".to_string(),
+                arguments: String::new(),
+            }]
+        );
     }
 
     #[test]
@@ -438,11 +617,169 @@ mod tests {
         .unwrap();
         let request = server.join().unwrap();
         assert_eq!(result.reply, "自然文本");
-        assert_eq!(result.response_mode, "text");
+        assert_eq!(result.response_mode, "native-text");
         assert_eq!(deltas.concat(), "自然文本");
+        assert!(request.contains("\"tools\""));
         assert!(request.contains("natural Chinese text"));
         assert!(!request.contains("Return only strict JSON"));
         assert!(!request.contains("shouldCreatePlan"));
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[tokio::test]
+    async fn persists_an_accepted_native_function_call() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let request = read_http_request(&mut stream);
+            let body = concat!(
+                "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"name\":\"start_\"}}]}}]}\n\n",
+                "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"name\":\"engineering_task\",\"arguments\":\"{\\\"task\\\":\\\"修复发送延迟\\\"}\"}}]}}]}\n\n",
+                "data: [DONE]\n\n"
+            );
+            write_sse_response(&mut stream, body);
+            request
+        });
+        let (root, provider) = native_test_provider(address);
+        let result = generate_provider_chat(
+            &provider,
+            &root,
+            "OmniDesk",
+            "stabilizing",
+            "修复发送延迟",
+            &[],
+            &[],
+            &DialogueContextInput::default(),
+            &json!({}),
+            &[],
+            &json!({}),
+            |_, _| {},
+        )
+        .await
+        .unwrap();
+        let request = server.join().unwrap();
+        assert!(request.contains("\"tools\""));
+        assert!(result.should_create_plan);
+        assert_eq!(result.response_mode, "native-function-call");
+        assert_eq!(
+            crate::runtime::provider_tools::provider_tool_mode(&root, &provider),
+            ProviderToolMode::NativeFunctionCalling
+        );
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[tokio::test]
+    async fn persists_explicit_tool_rejection_and_retries_without_tools_once() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = std::thread::spawn(move || {
+            let (mut first, _) = listener.accept().unwrap();
+            let first_request = read_http_request(&mut first);
+            let error = "{\"error\":{\"message\":\"tools are unsupported\"}}";
+            write!(
+                first,
+                "HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                error.len(),
+                error
+            )
+            .unwrap();
+
+            let (mut second, _) = listener.accept().unwrap();
+            let second_request = read_http_request(&mut second);
+            let body = concat!(
+                "data: {\"choices\":[{\"delta\":{\"content\":\"正在准备\"}}]}\n\n",
+                "data: [DONE]\n\n"
+            );
+            write_sse_response(&mut second, body);
+            (first_request, second_request)
+        });
+        let (root, provider) = native_test_provider(address);
+        let result = generate_provider_chat(
+            &provider,
+            &root,
+            "OmniDesk",
+            "stabilizing",
+            "修复发送延迟",
+            &[],
+            &[],
+            &DialogueContextInput::default(),
+            &json!({}),
+            &[],
+            &json!({}),
+            |_, _| {},
+        )
+        .await
+        .unwrap();
+        let (first_request, second_request) = server.join().unwrap();
+        assert!(first_request.contains("\"tools\""));
+        assert!(!second_request.contains("\"tools\""));
+        assert_eq!(result.response_mode, "compatibility-keyword");
+        assert_eq!(
+            crate::runtime::provider_tools::provider_tool_mode(&root, &provider),
+            ProviderToolMode::CompatibilityKeyword
+        );
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    fn native_test_provider(address: std::net::SocketAddr) -> (std::path::PathBuf, ProviderConfig) {
+        let root = std::env::temp_dir().join(format!(
+            "omnidesk-native-tool-chat-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join(".env.local"), "OMNIDESK_CHAT_TEST_KEY=test-key\n").unwrap();
+        let provider = ProviderConfig {
+            schema_version: "omnidesk.desktop-provider.v0.1".to_string(),
+            provider: "openai-compatible".to_string(),
+            model: "test-model".to_string(),
+            api_base: format!("http://{address}/v1"),
+            api_key_env: "OMNIDESK_CHAT_TEST_KEY".to_string(),
+            enabled: true,
+            active_profile_id: String::new(),
+            profiles: Vec::new(),
+        };
+        (root, provider)
+    }
+
+    fn read_http_request(stream: &mut std::net::TcpStream) -> String {
+        let mut request = Vec::new();
+        let mut buffer = [0_u8; 8192];
+        loop {
+            let count = stream.read(&mut buffer).unwrap();
+            if count == 0 {
+                break;
+            }
+            request.extend_from_slice(&buffer[..count]);
+            let Some(header_end) = request.windows(4).position(|bytes| bytes == b"\r\n\r\n") else {
+                continue;
+            };
+            let headers = String::from_utf8_lossy(&request[..header_end]);
+            let content_length = headers
+                .lines()
+                .find_map(|line| {
+                    line.to_ascii_lowercase()
+                        .strip_prefix("content-length:")
+                        .and_then(|value| value.trim().parse::<usize>().ok())
+                })
+                .unwrap_or(0);
+            if request.len() >= header_end + 4 + content_length {
+                break;
+            }
+        }
+        String::from_utf8_lossy(&request).to_string()
+    }
+
+    fn write_sse_response(stream: &mut std::net::TcpStream, body: &str) {
+        write!(
+            stream,
+            "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            body.len(),
+            body
+        )
+        .unwrap();
     }
 }

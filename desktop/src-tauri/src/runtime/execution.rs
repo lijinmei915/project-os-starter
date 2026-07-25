@@ -291,6 +291,55 @@ pub fn execute_approved_agent_tool(
             &arguments,
             timestamp,
         )
+    } else if name == "mcp_discover" {
+        if project_access_mode != "controlled" {
+            Err("当前项目未授权启动 MCP 能力发现进程。".to_string())
+        } else {
+            let server_id = arguments
+                .get("serverId")
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty())
+                .ok_or_else(|| "MCP 能力发现审批缺少 serverId。".to_string());
+            server_id.and_then(|server_id| {
+                crate::runtime::mcp_runtime::discover_tools(app_root, project_root, server_id, None)
+                    .and_then(|result| {
+                        crate::runtime::mcp_runtime::save_discovery_evidence(
+                            app_root,
+                            project_id,
+                            result.clone(),
+                            timestamp,
+                        )?;
+                        serde_json::to_value(result).map_err(|error| error.to_string())
+                    })
+            })
+        }
+    } else if name == "mcp_call" {
+        if project_access_mode != "controlled" {
+            Err("当前项目未授权启动 MCP 工具调用进程。".to_string())
+        } else {
+            let server_id = arguments
+                .get("serverId")
+                .and_then(Value::as_str)
+                .unwrap_or("");
+            let remote_name = arguments
+                .get("remoteName")
+                .and_then(Value::as_str)
+                .unwrap_or("");
+            let tool_arguments = arguments
+                .get("arguments")
+                .cloned()
+                .unwrap_or_else(|| json!({}));
+            crate::runtime::mcp_runtime::call_tool(
+                app_root,
+                project_root,
+                project_id,
+                server_id,
+                remote_name,
+                &tool_arguments,
+                None,
+            )
+            .and_then(|result| serde_json::to_value(result).map_err(|error| error.to_string()))
+        }
     } else {
         let execution_root = run
             .isolation
@@ -345,7 +394,8 @@ fn integrate_isolated_workspace(
         .and_then(Value::as_str)
         .filter(|value| !value.trim().is_empty())
         .ok_or_else(|| "隔离合并审批缺少 diff。".to_string())?;
-    let current_diff = crate::runtime::isolated_workspace::integration_diff(workspace, project_root)?;
+    let current_diff =
+        crate::runtime::isolated_workspace::integration_diff(workspace, project_root)?;
     if current_diff != approved_diff {
         return Err("隔离工作区在审批后发生变化；请重新生成合并审批。".to_string());
     }
@@ -417,6 +467,8 @@ fn execute_approved_tool(
                 .map_err(|err| err.to_string())
         }
         "integrate_worktree" => Err("隔离合并只能通过绑定 Agent Run 的执行入口。".to_string()),
+        "mcp_discover" => Err("MCP 能力发现只能通过绑定 Agent Run 的执行入口。".to_string()),
+        "mcp_call" => Err("MCP 工具调用只能通过绑定 Agent Run 的执行入口。".to_string()),
         _ => Err(format!("不允许执行审批工具：{name}")),
     }
 }
@@ -546,6 +598,8 @@ pub fn append_handoff(root: &Path, block: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
+    use std::os::unix::fs::PermissionsExt;
     use std::process::Command;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -779,21 +833,21 @@ mod tests {
         commit_initial_file(&root, "README.md", "before\n");
         crate::runtime::state_namespace::ensure_active_state_namespace(&root).unwrap();
         let workspace = crate::runtime::isolated_workspace::create(&root, "run-isolated").unwrap();
-        let isolated = crate::runtime::isolated_workspace::execution_root(&workspace, &root).unwrap();
+        let isolated =
+            crate::runtime::isolated_workspace::execution_root(&workspace, &root).unwrap();
         std::fs::write(isolated.join("README.md"), "after\n").unwrap();
-        let approved = crate::runtime::isolated_workspace::integration_diff(&workspace, &root).unwrap();
+        let approved =
+            crate::runtime::isolated_workspace::integration_diff(&workspace, &root).unwrap();
         let arguments = json!({ "diff": approved, "allowedFiles": ["README.md"] });
 
-        let result = integrate_isolated_workspace(
-            &root,
-            "controlled",
-            Some(&workspace),
-            &arguments,
-            "now",
-        )
-        .unwrap();
+        let result =
+            integrate_isolated_workspace(&root, "controlled", Some(&workspace), &arguments, "now")
+                .unwrap();
         assert_eq!(result["success"], true);
-        assert_eq!(std::fs::read_to_string(root.join("README.md")).unwrap(), "after\n");
+        assert_eq!(
+            std::fs::read_to_string(root.join("README.md")).unwrap(),
+            "after\n"
+        );
         assert!(!Path::new(&workspace.root).exists());
         std::fs::remove_dir_all(root).unwrap();
     }
@@ -803,23 +857,24 @@ mod tests {
         let root = initialize_git_directory("isolated-stale-merge");
         commit_initial_file(&root, "README.md", "before\n");
         crate::runtime::state_namespace::ensure_active_state_namespace(&root).unwrap();
-        let workspace = crate::runtime::isolated_workspace::create(&root, "run-isolated-stale").unwrap();
-        let isolated = crate::runtime::isolated_workspace::execution_root(&workspace, &root).unwrap();
+        let workspace =
+            crate::runtime::isolated_workspace::create(&root, "run-isolated-stale").unwrap();
+        let isolated =
+            crate::runtime::isolated_workspace::execution_root(&workspace, &root).unwrap();
         std::fs::write(isolated.join("README.md"), "after\n").unwrap();
-        let approved = crate::runtime::isolated_workspace::integration_diff(&workspace, &root).unwrap();
+        let approved =
+            crate::runtime::isolated_workspace::integration_diff(&workspace, &root).unwrap();
         std::fs::write(isolated.join("README.md"), "changed-after-approval\n").unwrap();
         let arguments = json!({ "diff": approved, "allowedFiles": ["README.md"] });
 
-        let error = integrate_isolated_workspace(
-            &root,
-            "controlled",
-            Some(&workspace),
-            &arguments,
-            "now",
-        )
-        .unwrap_err();
+        let error =
+            integrate_isolated_workspace(&root, "controlled", Some(&workspace), &arguments, "now")
+                .unwrap_err();
         assert!(error.contains("审批后发生变化"));
-        assert_eq!(std::fs::read_to_string(root.join("README.md")).unwrap(), "before\n");
+        assert_eq!(
+            std::fs::read_to_string(root.join("README.md")).unwrap(),
+            "before\n"
+        );
         crate::runtime::isolated_workspace::remove(&workspace, &root).unwrap();
         std::fs::remove_dir_all(root).unwrap();
     }
@@ -856,6 +911,74 @@ mod tests {
             run.checkpoint.tool_result.as_ref().unwrap()["success"],
             true
         );
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn approved_mcp_discovery_runs_only_after_approval_and_records_tool_result() {
+        let root = initialize_git_directory("approved-mcp-discovery");
+        crate::runtime::state_namespace::ensure_active_state_namespace(&root).unwrap();
+        let marker = root.join("mcp-started");
+        let script = root.join("fixture-mcp.sh");
+        std::fs::write(
+            &script,
+            format!(
+                "#!/bin/sh\ntouch '{}'\nIFS= read -r initialize\nprintf '%s\\n' '{{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{{\"tools\":{{}}}}}}}}'\nIFS= read -r initialized\nIFS= read -r list\nprintf '%s\\n' '{{\"jsonrpc\":\"2.0\",\"id\":2,\"result\":{{\"tools\":[{{\"name\":\"lookup\",\"inputSchema\":{{\"type\":\"object\",\"properties\":{{}}}}}}]}}}}'\n",
+                marker.to_string_lossy()
+            ),
+        )
+        .unwrap();
+        let mut permissions = std::fs::metadata(&script).unwrap().permissions();
+        permissions.set_mode(0o700);
+        std::fs::set_permissions(&script, permissions).unwrap();
+        crate::runtime::mcp_runtime::save(
+            &root,
+            crate::runtime::mcp_runtime::McpServerConfig {
+                schema_version: crate::runtime::mcp_runtime::MCP_SERVER_SCHEMA.to_string(),
+                id: "fixture-server".to_string(),
+                name: "Fixture Server".to_string(),
+                transport: "stdio".to_string(),
+                command: script.to_string_lossy().to_string(),
+                args: Vec::new(),
+                env: Vec::new(),
+                enabled: true,
+                approval_policy: "always".to_string(),
+            },
+        )
+        .unwrap();
+        let pending = crate::runtime::agent_runs::create_mcp_discovery_run(
+            &root,
+            "run-mcp-discovery".to_string(),
+            "request-mcp-discovery".to_string(),
+            "project-a".to_string(),
+            "fixture-server".to_string(),
+            "approval-mcp".to_string(),
+            "now",
+        )
+        .unwrap();
+        assert_eq!(pending.status, "awaiting-approval");
+        assert!(!marker.exists());
+        let approved =
+            crate::runtime::agent_runs::approve(&root, "run-mcp-discovery", "approved").unwrap();
+        let result = execute_approved_agent_tool(
+            &root,
+            &root,
+            "project-a",
+            "controlled",
+            "run-mcp-discovery",
+            &approved.approval_token,
+            "executed",
+        )
+        .unwrap();
+
+        assert!(marker.exists());
+        assert_eq!(result["serverId"], "fixture-server");
+        assert_eq!(result["tools"][0]["remoteName"], "lookup");
+        let settled = crate::runtime::agent_runs::load(&root, "run-mcp-discovery").unwrap();
+        assert_eq!(settled.status, "succeeded");
+        assert_eq!(settled.checkpoint.next_action, "none");
+        assert_eq!(settled.evidence.last().unwrap()["kind"], "tool");
         std::fs::remove_dir_all(root).unwrap();
     }
 

@@ -1,5 +1,6 @@
 import { ArrowRight, Check, MessageSquare, Plus } from "lucide-react";
 import { Button } from "../ui/button";
+import { taskWorkflowState, workflowStateIsFailure, workflowStates } from "../../lib/workflow-state";
 
 function isNoiseTask(task) {
   const title = String(task?.title || "").trim().replace(/[。！？!?,，\s]/g, "").toLowerCase();
@@ -12,9 +13,10 @@ export function WorkspaceDashboard({ onNavigate, onRequestProjectAccess, snapsho
   const indexedActiveTasks = projects.reduce((sum, project) => sum + Number(project.activeTaskCount || 0), 0);
   const indexedFailedTasks = projects.reduce((sum, project) => sum + Number(project.failedTaskCount || 0), 0);
   const currentTasks = tasks.filter((task) => !isNoiseTask(task));
-  const currentRunningTasks = currentTasks.filter((task) => task.status === taskStatuses.running);
-  const currentWaitingTasks = currentTasks.filter((task) => [taskStatuses.waitingApproval, taskStatuses.planned].includes(task.status));
-  const currentFailedTasks = currentTasks.filter((task) => task.status === taskStatuses.failed);
+  const stateFor = (task) => taskWorkflowState(task, taskStatuses);
+  const currentRunningTasks = currentTasks.filter((task) => [workflowStates.working, workflowStates.verifying].includes(stateFor(task)));
+  const currentWaitingTasks = currentTasks.filter((task) => [workflowStates.planned, workflowStates.waitingUser, workflowStates.waitingApproval].includes(stateFor(task)));
+  const currentFailedTasks = currentTasks.filter((task) => workflowStateIsFailure(stateFor(task)));
   const attentionItems = [
     ...projects.filter((project) => Number(project.failedTaskCount) > 0).map((project) => ({ action: "处理失败任务", body: `${project.failedTaskCount} 个任务失败，需要检查结果并决定是否生成修复任务。`, project, tone: "danger", title: `${project.name} 有执行失败` })),
     ...projects.filter((project) => project.health === "missing").map((project) => ({ action: "重新定位", body: "项目路径已经失效，需要重新定位后才能继续读取和执行。", project, tone: "danger", title: `${project.name} 无法访问` })),

@@ -8,6 +8,9 @@ export function resolveConversationCommand({ activeTask, hasAttachments = false,
   if (pendingAction && decision === "cancel") return { command: conversationCommands.cancelAction, decision, pendingAction };
   if (pendingAction && decision === "inspect") return { command: conversationCommands.inspectAction, decision, pendingAction };
   if (pendingAction && decision === "confirm") return { command: conversationCommands.confirmAction, decision, pendingAction };
+  if (pendingAction) {
+    return { command: conversationCommands.answer, decision: "revise", intent: "chat", pendingAction };
+  }
   if (!pendingAction && decision === "confirm" && activeTask) return { command: conversationCommands.resumeTask, decision, taskId: activeTask.id };
   const actionDecision = conversationActionDecision(message);
   if (actionDecision?.confirmation === "none") {

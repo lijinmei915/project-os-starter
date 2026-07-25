@@ -294,6 +294,14 @@ pub fn git_status(root: &Path) -> Result<Value, String> {
 /// Executes only the registered read-only Agent tools. The Tauri adapter owns
 /// selecting the current project root; this module owns argument validation and dispatch.
 pub fn execute_read_tool(root: &Path, name: &str, arguments: &Value) -> Result<Value, String> {
+    let descriptor = crate::runtime::tool_registry::find_builtin(name)
+        .ok_or_else(|| "Native Core 只接受已登记的只读 Agent Tool".to_string())?;
+    if descriptor.risk != crate::runtime::tool_registry::ToolRisk::ReadOnly
+        || descriptor.requires_approval
+    {
+        return Err("该工具不能通过只读 Agent Tool 入口执行".to_string());
+    }
+    crate::runtime::tool_registry::validate_arguments(&descriptor, arguments)?;
     let arguments = arguments
         .as_object()
         .ok_or_else(|| "工具参数格式错误".to_string())?;
@@ -307,7 +315,7 @@ pub fn execute_read_tool(root: &Path, name: &str, arguments: &Value) -> Result<V
             arguments.get("query").and_then(Value::as_str).unwrap_or(""),
         ),
         "git_status" => git_status(root),
-        _ => Err("Native Core 只接受已登记的只读 Agent Tool".to_string()),
+        _ => Err("已登记工具缺少 Native Core 执行器".to_string()),
     }
 }
 
@@ -445,6 +453,9 @@ mod tests {
         fs::create_dir_all(&root).unwrap();
         assert!(execute_read_tool(&root, "write_file", &json!({})).is_err());
         assert!(execute_read_tool(&root, "list_files", &json!([])).is_err());
+        assert!(execute_read_tool(&root, "git_status", &json!({ "path": "." })).is_err());
+        assert!(execute_read_tool(&root, "read_file", &json!({})).is_err());
+        assert!(execute_read_tool(&root, "search_project", &json!({ "query": "" })).is_err());
         fs::remove_dir_all(root).unwrap();
     }
 

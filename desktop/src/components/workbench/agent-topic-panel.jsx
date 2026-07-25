@@ -8,6 +8,8 @@ import { goalStatusLabelText } from "../../lib/goal-presentation";
 export function AgentTopicPanel({
   agentRuns = [],
   onApproveAgentRun,
+  onCancelAgentRun,
+  onExportAgentRun,
   onResumeAgentRun,
   activeTaskId,
   provider,
@@ -120,7 +122,7 @@ export function AgentTopicPanel({
     cards={cards}
     compact={compact}
     currentTaskDetailProps={{ currentChecks, currentPlan, currentTask, goalTitleForTask, onApplyPatchDraft, onGeneratePatchDraft, onMergeHandoff, onOpenTask: selectTaskInWorkspace, onRunChecks: runChecksForTask, taskStatusLabel }}
-    executionResultsProps={{ agentRuns, failedRunsForTask, failureSummaryForTask, onApproveAgentRun, onCreateRepairTask, onOpenTask: selectTaskInWorkspace, onResumeAgentRun, onRerunFailedChecks: rerunFailedChecks, recentResultTasks, runnerLoadingId, taskStatuses, taskStatusLabel }}
+    executionResultsProps={{ agentRuns, failedRunsForTask, failureSummaryForTask, onApproveAgentRun, onCancelAgentRun, onCreateRepairTask, onExportAgentRun, onOpenTask: selectTaskInWorkspace, onResumeAgentRun, onRerunFailedChecks: rerunFailedChecks, recentResultTasks, runnerLoadingId, taskStatuses, taskStatusLabel }}
     id={id}
     onOpenCapabilityFile={onOpenCapabilityFile}
     taskBoardProps={{

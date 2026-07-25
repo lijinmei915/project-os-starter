@@ -32,6 +32,34 @@ export function executeAgentReadTool(name, arguments_ = {}) {
   return invokeRuntimeCommand("execute_agent_read_tool", { input: { name, arguments: arguments_ } });
 }
 
+export function getAgentToolRegistry() {
+  return invokeRuntimeCommand("get_agent_tool_registry", {});
+}
+
+export function getMcpServerRegistry() {
+  return invokeRuntimeCommand("get_mcp_server_registry", {});
+}
+
+export function saveMcpServer(server) {
+  return invokeRuntimeCommand("save_mcp_server", { input: server });
+}
+
+export function removeMcpServer(id) {
+  return invokeRuntimeCommand("remove_mcp_server", { input: { id } });
+}
+
+export function getMcpDiscoveryEvidence(serverId) {
+  return invokeRuntimeCommand("get_mcp_discovery_evidence", { input: { serverId } });
+}
+
+export function requestMcpDiscovery(serverId) {
+  return invokeRuntimeCommand("request_mcp_discovery", { input: { serverId } });
+}
+
+export function requestMcpCall(serverId, remoteName, arguments_ = {}) {
+  return invokeRuntimeCommand("request_mcp_call", { input: { serverId, remoteName, arguments: arguments_ } });
+}
+
 export function runHermesAgent(prompt, requestId = "", maxSteps = 20, approvalToken = "", context = {}) {
   return invokeRuntimeCommand("run_hermes_agent", {
     input: {
@@ -58,8 +86,36 @@ export function listAgentRuns() {
   return invokeRuntimeCommand("list_agent_runs", {});
 }
 
+export function getAgentScheduler() {
+  return invokeRuntimeCommand("get_agent_scheduler", {});
+}
+
+export function cancelAgentRun(run) {
+  if (!run?.id) throw new Error("缺少可取消的 Agent Run。");
+  return invokeRuntimeCommand("cancel_agent_run", { input: { id: run.id } });
+}
+
+export function exportAgentRunTimeline(run) {
+  if (!run?.id) throw new Error("缺少可导出的 Agent Run。");
+  return invokeRuntimeCommand("export_agent_run_timeline", { input: { id: run.id } });
+}
+
+export async function listScheduledAgentRuns() {
+  const [runs, scheduler] = await Promise.all([listAgentRuns(), getAgentScheduler()]);
+  return projectScheduledAgentRuns(runs, scheduler);
+}
+
+export function projectScheduledAgentRuns(runs, scheduler) {
+  const scheduled = new Map((scheduler?.entries || []).map((entry) => [entry.runId, entry]));
+  return (Array.isArray(runs) ? runs : []).map((run) => ({
+    ...run,
+    scheduler: scheduled.get(run.id) || null,
+  }));
+}
+
 export async function resumeHermesAgent(run) {
   if (!run?.id) throw new Error("缺少可恢复的 Agent Run。");
+  if (run.status === "queued") return invokeRuntimeCommand("continue_agent_run", { input: { id: run.id } });
   const resumed = await invokeRuntimeCommand("resume_agent_run", { input: { id: run.id } });
   if (resumed.status === "awaiting-approval") return resumed;
   return invokeRuntimeCommand("continue_agent_run", { input: { id: resumed.id } });

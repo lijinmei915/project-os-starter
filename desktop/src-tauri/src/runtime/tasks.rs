@@ -29,7 +29,9 @@ pub fn list_repository_records(repository: &Repository) -> Result<Vec<(String, V
 pub fn list(root: &Path) -> Result<Vec<Value>, String> {
     let mut tasks = list_repository_records(&Repository::new(root))?
         .into_iter()
-        .map(|(_, task)| project_legacy_execution_state(project_task_schema(task)))
+        .map(|(_, task)| {
+            project_confirmation_title(project_legacy_execution_state(project_task_schema(task)))
+        })
         .collect::<Vec<_>>();
     tasks.sort_by(|a, b| {
         let a_time = a
@@ -45,6 +47,54 @@ pub fn list(root: &Path) -> Result<Vec<Value>, String> {
         b_time.cmp(a_time)
     });
     Ok(tasks)
+}
+
+fn project_confirmation_title(mut task: Value) -> Value {
+    let title = task
+        .get("title")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim()
+        .trim_matches(&['。', '！', '!', '，', ',', ' '][..])
+        .to_string();
+    if ![
+        "好",
+        "好的",
+        "可以",
+        "行",
+        "继续",
+        "开始",
+        "执行",
+        "就这样",
+        "按这个来",
+    ]
+    .contains(&title.as_str())
+    {
+        return task;
+    }
+    let replacement = task
+        .pointer("/plan/task")
+        .and_then(Value::as_str)
+        .or_else(|| task.pointer("/plan/summary").and_then(Value::as_str))
+        .map(str::trim)
+        .filter(|value| !value.is_empty() && !["好", "好的", "可以", "行", "继续"].contains(value))
+        .map(str::to_string);
+    let Some(replacement) = replacement else {
+        return task;
+    };
+    let Some(object) = task.as_object_mut() else {
+        return task;
+    };
+    object.insert("title".to_string(), Value::String(replacement));
+    object.insert(
+        "runtimeMigration".to_string(),
+        serde_json::json!({
+            "fromTitle": title,
+            "reason": "历史确认词标题已按现有计划摘要恢复。",
+            "version": "confirmation-title-v1"
+        }),
+    );
+    task
 }
 
 // Reading legacy records is non-destructive. The next explicit task write
@@ -435,6 +485,20 @@ mod tests {
             LEGACY_TASK_SCHEMA_VERSION
         );
         assert_eq!(projected["schemaMigration"]["mode"], "read-projection");
+    }
+
+    #[test]
+    fn projects_confirmation_word_titles_from_existing_plan_evidence() {
+        let projected = project_confirmation_title(serde_json::json!({
+            "id": "confirmation-title",
+            "title": "可以",
+            "plan": { "summary": "修复对话状态机" }
+        }));
+        assert_eq!(projected["title"], "修复对话状态机");
+        assert_eq!(
+            projected["runtimeMigration"]["version"],
+            "confirmation-title-v1"
+        );
     }
 
     #[test]

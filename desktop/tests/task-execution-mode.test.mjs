@@ -13,8 +13,17 @@ test("shows existing validation evidence instead of rerunning an unchanged check
   assert.deepEqual(taskExecutionNextAction({
     id: "task-check",
     plan: { candidateChanges: ["先不写文件，只形成下一步建议。"], checks: ["npm --prefix desktop test"] },
-    verificationSummary: { status: "passed" },
+    verificationSummary: "自动验证通过",
+    executionEvidence: [{ kind: "check", status: "succeeded" }],
   }), { id: "open-topic", label: "查看检查结果", target: "execution", taskId: "task-check" });
+});
+
+test("does not treat a validation summary without check evidence as completed", () => {
+  assert.equal(taskExecutionNextAction({
+    id: "task-check",
+    plan: { checks: ["npm --prefix desktop test"] },
+    verificationSummary: "自动验证通过",
+  }).id, "run-check");
 });
 
 test("drafts a patch only when the plan has an engineering change", () => {

@@ -13,8 +13,29 @@ function normalizeWaitingForUserActionTurn(turn) {
   return { ...turn, outcome: "awaiting-confirmation" };
 }
 
+function normalizeLegacyInvalidPatchTurn(turn) {
+  const invalidPatch = turn?.role === "assistant"
+    && turn?.outcome === "succeeded"
+    && /不是可应用的 diff|没有可应用的 diff/.test(String(turn?.text || ""));
+  if (!invalidPatch) return turn;
+  return {
+    ...turn,
+    diagnostic: turn.diagnostic || {
+      detail: "历史记录中的草稿不是可应用的 unified diff。",
+      label: "改动草稿不可应用",
+      message: "任务和失败证据已保留，可补充要求后重新生成。",
+    },
+    events: Array.isArray(turn.events) ? turn.events.map((event) => event?.id === "change-draft-patch"
+      ? { ...event, detail: event.detail || "当前草稿尚不可应用。", status: "failed" }
+      : event) : turn.events,
+    outcome: "failed",
+  };
+}
+
 export function migrateConversationRecord(record = {}) {
-  const turns = Array.isArray(record.turns) ? record.turns.map(normalizeWaitingForUserActionTurn) : [];
+  const turns = Array.isArray(record.turns)
+    ? record.turns.map(normalizeWaitingForUserActionTurn).map(normalizeLegacyInvalidPatchTurn)
+    : [];
   const waitingForUserAction = turns.some((turn) => turn?.outcome === "awaiting-confirmation"
     && Array.isArray(turn.actions) && turn.actions.some((action) => action?.id === "generate-patch"));
   const migrated = {

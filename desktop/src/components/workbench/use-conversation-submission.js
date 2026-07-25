@@ -117,6 +117,9 @@ export function useConversationSubmission({
     });
     if (takeoverResult.handled) return;
     const requestBaseTurns = takeoverResult.turns;
+    setTaskInput("");
+    clearAttachments();
+    onChatTurnsChange([...requestBaseTurns, userTurn]);
     const baseRequestContext = buildChatRequestContext([...requestBaseTurns, userTurn], 8, conversationSummary);
     let requestContext = withActiveTaskConversationContext(baseRequestContext, {
       activeConversationTaskId,
@@ -285,13 +288,16 @@ export function useConversationSubmission({
       releaseConversationAttachments(submittedAttachments);
       return;
     }
-    const commitmentAction = actionFromAssistantCommitment(chatResult?.reply, contextualTask, `generate-plan-${requestId}`);
+    const revisingPendingAction = runtimeCommand.decision === "revise";
+    const commitmentAction = revisingPendingAction
+      ? null
+      : actionFromAssistantCommitment(chatResult?.reply, contextualTask, `generate-plan-${requestId}`);
     const recommendedAction = commitmentAction ? null : actionFromAssistantRecommendation(
       chatResult?.reply,
       contextualTask,
       `recommend-plan-${requestId}`,
     );
-    const shouldCreatePlan = shouldGenerateConversationPlan({
+    const shouldCreatePlan = !revisingPendingAction && shouldGenerateConversationPlan({
       actionFromCommitment: commitmentAction,
       attachmentsCount: submittedAttachments.length,
       chatResult,

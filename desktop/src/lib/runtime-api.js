@@ -38,6 +38,12 @@ export async function invokePreviewCommand(command, payload) {
   if (command === "resume_agent_run") {
     throw new Error("浏览器预览不能恢复 Hermes 运行，请在桌面 App 窗口里使用。");
   }
+  if (command === "cancel_agent_run") {
+    throw new Error("浏览器预览不能取消 Hermes 运行，请在桌面 App 窗口里使用。");
+  }
+  if (command === "export_agent_run_timeline") {
+    throw new Error("浏览器预览不能导出 Agent 运行证据，请在桌面 App 窗口里使用。");
+  }
   if (command === "continue_agent_run") {
     throw new Error("浏览器预览不能继续 Hermes 运行，请在桌面 App 窗口里使用。");
   }
@@ -49,6 +55,9 @@ export async function invokePreviewCommand(command, payload) {
   }
   if (command === "execute_approved_agent_tool") {
     throw new Error("浏览器预览不能执行已批准工具，请在桌面 App 窗口里使用。");
+  }
+  if (command === "get_agent_scheduler") {
+    throw new Error("浏览器预览不能读取桌面 Agent 调度状态。");
   }
   const spec = previewOperation(command);
   const response = await fetch(spec.endpoint, {

@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { agentRunWorkflowState, workflowStates } from "../../lib/workflow-state";
 import { Button } from "../ui/button";
 import { Field } from "../ui/field";
 import { Input } from "../ui/input";
@@ -11,8 +12,9 @@ function answerSummary(interaction, runStatus) {
   const response = interaction?.response;
   if (!response) return "";
   if (response.action === "skip") return "已跳过";
-  if (["queued", "running"].includes(runStatus)) return "AI 正在继续";
-  if (runStatus === "failed") return "继续失败";
+  const state = agentRunWorkflowState(runStatus);
+  if ([workflowStates.planned, workflowStates.working, workflowStates.verifying].includes(state)) return "AI 正在继续";
+  if ([workflowStates.failed, workflowStates.interrupted].includes(state)) return "继续失败";
   return "已提交";
 }
 

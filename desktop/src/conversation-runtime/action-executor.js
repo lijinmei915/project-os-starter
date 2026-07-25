@@ -1,6 +1,7 @@
-import { conversationActionDefinition, executeRegisteredConversationAction, isApplicablePatchDraft } from "./action-registry.js";
+import { conversationActionDefinition, executeRegisteredConversationAction } from "./action-registry.js";
 import { guardedCheckCapability } from "./capabilities.js";
 import { taskExecutionNextAction } from "../lib/task-execution-mode.js";
+import { patchDraftResultState } from "../lib/patch-draft-state.js";
 
 const terminalStatuses = new Set(["cancelled", "failed", "succeeded", "timed-out"]);
 
@@ -173,7 +174,8 @@ async function executePatchAction(action, adapters, context, emitProgress, now) 
   emitProgress({ events: changeDraftProgressEvents("patch"), label: "生成改动草稿" });
   const patchResult = await adapters.generatePatch({ action, requestId: context.requestId, task: planOutcome.task });
   const success = Boolean(patchResult?.success);
-  const applicable = success && isApplicablePatchDraft(patchResult.patchDraft);
+  const draftState = patchDraftResultState(patchResult);
+  const { applicable } = draftState;
   const taskId = planOutcome.taskId || planOutcome.task.id;
   const pendingAction = applicable ? {
     id: `apply-task-${taskId || context.requestId}`,
@@ -183,7 +185,7 @@ async function executePatchAction(action, adapters, context, emitProgress, now) 
   } : null;
   return {
     handled: true,
-    requestStatus: success ? "succeeded" : "failed",
+    requestStatus: draftState.requestStatus,
     turn: {
       ...turnBase(context, "patch", now),
       actions: applicable
@@ -192,17 +194,17 @@ async function executePatchAction(action, adapters, context, emitProgress, now) 
           { id: "apply-patch", label: "确认应用改动", taskId },
         ]
         : [{ id: "open-topic", label: "查看改动草稿", target: "execution", taskId }],
-      diagnostic: success ? null : {
-        detail: patchResult?.error || "改动草稿生成失败。",
-        label: "改动草稿生成失败",
-        message: "计划任务已保留，可在任务详情中重试。",
+      diagnostic: applicable ? null : {
+        detail: patchResult?.error || "模型返回的草稿不是可应用的 unified diff。",
+        label: success ? "改动草稿不可应用" : "改动草稿生成失败",
+        message: "任务和失败证据已保留，可补充要求后重新生成。",
       },
       events: changeDraftProgressEvents(
         applicable ? "review" : "patch",
-        success ? (applicable ? "current" : "done") : "failed",
+        draftState.eventStatus,
         applicable ? "草稿已就绪，确认后才会写入文件。" : patchResult?.error || "当前草稿尚不可应用。",
       ),
-      outcome: applicable ? "awaiting-confirmation" : success ? "succeeded" : "failed",
+      outcome: draftState.outcome,
       pendingAction,
       taskId,
       text: applicable

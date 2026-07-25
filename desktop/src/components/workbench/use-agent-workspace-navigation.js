@@ -39,7 +39,7 @@ export function useAgentWorkspaceNavigation({
     setTaskInput(taskContinuationPrompt({
       goalName: taskGoalName(task, snapshot),
       nextActionLabel: next.label,
-      statusLabel: taskStatusLabel(task.status),
+      statusLabel: taskStatusLabel(task),
       title: task.title,
     }));
     requestAnimationFrame(() => focusComposer?.());

@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import { executeReadonlyPlanWorkflow } from "../../lib/plan-executor";
+import { taskTitleForPlan } from "../../lib/task-record-factory";
 
 /** React lifecycle wrapper for the shared read-only plan workflow. */
 export function usePlanAction({
@@ -32,7 +33,7 @@ export function usePlanAction({
         autoContinue,
         buildLocalPlan,
         commandInput,
-        createTask: (plan) => createTaskFromPlan(plan, commandInput.displayTask || commandInput.task, {
+        createTask: (plan) => createTaskFromPlan(plan, taskTitleForPlan(commandInput.displayTask, commandInput.task, plan), {
           conversationId: commandInput.conversationId || activeConversationId,
           origin: "conversation",
           requestId,

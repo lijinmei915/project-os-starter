@@ -1,4 +1,5 @@
 import { taskExecutionNextAction } from "./task-execution-mode.js";
+import { taskHasVerificationEvidence } from "./workflow-state.js";
 
 const flowSteps = [
   { id: "draft", label: "生成 AI 建议" },
@@ -56,7 +57,7 @@ export function taskNextAction(task) {
       step: "review",
     };
   }
-  if (!task.verificationSummary) {
+  if (!taskHasVerificationEvidence(task)) {
     return {
       action: "run-check",
       detail: "改动已应用，下一步运行已经登记的检查。",

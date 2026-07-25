@@ -101,6 +101,17 @@ async function script(source) {
   });
 }
 
+async function clickButtonByText(text, rootSelector = "body") {
+  const deadline = Date.now() + 12_000;
+  let result;
+  while (Date.now() < deadline) {
+    result = await script(`const root = document.querySelector(${JSON.stringify(rootSelector)}); const buttons = [...(root?.querySelectorAll('button') || [])]; const button = buttons.find((item) => item.textContent.trim().includes(${JSON.stringify(text)})); if (!button) return { clicked: false, labels: buttons.map((item) => item.textContent.trim()).filter(Boolean).slice(0, 40) }; button.click(); return { clicked: true };`);
+    if (result?.clicked) return;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error(`找不到按钮：${text}；当前按钮：${JSON.stringify(result?.labels || [])}`);
+}
+
 async function readTerminalTrace() {
   return script("return JSON.parse(window.localStorage.getItem('omnidesk.native-terminal-trace') || '[]')");
 }
@@ -233,7 +244,130 @@ try {
     throw new Error(`原生测试构建没有写入终端启动阶段记录：${JSON.stringify({ runtimeIdentity, startupLocalTrace, startupTrace })}`);
   }
 
+  currentStage = "读取原生 Agent 工具能力";
+  const toolRegistry = await invokeNative("get_agent_tool_registry");
+  const expectedTools = ["git_status", "list_files", "read_file", "search_project"];
+  const discoveredTools = (toolRegistry?.tools || []).map((tool) => tool.name).sort();
+  if (toolRegistry?.schemaVersion !== "omnidesk.tool-registry.v0.1"
+    || JSON.stringify(discoveredTools) !== JSON.stringify(expectedTools)
+    || toolRegistry.tools.some((tool) => tool.source !== "builtin"
+      || tool.risk !== "read-only"
+      || tool.requiresApproval
+      || tool.inputSchema?.additionalProperties !== false)) {
+    throw new Error(`原生工具能力发现未遵守版本、风险或封闭 schema 契约：${JSON.stringify(toolRegistry)}`);
+  }
+
+  currentStage = "持久化原生 MCP Server 配置";
+  await invokeNative("add_registry_project", { input: { path: fixture, accessMode: "controlled" } });
+  await invokeNative("update_project_capability", { input: {
+    capabilityId: "agent-configuration", status: "enabled", modules: [], candidateModules: [],
+  } });
+  const mcpExecutionMarker = path.join(fixture, "mcp-config-must-not-execute");
+  const savedMcpRegistry = await invokeNative("save_mcp_server", { input: {
+    schemaVersion: "omnidesk.mcp-server.v0.1",
+    id: "native-fixture",
+    name: "Native Fixture",
+    transport: "stdio",
+    command: "/usr/bin/touch",
+    args: [mcpExecutionMarker],
+    env: [{ name: "API_KEY", sourceEnv: "OMNIDESK_MCP_FIXTURE_KEY" }],
+    enabled: true,
+    approvalPolicy: "always",
+  } });
+  const loadedMcpRegistry = await invokeNative("get_mcp_server_registry");
+  if (savedMcpRegistry?.schemaVersion !== "omnidesk.mcp-servers.v0.1"
+    || loadedMcpRegistry?.servers?.[0]?.id !== "native-fixture"
+    || loadedMcpRegistry?.servers?.[0]?.approvalPolicy !== "always"
+    || fs.existsSync(mcpExecutionMarker)) {
+    throw new Error(`MCP 配置未安全持久化，或保存配置时错误启动了进程：${JSON.stringify(loadedMcpRegistry)}`);
+  }
+  currentStage = "创建原生 MCP 能力发现审批";
+  const mcpDiscoveryRun = await invokeNative("request_mcp_discovery", { input: { serverId: "native-fixture" } });
+  if (mcpDiscoveryRun?.status !== "awaiting-approval"
+    || mcpDiscoveryRun?.approval?.name !== "mcp_discover"
+    || mcpDiscoveryRun?.approval?.status !== "pending"
+    || fs.existsSync(mcpExecutionMarker)) {
+    throw new Error(`MCP 发现请求绕过审批或提前启动了进程：${JSON.stringify(mcpDiscoveryRun)}`);
+  }
+  await invokeNative("cancel_agent_run", { input: { id: mcpDiscoveryRun.id } });
+  const removedMcpRegistry = await invokeNative("remove_mcp_server", { input: { id: "native-fixture" } });
+  if (removedMcpRegistry?.servers?.length !== 0 || fs.existsSync(mcpExecutionMarker)) {
+    throw new Error("删除 MCP 配置后仍有残留，或配置进程被错误启动。");
+  }
+
+  currentStage = "执行原生 MCP 发现与调用审批闭环";
+  const mcpCallMarker = path.join(fixture, "mcp-call-approved");
+  const mcpScript = path.join(fixture, "native-mcp.sh");
+  fs.writeFileSync(mcpScript, `#!/bin/sh
+IFS= read -r initialize
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05","capabilities":{"tools":{}}}}'
+IFS= read -r initialized
+IFS= read -r request
+case "$request" in
+  *tools/list*) printf '%s\n' '{"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"lookup","inputSchema":{"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}}]}}' ;;
+  *tools/call*) touch '${mcpCallMarker}'; printf '%s\n' '{"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"found"}],"isError":false}}' ;;
+esac
+`, { mode: 0o700 });
+  await invokeNative("save_mcp_server", { input: {
+    schemaVersion: "omnidesk.mcp-server.v0.1", id: "native-callable", name: "Native Callable",
+    transport: "stdio", command: mcpScript, args: [], env: [], enabled: true, approvalPolicy: "always",
+  } });
+  const discoveryPending = await invokeNative("request_mcp_discovery", { input: { serverId: "native-callable" } });
+  const discoveryApproved = await invokeNative("approve_agent_run", { input: { id: discoveryPending.id } });
+  await invokeNative("execute_approved_agent_tool", { input: { id: discoveryApproved.id, token: discoveryApproved.approvalToken } });
+  const discoveryEvidence = await invokeNative("get_mcp_discovery_evidence", { input: { serverId: "native-callable" } });
+  if (discoveryEvidence?.projectId == null || discoveryEvidence?.result?.tools?.[0]?.remoteName !== "lookup") {
+    throw new Error(`原生 MCP 发现证据没有按当前项目投影：${JSON.stringify(discoveryEvidence)}`);
+  }
+
+  currentStage = "通过原生 MCP 管理界面创建调用审批";
+  await clickButtonByText("Agent 配置", 'nav[aria-label="工作区能力"]');
+  await clickButtonByText("工具白名单", 'nav[aria-label="Agent 配置子项"]');
+  await waitForElement("[data-mcp-management]");
+  await waitForElement(".mcpToolRow");
+  const mcpSurfaceText = await script("return document.querySelector('[data-mcp-management]')?.textContent || ''");
+  if (!mcpSurfaceText.includes("Native Callable") || !mcpSurfaceText.includes("lookup")) {
+    throw new Error(`原生 MCP 管理界面没有显示 Server 或发现工具：${mcpSurfaceText}`);
+  }
+  await clickButtonByText("准备调用", "[data-mcp-management]");
+  const queryInput = await waitForElement(".mcpToolForm .uiInput");
+  await request(`/session/${sessionId}/element/${queryInput}/value`, {
+    method: "POST",
+    body: JSON.stringify({ text: "docs", value: [..."docs"] })
+  });
+  const callSubmit = await waitForElement('.mcpToolForm button[type="submit"]');
+  await request(`/session/${sessionId}/element/${callSubmit}/click`, { method: "POST" });
+  const callPendingDeadline = Date.now() + 10_000;
+  let callPending;
+  while (Date.now() < callPendingDeadline) {
+    const runs = await invokeNative("list_agent_runs");
+    callPending = runs.find((run) => run?.approval?.name === "mcp_call" && run?.status === "awaiting-approval");
+    if (callPending) break;
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  if (callPending?.status !== "awaiting-approval" || callPending?.approval?.name !== "mcp_call" || fs.existsSync(mcpCallMarker)) {
+    throw new Error(`MCP 工具调用没有停在独立审批前：${JSON.stringify(callPending)}`);
+  }
+  await waitForElement(`[data-mcp-run-id="${callPending.id}"]`);
+  await clickButtonByText("批准并执行", `[data-mcp-run-id="${callPending.id}"]`);
+  const callCompletedDeadline = Date.now() + 10_000;
+  let callCompleted;
+  while (Date.now() < callCompletedDeadline) {
+    const runs = await invokeNative("list_agent_runs");
+    callCompleted = runs.find((run) => run.id === callPending.id);
+    if (callCompleted?.status === "succeeded") break;
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  const callResult = callCompleted?.checkpoint?.toolResult;
+  if (!fs.existsSync(mcpCallMarker) || callCompleted?.status !== "succeeded" || callResult?.remoteName !== "lookup" || callResult?.content?.[0]?.text !== "found") {
+    throw new Error(`MCP 工具调用审批后没有形成受控结果：${JSON.stringify(callCompleted)}`);
+  }
+  await invokeNative("remove_mcp_server", { input: { id: "native-callable" } });
+
   currentStage = "创建结构化追问夹具";
+  const closeMcpTab = await waitForElement(".workspaceTab.fileTab .workspaceTabClose");
+  await request(`/session/${sessionId}/element/${closeMcpTab}/click`, { method: "POST" });
+  await waitForElement("[data-conversation-id]");
   const conversationId = await script("return document.querySelector('[data-conversation-id]')?.dataset.conversationId || ''");
   if (!conversationId) throw new Error("原生对话没有暴露稳定的 conversationId。");
   const interactionRun = await invokeNative("seed_native_agent_interaction", { input: { conversationId } });
@@ -284,6 +418,15 @@ try {
     || JSON.stringify(seeded?.checkpoint?.allowedFiles) !== JSON.stringify(expectedAuthorizedFiles)) {
     throw new Error(`原生恢复夹具未创建等待审批 Run：${JSON.stringify(seeded)}`);
   }
+  currentStage = "创建原生 Agent 调度夹具";
+  const schedulerBeforeRestart = await invokeNative("seed_native_agent_scheduler");
+  const queuedBeforeRestart = schedulerBeforeRestart?.entries?.find((entry) => entry.runId === "native-scheduler-queued");
+  const capQueuedBeforeRestart = schedulerBeforeRestart?.entries?.find((entry) => entry.runId === "native-scheduler-cap-queued");
+  if (schedulerBeforeRestart?.activeCount !== 2 || schedulerBeforeRestart?.maxConcurrentRuns !== 2
+    || queuedBeforeRestart?.status !== "queued" || queuedBeforeRestart?.queuePosition !== 1
+    || capQueuedBeforeRestart?.status !== "queued" || capQueuedBeforeRestart?.queuePosition !== 2) {
+    throw new Error(`原生调度夹具没有保留跨项目并发上限、项目互斥和队列位置：${JSON.stringify(schedulerBeforeRestart)}`);
+  }
   currentStage = "重启原生应用";
   await closeSession();
   stopApp();
@@ -305,6 +448,63 @@ try {
     || interrupted?.approval?.token !== "native-recovery-approval"
     || JSON.stringify(interrupted?.checkpoint?.allowedFiles) !== JSON.stringify(expectedAuthorizedFiles)) {
     throw new Error(`原生重启未保留审批 checkpoint：${JSON.stringify(interrupted)}`);
+  }
+  currentStage = "验证重启后的 Agent 调度恢复";
+  const schedulerAfterRestart = await invokeNative("read_native_agent_scheduler");
+  const interruptedScheduler = schedulerAfterRestart?.find(
+    (entry) => entry.runId === "native-scheduler-active",
+  );
+  const interruptedSchedulerB = schedulerAfterRestart?.find(
+    (entry) => entry.runId === "native-scheduler-active-b",
+  );
+  const queuedScheduler = schedulerAfterRestart?.find(
+    (entry) => entry.runId === "native-scheduler-queued",
+  );
+  const capQueuedScheduler = schedulerAfterRestart?.find(
+    (entry) => entry.runId === "native-scheduler-cap-queued",
+  );
+  if (interruptedScheduler?.status !== "interrupted" || interruptedSchedulerB?.status !== "interrupted"
+    || queuedScheduler?.status !== "queued" || capQueuedScheduler?.status !== "queued") {
+    throw new Error(`重启后调度恢复不正确：${JSON.stringify(schedulerAfterRestart)}`);
+  }
+  const persistedRunsAfterRestart = await invokeNative("list_agent_runs");
+  const queuedRunAfterRestart = persistedRunsAfterRestart?.find((run) => run.id === "native-scheduler-queued");
+  const interruptedRunAfterRestart = persistedRunsAfterRestart?.find((run) => run.id === "native-scheduler-active");
+  if (queuedRunAfterRestart?.status !== "queued"
+    || queuedRunAfterRestart?.evidence?.[0]?.schemaVersion !== "omnidesk.run-event.v0.1"
+    || queuedRunAfterRestart?.evidence?.[0]?.kind !== "scheduling"
+    || interruptedRunAfterRestart?.evidence?.at(-1)?.kind !== "recovery") {
+    throw new Error(`重启后 Agent Run 与 Scheduler 的 queued 状态不一致：${JSON.stringify(queuedRunAfterRestart)}`);
+  }
+  currentStage = "取消重启后仍在排队的 Agent Run";
+  const cancelledQueuedRun = await invokeNative("cancel_agent_run", { input: { id: "native-scheduler-queued" } });
+  const schedulerAfterCancel = await invokeNative("read_native_agent_scheduler");
+  const cancelledScheduler = schedulerAfterCancel?.find((entry) => entry.runId === "native-scheduler-queued");
+  if (cancelledQueuedRun?.status !== "cancelled" || cancelledScheduler?.status !== "cancelled"
+    || cancelledQueuedRun?.evidence?.at(-1)?.kind !== "cancellation") {
+    throw new Error(`显式取消没有同步 Agent Run 与 Scheduler：${JSON.stringify({ cancelledQueuedRun, cancelledScheduler })}`);
+  }
+  currentStage = "导出脱敏 Agent Run 时间线";
+  const timelineExport = await invokeNative("export_agent_run_timeline", {
+    input: { id: "native-scheduler-queued" },
+  });
+  const exportedTimeline = timelineExport?.timeline;
+  const serializedEvents = JSON.stringify(exportedTimeline?.events);
+  if (exportedTimeline?.schemaVersion !== "omnidesk.run-timeline-export.v0.1"
+    || exportedTimeline?.redaction?.policy !== "metadata-only"
+    || !exportedTimeline?.metrics?.eventCount
+    || !Array.isArray(exportedTimeline?.events)
+    || !timelineExport?.path?.endsWith("/native-scheduler-queued.json")) {
+    throw new Error(`原生时间线导出缺少 schema、指标或脱敏策略：${JSON.stringify(timelineExport)}`);
+  }
+  for (const excludedContent of [
+    "Native scheduler fixture; do not execute tools.",
+    "observations",
+    "diff --git",
+  ]) {
+    if (serializedEvents.includes(excludedContent)) {
+      throw new Error(`脱敏时间线泄露了排除内容：${excludedContent}`);
+    }
   }
   const resumed = await invokeNative("resume_agent_run", { input: { id: "native-recovery-run" } });
   if (resumed?.status !== "awaiting-approval" || resumed?.approval?.token !== "native-recovery-approval") {
@@ -341,7 +541,7 @@ try {
     }
   }
 
-  console.log(`原生 WebDriver smoke 通过：可提交持久化 ask_user 表单、验证幂等并在重启后恢复表单与原审批${diagnoseTerminal ? "，并完成终端诊断" : ""}；未写入工程文件。`);
+  console.log(`原生 WebDriver smoke 通过：可发现版本化内置工具及其风险/schema，MCP 配置零自动执行，发现与调用分别取得项目互斥和独立审批，tools/call 审批前 marker 不存在、批准后才执行并写回有界结果；提交持久化 ask_user 表单并验证幂等，验证跨项目并发与稳定队列位置，并在重启后恢复表单与原审批；Run Timeline 可按 metadata-only 策略脱敏导出${diagnoseTerminal ? "，并完成终端诊断" : ""}；未写入工程文件。`);
 } catch (error) {
   failure = error instanceof Error ? error : new Error(String(error));
   console.error(`原生 WebDriver smoke 失败（${currentStage}）：${failure.message}`);

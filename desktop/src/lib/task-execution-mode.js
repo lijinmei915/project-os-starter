@@ -14,10 +14,11 @@ export function taskExecutionNextAction(task = {}) {
     return { id: "generate-patch", label: "生成文件改动", taskId: task.id || "" };
   }
   if (checks.length) {
-    if (task.verificationSummary) {
+    if (taskHasVerificationEvidence(task)) {
       return { id: "open-topic", label: "查看检查结果", target: "execution", taskId: task.id || "" };
     }
     return { checkId: "runtime", id: "run-check", label: "运行基础检查", taskId: task.id || "" };
   }
   return { id: "open-topic", label: "查看任务详情", target: "execution", taskId: task.id || "" };
 }
+import { taskHasVerificationEvidence } from "./workflow-state.js";

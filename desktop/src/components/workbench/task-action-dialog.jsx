@@ -3,6 +3,7 @@ import { Button } from "../ui/button";
 import { Dialog, DialogClose, DialogContent } from "../ui/dialog";
 import { Notice } from "../ui/notice";
 import { taskNextAction } from "../../lib/task-next-action";
+import { taskHasPassedVerification } from "../../lib/workflow-state";
 
 function previewItems(items = [], limit = 3) {
   return items.filter(Boolean).slice(0, limit);
@@ -34,13 +35,14 @@ export function TaskActionDialog({
   const next = task ? taskNextAction(task) : null;
   const title = { review: "确认任务", start: "开始执行", result: "任务结果", failure: "处理失败" }[mode] || "任务详情";
   const checks = task?.plan?.checks || [];
+  const verificationPassed = taskHasPassedVerification(task);
 
   return (
     <Dialog open={Boolean(action)} onOpenChange={(open) => { if (!open) onClose?.(); }}>
       <DialogContent className="taskActionDialogContent" description={task?.title || "未命名任务"} title={title}>
         {mode === "review" ? <div className="taskReviewLayout"><section className="taskReviewSummary"><span>任务说明</span><p>{task.plan?.summary || task.description || "暂无说明"}</p></section><div className="taskReviewDetails"><section><span>计划步骤</span><ol>{previewItems(task.plan?.steps).map((step, index) => <li key={step}><em>{index + 1}</em><p>{step}</p></li>)}{!previewItems(task.plan?.steps).length ? <li><em>1</em><p>确认后由模型生成执行建议</p></li> : null}</ol></section><section><span>验证项</span><ul>{checks.slice(0, 3).map((check) => <li key={check.id}>{check.label}</li>)}{!checks.length ? <li>暂无已登记验证项</li> : null}</ul></section></div></div> : null}
         {mode === "start" ? <><Notice variant="info">确认后任务进入进行中。工程文件仍需在改动草稿阶段再次确认后才会写入。</Notice><label className="taskIsolationToggle"><input checked={isolate} type="checkbox" onChange={(event) => setIsolate(event.target.checked)} /><span><strong>在隔离工作区中执行</strong><small>仅限干净 Git 项目；通过检查后仍需单独确认合并回当前工程。</small></span></label></> : null}
-        {mode === "result" ? <div className="agentFailureBox"><strong>{task.verificationSummary || "任务已完成"}</strong><p>{task.handoffMerge ? "验证结果已更新到交接记录。" : "验证已结束，交接记录尚未更新。"}</p></div> : null}
+        {mode === "result" ? <div className="agentFailureBox"><strong>{task.verificationSummary || "任务已处理完成"}</strong><p>{verificationPassed ? (task.handoffMerge ? "验证结果已更新到交接记录。" : "验证已通过，交接记录尚未更新。") : "当前只有处理结果，尚未形成通过的检查证据。"}</p></div> : null}
         {mode === "failure" ? <div className="agentFailureBox"><strong>失败摘要</strong><p>{failureSummary?.(task)}</p>{(task.runs || []).filter((run) => run?.success === false).slice(0, 3).map((run) => <span key={`${task.id}-${run.id}`}>{run.label || run.id || "失败检查"}</span>)}</div> : null}
         {mode === "detail" && task ? <><div className="taskActionDetail"><section><span>任务说明</span><p>{task.plan?.summary || task.description || "暂无说明"}</p></section><section><span>当前下一步</span><p>{next?.detail}</p></section><section><span>关联目标</span><p>{goalTitle?.(task)}</p></section></div>{task.patchDraft ? renderPatchDraft?.(task.patchDraft) : null}</> : null}
         {mutationError ? <Notice variant="danger">{mutationError}</Notice> : null}

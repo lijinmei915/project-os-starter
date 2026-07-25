@@ -39,10 +39,22 @@ test("filters completed tasks by verified evidence", () => {
     sort: "updated",
     statuses,
     tasks: [
-      { id: "verified", title: "已验证", status: statuses.done, verificationSummary: "自动验证通过", updatedAt: "2026-07-17T12:00:00Z" },
+      { id: "verified", title: "已验证", status: statuses.done, verificationSummary: "自动验证通过", executionEvidence: [{ kind: "check", status: "succeeded" }], updatedAt: "2026-07-17T12:00:00Z" },
       { id: "pending", title: "待验证", status: statuses.done, verificationSummary: "待验证", updatedAt: "2026-07-17T13:00:00Z" },
     ],
   });
   assert.deepEqual(model.visibleTasks.map((task) => task.id), ["verified", "pending"]);
   assert.deepEqual(model.taskGroups.flatMap((group) => group.tasks).map((task) => task.id), ["verified"]);
+});
+
+test("does not treat verification prose as passed evidence", () => {
+  const common = { activeTaskId: "", isNoiseTask: () => false, snapshot, sort: "updated", statuses };
+  const tasks = [
+    { id: "prose", title: "只有文案", status: statuses.done, verificationSummary: "自动验证通过", updatedAt: "2026-07-17T12:00:00Z" },
+    { id: "evidence", title: "有证据", status: statuses.done, executionEvidence: [{ kind: "check", status: "succeeded" }], updatedAt: "2026-07-17T13:00:00Z" },
+  ];
+  const verified = buildTaskBoardViewModel({ ...common, filter: "done", tasks });
+  const awaitingEvidence = buildTaskBoardViewModel({ ...common, filter: "verify", tasks });
+  assert.deepEqual(verified.taskGroups.flatMap((group) => group.tasks).map((task) => task.id), ["evidence"]);
+  assert.deepEqual(awaitingEvidence.taskGroups.flatMap((group) => group.tasks).map((task) => task.id), ["prose"]);
 });

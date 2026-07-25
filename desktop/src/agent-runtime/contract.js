@@ -6,6 +6,7 @@ export const agentRunStatuses = Object.freeze({
   awaitingApproval: "awaiting-approval",
   awaitingUserInput: "awaiting-user-input",
   applying: "applying",
+  runningTool: "running-tool",
   verifying: "verifying",
   succeeded: "succeeded",
   failed: "failed",
@@ -34,10 +35,11 @@ const finalStatuses = new Set(agentRunFinalStatuses);
 
 const runTransitions = Object.freeze({
   [agentRunStatuses.queued]: [agentRunStatuses.running, agentRunStatuses.cancelled, agentRunStatuses.interrupted],
-  [agentRunStatuses.running]: [agentRunStatuses.awaitingApproval, agentRunStatuses.awaitingUserInput, agentRunStatuses.applying, agentRunStatuses.verifying, agentRunStatuses.succeeded, agentRunStatuses.failed, agentRunStatuses.cancelled, agentRunStatuses.interrupted],
-  [agentRunStatuses.awaitingApproval]: [agentRunStatuses.running, agentRunStatuses.applying, agentRunStatuses.failed, agentRunStatuses.cancelled, agentRunStatuses.interrupted],
+  [agentRunStatuses.running]: [agentRunStatuses.awaitingApproval, agentRunStatuses.awaitingUserInput, agentRunStatuses.applying, agentRunStatuses.runningTool, agentRunStatuses.verifying, agentRunStatuses.succeeded, agentRunStatuses.failed, agentRunStatuses.cancelled, agentRunStatuses.interrupted],
+  [agentRunStatuses.awaitingApproval]: [agentRunStatuses.running, agentRunStatuses.applying, agentRunStatuses.runningTool, agentRunStatuses.failed, agentRunStatuses.cancelled, agentRunStatuses.interrupted],
   [agentRunStatuses.awaitingUserInput]: [agentRunStatuses.queued, agentRunStatuses.failed, agentRunStatuses.cancelled],
   [agentRunStatuses.applying]: [agentRunStatuses.verifying, agentRunStatuses.succeeded, agentRunStatuses.failed, agentRunStatuses.cancelled, agentRunStatuses.interrupted],
+  [agentRunStatuses.runningTool]: [agentRunStatuses.queued, agentRunStatuses.succeeded, agentRunStatuses.failed, agentRunStatuses.cancelled, agentRunStatuses.interrupted],
   [agentRunStatuses.verifying]: [agentRunStatuses.running, agentRunStatuses.succeeded, agentRunStatuses.failed, agentRunStatuses.cancelled, agentRunStatuses.interrupted],
   [agentRunStatuses.interrupted]: [agentRunStatuses.queued, agentRunStatuses.awaitingApproval, agentRunStatuses.failed, agentRunStatuses.cancelled],
 });

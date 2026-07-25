@@ -1,5 +1,6 @@
 import { FileText } from "lucide-react";
 import { conversationTextForDisplay } from "../../conversation-runtime";
+import { conversationTurnWorkflowState, workflowStatePresentation, workflowStates } from "../../lib/workflow-state";
 import { Badge } from "../ui/badge";
 import { PatchDraft, ReadonlyPlan } from "./plan-views";
 import { AgentProcessingStatus, Conversation, ConversationMessage } from "./conversation";
@@ -17,6 +18,11 @@ function shouldShowAgentTimeline(turn) {
   );
 }
 
+function shouldShowReadonlyPlan(turn) {
+  return turn?.pendingAction?.type === "confirm-active-task"
+    || agentEventsForTurn(turn).some((event) => event.id === "confirmation");
+}
+
 function referenceSignature(references = []) {
   return references.map((reference) => `${reference.kind}:${reference.target}`).sort().join("|");
 }
@@ -30,12 +36,14 @@ function displayText(value) {
   return String(value || "").replace(/\u0000/g, "") || "--";
 }
 
-function TaskOutcome({ turn }) {
+function TaskOutcome({ task, turn }) {
   if (!turn?.taskId || turn.pendingAction || !["succeeded", "failed"].includes(turn.outcome)) return null;
-  const succeeded = turn.outcome === "succeeded";
+  const state = conversationTurnWorkflowState(turn, task);
+  const status = workflowStatePresentation(state);
+  const succeeded = [workflowStates.completed, workflowStates.verified].includes(state);
   return <div className="conversationTaskOutcome">
-    <Badge variant={succeeded ? "success" : "danger"}>{succeeded ? "验收通过" : "需要处理"}</Badge>
-    <span>{succeeded ? "结果已写入任务记录。" : "失败证据已保留，可从执行工作面继续处理。"}</span>
+    <Badge variant={status.tone}>{status.label}</Badge>
+    <span>{state === workflowStates.verified ? "检查证据已写入任务记录。" : succeeded ? "结果已写入任务记录，尚未形成验证证据。" : "失败证据已保留，可从执行工作面继续处理。"}</span>
   </div>;
 }
 
@@ -78,7 +86,7 @@ export function ConversationTranscript({
         {shouldShowAgentTimeline(turn) ? (
           <AgentProcessingStatus conversationEvents={turn.conversationEvents} durationMs={turn.durationMs} events={agentEventsForTurn(turn)} />
         ) : null}
-          {turn.taskId || turn.pendingAction?.type === "confirm-active-task" ? (() => {
+          {shouldShowReadonlyPlan(turn) ? (() => {
             const taskId = turn.taskId || turn.pendingAction.taskId;
             const task = tasks.find((item) => item.id === taskId);
             return task?.plan ? <ReadonlyPlan className="conversationReadonlyPlan" plan={task.plan} statusLabel={turn.pendingAction ? "计划待确认" : "已确认"} /> : null;
@@ -97,7 +105,7 @@ export function ConversationTranscript({
               {turn.intent === "stage-goal-candidate" ? <p>确认前不会写入目标，也不会创建任务或开始执行。</p> : null}
             </section>
           ) : <div>{conversationTextForDisplay(displayText(turn.text))}</div>}
-          <TaskOutcome turn={turn} />
+          <TaskOutcome task={tasks.find((task) => task.id === turn.taskId)} turn={turn} />
           {turn.pendingAction?.type === "apply-patch" ? (
             <PatchDraft className="conversationPatchDraft" draft={tasks.find((task) => task.id === turn.pendingAction.taskId)?.patchDraft} />
           ) : null}

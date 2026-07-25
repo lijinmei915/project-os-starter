@@ -1478,7 +1478,10 @@ mod tests {
             "model-unavailable"
         );
         assert_eq!(classify_failure("request timed out"), "network-unavailable");
-        assert_eq!(classify_failure("模型等待首个响应超时"), "network-unavailable");
+        assert_eq!(
+            classify_failure("模型等待首个响应超时"),
+            "network-unavailable"
+        );
         assert!(!failure_changes_health("network-unavailable"));
         assert!(failure_changes_health("authentication-failed"));
     }

@@ -4,9 +4,47 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Notice } from "../ui/notice";
 import { taskExecutionFlow, taskNextAction } from "../../lib/task-next-action";
+import { agentRunWorkflowState, workflowStatePresentation } from "../../lib/workflow-state";
 
 function previewItems(items = [], limit = 3) {
   return items.filter(Boolean).slice(0, limit);
+}
+
+function schedulerStatusLabel(status) {
+  return {
+    running: "正在执行",
+    "waiting-approval": "等待审批",
+    "waiting-user": "等待回答",
+    "waiting-continuation": "等待继续",
+  }[status] || "";
+}
+
+function runEventLabel(event = {}) {
+  return {
+    approval: "等待审批",
+    cancellation: "任务取消",
+    check: "运行检查",
+    model: "模型处理",
+    patch: "应用改动",
+    recovery: "恢复状态",
+    result: "执行结果",
+    scheduling: "任务调度",
+    tool: "工具执行",
+    "user-interaction": "等待回答",
+  }[event.kind] || event.phase || "运行事件";
+}
+
+function runEventMetrics(event = {}) {
+  const metrics = [];
+  if (event.details?.durationMs) metrics.push(`${event.details.durationMs}ms`);
+  if (event.details?.usage?.totalTokens) metrics.push(`${event.details.usage.totalTokens} tokens`);
+  if (Number.isFinite(event.details?.usage?.costUsd)) metrics.push(`$${event.details.usage.costUsd.toFixed(6)}`);
+  return metrics.length ? ` · ${metrics.join(" · ")}` : "";
+}
+
+function RunTimeline({ events = [] }) {
+  if (!events.length) return null;
+  return <details><summary>运行时间线</summary><ol className="taskEvidenceTimeline">{events.slice(-20).map((event, index) => <li key={event.id || `${event.recordedAt || index}-${event.phase || "event"}`}><strong>{runEventLabel(event)}</strong><span>{event.summary || "已记录运行状态。"}</span><span>{event.status || ""}{runEventMetrics(event)}{event.recordedAt ? ` · ${new Date(event.recordedAt).toLocaleString("zh-CN")}` : ""}</span>{event.details && Object.keys(event.details).length ? <details><summary>查看详情</summary><pre>{JSON.stringify(event.details, null, 2)}</pre></details> : null}</li>)}</ol></details>;
 }
 
 function TaskEvidenceTimeline({ items = [] }) {
@@ -26,7 +64,7 @@ export function AgentTopicCurrentTaskDetail({ currentTask, currentChecks, curren
   };
 
   return <div className="agentTopicDetail">
-    <div className="agentTopicDetailHeader"><div><strong>{currentTask.title || "暂无选中的任务"}</strong><span>目标：{goalTitleForTask(currentTask)}</span></div><Badge status={taskStatusLabel(currentTask.status)}>{taskStatusLabel(currentTask.status)}</Badge></div>
+    <div className="agentTopicDetailHeader"><div><strong>{currentTask.title || "暂无选中的任务"}</strong><span>目标：{goalTitleForTask(currentTask)}</span></div><Badge status={taskStatusLabel(currentTask)}>{taskStatusLabel(currentTask)}</Badge></div>
     <section className="taskNextAction" aria-label="当前该做什么"><span>当前该做什么</span><strong>{next.label}</strong><p>{next.detail}</p>{next.action !== "none" ? <Button type="button" variant="primary" onClick={executeNextAction}>{next.label}</Button> : null}</section>
     {currentTask.patchDraft ? <section className="taskDraftReview" aria-label="AI 建议的改动"><div className="runnerHeader"><strong>AI 建议的改动</strong><span>尚未写入文件</span></div><PatchDraft draft={currentTask.patchDraft} /></section> : null}
     <ol className="taskExecutionFlow" aria-label="任务执行步骤">{taskExecutionFlow(currentTask).map((step) => <li className={step.status} key={step.id}><span aria-hidden="true" /><strong>{step.label}</strong></li>)}</ol>
@@ -35,11 +73,11 @@ export function AgentTopicCurrentTaskDetail({ currentTask, currentChecks, curren
   </div>;
 }
 
-export function AgentTopicExecutionResults({ agentRuns = [], failedRunsForTask, failureSummaryForTask, onApproveAgentRun, onCreateRepairTask, onOpenTask, onResumeAgentRun, onRerunFailedChecks, recentResultTasks, runnerLoadingId, taskStatuses, taskStatusLabel }) {
+export function AgentTopicExecutionResults({ agentRuns = [], failedRunsForTask, failureSummaryForTask, onApproveAgentRun, onCancelAgentRun, onCreateRepairTask, onExportAgentRun, onOpenTask, onResumeAgentRun, onRerunFailedChecks, recentResultTasks, runnerLoadingId, taskStatuses, taskStatusLabel }) {
   return <div className="agentTopicList">
-    {agentRuns.length ? <section className="agentPatchItem agentRunHistory"><div className="agentPatchItemHeader"><div><strong>Agent 运行记录</strong><span>Hermes / 本地执行器</span></div><Badge>只读</Badge></div>{agentRuns.slice(0, 8).map((run) => <div className="agentTopicStatusLine" key={run.id}><span>{run.executorId || "Agent"} · {run.status}</span><span>第 {run.step || 0}/{run.maxSteps || 20} 步 · {run.summary || "暂无摘要"}</span>{run.checkpoint?.phase ? <span>恢复点：{run.checkpoint.phase} · {run.checkpoint.nextAction || "resume-stage"}</span> : null}{run.status === "interrupted" ? <Button size="sm" type="button" variant="outline" onClick={() => onResumeAgentRun?.(run)}>恢复执行</Button> : null}{run.status === "awaiting-approval" ? <Button size="sm" type="button" variant="primary" onClick={() => onApproveAgentRun?.(run)}>批准并继续</Button> : null}{run.evidence?.length ? <details><summary>查看证据</summary><pre>{JSON.stringify(run.evidence, null, 2)}</pre></details> : null}</div>)}</section> : null}
+    {agentRuns.length ? <section className="agentPatchItem agentRunHistory"><div className="agentPatchItemHeader"><div><strong>Agent 运行记录</strong><span>Hermes / 本地执行器</span></div><Badge>只读</Badge></div>{agentRuns.slice(0, 8).map((run) => <div className="agentTopicStatusLine" key={run.id}><span>{run.executorId || "Agent"} · {workflowStatePresentation(agentRunWorkflowState(run)).label}</span><span>第 {run.step || 0}/{run.maxSteps || 20} 步 · {run.summary || "暂无摘要"}</span>{run.scheduler?.queuePosition ? <span>调度队列：第 {run.scheduler.queuePosition} 位</span> : null}{schedulerStatusLabel(run.scheduler?.status) ? <span>调度状态：{schedulerStatusLabel(run.scheduler.status)}</span> : null}{run.checkpoint?.phase ? <span>恢复点：{run.checkpoint.phase} · {run.checkpoint.nextAction || "resume-stage"}</span> : null}{["queued", "interrupted"].includes(run.status) ? <Button size="sm" type="button" variant="outline" onClick={() => onResumeAgentRun?.(run)}>{run.status === "queued" ? "继续任务" : "恢复执行"}</Button> : null}{run.status === "awaiting-approval" ? <Button size="sm" type="button" variant="primary" onClick={() => onApproveAgentRun?.(run)}>批准并继续</Button> : null}{["queued", "running", "awaiting-approval", "awaiting-user-input", "interrupted"].includes(run.status) ? <Button size="sm" type="button" variant="ghost" onClick={() => onCancelAgentRun?.(run)}>取消任务</Button> : null}<Button size="sm" type="button" variant="ghost" onClick={() => onExportAgentRun?.(run)}>导出证据</Button><RunTimeline events={run.evidence} /></div>)}</section> : null}
     {recentResultTasks.length ? recentResultTasks.map((task) => <div className="agentPatchItem" key={task.id}>
-      <div className="agentPatchItemHeader"><div><strong>{task.title}</strong><span>{task.runSummary?.path || task.createdAt || "暂无 run summary"}</span></div><Badge status={taskStatusLabel(task.status)}>{taskStatusLabel(task.status)}</Badge></div>
+      <div className="agentPatchItemHeader"><div><strong>{task.title}</strong><span>{task.runSummary?.path || task.createdAt || "暂无 run summary"}</span></div><Badge status={taskStatusLabel(task)}>{taskStatusLabel(task)}</Badge></div>
       <div className="agentTopicStatusLine"><span>{task.verificationSummary || "未记录验证摘要"}</span><span>{task.handoffMerge ? "交接已更新" : "交接未更新"}</span></div>
       {[taskStatuses.failed, taskStatuses.repairPending, taskStatuses.repairFailed].includes(task.status) ? <div className="agentFailureBox"><strong>失败摘要</strong><p>{failureSummaryForTask(task)}</p><div className="agentTopicStatusLine">{failedRunsForTask(task).length ? failedRunsForTask(task).slice(0, 3).map((run) => <span key={`${task.id}-${run.id}-${run.finishedAt || run.command}`}>{run.label || run.id || run.command || "失败检查"}</span>) : <span>暂无失败检查明细</span>}</div><TaskEvidenceTimeline items={task.executionEvidence} /></div> : null}
       <TaskCommandBar actions={[{ key: `result-open-${task.id}`, label: "查看任务", onClick: () => onOpenTask?.(task.id) }, { disabled: ![taskStatuses.failed, taskStatuses.repairPending].includes(task.status) || Boolean(runnerLoadingId), key: `result-rerun-${task.id}`, label: runnerLoadingId ? "重跑中" : "重跑失败检查", onClick: () => onRerunFailedChecks?.(task) }, { disabled: ![taskStatuses.failed, taskStatuses.repairPending].includes(task.status), key: `result-repair-${task.id}`, label: task.status === taskStatuses.repairPending ? "生成修复草稿" : "准备修复", variant: "primary", onClick: () => onCreateRepairTask?.(task.id) }]} meta={[taskStatuses.failed, taskStatuses.repairPending].includes(task.status) ? "修复保留在当前任务中；草稿、写入和检查仍各自等待确认。" : "已完成任务保留结果追溯。"} />

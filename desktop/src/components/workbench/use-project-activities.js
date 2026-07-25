@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { taskWorkflowState, workflowStateIsFailure, workflowStateIsFinished } from "../../lib/workflow-state";
 
 export function useProjectActivities({ planLoading, snapshot, tasks, terminalRunningId, taskStatuses }) {
   const [projectActivities, setProjectActivities] = useState({});
@@ -8,7 +9,7 @@ export function useProjectActivities({ planLoading, snapshot, tasks, terminalRun
     const relatedTasks = tasks.filter((task) => task.projectId === projectId || task.projectPath === snapshot.currentProjectPath || task.projectName === snapshot.projectName);
     const activity = planLoading || relatedTasks.some((task) => task.id === terminalRunningId)
       ? { tone: "running", label: "进行中" }
-      : relatedTasks.some((task) => [taskStatuses.failed, "interrupted", "canceled", "cancelled", "error"].includes(task.status))
+      : relatedTasks.some((task) => workflowStateIsFailure(taskWorkflowState(task, taskStatuses)) || task.status === "error")
         ? { tone: "danger", label: "任务或会话中断" }
         : null;
     setProjectActivities((current) => {
@@ -29,10 +30,10 @@ export function useProjectActivities({ planLoading, snapshot, tasks, terminalRun
     });
   }, []);
   const markProjectActivityCompleted = useCallback((task, fallbackProjectId) => {
-    if (task?.status !== taskStatuses.done) return;
+    if (!workflowStateIsFinished(taskWorkflowState(task, taskStatuses))) return;
     const projectId = task.projectId || fallbackProjectId;
     if (!projectId) return;
     setProjectActivities((current) => ({ ...current, [projectId]: { tone: "success", label: "有新完成结果", taskId: task.id } }));
-  }, [taskStatuses.done]);
+  }, [taskStatuses]);
   return { markProjectActivityCompleted, markProjectActivitySeen, projectActivities };
 }

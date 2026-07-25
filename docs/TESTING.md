@@ -1,7 +1,7 @@
 ---
 layer: knowledge
 type: spec
-last_verified: 2026-07-21
+last_verified: 2026-07-26
 teaches: "OmniDesk Desktop Runtime 的测试分层、发布证据和验收边界"
 use_when: "AI 要写测试、验收桌面运行时或判断改动需要哪些发布证据时"
 ---
@@ -141,7 +141,11 @@ macOS 原生窗口 smoke 不使用官方 `tauri-driver`。它通过仅测试构�
 npm --prefix desktop run test:native
 ```
 
-该命令验证原生窗口的 DOM/React 输入与发送状态，并从 active `.omnidesk/cache` 读取原生终端 trace。它还会建立一条四文件授权的待审批 Agent Run、重启原生应用、断言 Run 被标为 `interrupted` 且保留审批 token 与全部授权文件，随后恢复到 `awaiting-approval`。它不把浏览器 Preview 当成桌面证据，不执行终端、检查、Patch 或模型请求；Provider 网络中断的真实链路由受保护 Agent Eval 的原始 trace 覆盖。
+该命令验证原生窗口的 DOM/React 输入与发送状态，并从 active `.omnidesk/cache` 读取原生终端 trace。它还会读取 `omnidesk.tool-registry.v0.1`，断言四个内置工具的来源、只读风险、审批声明和封闭参数 schema；保存、读取、删除一个固定逐次审批的 MCP stdio 配置，并用 `/usr/bin/touch` 标记证明配置过程没有启动进程。随后通过真实 `Agent 配置 / 受控工具` 页面查看已批准发现的 `lookup` 工具，在 schema 表单填写 `docs` 创建独立调用审批，断言审批前 marker 不存在，再从页面批准执行并验证有界结果写回同 Run。后续还建立一条四文件授权的待审批 Agent Run，以及两个跨项目活动占用、一个同项目互斥队列和一个并发上限队列。重启后断言活动项转为 `interrupted`、queued 不自动执行、Agent Run 与 Scheduler 状态一致并可显式取消，同时恢复原审批到 `awaiting-approval`。取消后的 Run 会通过原生 command 导出时间线，并断言 `omnidesk.run-timeline-export.v0.1` schema、聚合指标、`metadata-only` 策略及 prompt/observations/diff 脱敏。它不把浏览器 Preview 当成桌面证据，不执行终端、检查、Patch 或模型请求；Provider 网络中断、真实第三方 MCP 与真实 usage/cost 链路由受保护 Agent Eval 的原始 trace 覆盖。
+
+MCP 审批执行的 Rust 回归另使用带副作用 marker 的 stdio fixture：创建 `mcp_discover` Agent Run 后 marker 必须不存在；只有审批 token 被消费后才允许启动进程、发现工具并把有界结果写回同一 Run。该测试同时约束通用工具状态为 `running-tool`，不能复用检查的 `verifying` 语义。原生 smoke 先通过正式项目命令把夹具切为受控模式，再请求 MCP 发现并验证 Scheduler 已保留项目、审批仍为 pending、marker 不存在，最后取消 Run 释放项目。
+
+同一原生 smoke 还会运行标准 initialize / `tools/list` / `tools/call` fixture：发现和调用必须分别消费两个 approval token；当前项目有效证据可通过只读投影展示，跨项目或配置变化的旧证据不得成为可调用能力；调用审批前 marker 不存在，审批后才出现，并校验有界 tool result。Rust 回归覆盖无发现证据拒绝、未知参数启动前拒绝、合法调用和 Server 配置变化导致旧证据失效。
 
 ### 8. CI 自动化检查
 
@@ -170,7 +174,15 @@ CI 文件：
 npm --prefix desktop run check:agent-eval
 ```
 
-`.github/workflows/agent-eval.yml` 在受保护的 `agent-eval` environment 中按日或手动运行。它需要 `OMNIDESK_AGENT_EVAL_KEY` secret 与 `OMNIDESK_AGENT_EVAL_MODEL` variable，执行所有已登记 case、保留真实 trace，并拒绝任务成功率、Patch 可应用率、检查通过率或恢复成功率回退。真实 Provider Eval 强制提供 `--trace-dir`：suite 会把 trace 复制到 `.omnidesk/evidence/agent-eval/<run-id>/traces/`，并将 `results.json` 中的 trace 引用写成相对 artifact 路径。`goal-rebind` 必须证明四份授权文件均实际变更；`interrupted-run` 必须记录网络不可用分类、未接受 Provider 响应和恢复后的原审批；`ask-user-resume` 必须证明追问持久化、交互审批为零、回答后恢复同一 Run，并以独立审批完成 Patch。工作流还独立运行 `isolated-worktree` 真实证明：模型 Patch 必须先在临时 detached worktree 应用并通过检查，源工程在第二次审批前保持干净，批准 diff 必须与当前 worktree diff 完全一致，合并后源工程通过验证且 worktree 被清理。该证明不修改已提交基线，报告没有真实 trace 时不能替代任一门槛。
+`.github/workflows/agent-eval.yml` 在受保护的 `agent-eval` environment 中按日或手动运行。它需要 `OMNIDESK_AGENT_EVAL_KEY` secret，以及 `OMNIDESK_AGENT_EVAL_API_BASE`、`OMNIDESK_AGENT_EVAL_MODEL` variables，执行所有已登记 case、保留真实 trace，并拒绝任务成功率、Patch 可应用率、检查通过率或恢复成功率回退。真实 Provider Eval 强制提供 `--trace-dir`：suite 会把 trace 复制到 `.omnidesk/evidence/agent-eval/<run-id>/traces/`，并将 `results.json` 中的 trace 引用写成相对 artifact 路径。`goal-rebind` 必须证明四份授权文件均实际变更；`interrupted-run` 必须记录网络不可用分类、未接受 Provider 响应和恢复后的原审批；`ask-user-resume` 必须证明追问持久化、交互审批为零、回答后恢复同一 Run，并以独立审批完成 Patch。工作流还独立运行 `isolated-worktree` 真实证明：模型 Patch 必须先在临时 detached worktree 应用并通过检查，源工程在第二次审批前保持干净，批准 diff 必须与当前 worktree diff 完全一致，合并后源工程通过验证且 worktree 被清理。该证明不修改已提交基线，报告没有真实 trace 时不能替代任一门槛。
+
+同一受保护工作流还必须运行 `eval:provider:function`：向当前 Provider 发送正式 `start_engineering_task` tools schema 与强制 tool choice，只有 HTTP 成功、返回可解析的 `task` 参数并明确提供输入、输出和总 token usage 才通过。生产对话必须使用同等参数门槛累计 SSE/非流式完整调用，拒绝缺失、非法、额外字段或重复的工程任务调用；不能只凭工具名创建计划。脱敏请求摘要、原始 Provider 响应、规范化 usage、耗时和 request id 保存为 `provider-function-calling.trace.json`；密钥不得进入 trace。Provider 未明确返回的 cost 保存为 `null`，不得自行估算。该证据独立于 Hermes 13-case Eval，不能用 Hermes 工具调用替代普通 Provider Function Calling 验收。
+
+P3 另运行 `eval:provider:timeline`：只读任务必须经过生产 `agent_scheduler`、`agent_runs`、`hermes_execution` 和 Timeline 导出。只有 Run 为 `succeeded`、执行期间项目租约为 `running`、结束后 Scheduler 无残留、Timeline 为 `metadata-only`，且聚合后的输入、输出、总 token 均大于 0 才通过；usage source 必须是 `acp-response`。ACP 未返回 cost 时 Timeline 不应出现 `costUsd`。结果保存为 `provider-runtime-timeline.trace.json`，HTTP 层原始 usage 不能替代这份 Runtime 聚合证据。
+
+P1 compatibility 与普通聊天可靠性另运行 `eval:provider:fallback`。本地 relay 对生产 Runtime 的首次原生 tools 请求返回明确 `400 tools unsupported`，并只把第二次无 tools 请求转发给受保护环境中的真实 Provider；真实回答转换为 SSE 后保持连接至少 12 秒，证明旧前端墙钟不会重新出现。Runtime 必须持久化 `compatibility-keyword / explicit-tool-rejection`，第三次请求不得再次携带 tools；relay 随后注入中途断流，Runtime 必须返回非空 partial reply 和失败证据。trace 只保存请求是否包含 tools、真实 upstream 的状态/usage/字符数、时长和 Runtime 状态，不保存 Prompt、回答正文、密钥或临时路径。
+
+工作流还会在临时目录安装固定版本与 integrity 的官方 `@modelcontextprotocol/server-filesystem`，并运行 `eval:mcp:third-party`。脚本会复核实际安装记录的 integrity 和入口文件，再经生产 `mcp_runtime -> agent_scheduler -> agent_runs -> execution` 完成 `tools/list` 与 `list_directory`。通过条件包括：发现和调用使用两个独立 approval token；审批前无工具结果或发现证据；等待审批时项目仍被 Scheduler 保留；结果包含夹具 `proof.txt` 且不超过 1 MiB；两个 Run 与 Timeline 均成功；Timeline 使用 `metadata-only` 脱敏；执行后 Scheduler 无残留。该测试不需要 Provider 密钥，但只有受保护工作流上传的 `third-party-mcp.trace.json` 才能作为 P4 外部验收证据。
 
 ---
 

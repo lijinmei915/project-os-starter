@@ -39,6 +39,19 @@ jobs:
           printf '%s' '{"diff":"--- README.md\n+++ README.md\n@@ -1 +1 @@\n-before\n+after\n","contexts":[{"path":"README.md","content":"before\n"}]}' \
             | cargo run --quiet --manifest-path desktop/src-tauri/Cargo.toml --bin omnidesk-patch-normalizer \
             | node -e 'let body=""; process.stdin.on("data", (chunk) => body += chunk).on("end", () => { const result = JSON.parse(body); if (!result.normalizedDiff.includes("+after")) process.exit(1); })'
+      - name: Run protected third-party MCP evaluation
+        env:
+          MCP_FILESYSTEM_VERSION: "2026.7.10"
+          MCP_FILESYSTEM_INTEGRITY: "sha512-Mmjg4anFBD5OzbPnGJOA0jPPN8645ERhQk38HQLpSenx1ox9bfdPkmAzUnNjeQtqQGFLtKe13J20RtLBmUKMZA=="
+        run: |
+          export eval_root=".omnidesk/evidence/agent-eval/${{ github.run_id }}"
+          export mcp_root="$RUNNER_TEMP/omnidesk-third-party-mcp"
+          test "$(npm view "@modelcontextprotocol/server-filesystem@$MCP_FILESYSTEM_VERSION" dist.integrity)" = "$MCP_FILESYSTEM_INTEGRITY"
+          mkdir -p "$eval_root" "$mcp_root"
+          npm install --prefix "$mcp_root" --ignore-scripts --no-audit --no-fund --no-save "@modelcontextprotocol/server-filesystem@$MCP_FILESYSTEM_VERSION"
+          npm --prefix desktop run eval:mcp:third-party -- \
+            --server-entry "$mcp_root/node_modules/@modelcontextprotocol/server-filesystem/dist/index.js" \
+            --trace "../$eval_root/traces/third-party-mcp.trace.json"
       - name: Run the registered real evaluation suite
         env:
           OMNIDESK_AGENT_EVAL_KEY: ${{ secrets.OMNIDESK_AGENT_EVAL_KEY }}
@@ -55,6 +68,9 @@ jobs:
           node -e 'const fs=require("fs"); const base=JSON.stringify(process.env.OMNIDESK_AGENT_EVAL_API_BASE); const model=JSON.stringify(process.env.OMNIDESK_AGENT_EVAL_MODEL); fs.writeFileSync(process.env.HOME+"/.hermes/config.yaml", `model:\n  provider: "omnidesk-gateway"\n  base_url: ${base}\n  api_mode: "chat_completions"\n  default: ${model}\n  key_env: "OMNIDESK_AGENT_EVAL_KEY"\ncustom_providers:\n  - name: "omnidesk-gateway"\n    base_url: ${base}\n    model: ${model}\n    api_mode: "chat_completions"\n    key_env: "OMNIDESK_AGENT_EVAL_KEY"\n`);'
           OMNIDESK_AGENT_EVAL_API_KEY_ENV=OMNIDESK_AGENT_EVAL_KEY npm --prefix desktop run eval:agent:suite -- --output "../$eval_root/results.json" --trace-dir "../$eval_root/traces"
           node desktop/scripts/check-agent-eval-traces.mjs --results "$eval_root/results.json" --trace-dir "$eval_root/traces"
+          npm --prefix desktop run eval:provider:function -- --trace "../$eval_root/traces/provider-function-calling.trace.json"
+          npm --prefix desktop run eval:provider:timeline -- --trace "../$eval_root/traces/provider-runtime-timeline.trace.json"
+          npm --prefix desktop run eval:provider:fallback -- --trace "../$eval_root/traces/provider-fallback-slow-stream.trace.json"
           OMNIDESK_AGENT_EVAL_API_KEY_ENV=OMNIDESK_AGENT_EVAL_KEY npm --prefix desktop run eval:agent:isolated -- --output "../$eval_root/isolated-worktree-results.json"
           node -e 'const fs=require("fs"); const path=require("path"); const root=process.argv[1]; const result=JSON.parse(fs.readFileSync(path.join(root,"isolated-worktree-results.json"),"utf8")).results[0]; const trace=JSON.parse(fs.readFileSync(result.execution.tracePath,"utf8")); fs.writeFileSync(path.join(root,"traces","isolated-worktree.trace.json"), JSON.stringify(trace,null,2)+"\n"); result.execution.tracePath="traces/isolated-worktree.trace.json"; fs.writeFileSync(path.join(root,"isolated-worktree-results.json"), JSON.stringify({results:[result]},null,2)+"\n");' "$eval_root"
           node desktop/scripts/check-agent-eval-traces.mjs --results "$eval_root/isolated-worktree-results.json" --trace-dir "$eval_root/traces"

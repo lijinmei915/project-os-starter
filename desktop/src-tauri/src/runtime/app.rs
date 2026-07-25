@@ -52,9 +52,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::time::Duration;
-#[cfg(test)]
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, State};
 
 const STATE_PATH: &str = ".omnidesk/data/state.json";
@@ -283,6 +281,33 @@ fn default_agent_max_steps() -> usize {
 #[serde(rename_all = "camelCase")]
 struct ExecuteAgentReadToolInput {
     name: String,
+    #[serde(default)]
+    arguments: Value,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RemoveMcpServerInput {
+    id: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GetMcpDiscoveryEvidenceInput {
+    server_id: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RequestMcpDiscoveryInput {
+    server_id: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RequestMcpCallInput {
+    server_id: String,
+    remote_name: String,
     #[serde(default)]
     arguments: Value,
 }
@@ -750,6 +775,137 @@ fn execute_agent_read_tool(input: ExecuteAgentReadToolInput) -> Result<Value, St
 }
 
 #[tauri::command]
+fn get_agent_tool_registry() -> Result<crate::runtime::tool_registry::ToolRegistrySnapshot, String>
+{
+    let registry = crate::runtime::tool_registry::builtin_registry();
+    crate::runtime::tool_registry::validate_registry(&registry)?;
+    Ok(registry)
+}
+
+#[tauri::command]
+fn get_mcp_server_registry() -> Result<crate::runtime::mcp_runtime::McpServerRegistry, String> {
+    let app_root = find_workspace_root()?;
+    crate::runtime::mcp_runtime::load(&app_root)
+}
+
+#[tauri::command]
+fn save_mcp_server(
+    input: crate::runtime::mcp_runtime::McpServerConfig,
+) -> Result<crate::runtime::mcp_runtime::McpServerRegistry, String> {
+    let app_root = find_workspace_root()?;
+    crate::runtime::mcp_runtime::save(&app_root, input)
+}
+
+#[tauri::command]
+fn remove_mcp_server(
+    input: RemoveMcpServerInput,
+) -> Result<crate::runtime::mcp_runtime::McpServerRegistry, String> {
+    let app_root = find_workspace_root()?;
+    crate::runtime::mcp_runtime::remove(&app_root, &input.id)
+}
+
+#[tauri::command]
+fn get_mcp_discovery_evidence(
+    input: GetMcpDiscoveryEvidenceInput,
+) -> Result<Option<crate::runtime::mcp_runtime::McpDiscoveryEvidence>, String> {
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let project = current_registry_project(&mut registry, &app_root)?;
+    crate::runtime::mcp_runtime::load_valid_discovery_evidence(
+        &app_root,
+        &project.id,
+        &input.server_id,
+    )
+}
+
+#[tauri::command]
+fn request_mcp_discovery(input: RequestMcpDiscoveryInput) -> Result<PersistedAgentRun, String> {
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let project = current_registry_project(&mut registry, &app_root)?;
+    if normalize_project_access_mode(&project.access_mode) != "controlled" {
+        return Err("当前项目未授权启动 MCP 能力发现进程。".to_string());
+    }
+    let server_id = input.server_id.trim();
+    let configured = crate::runtime::mcp_runtime::load(&app_root)?
+        .servers
+        .into_iter()
+        .any(|server| server.id == server_id && server.enabled);
+    if !configured {
+        return Err("未找到已启用的 MCP Server。".to_string());
+    }
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let run_id = format!("mcp-discovery-{nonce}");
+    let timestamp = current_timestamp_string();
+    crate::runtime::agent_scheduler::enqueue(&app_root, &run_id, &project.id, &timestamp)?;
+    let (outcome, lease) =
+        crate::runtime::agent_scheduler::try_claim(&app_root, &run_id, &timestamp)?;
+    if outcome != crate::runtime::agent_scheduler::ClaimOutcome::Claimed {
+        crate::runtime::agent_scheduler::settle(&app_root, &run_id, "cancelled", &timestamp)?;
+        return Err("当前项目已有 Agent Run，暂不能发现 MCP 工具。".to_string());
+    }
+    let lease = lease.ok_or_else(|| "调度器领取成功但没有返回租约。".to_string())?;
+    let run = crate::runtime::agent_runs::create_mcp_discovery_run(
+        &app_root,
+        run_id.clone(),
+        format!("{run_id}-request"),
+        project.id,
+        server_id.to_string(),
+        format!("mcp-approval-{nonce}"),
+        &timestamp,
+    )?;
+    lease.settle("waiting-approval", &timestamp)?;
+    Ok(run)
+}
+
+#[tauri::command]
+fn request_mcp_call(input: RequestMcpCallInput) -> Result<PersistedAgentRun, String> {
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let project = current_registry_project(&mut registry, &app_root)?;
+    if normalize_project_access_mode(&project.access_mode) != "controlled" {
+        return Err("当前项目未授权启动 MCP 工具调用进程。".to_string());
+    }
+    crate::runtime::mcp_runtime::discovered_tool_for_call(
+        &app_root,
+        &project.id,
+        &input.server_id,
+        &input.remote_name,
+        &input.arguments,
+    )?;
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let run_id = format!("mcp-call-{nonce}");
+    let timestamp = current_timestamp_string();
+    crate::runtime::agent_scheduler::enqueue(&app_root, &run_id, &project.id, &timestamp)?;
+    let (outcome, lease) =
+        crate::runtime::agent_scheduler::try_claim(&app_root, &run_id, &timestamp)?;
+    if outcome != crate::runtime::agent_scheduler::ClaimOutcome::Claimed {
+        crate::runtime::agent_scheduler::settle(&app_root, &run_id, "cancelled", &timestamp)?;
+        return Err("当前项目已有 Agent Run，暂不能调用 MCP 工具。".to_string());
+    }
+    let lease = lease.ok_or_else(|| "调度器领取成功但没有返回租约。".to_string())?;
+    let run = crate::runtime::agent_runs::create_mcp_call_run(
+        &app_root,
+        run_id.clone(),
+        format!("{run_id}-request"),
+        project.id,
+        input.server_id,
+        input.remote_name,
+        input.arguments,
+        format!("mcp-call-approval-{nonce}"),
+        &timestamp,
+    )?;
+    lease.settle("waiting-approval", &timestamp)?;
+    Ok(run)
+}
+
+#[tauri::command]
 async fn chat_with_model(
     input: ChatWithModelInput,
     runtime_requests: State<'_, RuntimeRequestState>,
@@ -812,54 +968,52 @@ async fn chat_with_model(
             json!({}),
         );
         let provider_request = async {
-            tokio::time::timeout(
-                Duration::from_secs(300),
-                async {
-                    let mut attempt = 0;
-                    loop {
-                        let result = generate_provider_chat(
-                            &provider,
-                            &root,
-                            &project_name,
-                            &stage,
-                            &message,
-                            &attachments,
-                            &input.recent_turns,
-                            &input.context_state,
-                            &input.summary,
-                            &input.project_memory,
-                            &project_evidence,
-                            |text, chars| {
-                                emit_conversation_event(
-                                    &app,
-                                    &request_id,
-                                    "model.delta",
-                                    "thinking",
-                                    "running",
-                                    json!({ "chars": chars, "text": text }),
-                                )
-                            },
-                        ).await;
-                        let should_retry = result
-                            .as_ref()
-                            .err()
-                            .is_some_and(|err| should_retry_provider_chat(err, attempt));
-                        if !should_retry {
-                            break result;
-                        }
-                        attempt += 1;
-                        emit_conversation_event(
-                            &app,
-                            &request_id,
-                            "request.retrying",
-                            "thinking",
-                            "running",
-                            json!({ "attempt": attempt + 1, "reason": "network-unavailable" }),
-                        );
-                        tokio::time::sleep(Duration::from_millis(400)).await;
+            tokio::time::timeout(Duration::from_secs(300), async {
+                let mut attempt = 0;
+                loop {
+                    let result = generate_provider_chat(
+                        &provider,
+                        &root,
+                        &project_name,
+                        &stage,
+                        &message,
+                        &attachments,
+                        &input.recent_turns,
+                        &input.context_state,
+                        &input.summary,
+                        &input.project_memory,
+                        &project_evidence,
+                        |text, chars| {
+                            emit_conversation_event(
+                                &app,
+                                &request_id,
+                                "model.delta",
+                                "thinking",
+                                "running",
+                                json!({ "chars": chars, "text": text }),
+                            )
+                        },
+                    )
+                    .await;
+                    let should_retry = result
+                        .as_ref()
+                        .err()
+                        .is_some_and(|err| should_retry_provider_chat(err, attempt));
+                    if !should_retry {
+                        break result;
                     }
-                },
-            )
+                    attempt += 1;
+                    emit_conversation_event(
+                        &app,
+                        &request_id,
+                        "request.retrying",
+                        "thinking",
+                        "running",
+                        json!({ "attempt": attempt + 1, "reason": "network-unavailable" }),
+                    );
+                    tokio::time::sleep(Duration::from_millis(400)).await;
+                }
+            })
             .await
             .map_err(|_| ChatStreamError {
                 message: "模型响应超过整体时间上限".to_string(),
@@ -919,7 +1073,10 @@ async fn chat_with_model(
                 let interrupted = !err.partial_reply.is_empty();
                 let timed_out = err.message.contains("超时") || err.message.contains("时间上限");
                 let failure_status = crate::runtime::provider::classify_failure(&err.message);
-                if !interrupted && !timed_out && crate::runtime::provider::failure_changes_health(failure_status) {
+                if !interrupted
+                    && !timed_out
+                    && crate::runtime::provider::failure_changes_health(failure_status)
+                {
                     crate::runtime::provider::record_failure(&app_root, &provider, &err.message)?;
                 }
                 emit_conversation_event(
@@ -963,7 +1120,8 @@ async fn chat_with_model(
                 }
                 if failure_status == "network-unavailable" {
                     return Ok(ChatWithModelResult {
-                        reply: "本轮请求遇到网络异常，自动重试后仍未收到正文。你可以重新发送。".to_string(),
+                        reply: "本轮请求遇到网络异常，自动重试后仍未收到正文。你可以重新发送。"
+                            .to_string(),
                         should_create_plan: false,
                         intent: "chat".to_string(),
                         provider_status: "request-failed".to_string(),
@@ -1325,9 +1483,43 @@ fn list_agent_runs() -> Result<Vec<PersistedAgentRun>, String> {
 }
 
 #[tauri::command]
+fn get_agent_scheduler() -> Result<crate::runtime::agent_scheduler::AgentSchedulerSnapshot, String>
+{
+    let app_root = find_workspace_root()?;
+    crate::runtime::agent_scheduler::snapshot(&app_root)
+}
+
+#[tauri::command]
+fn export_agent_run_timeline(input: ContinueAgentRunInput) -> Result<Value, String> {
+    let app_root = find_workspace_root()?;
+    crate::runtime::agent_runs::export_timeline(&app_root, &input.id, &current_timestamp_string())
+}
+
+#[tauri::command]
 fn resume_agent_run(input: ResumeAgentRunInput) -> Result<PersistedAgentRun, String> {
     let app_root = find_workspace_root()?;
     crate::runtime::agent_runs::resume(&app_root, &input.id, &current_timestamp_string())
+}
+
+#[tauri::command]
+fn cancel_agent_run(
+    input: ContinueAgentRunInput,
+    runtime_requests: State<'_, RuntimeRequestState>,
+) -> Result<PersistedAgentRun, String> {
+    let app_root = find_workspace_root()?;
+    let existing = crate::runtime::agent_runs::load(&app_root, &input.id)?;
+    if !existing.request_id.trim().is_empty() {
+        runtime_requests.cancel(&existing.request_id);
+    }
+    let cancelled =
+        crate::runtime::agent_runs::cancel(&app_root, &input.id, &current_timestamp_string())?;
+    crate::runtime::agent_scheduler::settle_if_present(
+        &app_root,
+        &input.id,
+        "cancelled",
+        &current_timestamp_string(),
+    )?;
+    Ok(cancelled)
 }
 
 #[tauri::command]
@@ -1357,7 +1549,7 @@ fn execute_approved_agent_tool(input: ExecuteApprovedAgentToolInput) -> Result<V
     let mut registry = load_or_seed_registry(&app_root)?;
     let project = current_registry_project(&mut registry, &app_root)?;
     let access_mode = normalize_project_access_mode(&project.access_mode);
-    crate::runtime::execution::execute_approved_agent_tool(
+    let result = crate::runtime::execution::execute_approved_agent_tool(
         &app_root,
         Path::new(&project.path),
         &project.id,
@@ -1365,12 +1557,31 @@ fn execute_approved_agent_tool(input: ExecuteApprovedAgentToolInput) -> Result<V
         &input.id,
         &input.token,
         &current_timestamp_string(),
-    )
+    )?;
+    if let Ok(run) = crate::runtime::agent_runs::load(&app_root, &input.id) {
+        let scheduler_status = match run.status.as_str() {
+            "queued" => Some("waiting-continuation"),
+            "succeeded" => Some("completed"),
+            "failed" => Some("failed"),
+            "cancelled" => Some("cancelled"),
+            _ => None,
+        };
+        if let Some(status) = scheduler_status {
+            crate::runtime::agent_scheduler::settle_if_present(
+                &app_root,
+                &run.id,
+                status,
+                &current_timestamp_string(),
+            )?;
+        }
+    }
+    Ok(result)
 }
 
 #[tauri::command]
 async fn continue_agent_run(
     input: ContinueAgentRunInput,
+    app: AppHandle,
     runtime_requests: State<'_, RuntimeRequestState>,
 ) -> Result<HermesAgentLoopResult, String> {
     let app_root = find_workspace_root()?;
@@ -1397,6 +1608,7 @@ async fn continue_agent_run(
             task_id: run.task_id.clone(),
             isolate: false,
         },
+        app,
         runtime_requests,
     )
     .await
@@ -1405,6 +1617,7 @@ async fn continue_agent_run(
 #[tauri::command]
 async fn run_hermes_agent(
     input: RunHermesAgentInput,
+    app: AppHandle,
     runtime_requests: State<'_, RuntimeRequestState>,
 ) -> Result<HermesAgentLoopResult, String> {
     let app_root = find_workspace_root()?;
@@ -1426,6 +1639,80 @@ async fn run_hermes_agent(
     } else {
         format!("agent-{request_id}")
     };
+    let request_lease = if request_id.is_empty() {
+        None
+    } else {
+        Some(runtime_requests.try_lease(&request_id)?)
+    };
+    let scheduler_timestamp = current_timestamp_string();
+    let is_new_run = input.run_id.trim().is_empty();
+    if is_new_run {
+        let queued_run = crate::runtime::agent_runs::new_hermes_run_with_context(
+            run_id.clone(),
+            request_id.clone(),
+            current_project.id.clone(),
+            input.prompt.clone(),
+            input.max_steps,
+            input.approval_token.clone(),
+            input.conversation_id.clone(),
+            input.task_id.clone(),
+            &scheduler_timestamp,
+        );
+        crate::runtime::agent_runs::persist_new_queued(&app_root, &queued_run)?;
+    }
+    crate::runtime::agent_scheduler::enqueue(
+        &app_root,
+        &run_id,
+        &current_project.id,
+        &scheduler_timestamp,
+    )?;
+    let mut queue_event_emitted = false;
+    let scheduler_lease = loop {
+        let (outcome, lease) = crate::runtime::agent_scheduler::try_claim(
+            &app_root,
+            &run_id,
+            &current_timestamp_string(),
+        )?;
+        if outcome == crate::runtime::agent_scheduler::ClaimOutcome::Claimed {
+            break lease.ok_or_else(|| "调度器领取成功但没有返回租约。".to_string())?;
+        }
+        if !queue_event_emitted {
+            let position = crate::runtime::agent_scheduler::snapshot(&app_root)?
+                .entries
+                .into_iter()
+                .find(|entry| entry.run_id == run_id)
+                .and_then(|entry| entry.queue_position)
+                .unwrap_or(1);
+            crate::runtime::agent_runs::record_queue_wait(
+                &app_root,
+                &run_id,
+                position,
+                &current_timestamp_string(),
+            )?;
+            emit_conversation_event(
+                &app,
+                &request_id,
+                "request.queued",
+                "thinking",
+                "pending",
+                json!({ "position": position, "runId": run_id }),
+            );
+            queue_event_emitted = true;
+        }
+        if request_lease
+            .as_ref()
+            .is_some_and(|lease| lease.token().is_cancelled())
+        {
+            crate::runtime::agent_scheduler::settle(
+                &app_root,
+                &run_id,
+                "cancelled",
+                &current_timestamp_string(),
+            )?;
+            return Err("请求已取消".to_string());
+        }
+        tokio::time::sleep(Duration::from_millis(250)).await;
+    };
     let isolation = if input.run_id.trim().is_empty() && input.isolate {
         Some(crate::runtime::isolated_workspace::create(
             &source_root,
@@ -1446,7 +1733,7 @@ async fn run_hermes_agent(
             approval_token: input.approval_token.clone(),
             conversation_id: input.conversation_id.clone(),
             task_id: input.task_id.clone(),
-            resume_existing: !input.run_id.trim().is_empty(),
+            resume_existing: true,
             isolation,
         },
         &now,
@@ -1461,12 +1748,9 @@ async fn run_hermes_agent(
         })
         .transpose()?
         .unwrap_or_else(|| source_root.clone());
-    let token = if request_id.is_empty() {
-        None
-    } else {
-        Some(runtime_requests.start(&request_id))
-    };
+    let token = request_lease.as_ref().map(|lease| lease.token());
     let cancellation = token.clone();
+    let model_started_at = std::time::Instant::now();
     let mut result = tauri::async_runtime::spawn_blocking(move || {
         run_structured_loop(
             &execution_root,
@@ -1480,6 +1764,7 @@ async fn run_hermes_agent(
     })
     .await
     .map_err(|err| format!("Hermes worker 中断: {err}"))?;
+    let model_duration_ms = model_started_at.elapsed().as_millis() as u64;
     let mut status = match result.as_ref() {
         Ok(value) if value.status == "awaiting-approval" => "awaiting-approval",
         Ok(value) if value.status == "awaiting-user-input" => "awaiting-user-input",
@@ -1510,9 +1795,13 @@ async fn run_hermes_agent(
                 "trace": value.trace,
                 "observations": value.observations,
                 "interaction": value.interaction,
+                "durationMs": model_duration_ms,
+                "usage": value.usage,
             })
         })
-        .unwrap_or_else(|error| json!({ "error": error.to_string() }));
+        .unwrap_or_else(
+            |error| json!({ "error": error.to_string(), "durationMs": model_duration_ms }),
+        );
     if status == "succeeded" {
         if let Some(workspace) = running_run.isolation.as_ref() {
             let diff =
@@ -1554,6 +1843,13 @@ async fn run_hermes_agent(
         loop_result.summary = summary.clone();
         loop_result.approval = approval.clone();
     }
+    let scheduler_status = match status.as_str() {
+        "awaiting-approval" => "waiting-approval",
+        "awaiting-user-input" => "waiting-user",
+        "succeeded" => "completed",
+        "cancelled" => "cancelled",
+        _ => "failed",
+    };
     crate::runtime::agent_runs::settle_model_run(
         &app_root,
         running_run,
@@ -1567,9 +1863,7 @@ async fn run_hermes_agent(
         },
         &current_timestamp_string(),
     )?;
-    if !request_id.is_empty() {
-        runtime_requests.finish(&request_id);
-    }
+    scheduler_lease.settle(scheduler_status, &current_timestamp_string())?;
     result
 }
 
@@ -1842,6 +2136,50 @@ fn read_native_agent_run_for_recovery(
 ) -> Result<crate::runtime::agent_runs::PersistedAgentRun, String> {
     let app_root = find_workspace_root()?;
     crate::runtime::agent_runs::load(&app_root, "native-recovery-run")
+}
+
+#[cfg(feature = "webdriver")]
+#[tauri::command]
+fn seed_native_agent_scheduler(
+) -> Result<crate::runtime::agent_scheduler::AgentSchedulerSnapshot, String> {
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let project = current_registry_project(&mut registry, &app_root)?;
+    let timestamp = current_timestamp_string();
+    let fixtures = [
+        ("native-scheduler-active", project.id.as_str(), "running"),
+        ("native-scheduler-active-b", "native-project-b", "running"),
+        ("native-scheduler-queued", project.id.as_str(), "queued"),
+        ("native-scheduler-cap-queued", "native-project-c", "queued"),
+    ];
+    for (run_id, project_id, status) in fixtures {
+        let mut run = crate::runtime::agent_runs::new_hermes_run(
+            run_id.to_string(),
+            format!("{run_id}-request"),
+            project_id.to_string(),
+            "Native scheduler fixture; do not execute tools.".to_string(),
+            4,
+            String::new(),
+            &timestamp,
+        );
+        run.status = status.to_string();
+        run.checkpoint.phase = status.to_string();
+        crate::runtime::agent_runs::persist(&app_root, &run)?;
+        crate::runtime::agent_scheduler::enqueue(&app_root, run_id, project_id, &timestamp)?;
+        if status == "running" {
+            let (_, lease) =
+                crate::runtime::agent_scheduler::try_claim(&app_root, run_id, &timestamp)?;
+            std::mem::forget(lease);
+        }
+    }
+    crate::runtime::agent_scheduler::snapshot(&app_root)
+}
+
+#[cfg(feature = "webdriver")]
+#[tauri::command]
+fn read_native_agent_scheduler(
+) -> Result<Vec<crate::runtime::agent_scheduler::ScheduledAgentRun>, String> {
+    crate::runtime::agent_scheduler::debug_entries(&find_workspace_root()?)
 }
 
 #[cfg(feature = "webdriver")]
@@ -2401,10 +2739,20 @@ pub fn run() {
             test_provider_model_with_cache,
             open_native_terminal,
             read_engineering_file,
+            get_agent_tool_registry,
+            get_mcp_server_registry,
+            save_mcp_server,
+            remove_mcp_server,
+            get_mcp_discovery_evidence,
+            request_mcp_discovery,
+            request_mcp_call,
             execute_agent_read_tool,
             run_hermes_agent,
             list_agent_runs,
+            get_agent_scheduler,
+            export_agent_run_timeline,
             resume_agent_run,
+            cancel_agent_run,
             continue_agent_run,
             approve_agent_run,
             submit_agent_interaction,
@@ -2423,6 +2771,10 @@ pub fn run() {
             seed_native_agent_run_for_recovery,
             #[cfg(feature = "webdriver")]
             read_native_agent_run_for_recovery,
+            #[cfg(feature = "webdriver")]
+            seed_native_agent_scheduler,
+            #[cfg(feature = "webdriver")]
+            read_native_agent_scheduler,
             #[cfg(feature = "webdriver")]
             seed_native_agent_interaction,
             #[cfg(feature = "webdriver")]
@@ -2455,6 +2807,11 @@ fn recover_runtime_transactions_on_start() {
         crate::runtime::agent_runs::recover_stale(&app_root, &current_timestamp_string())
     {
         eprintln!("OmniDesk Agent Run 恢复失败：{error}");
+    }
+    if let Err(error) =
+        crate::runtime::agent_scheduler::recover_stale(&app_root, &current_timestamp_string())
+    {
+        eprintln!("OmniDesk Agent 调度恢复失败：{error}");
     }
 }
 

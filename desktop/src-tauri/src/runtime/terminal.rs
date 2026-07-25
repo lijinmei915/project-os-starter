@@ -302,10 +302,7 @@ pub fn start_session(
             },
         );
 
-    let sessions = state
-        .sessions
-        .lock()
-        .map_err(|err| err.to_string())?;
+    let sessions = state.sessions.lock().map_err(|err| err.to_string())?;
     let session = sessions
         .get(&session_id)
         .ok_or_else(|| "终端会话未创建".to_string())?;
@@ -371,8 +368,9 @@ pub fn stop_session(state: &TerminalState, input: StopTerminalSessionInput) -> R
 }
 
 pub fn list_evidence(root: &Path) -> Result<Vec<TerminalSessionEvidence>, String> {
-    let directory = crate::runtime::state_namespace::state_path_for_read(root, TERMINAL_EVIDENCE_DIRECTORY)
-        .unwrap_or_else(|_| root.join(TERMINAL_EVIDENCE_DIRECTORY));
+    let directory =
+        crate::runtime::state_namespace::state_path_for_read(root, TERMINAL_EVIDENCE_DIRECTORY)
+            .unwrap_or_else(|_| root.join(TERMINAL_EVIDENCE_DIRECTORY));
     let mut records = fs::read_dir(directory)
         .ok()
         .into_iter()
@@ -388,7 +386,10 @@ pub fn list_evidence(root: &Path) -> Result<Vec<TerminalSessionEvidence>, String
 
 fn recover_stale_evidence_once(state: &TerminalState, root: &Path) -> Result<(), String> {
     let canonical = root.canonicalize().map_err(|error| error.to_string())?;
-    let mut recovered = state.recovered_roots.lock().map_err(|error| error.to_string())?;
+    let mut recovered = state
+        .recovered_roots
+        .lock()
+        .map_err(|error| error.to_string())?;
     if !recovered.insert(canonical.clone()) {
         return Ok(());
     }
@@ -443,7 +444,11 @@ fn persist_live_evidence(
         status: status.to_string(),
         started_at: evidence.started_at.clone(),
         updated_at: now.clone(),
-        ended_at: if reason.is_empty() { String::new() } else { now },
+        ended_at: if reason.is_empty() {
+            String::new()
+        } else {
+            now
+        },
         command_count: evidence.command_count,
         last_command_summary: evidence.last_command.clone(),
         output_tail,
@@ -455,7 +460,10 @@ fn persist_live_evidence(
 fn persist_record(root: &Path, record: &TerminalSessionEvidence) -> Result<(), String> {
     let path = crate::runtime::state_namespace::state_path_for_write(
         root,
-        &format!("{TERMINAL_EVIDENCE_DIRECTORY}/{}.json", safe_session_id(&record.session_id)),
+        &format!(
+            "{TERMINAL_EVIDENCE_DIRECTORY}/{}.json",
+            safe_session_id(&record.session_id)
+        ),
     )?;
     if let Ok(existing) = fs::read_to_string(&path) {
         if let Ok(existing) = serde_json::from_str::<TerminalSessionEvidence>(&existing) {
@@ -502,7 +510,15 @@ fn update_command_summary(session: &TerminalSession, input: &str) -> bool {
     };
     evidence.input_buffer.push_str(input);
     if !evidence.input_buffer.contains(['\n', '\r']) {
-        evidence.input_buffer = evidence.input_buffer.chars().rev().take(512).collect::<String>().chars().rev().collect();
+        evidence.input_buffer = evidence
+            .input_buffer
+            .chars()
+            .rev()
+            .take(512)
+            .collect::<String>()
+            .chars()
+            .rev()
+            .collect();
         return false;
     }
     let submitted = evidence
@@ -560,7 +576,11 @@ fn safe_session_id(value: &str) -> String {
         .filter(|character| character.is_ascii_alphanumeric() || matches!(character, '-' | '_'))
         .take(80)
         .collect::<String>();
-    if result.is_empty() { "terminal".to_string() } else { result }
+    if result.is_empty() {
+        "terminal".to_string()
+    } else {
+        result
+    }
 }
 
 fn current_timestamp() -> String {
@@ -691,7 +711,10 @@ mod tests {
         assert!(looks_sensitive("curl -H 'Authorization: Bearer sk-value'"));
         assert!(!looks_sensitive("npm test"));
         assert_eq!(safe_session_id("../../unsafe"), "unsafe");
-        assert_eq!(redact_terminal_output("API_KEY=value\npassed"), "[sensitive output omitted]\npassed");
+        assert_eq!(
+            redact_terminal_output("API_KEY=value\npassed"),
+            "[sensitive output omitted]\npassed"
+        );
     }
 
     #[test]
@@ -714,20 +737,16 @@ mod tests {
         let output = Arc::new(Mutex::new(String::new()));
         append_output_tail(&output, "API_KEY=never-store\nall tests passed\n");
         persist_live_evidence(
-            &root,
-            "main",
-            2,
-            "/bin/zsh",
-            &evidence,
-            &output,
-            "running",
-            "",
+            &root, "main", 2, "/bin/zsh", &evidence, &output, "running", "",
         )
         .unwrap();
         let record = list_evidence(&root).unwrap().remove(0);
         assert_eq!(record.command_count, 1);
         assert_eq!(record.last_command_summary, "npm test");
-        assert_eq!(record.output_tail, "[sensitive output omitted]\nall tests passed");
+        assert_eq!(
+            record.output_tail,
+            "[sensitive output omitted]\nall tests passed"
+        );
         std::fs::remove_dir_all(root).unwrap();
     }
 
@@ -758,7 +777,11 @@ mod tests {
             end_reason: String::new(),
         };
         persist_record(&root, &newest).unwrap();
-        let stale = TerminalSessionEvidence { generation: 1, output_tail: "stale output".to_string(), ..newest.clone() };
+        let stale = TerminalSessionEvidence {
+            generation: 1,
+            output_tail: "stale output".to_string(),
+            ..newest.clone()
+        };
         persist_record(&root, &stale).unwrap();
         let record = list_evidence(&root).unwrap().remove(0);
         assert_eq!(record.generation, 2);

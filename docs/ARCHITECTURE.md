@@ -1,7 +1,7 @@
 ---
 layer: knowledge
 type: spec
-last_verified: 2026-07-22
+last_verified: 2026-07-25
 depends_on: [AGENTS.md, PROJECT.md, docs/PRODUCT_PLAN.md]
 teaches: "OmniDesk Desktop Runtime 的系统边界、模块职责、状态所有权和运行路径"
 use_when: "AI 需要判断架构影响范围、模块所有权、执行边界或迁移顺序时"
@@ -121,14 +121,24 @@ Agent Run 已持久化 attempt、审批、观察、request checkpoint、当前�
 | `tasks` | 任务状态、文件授权、Patch/检查结果和任务所有权 |
 | `goals` | 目标、任务索引、验收、归档、恢复和合并 |
 | `agent_runs` | 有界运行、attempt、审批、恢复和最终态 |
+| `agent_scheduler` | 持久化队列、全局并发上限、项目互斥、FIFO 领取、租约和重启中断 |
 | `agent_tools` | 受控项目读取、上下文包和只读工具参数边界 |
+| `tool_registry` | 版本化工具描述符、能力发现、输入 schema、来源、风险与审批声明校验 |
+| `mcp_runtime` | MCP stdio Server 配置、环境变量引用、有界发现/调用 transport 与项目绑定发现证据；仅由消费独立 Agent Run 审批后的 Tool Gateway 调用 |
 | `provider` | Provider 配置、密钥隔离、预检和失败分类 |
+| `provider_tools` | 原生 Function Calling 能力、按 API Base + 模型持久化的能力证据、标准工具 schema、SSE/非流式完整 tool call 累计与参数校验、明确拒绝后的兼容降级 |
 | `patch` | unified diff 归一化、授权路径、hunk 和上下文校验 |
 | `execution` | 受控写入、检查、审计和执行结果 |
 | `repository` | schema、锁、原子事务、事件和异常恢复 |
 | `state_namespace` | 四分区路径映射、非破坏性迁移、冲突回退和激活 manifest |
 
 跨模块写入必须由 Runtime 领域服务在一个 Repository 事务内完成。React 只消费投影和调用明确 operation，不承担跨实体补偿逻辑。
+
+Agent Scheduler 保存于 `.omnidesk/runtime/agent-scheduler.json`。完整 Agent Run 必须先于 scheduler 入队持久化，因此重启后的 queued 项仍有任务、对话和恢复上下文。只读 snapshot 向工作台提供全局上限、活动数、调度状态和稳定队列位置。`queued` 不占项目；`running`、等待审批、等待追问和等待工具续接均保留项目。模型阶段异常退出由作用域租约落为 `interrupted`；启动恢复只中断旧保留，不领取 queued 项或重放 Patch/检查。显式取消同时封口 Agent Run 与 scheduler，释放项目；revision 与 scheduler 终态守卫拒绝迟到结果覆盖。
+
+Agent Run 的新 evidence 采用 `omnidesk.run-event.v0.1`：每个事件包含稳定 `id/sequence/kind/phase/status/actor/recordedAt/summary/details`。调度、模型、审批、用户追问、Patch、检查、工具、恢复、取消和结果都写入该时间线；旧 evidence 继续兼容读取。模型事件的 `details` 保存真实耗时，并仅透传 ACP 响应明确给出的 token/cost，缺失值保持未知。Runtime 负责聚合 Run 指标；导出使用 `omnidesk.run-timeline-export.v0.1` 和 `metadata-only` 脱敏策略，调试证据不携带 prompt、工程正文、diff、模型 output、observations 或 credentials。
+
+MCP 管理面位于 `Agent 配置 / 受控工具`，但 React 不持有 transport 权限。Workbench controller 注入 Server 配置、有效发现证据和创建审批的 operation；页面只能创建 `mcp_discover` / `mcp_call` Agent Run，再复用统一批准、取消与证据导出入口。Runtime 只向当前项目返回仍匹配 Server 配置快照的发现证据；Preview 不读取 MCP 配置或证据，也不能发现或调用工具。
 
 ## 状态所有权
 

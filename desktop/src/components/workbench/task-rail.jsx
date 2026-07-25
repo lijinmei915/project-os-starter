@@ -23,7 +23,7 @@ export function TaskRailDetail({ task, onMarkTaskWaiting, onSendTaskToChat, onSe
 export function TaskQueueItem({ active, onMarkTaskWaiting, onSelectTask, statusLabel, task }) {
   return <Panel as="article" className={`queueCard taskQueueItem${active ? " active" : ""}`} padding="none">
     <button aria-label={`打开对话：${task.title}`} className="taskQueueButton" type="button" onClick={() => onSelectTask(task.id)}>
-      <div className="queueHead"><strong>{task.title}</strong><Badge status={statusLabel(task.status)}>{statusLabel(task.status)}</Badge></div>
+      <div className="queueHead"><strong>{task.title}</strong><Badge status={statusLabel(task)}>{statusLabel(task)}</Badge></div>
       <p>{task.projectName} · {task.createdAt}</p>
     </button>
     <div className="taskActions"><Button size="sm" variant="primary" type="button" onClick={() => onMarkTaskWaiting(task.id)} disabled={task.status !== "planned"}>开始执行</Button></div>

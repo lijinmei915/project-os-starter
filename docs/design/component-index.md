@@ -32,6 +32,7 @@
 |----------------|------|------|-------------|----------|
 | `Button` | Primitive | 本文 | `desktop/src/components/ui/button.jsx` | 任务和页面动作 |
 | `Input` | Primitive | 本文 | `desktop/src/components/ui/input.jsx` | 表单和对话输入 |
+| `Textarea` | Primitive | 本文 | `desktop/src/components/ui/textarea.jsx` | 多行结构化参数输入 |
 | `Badge` | Primitive | 本文 | `desktop/src/components/ui/badge.jsx` | 状态展示 |
 
 ## 桌面端 v0.1 组件现状
@@ -58,6 +59,7 @@
 | `TokenGovernancePanel` | Composition | `desktop/src/components/workbench/token-governance-panel.jsx` | Token 分类、实际变量名和运行时样例；自身归属 `Token` 页 |
 | `Button` | Primitive | `desktop/src/components/ui/button.jsx` | Radix Slot + CVA 变体，视觉映射到 Desktop tokens |
 | `Input` | Primitive | `desktop/src/components/ui/input.jsx` | 表单与 Composer 输入框，视觉映射到 Desktop tokens |
+| `Textarea` | Primitive | `desktop/src/components/ui/textarea.jsx` | 多行表单输入，复用 Input 的 Desktop token 状态并限制纵向缩放 |
 | `Select` | Primitive | `desktop/src/components/ui/select.jsx` | Provider 和模型下拉，视觉映射到 Desktop tokens |
 | `Badge` | Primitive | `desktop/src/components/ui/badge.jsx` | 任务状态、只读标识和队列状态，视觉映射到 Desktop tokens |
 | `Panel` | Primitive | `desktop/src/components/ui/panel.jsx` | Provider、Queue、Diff、Runner、Index 等容器，视觉映射到 Desktop tokens |
@@ -93,6 +95,7 @@
 | `TaskSurface` | Composition | 当前任务、任务详情、Patch 草案和执行结果 | `Panel`、`Badge`、`TaskCommandBar`、`Notice` |
 | `HealthSurface` | Composition | 治理文件、设计实现、Schema、报告产物等健康状态工作面 | `Panel`、`Badge`、`Button`、`Notice` |
 | `ConfigurationSurface` | Composition | 模型连接、工具白名单、Skill、适配器和安全边界 | `Panel`、`Field`、`Button`、`Badge`、`Switch` |
+| `McpManagementPanel` | Composition | MCP Server 配置、发现证据、schema 参数表单和独立调用审批 | `OverviewSection`、`Field`、`Input`、`Textarea`、`Select`、`Switch`、`Button`、`Badge`、`Dialog`、`Notice` |
 | `MemorySurface` | Composition | 项目事实、用户偏好、长期记忆和会话摘要 | `Panel`、`Badge`、`Notice` |
 
 工作区菜单可视化结构见 `docs/design/workbench-visualization.md`。

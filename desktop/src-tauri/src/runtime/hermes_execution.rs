@@ -1,7 +1,7 @@
 use crate::runtime::agent_tools::{build_task_context, execute_hermes_read_tool};
 use crate::runtime::hermes_protocol::{
-    acp_program, custom_provider_key_env, extract_structured_envelope, wait_for_response,
-    write_request,
+    acp_program, custom_provider_key_env, extract_structured_envelope, provider_usage,
+    wait_for_response, write_request, ProviderUsage,
 };
 use crate::runtime::patch::{validate_apply_diff_paths, validate_unified_diff_authorized};
 use crate::runtime::provider::trim_for_trace;
@@ -33,6 +33,8 @@ pub struct HermesAgentLoopResult {
     pub interaction: Option<Value>,
     pub observations: Vec<Value>,
     pub trace: Vec<String>,
+    #[serde(skip_serializing_if = "ProviderUsage::is_empty")]
+    pub usage: ProviderUsage,
 }
 
 pub fn run_structured_loop(
@@ -105,6 +107,7 @@ pub fn run_structured_loop(
     })];
     let mut authorized_patch_files = HashSet::<String>::new();
     let mut envelope_retry_used = false;
+    let mut usage = ProviderUsage::default();
     let mut result = (|| -> Result<HermesAgentLoopResult, String> {
         write_request(
             &mut stdin,
@@ -157,7 +160,7 @@ pub fn run_structured_loop(
                 json!({ "sessionId": session_id, "prompt": [{ "type": "text", "text": next_prompt }] }),
             )?;
             let mut agent_text = String::new();
-            wait_for_response(
+            let prompt_response = wait_for_response(
                 &lines_rx,
                 &mut stdin,
                 request_id,
@@ -165,6 +168,9 @@ pub fn run_structured_loop(
                 &mut agent_text,
                 cancellation,
             )?;
+            if let Some(prompt_usage) = provider_usage(&prompt_response) {
+                usage.merge(prompt_usage);
+            }
             let parsed = extract_structured_envelope(&agent_text);
             let invalid_reason = match &parsed {
                 Ok(value)
@@ -197,7 +203,7 @@ pub fn run_structured_loop(
                     }),
                 )?;
                 let mut corrected_text = String::new();
-                wait_for_response(
+                let corrected_response = wait_for_response(
                     &lines_rx,
                     &mut stdin,
                     request_id + 1,
@@ -205,6 +211,9 @@ pub fn run_structured_loop(
                     &mut corrected_text,
                     cancellation,
                 )?;
+                if let Some(prompt_usage) = provider_usage(&corrected_response) {
+                    usage.merge(prompt_usage);
+                }
                 let corrected = extract_structured_envelope(&corrected_text)?;
                 if !matches!(
                     corrected.get("type").and_then(Value::as_str),
@@ -228,6 +237,7 @@ pub fn run_structured_loop(
                     interaction: None,
                     observations,
                     trace,
+                    usage,
                 });
             }
             debug_assert_eq!(kind, "tool_call");
@@ -249,6 +259,7 @@ pub fn run_structured_loop(
                     interaction: Some(interaction),
                     observations,
                     trace,
+                    usage,
                 });
             }
             if matches!(name, "apply_patch" | "run_check") {
@@ -272,6 +283,7 @@ pub fn run_structured_loop(
                     interaction: None,
                     observations,
                     trace,
+                    usage,
                 });
             }
             let observation = execute_hermes_read_tool(root, name, &args)?;
@@ -299,6 +311,7 @@ pub fn run_structured_loop(
             interaction: None,
             observations,
             trace,
+            usage,
         })
     })();
     let _ = child.kill();

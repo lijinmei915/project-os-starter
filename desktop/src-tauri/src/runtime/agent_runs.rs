@@ -97,7 +97,21 @@ pub struct ModelRunCompletion {
     pub evidence_details: Value,
 }
 
+#[derive(Debug, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentRunMetrics {
+    pub event_count: usize,
+    pub model_event_count: usize,
+    pub duration_ms: u64,
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+    pub total_tokens: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cost_usd: Option<f64>,
+}
+
 const INTERACTION_SCHEMA_VERSION: &str = "omnidesk.interaction.v0.1";
+const RUN_EVENT_SCHEMA_VERSION: &str = "omnidesk.run-event.v0.1";
 
 pub fn validate_ask_user_interaction(arguments: &Value, step: usize) -> Result<Value, String> {
     let object = arguments
@@ -122,32 +136,64 @@ pub fn validate_ask_user_interaction(arguments: &Value, step: usize) -> Result<V
     let mut ids = std::collections::HashSet::new();
     let mut normalized_fields = Vec::new();
     for field in fields {
-        let field = field.as_object().ok_or_else(|| "ask_user field 必须是对象。".to_string())?;
+        let field = field
+            .as_object()
+            .ok_or_else(|| "ask_user field 必须是对象。".to_string())?;
         let id = field.get("id").and_then(Value::as_str).unwrap_or("").trim();
-        if id.is_empty() || id.len() > 48 || !id.chars().all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '-') || !ids.insert(id.to_string()) {
+        if id.is_empty()
+            || id.len() > 48
+            || !id
+                .chars()
+                .all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '-')
+            || !ids.insert(id.to_string())
+        {
             return Err("ask_user field id 必须唯一且仅含字母、数字、- 或 _。".to_string());
         }
         let kind = field.get("type").and_then(Value::as_str).unwrap_or("");
         if !matches!(kind, "single-choice" | "multi-choice" | "text" | "confirm") {
             return Err("ask_user field type 不受支持。".to_string());
         }
-        let label = field.get("label").and_then(Value::as_str).unwrap_or("").trim();
+        let label = field
+            .get("label")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim();
         if label.is_empty() || label.chars().count() > 100 {
             return Err("ask_user field label 长度不合法。".to_string());
         }
-        let required = field.get("required").and_then(Value::as_bool).unwrap_or(false);
-        let mut normalized = json!({ "id": id, "type": kind, "label": label, "required": required });
+        let required = field
+            .get("required")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        let mut normalized =
+            json!({ "id": id, "type": kind, "label": label, "required": required });
         if matches!(kind, "single-choice" | "multi-choice") {
-            let options = field.get("options").and_then(Value::as_array).ok_or_else(|| "选择题缺少 options。".to_string())?;
+            let options = field
+                .get("options")
+                .and_then(Value::as_array)
+                .ok_or_else(|| "选择题缺少 options。".to_string())?;
             if options.is_empty() || options.len() > 12 {
                 return Err("选择题选项数量必须在 1 到 12 之间。".to_string());
             }
             let mut values = std::collections::HashSet::new();
             let mut normalized_options = Vec::new();
             for option in options {
-                let value = option.get("value").and_then(Value::as_str).unwrap_or("").trim();
-                let label = option.get("label").and_then(Value::as_str).unwrap_or("").trim();
-                if value.is_empty() || value.len() > 80 || label.is_empty() || label.chars().count() > 100 || !values.insert(value.to_string()) {
+                let value = option
+                    .get("value")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .trim();
+                let label = option
+                    .get("label")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .trim();
+                if value.is_empty()
+                    || value.len() > 80
+                    || label.is_empty()
+                    || label.chars().count() > 100
+                    || !values.insert(value.to_string())
+                {
                     return Err("ask_user 选项不合法或重复。".to_string());
                 }
                 normalized_options.push(json!({ "value": value, "label": label }));
@@ -175,8 +221,39 @@ pub fn append_evidence(
     details: Value,
     timestamp: &str,
 ) {
+    let sequence = run
+        .evidence
+        .last()
+        .and_then(|event| event.get("sequence"))
+        .and_then(Value::as_u64)
+        .unwrap_or(run.evidence.len() as u64)
+        + 1;
+    let kind = match phase {
+        "scheduling" => "scheduling",
+        "draft" => "model",
+        "approval" => "approval",
+        "interaction" => "user-interaction",
+        "applying" => "patch",
+        "running-tool" => "tool",
+        "check" => "check",
+        "tool-result" | "tool-failed" => "tool",
+        "recovery" => "recovery",
+        "cancelled" => "cancellation",
+        _ => "result",
+    };
+    let actor = match kind {
+        "model" | "approval" | "user-interaction" => "assistant",
+        "cancellation" => "user",
+        _ => "runtime",
+    };
     run.evidence.push(json!({
+        "schemaVersion": RUN_EVENT_SCHEMA_VERSION,
+        "id": format!("{}:event:{}", run.id, sequence),
+        "sequence": sequence,
+        "kind": kind,
         "phase": phase,
+        "status": run.status,
+        "actor": actor,
         "recordedAt": timestamp,
         "summary": summary.into(),
         "details": details,
@@ -202,6 +279,19 @@ fn relative_path(id: &str) -> Result<String, String> {
 pub fn persist(root: &Path, run: &PersistedAgentRun) -> Result<(), String> {
     Repository::new(root).transaction("persist-agent-run", &[mutation(run)?])?;
     Ok(())
+}
+
+pub fn persist_new_queued(root: &Path, run: &PersistedAgentRun) -> Result<(), String> {
+    if run.status != "queued" {
+        return Err("只有完整的 queued Agent Run 可以首次入队。".to_string());
+    }
+    Repository::new(root).transaction_with("create-queued-agent-run", |repository| {
+        let path = relative_path(&run.id)?;
+        if repository.read_json(&path).is_some() {
+            return Err("Agent Run 已存在，拒绝覆盖原有执行证据。".to_string());
+        }
+        Ok(((), vec![mutation(run)?]))
+    })
 }
 
 fn mutation(run: &PersistedAgentRun) -> Result<JsonMutation, String> {
@@ -243,7 +333,7 @@ pub fn recover_stale(root: &Path, timestamp: &str) -> Result<(), String> {
         for mut run in list_from_repository(repository)? {
             if !matches!(
                 run.status.as_str(),
-                "queued" | "running" | "awaiting-approval" | "applying" | "verifying"
+                "running" | "running-tool" | "awaiting-approval" | "applying" | "verifying"
             ) {
                 continue;
             }
@@ -269,6 +359,15 @@ pub fn recover_stale(root: &Path, timestamp: &str) -> Result<(), String> {
             run.revision += 1;
             run.updated_at = timestamp.to_string();
             run.summary = "应用退出时 Agent Run 未完成；旧进程结果已失效，可重新恢复。".to_string();
+            let summary = run.summary.clone();
+            let prior_phase = run.checkpoint.phase.clone();
+            append_evidence(
+                &mut run,
+                "recovery",
+                summary,
+                json!({ "priorPhase": prior_phase, "action": "interrupted-on-startup" }),
+                timestamp,
+            );
             mutations.push(mutation(&run)?);
         }
         Ok(((), mutations))
@@ -301,6 +400,230 @@ pub fn resume(root: &Path, id: &str, timestamp: &str) -> Result<PersistedAgentRu
             } else {
                 "重新调度"
             }
+        );
+        let summary = run.summary.clone();
+        let from = run.checkpoint.phase.clone();
+        let to = run.status.clone();
+        append_evidence(
+            &mut run,
+            "recovery",
+            summary,
+            json!({ "from": from, "to": to }),
+            timestamp,
+        );
+        Ok((run.clone(), vec![mutation(&run)?]))
+    })
+}
+
+pub fn record_queue_wait(
+    root: &Path,
+    id: &str,
+    position: usize,
+    timestamp: &str,
+) -> Result<PersistedAgentRun, String> {
+    Repository::new(root).transaction_with("record-agent-queue-wait", |repository| {
+        let mut run = load_from_repository(repository, id)?;
+        if run.status != "queued" {
+            return Err(format!("当前状态为 {}，不能记录排队等待。", run.status));
+        }
+        run.revision += 1;
+        run.updated_at = timestamp.to_string();
+        run.summary = format!("任务已排队（第 {position} 位）。");
+        let summary = run.summary.clone();
+        append_evidence(
+            &mut run,
+            "scheduling",
+            summary,
+            json!({ "position": position, "reason": "capacity-or-project-lock" }),
+            timestamp,
+        );
+        Ok((run.clone(), vec![mutation(&run)?]))
+    })
+}
+
+pub fn timeline_metrics(run: &PersistedAgentRun) -> AgentRunMetrics {
+    let mut metrics = AgentRunMetrics {
+        event_count: run.evidence.len(),
+        ..AgentRunMetrics::default()
+    };
+    let mut usage_event_count = 0_usize;
+    let mut cost_event_count = 0_usize;
+    let mut reported_cost = 0.0_f64;
+    for event in &run.evidence {
+        if event.get("kind").and_then(Value::as_str) == Some("model") {
+            metrics.model_event_count += 1;
+        }
+        let details = event.get("details").unwrap_or(&Value::Null);
+        metrics.duration_ms = metrics.duration_ms.saturating_add(
+            details
+                .get("durationMs")
+                .and_then(Value::as_u64)
+                .unwrap_or(0),
+        );
+        let usage = details.get("usage").unwrap_or(&Value::Null);
+        if usage.is_object() {
+            usage_event_count += 1;
+        }
+        metrics.input_tokens = metrics.input_tokens.saturating_add(
+            usage
+                .get("inputTokens")
+                .and_then(Value::as_u64)
+                .unwrap_or(0),
+        );
+        metrics.output_tokens = metrics.output_tokens.saturating_add(
+            usage
+                .get("outputTokens")
+                .and_then(Value::as_u64)
+                .unwrap_or(0),
+        );
+        metrics.total_tokens = metrics.total_tokens.saturating_add(
+            usage
+                .get("totalTokens")
+                .and_then(Value::as_u64)
+                .unwrap_or(0),
+        );
+        if let Some(cost) = usage.get("costUsd").and_then(Value::as_f64) {
+            cost_event_count += 1;
+            reported_cost += cost;
+        }
+    }
+    metrics.cost_usd = (usage_event_count > 0
+        && usage_event_count == metrics.model_event_count
+        && cost_event_count == usage_event_count)
+        .then_some(reported_cost);
+    metrics
+}
+
+pub fn export_timeline(root: &Path, id: &str, timestamp: &str) -> Result<Value, String> {
+    let run = load(root, id)?;
+    let path = format!(".omnidesk/evidence/agent-runs/{}.json", run.id);
+    let events = run
+        .evidence
+        .iter()
+        .map(redacted_timeline_event)
+        .collect::<Vec<_>>();
+    let export = json!({
+        "schemaVersion": "omnidesk.run-timeline-export.v0.1",
+        "runId": run.id,
+        "requestId": run.request_id,
+        "conversationId": run.conversation_id,
+        "taskId": run.task_id,
+        "projectId": run.project_id,
+        "executorId": run.executor_id,
+        "status": run.status,
+        "createdAt": run.created_at,
+        "updatedAt": run.updated_at,
+        "exportedAt": timestamp,
+        "metrics": timeline_metrics(&run),
+        "events": events,
+        "redaction": {
+            "excluded": ["prompt", "content", "diff", "output", "observations", "credentials"],
+            "policy": "metadata-only"
+        }
+    });
+    Repository::new(root).transaction(
+        "export-agent-run-timeline",
+        &[JsonMutation::upsert(path.clone(), export.clone())],
+    )?;
+    Ok(json!({ "path": path, "timeline": export }))
+}
+
+fn redacted_timeline_event(event: &Value) -> Value {
+    let details = event.get("details").unwrap_or(&Value::Null);
+    let mut safe_details = serde_json::Map::new();
+    for key in [
+        "durationMs",
+        "usage",
+        "step",
+        "position",
+        "reason",
+        "priorPhase",
+        "action",
+        "from",
+        "to",
+    ] {
+        if let Some(value) = details.get(key) {
+            safe_details.insert(key.to_string(), value.clone());
+        }
+    }
+    if let Some(trace) = details.get("trace").and_then(Value::as_array) {
+        safe_details.insert(
+            "trace".to_string(),
+            Value::Array(
+                trace
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .take(40)
+                    .map(|line| Value::String(line.chars().take(240).collect()))
+                    .collect(),
+            ),
+        );
+    }
+    if let Some(name) = details.get("name").and_then(Value::as_str) {
+        safe_details.insert("name".to_string(), json!(name));
+    }
+    if let Some(success) = details
+        .get("success")
+        .and_then(Value::as_bool)
+        .or_else(|| details.pointer("/result/success").and_then(Value::as_bool))
+    {
+        safe_details.insert("success".to_string(), json!(success));
+    }
+    if let Some(error) = details.get("error").and_then(Value::as_str) {
+        safe_details.insert(
+            "error".to_string(),
+            Value::String(error.chars().take(500).collect()),
+        );
+    }
+    let mut output = event.clone();
+    output["details"] = Value::Object(safe_details);
+    output
+}
+
+pub fn cancel(root: &Path, id: &str, timestamp: &str) -> Result<PersistedAgentRun, String> {
+    Repository::new(root).transaction_with("cancel-agent-run", |repository| {
+        let mut run = load_from_repository(repository, id)
+            .map_err(|_| "没有找到可取消的 Agent Run。".to_string())?;
+        if run.status == "cancelled" {
+            return Ok((run, Vec::new()));
+        }
+        if !matches!(
+            run.status.as_str(),
+            "queued"
+                | "running"
+                | "running-tool"
+                | "awaiting-approval"
+                | "awaiting-user-input"
+                | "interrupted"
+        ) {
+            return Err(format!("当前状态为 {}，不能取消。", run.status));
+        }
+        run.status = "cancelled".to_string();
+        run.revision += 1;
+        run.updated_at = timestamp.to_string();
+        run.summary = "用户已取消 Agent Run；不会自动恢复或重放工程操作。".to_string();
+        run.approval_token.clear();
+        if let Some(approval) = run.approval.as_mut().and_then(Value::as_object_mut) {
+            approval.insert("status".to_string(), json!("cancelled"));
+        }
+        if let Some(interaction) = run
+            .checkpoint
+            .interaction
+            .as_mut()
+            .and_then(Value::as_object_mut)
+        {
+            interaction.insert("status".to_string(), json!("cancelled"));
+        }
+        run.checkpoint.phase = "cancelled".to_string();
+        run.checkpoint.context_summary = run.summary.clone();
+        run.checkpoint.next_action = "none".to_string();
+        let summary = run.summary.clone();
+        append_evidence(
+            &mut run,
+            "cancelled",
+            summary,
+            json!({ "reason": "user-requested" }),
+            timestamp,
         );
         Ok((run.clone(), vec![mutation(&run)?]))
     })
@@ -376,7 +699,11 @@ pub fn submit_interaction(
         submitted["status"] = json!("submitted");
         submitted["response"] = response.clone();
         submitted["submittedAt"] = json!(timestamp);
-        if let Some(index) = run.interactions.iter().position(|item| item.get("id") == Some(&json!(form_id))) {
+        if let Some(index) = run
+            .interactions
+            .iter()
+            .position(|item| item.get("id") == Some(&json!(form_id)))
+        {
             run.interactions[index] = submitted.clone();
         } else {
             run.interactions.push(submitted.clone());
@@ -413,7 +740,11 @@ pub fn submit_interaction(
     })
 }
 
-fn validate_interaction_answers(interaction: &Value, action: &str, answers: &Value) -> Result<Value, String> {
+fn validate_interaction_answers(
+    interaction: &Value,
+    action: &str,
+    answers: &Value,
+) -> Result<Value, String> {
     if action == "skip" {
         return Ok(json!({}));
     }
@@ -428,11 +759,17 @@ fn validate_interaction_answers(interaction: &Value, action: &str, answers: &Val
     for field in fields {
         let id = field.get("id").and_then(Value::as_str).unwrap_or("");
         let kind = field.get("type").and_then(Value::as_str).unwrap_or("");
-        let required = field.get("required").and_then(Value::as_bool).unwrap_or(false);
+        let required = field
+            .get("required")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
         let value = answers.get(id);
         if value.is_none() || value == Some(&Value::Null) {
             if required {
-                return Err(format!("请完成「{}」。", field.get("label").and_then(Value::as_str).unwrap_or(id)));
+                return Err(format!(
+                    "请完成「{}」。",
+                    field.get("label").and_then(Value::as_str).unwrap_or(id)
+                ));
             }
             continue;
         }
@@ -445,18 +782,28 @@ fn validate_interaction_answers(interaction: &Value, action: &str, answers: &Val
                 }
                 Value::String(text.to_string())
             }
-            "confirm" => Value::Bool(value.as_bool().ok_or_else(|| format!("「{}」必须确认或取消。", id))?),
+            "confirm" => Value::Bool(
+                value
+                    .as_bool()
+                    .ok_or_else(|| format!("「{}」必须确认或取消。", id))?,
+            ),
             "single-choice" => {
-                let choice = value.as_str().ok_or_else(|| format!("「{}」必须选择一个选项。", id))?;
+                let choice = value
+                    .as_str()
+                    .ok_or_else(|| format!("「{}」必须选择一个选项。", id))?;
                 validate_interaction_option(field, choice)?;
                 Value::String(choice.to_string())
             }
             "multi-choice" => {
-                let choices = value.as_array().ok_or_else(|| format!("「{}」必须选择选项。", id))?;
+                let choices = value
+                    .as_array()
+                    .ok_or_else(|| format!("「{}」必须选择选项。", id))?;
                 let mut unique = std::collections::HashSet::new();
                 let mut result = Vec::new();
                 for choice in choices {
-                    let choice = choice.as_str().ok_or_else(|| format!("「{}」选项不合法。", id))?;
+                    let choice = choice
+                        .as_str()
+                        .ok_or_else(|| format!("「{}」选项不合法。", id))?;
                     validate_interaction_option(field, choice)?;
                     if unique.insert(choice.to_string()) {
                         result.push(Value::String(choice.to_string()));
@@ -478,8 +825,16 @@ fn validate_interaction_option(field: &Value, choice: &str) -> Result<(), String
     let valid = field
         .get("options")
         .and_then(Value::as_array)
-        .is_some_and(|options| options.iter().any(|option| option.get("value").and_then(Value::as_str) == Some(choice)));
-    if valid { Ok(()) } else { Err("表单选项不属于当前问题。".to_string()) }
+        .is_some_and(|options| {
+            options
+                .iter()
+                .any(|option| option.get("value").and_then(Value::as_str) == Some(choice))
+        });
+    if valid {
+        Ok(())
+    } else {
+        Err("表单选项不属于当前问题。".to_string())
+    }
 }
 
 /// Creates or resumes a persisted Agent Run at the model boundary. This
@@ -497,7 +852,7 @@ pub fn prepare_model_run(
             return Err("审批凭证不匹配，拒绝继续执行。".to_string());
         }
     }
-    let base_run = if input.resume_existing {
+    let mut base_run = if input.resume_existing {
         let run = load(root, &input.run_id)?;
         if run.project_id != input.project_id {
             return Err("Agent Run 不属于当前项目，拒绝继续。".to_string());
@@ -518,10 +873,13 @@ pub fn prepare_model_run(
             input.task_id,
             timestamp,
         );
-        run.isolation = input.isolation;
+        run.isolation = input.isolation.clone();
         persist(root, &run)?;
         run
     };
+    if base_run.isolation.is_none() {
+        base_run.isolation = input.isolation;
+    }
     let continuation = base_run
         .checkpoint
         .tool_result
@@ -538,7 +896,10 @@ pub fn prepare_model_run(
     } else {
         ""
     };
-    let execution_prompt = format!("{}{}{}", base_run.prompt, continuation, isolation_instruction);
+    let execution_prompt = format!(
+        "{}{}{}",
+        base_run.prompt, continuation, isolation_instruction
+    );
     let mut run = base_run;
     run.status = "running".to_string();
     run.revision += 1;
@@ -571,6 +932,7 @@ pub fn settle_model_run(
     completion: ModelRunCompletion,
     timestamp: &str,
 ) -> Result<PersistedAgentRun, String> {
+    let expected_revision = run.revision;
     run.status = completion.status;
     if let Some(step) = completion.step {
         run.step = step;
@@ -588,7 +950,11 @@ pub fn settle_model_run(
             completion.step.unwrap_or(run.step)
         ));
         value["requestedAt"] = json!(timestamp);
-        if let Some(index) = run.interactions.iter().position(|item| item.get("id") == value.get("id")) {
+        if let Some(index) = run
+            .interactions
+            .iter()
+            .position(|item| item.get("id") == value.get("id"))
+        {
             run.interactions[index] = value.clone();
         } else {
             run.interactions.push(value.clone());
@@ -622,8 +988,13 @@ pub fn settle_model_run(
         completion.evidence_details,
         timestamp,
     );
-    persist(root, &run)?;
-    Ok(run)
+    Repository::new(root).transaction_with("settle-agent-model-run", |repository| {
+        let current = load_from_repository(repository, &run.id)?;
+        if current.revision != expected_revision || current.status != "running" {
+            return Err("Agent Run 已进入更新的状态，拒绝写入迟到的模型结果。".to_string());
+        }
+        Ok((run.clone(), vec![mutation(&run)?]))
+    })
 }
 
 /// Consumes an already-approved tool request and records the durable execution
@@ -657,10 +1028,10 @@ pub fn begin_approved_tool(
         .get("arguments")
         .cloned()
         .unwrap_or_else(|| json!({}));
-    run.status = if matches!(name.as_str(), "apply_patch" | "integrate_worktree") {
-        "applying"
-    } else {
-        "verifying"
+    run.status = match name.as_str() {
+        "apply_patch" | "integrate_worktree" => "applying",
+        "run_check" => "verifying",
+        _ => "running-tool",
     }
     .to_string();
     run.revision += 1;
@@ -669,11 +1040,12 @@ pub fn begin_approved_tool(
     run.checkpoint.phase = run.status.clone();
     run.checkpoint.context_summary = run.summary.clone();
     run.checkpoint.last_confirmation = Some(approval);
-    run.checkpoint.next_action = if matches!(name.as_str(), "apply_patch" | "integrate_worktree") {
-        "resume-apply-approval".to_string()
-    } else {
-        "resume-check-approval".to_string()
-    };
+    run.checkpoint.next_action = match name.as_str() {
+        "apply_patch" | "integrate_worktree" => "resume-apply-approval",
+        "run_check" => "resume-check-approval",
+        _ => "resume-tool-approval",
+    }
+    .to_string();
     run.checkpoint.tool_name = name.clone();
     run.checkpoint.tool_arguments = arguments.clone();
     run.checkpoint.tool_result = None;
@@ -708,6 +1080,8 @@ pub fn settle_approved_tool(
 ) {
     let integration_succeeded = name == "integrate_worktree"
         && result.get("success").and_then(Value::as_bool) == Some(true);
+    let standalone_tool_succeeded =
+        run.executor_id == "tool-gateway" && matches!(name, "mcp_discover" | "mcp_call");
     let check_failed =
         name == "run_check" && result.get("success").and_then(Value::as_bool) == Some(false);
     if name == "run_check" {
@@ -728,6 +1102,15 @@ pub fn settle_approved_tool(
         run.status = "succeeded".to_string();
         run.checkpoint.next_action = "none".to_string();
         run.summary = "隔离工作区改动已在独立审批后合并到当前工程。".to_string();
+    } else if standalone_tool_succeeded {
+        run.status = "succeeded".to_string();
+        run.checkpoint.next_action = "none".to_string();
+        run.summary = if name == "mcp_discover" {
+            "MCP 工具能力发现完成。"
+        } else {
+            "MCP 工具调用完成。"
+        }
+        .to_string();
     } else if check_failed && run.checkpoint.remaining_repair_budget == 0 {
         run.status = "failed".to_string();
         run.checkpoint.next_action = "none".to_string();
@@ -774,6 +1157,7 @@ pub fn fail_approved_tool(run: &mut PersistedAgentRun, name: &str, error: &str, 
     run.checkpoint.context_summary = run.summary.clone();
     run.checkpoint.next_action = "none".to_string();
     run.checkpoint.tool_result = Some(json!({ "error": error }));
+    run.approval_token.clear();
     let summary = run.summary.clone();
     append_evidence(
         run,
@@ -782,6 +1166,136 @@ pub fn fail_approved_tool(run: &mut PersistedAgentRun, name: &str, error: &str, 
         json!({ "name": name, "error": error }),
         timestamp,
     );
+}
+
+/// Creates a durable approval request for MCP capability discovery. Creating
+/// this run never starts the configured process; execution remains behind the
+/// same approval consumer used by every governed Agent tool.
+pub fn create_mcp_discovery_run(
+    root: &Path,
+    id: String,
+    request_id: String,
+    project_id: String,
+    server_id: String,
+    approval_token: String,
+    timestamp: &str,
+) -> Result<PersistedAgentRun, String> {
+    let server_id = server_id.trim();
+    if server_id.is_empty() {
+        return Err("MCP 能力发现缺少 Server ID。".to_string());
+    }
+    if approval_token.trim().is_empty() {
+        return Err("MCP 能力发现缺少独立审批 token。".to_string());
+    }
+    let mut run = new_hermes_run_with_context(
+        id,
+        request_id,
+        project_id,
+        format!("发现 MCP Server {server_id} 的工具能力。"),
+        1,
+        String::new(),
+        String::new(),
+        String::new(),
+        timestamp,
+    );
+    run.executor_id = "tool-gateway".to_string();
+    run.status = "awaiting-approval".to_string();
+    run.summary = format!("等待批准发现 MCP Server {server_id} 的工具能力。");
+    let approval = json!({
+        "id": format!("{}:approval", run.id),
+        "name": "mcp_discover",
+        "arguments": { "serverId": server_id },
+        "reason": "启动已配置的 MCP Server 并读取其工具清单",
+        "toolCallId": format!("{}:tool", run.id),
+        "status": "pending",
+        "token": approval_token,
+    });
+    run.approval = Some(approval.clone());
+    run.checkpoint.phase = "awaiting-approval".to_string();
+    run.checkpoint.context_summary = run.summary.clone();
+    run.checkpoint.last_confirmation = Some(approval.clone());
+    run.checkpoint.next_action = "resume-approval".to_string();
+    run.checkpoint.tool_name = "mcp_discover".to_string();
+    run.checkpoint.tool_arguments = approval["arguments"].clone();
+    append_evidence(
+        &mut run,
+        "approval",
+        "MCP 能力发现正在等待独立审批。",
+        json!({ "name": "mcp_discover", "serverId": server_id }),
+        timestamp,
+    );
+    Repository::new(root).transaction_with("create-mcp-discovery-run", |repository| {
+        let path = relative_path(&run.id)?;
+        if repository.read_json(&path).is_some() {
+            return Err("Agent Run 已存在，拒绝覆盖原有执行证据。".to_string());
+        }
+        Ok((run.clone(), vec![mutation(&run)?]))
+    })
+}
+
+pub fn create_mcp_call_run(
+    root: &Path,
+    id: String,
+    request_id: String,
+    project_id: String,
+    server_id: String,
+    remote_name: String,
+    arguments: Value,
+    approval_token: String,
+    timestamp: &str,
+) -> Result<PersistedAgentRun, String> {
+    if server_id.trim().is_empty()
+        || remote_name.trim().is_empty()
+        || approval_token.trim().is_empty()
+    {
+        return Err("MCP 工具调用缺少 Server、工具名或独立审批 token。".to_string());
+    }
+    let mut run = new_hermes_run_with_context(
+        id,
+        request_id,
+        project_id,
+        format!("调用 MCP 工具 {server_id}/{remote_name}。"),
+        1,
+        String::new(),
+        String::new(),
+        String::new(),
+        timestamp,
+    );
+    run.executor_id = "tool-gateway".to_string();
+    run.status = "awaiting-approval".to_string();
+    run.summary = format!("等待批准调用 MCP 工具 {remote_name}。");
+    let approval = json!({
+        "id": format!("{}:approval", run.id),
+        "name": "mcp_call",
+        "arguments": { "serverId": server_id, "remoteName": remote_name, "arguments": arguments },
+        "reason": "启动已配置的 MCP Server 并调用指定工具",
+        "toolCallId": format!("{}:tool", run.id),
+        "status": "pending",
+        "token": approval_token,
+    });
+    run.approval = Some(approval.clone());
+    run.checkpoint.phase = "awaiting-approval".to_string();
+    run.checkpoint.context_summary = run.summary.clone();
+    run.checkpoint.last_confirmation = Some(approval.clone());
+    run.checkpoint.next_action = "resume-approval".to_string();
+    run.checkpoint.tool_name = "mcp_call".to_string();
+    run.checkpoint.tool_arguments = approval["arguments"].clone();
+    append_evidence(
+        &mut run,
+        "approval",
+        "MCP 工具调用正在等待独立审批。",
+        json!({
+            "name": "mcp_call", "serverId": server_id, "remoteName": remote_name
+        }),
+        timestamp,
+    );
+    Repository::new(root).transaction_with("create-mcp-call-run", |repository| {
+        let path = relative_path(&run.id)?;
+        if repository.read_json(&path).is_some() {
+            return Err("Agent Run 已存在，拒绝覆盖原有执行证据。".to_string());
+        }
+        Ok((run.clone(), vec![mutation(&run)?]))
+    })
 }
 
 #[cfg(any(test, feature = "webdriver"))]
@@ -818,7 +1332,7 @@ pub fn new_hermes_run_with_context(
     task_id: String,
     timestamp: &str,
 ) -> PersistedAgentRun {
-    PersistedAgentRun {
+    let mut run = PersistedAgentRun {
         schema_version: AGENT_RUN_SCHEMA_VERSION.to_string(),
         id,
         request_id,
@@ -853,13 +1367,16 @@ pub fn new_hermes_run_with_context(
             completed_check_ids: Vec::new(),
             remaining_repair_budget: default_remaining_repair_budget(),
         },
-        evidence: vec![json!({
-            "phase": "result",
-            "recordedAt": timestamp,
-            "summary": "Agent Run 已创建。",
-            "details": { "executor": "hermes-acp" },
-        })],
-    }
+        evidence: Vec::new(),
+    };
+    append_evidence(
+        &mut run,
+        "scheduling",
+        "Agent Run 已创建并等待调度。",
+        json!({ "executor": "hermes-acp" }),
+        timestamp,
+    );
+    run
 }
 
 /// Creates the native WebDriver recovery fixture through the same persisted
@@ -923,7 +1440,7 @@ pub fn seed_native_interaction_run(
     conversation_id: String,
     timestamp: &str,
 ) -> Result<PersistedAgentRun, String> {
-    let run = new_hermes_run_with_context(
+    let mut run = new_hermes_run_with_context(
         "native-interaction-run".to_string(),
         "native-interaction-request".to_string(),
         project_id,
@@ -934,6 +1451,9 @@ pub fn seed_native_interaction_run(
         "native-interaction-task".to_string(),
         timestamp,
     );
+    run.status = "running".to_string();
+    run.checkpoint.phase = "running".to_string();
+    persist(root, &run)?;
     let interaction = validate_ask_user_interaction(
         &json!({
             "title": "确认数据范围",
@@ -971,6 +1491,13 @@ mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    fn persist_running(root: &Path, mut run: PersistedAgentRun) -> PersistedAgentRun {
+        run.status = "running".to_string();
+        run.checkpoint.phase = "running".to_string();
+        persist(root, &run).unwrap();
+        run
+    }
+
     #[test]
     fn recovery_transitions_only_non_terminal_runs() {
         let root = std::env::temp_dir().join(format!(
@@ -993,14 +1520,159 @@ mod tests {
         let mut done = running.clone();
         done.id = "run-done".to_string();
         done.status = "succeeded".to_string();
+        let mut queued = running.clone();
+        queued.id = "run-queued".to_string();
+        queued.status = "queued".to_string();
         persist(&root, &running).unwrap();
         persist(&root, &done).unwrap();
+        persist(&root, &queued).unwrap();
         recover_stale(&root, "later").unwrap();
         assert_eq!(load(&root, "run-running").unwrap().status, "interrupted");
         let recovered = load(&root, "run-running").unwrap();
         assert_eq!(recovered.checkpoint.phase, "running");
         assert_eq!(recovered.checkpoint.next_action, "resume-stage");
+        assert_eq!(recovered.evidence.last().unwrap()["kind"], "recovery");
         assert_eq!(load(&root, "run-done").unwrap().status, "succeeded");
+        assert_eq!(load(&root, "run-queued").unwrap().status, "queued");
+    }
+
+    #[test]
+    fn initial_queue_persistence_keeps_complete_context_and_rejects_overwrite() {
+        let root = std::env::temp_dir().join(format!(
+            "omnidesk-agent-new-queue-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let run = new_hermes_run_with_context(
+            "run-queued-context".to_string(),
+            "request-queued-context".to_string(),
+            "project-1".to_string(),
+            "prepare a bounded change".to_string(),
+            4,
+            String::new(),
+            "conversation-1".to_string(),
+            "task-1".to_string(),
+            "now",
+        );
+        persist_new_queued(&root, &run).unwrap();
+        let saved = load(&root, &run.id).unwrap();
+        assert_eq!(saved.status, "queued");
+        assert_eq!(saved.request_id, "request-queued-context");
+        assert_eq!(saved.conversation_id, "conversation-1");
+        assert_eq!(saved.task_id, "task-1");
+        assert_eq!(saved.prompt, "prepare a bounded change");
+        assert_eq!(saved.evidence[0]["schemaVersion"], RUN_EVENT_SCHEMA_VERSION);
+        assert_eq!(saved.evidence[0]["kind"], "scheduling");
+        assert_eq!(saved.evidence[0]["sequence"], 1);
+        assert!(persist_new_queued(&root, &run)
+            .unwrap_err()
+            .contains("拒绝覆盖"));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn queue_wait_appends_a_stable_scheduling_event_sequence() {
+        let root = std::env::temp_dir().join(format!(
+            "omnidesk-agent-queue-event-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let run = new_hermes_run(
+            "run-queue-event".to_string(),
+            "request-queue-event".to_string(),
+            "project-1".to_string(),
+            "wait safely".to_string(),
+            4,
+            String::new(),
+            "now",
+        );
+        persist_new_queued(&root, &run).unwrap();
+        let waiting = record_queue_wait(&root, &run.id, 2, "later").unwrap();
+        assert_eq!(waiting.evidence.len(), 2);
+        assert_eq!(waiting.evidence[1]["sequence"], 2);
+        assert_eq!(waiting.evidence[1]["kind"], "scheduling");
+        assert_eq!(waiting.evidence[1]["details"]["position"], 2);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn timeline_export_aggregates_explicit_metrics_and_redacts_content() {
+        let root = std::env::temp_dir().join(format!(
+            "omnidesk-agent-timeline-export-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let mut run = new_hermes_run(
+            "run-export".to_string(),
+            "request-export".to_string(),
+            "project-1".to_string(),
+            "secret prompt must not be exported".to_string(),
+            4,
+            String::new(),
+            "now",
+        );
+        run.status = "running".to_string();
+        append_evidence(
+            &mut run,
+            "draft",
+            "model completed",
+            json!({
+                "durationMs": 125,
+                "usage": { "inputTokens": 10, "outputTokens": 5, "totalTokens": 15, "costUsd": 0.002 },
+                "observations": [{ "content": "private file body" }],
+                "trace": ["HERMES_STEP: 1 final"]
+            }),
+            "later",
+        );
+        persist(&root, &run).unwrap();
+        let exported = export_timeline(&root, &run.id, "exported").unwrap();
+        let timeline = &exported["timeline"];
+        assert_eq!(timeline["metrics"]["durationMs"], 125);
+        assert_eq!(timeline["metrics"]["totalTokens"], 15);
+        assert_eq!(timeline["metrics"]["costUsd"], 0.002);
+        let serialized = serde_json::to_string(timeline).unwrap();
+        assert!(!serialized.contains("secret prompt"));
+        assert!(!serialized.contains("private file body"));
+        assert!(serialized.contains("HERMES_STEP: 1 final"));
+        assert!(root.join(exported["path"].as_str().unwrap()).is_file());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn timeline_cost_is_unknown_when_any_model_stage_omits_cost() {
+        let mut run = new_hermes_run(
+            "run-partial-cost".to_string(),
+            "request-partial-cost".to_string(),
+            "project-1".to_string(),
+            "test cost completeness".to_string(),
+            4,
+            String::new(),
+            "now",
+        );
+        run.status = "running".to_string();
+        append_evidence(
+            &mut run,
+            "draft",
+            "first model stage",
+            json!({ "usage": { "inputTokens": 5, "outputTokens": 3, "totalTokens": 8, "costUsd": 0.001 } }),
+            "one",
+        );
+        append_evidence(
+            &mut run,
+            "draft",
+            "second model stage",
+            json!({ "usage": { "inputTokens": 4, "outputTokens": 2, "totalTokens": 6 } }),
+            "two",
+        );
+        let metrics = timeline_metrics(&run);
+        assert_eq!(metrics.total_tokens, 14);
+        assert_eq!(metrics.cost_usd, None);
     }
 
     #[test]
@@ -1140,14 +1812,17 @@ mod tests {
                 .unwrap()
                 .as_nanos()
         ));
-        let run = new_hermes_run(
-            "run-model-completion-approval".to_string(),
-            "request-1".to_string(),
-            "project-1".to_string(),
-            "update".to_string(),
-            4,
-            String::new(),
-            "now",
+        let run = persist_running(
+            &root,
+            new_hermes_run(
+                "run-model-completion-approval".to_string(),
+                "request-1".to_string(),
+                "project-1".to_string(),
+                "update".to_string(),
+                4,
+                String::new(),
+                "now",
+            ),
         );
         let settled = settle_model_run(
             &root,
@@ -1189,14 +1864,17 @@ mod tests {
                     .unwrap()
                     .as_nanos()
             ));
-            let run = new_hermes_run(
-                format!("run-model-completion-{status}"),
-                "request-1".to_string(),
-                "project-1".to_string(),
-                "update".to_string(),
-                4,
-                String::new(),
-                "now",
+            let run = persist_running(
+                &root,
+                new_hermes_run(
+                    format!("run-model-completion-{status}"),
+                    "request-1".to_string(),
+                    "project-1".to_string(),
+                    "update".to_string(),
+                    4,
+                    String::new(),
+                    "now",
+                ),
             );
             let settled = settle_model_run(
                 &root,
@@ -1220,6 +1898,52 @@ mod tests {
             assert_eq!(settled.evidence.last().unwrap()["phase"], "result");
             std::fs::remove_dir_all(root).unwrap();
         }
+    }
+
+    #[test]
+    fn cancellation_seals_the_run_against_late_model_results() {
+        let root = std::env::temp_dir().join(format!(
+            "omnidesk-agent-cancel-race-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let running = persist_running(
+            &root,
+            new_hermes_run(
+                "run-cancel-race".to_string(),
+                "request-cancel-race".to_string(),
+                "project-1".to_string(),
+                "update".to_string(),
+                4,
+                String::new(),
+                "now",
+            ),
+        );
+        let cancelled = cancel(&root, &running.id, "cancelled-at").unwrap();
+        assert_eq!(cancelled.status, "cancelled");
+        assert_eq!(cancelled.checkpoint.next_action, "none");
+        assert_eq!(cancelled.evidence.last().unwrap()["phase"], "cancelled");
+
+        let error = settle_model_run(
+            &root,
+            running,
+            ModelRunCompletion {
+                status: "succeeded".to_string(),
+                summary: "late result".to_string(),
+                step: Some(1),
+                approval: None,
+                interaction: None,
+                evidence_details: json!({ "late": true }),
+            },
+            "later",
+        )
+        .err()
+        .unwrap();
+        assert!(error.contains("迟到"));
+        assert_eq!(load(&root, "run-cancel-race").unwrap().status, "cancelled");
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
@@ -1250,6 +1974,75 @@ mod tests {
         assert_eq!(run.checkpoint.allowed_files, vec!["src/lib.rs"]);
         assert_eq!(run.evidence.last().unwrap()["phase"], "applying");
         assert!(begin_approved_tool(&mut run, "approval-token", "later").is_err());
+    }
+
+    #[test]
+    fn mcp_discovery_is_persisted_as_an_unexecuted_independent_approval() {
+        let root = std::env::temp_dir().join(format!(
+            "omnidesk-agent-mcp-discovery-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let run = create_mcp_discovery_run(
+            &root,
+            "run-mcp-discovery".to_string(),
+            "request-mcp-discovery".to_string(),
+            "project-1".to_string(),
+            "docs-server".to_string(),
+            "approval-mcp-discovery".to_string(),
+            "now",
+        )
+        .unwrap();
+
+        assert_eq!(run.executor_id, "tool-gateway");
+        assert_eq!(run.status, "awaiting-approval");
+        assert_eq!(run.approval.as_ref().unwrap()["status"], "pending");
+        assert_eq!(run.approval.as_ref().unwrap()["name"], "mcp_discover");
+        assert_eq!(run.checkpoint.tool_arguments["serverId"], "docs-server");
+        assert!(run.approval_token.is_empty());
+        assert_eq!(
+            load(&root, "run-mcp-discovery").unwrap().revision,
+            run.revision
+        );
+        assert!(create_mcp_discovery_run(
+            &root,
+            "run-mcp-discovery".to_string(),
+            "request-2".to_string(),
+            "project-1".to_string(),
+            "docs-server".to_string(),
+            "different-token".to_string(),
+            "later",
+        )
+        .is_err());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn generic_approved_tools_use_tool_execution_state_not_verification_state() {
+        let mut run = new_hermes_run(
+            "run-mcp-tool-state".to_string(),
+            "request-1".to_string(),
+            "project-1".to_string(),
+            "discover tools".to_string(),
+            1,
+            String::new(),
+            "now",
+        );
+        run.status = "awaiting-approval".to_string();
+        run.approval = Some(json!({
+            "token": "approval-token",
+            "status": "approved",
+            "name": "mcp_discover",
+            "arguments": { "serverId": "docs-server" }
+        }));
+
+        begin_approved_tool(&mut run, "approval-token", "later").unwrap();
+
+        assert_eq!(run.status, "running-tool");
+        assert_eq!(run.checkpoint.next_action, "resume-tool-approval");
+        assert_eq!(run.evidence.last().unwrap()["kind"], "tool");
     }
 
     #[test]
@@ -1434,7 +2227,10 @@ mod tests {
     fn user_interaction_survives_recovery_and_accepts_only_one_answer() {
         let root = std::env::temp_dir().join(format!(
             "omnidesk-agent-interaction-{}",
-            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
         ));
         let interaction = validate_ask_user_interaction(&json!({
             "title": "确认范围",
@@ -1444,52 +2240,164 @@ mod tests {
                 "options": [{ "value": "personal", "label": "个人" }, { "value": "team", "label": "团队" }]
             }]
         }), 2).unwrap();
-        let run = new_hermes_run_with_context(
-            "run-interaction".to_string(), "request-1".to_string(), "project-1".to_string(),
-            "build dashboard".to_string(), 4, String::new(), "conversation-1".to_string(), String::new(), "now",
+        let run = persist_running(
+            &root,
+            new_hermes_run_with_context(
+                "run-interaction".to_string(),
+                "request-1".to_string(),
+                "project-1".to_string(),
+                "build dashboard".to_string(),
+                4,
+                String::new(),
+                "conversation-1".to_string(),
+                String::new(),
+                "now",
+            ),
         );
-        let waiting = settle_model_run(&root, run, ModelRunCompletion {
-            status: "awaiting-user-input".to_string(), summary: "等待用户确认。".to_string(), step: Some(2),
-            approval: None, interaction: Some(interaction.clone()), evidence_details: json!({ "trace": ["ask-user"] }),
-        }, "later").unwrap();
+        let waiting = settle_model_run(
+            &root,
+            run,
+            ModelRunCompletion {
+                status: "awaiting-user-input".to_string(),
+                summary: "等待用户确认。".to_string(),
+                step: Some(2),
+                approval: None,
+                interaction: Some(interaction.clone()),
+                evidence_details: json!({ "trace": ["ask-user"] }),
+            },
+            "later",
+        )
+        .unwrap();
         assert_eq!(waiting.checkpoint.next_action, "await-user-input");
-        let form_id = waiting.checkpoint.interaction.as_ref().unwrap()["id"].as_str().unwrap().to_string();
+        let form_id = waiting.checkpoint.interaction.as_ref().unwrap()["id"]
+            .as_str()
+            .unwrap()
+            .to_string();
         assert_eq!(waiting.interactions.len(), 1);
         recover_stale(&root, "restart").unwrap();
-        assert_eq!(load(&root, "run-interaction").unwrap().status, "awaiting-user-input");
+        assert_eq!(
+            load(&root, "run-interaction").unwrap().status,
+            "awaiting-user-input"
+        );
 
-        let submitted = submit_interaction(&root, "run-interaction", &form_id, "submit", json!({ "scope": "team" }), "answer").unwrap();
+        let submitted = submit_interaction(
+            &root,
+            "run-interaction",
+            &form_id,
+            "submit",
+            json!({ "scope": "team" }),
+            "answer",
+        )
+        .unwrap();
         assert_eq!(submitted.status, "queued");
         assert_eq!(submitted.checkpoint.next_action, "resume-user-input");
-        assert_eq!(submitted.checkpoint.tool_result.as_ref().unwrap()["answers"]["scope"], "team");
+        assert_eq!(
+            submitted.checkpoint.tool_result.as_ref().unwrap()["answers"]["scope"],
+            "team"
+        );
         assert_eq!(submitted.interactions[0]["status"], "submitted");
-        let same = submit_interaction(&root, "run-interaction", &form_id, "submit", json!({ "scope": "team" }), "again").unwrap();
+        let same = submit_interaction(
+            &root,
+            "run-interaction",
+            &form_id,
+            "submit",
+            json!({ "scope": "team" }),
+            "again",
+        )
+        .unwrap();
         assert_eq!(same.revision, submitted.revision);
-        assert!(submit_interaction(&root, "run-interaction", &form_id, "submit", json!({ "scope": "personal" }), "conflict").is_err());
-        let resumed = prepare_model_run(&root, PrepareModelRunInput {
-            run_id: "run-interaction".to_string(), request_id: String::new(), project_id: "project-1".to_string(),
-            prompt: String::new(), max_steps: 4, approval_token: String::new(), conversation_id: String::new(), task_id: String::new(), resume_existing: true, isolation: None,
-        }, "continue").unwrap();
+        assert!(submit_interaction(
+            &root,
+            "run-interaction",
+            &form_id,
+            "submit",
+            json!({ "scope": "personal" }),
+            "conflict"
+        )
+        .is_err());
+        let resumed = prepare_model_run(
+            &root,
+            PrepareModelRunInput {
+                run_id: "run-interaction".to_string(),
+                request_id: String::new(),
+                project_id: "project-1".to_string(),
+                prompt: String::new(),
+                max_steps: 4,
+                approval_token: String::new(),
+                conversation_id: String::new(),
+                task_id: String::new(),
+                resume_existing: true,
+                isolation: None,
+            },
+            "continue",
+        )
+        .unwrap();
         assert!(resumed.execution_prompt.contains("ask_user_result"));
-        let completed = settle_model_run(&root, resumed.run, ModelRunCompletion {
-            status: "succeeded".to_string(), summary: "done".to_string(), step: Some(3), approval: None,
-            interaction: None, evidence_details: json!({ "result": true }),
-        }, "done").unwrap();
+        let completed = settle_model_run(
+            &root,
+            resumed.run,
+            ModelRunCompletion {
+                status: "succeeded".to_string(),
+                summary: "done".to_string(),
+                step: Some(3),
+                approval: None,
+                interaction: None,
+                evidence_details: json!({ "result": true }),
+            },
+            "done",
+        )
+        .unwrap();
         assert_eq!(completed.interactions[0]["status"], "submitted");
 
-        let skipped_run = new_hermes_run_with_context(
-            "run-interaction-skip".to_string(), "request-2".to_string(), "project-1".to_string(),
-            "build another dashboard".to_string(), 4, String::new(), "conversation-1".to_string(), String::new(), "now",
+        let skipped_run = persist_running(
+            &root,
+            new_hermes_run_with_context(
+                "run-interaction-skip".to_string(),
+                "request-2".to_string(),
+                "project-1".to_string(),
+                "build another dashboard".to_string(),
+                4,
+                String::new(),
+                "conversation-1".to_string(),
+                String::new(),
+                "now",
+            ),
         );
-        let skipped_waiting = settle_model_run(&root, skipped_run, ModelRunCompletion {
-            status: "awaiting-user-input".to_string(), summary: "等待用户确认。".to_string(), step: Some(1),
-            approval: None, interaction: Some(interaction), evidence_details: json!({ "trace": ["ask-user"] }),
-        }, "later").unwrap();
-        let skipped_form_id = skipped_waiting.checkpoint.interaction.as_ref().unwrap()["id"].as_str().unwrap();
-        let skipped = submit_interaction(&root, "run-interaction-skip", skipped_form_id, "skip", json!({ "scope": "invalid-is-ignored" }), "skipped").unwrap();
+        let skipped_waiting = settle_model_run(
+            &root,
+            skipped_run,
+            ModelRunCompletion {
+                status: "awaiting-user-input".to_string(),
+                summary: "等待用户确认。".to_string(),
+                step: Some(1),
+                approval: None,
+                interaction: Some(interaction),
+                evidence_details: json!({ "trace": ["ask-user"] }),
+            },
+            "later",
+        )
+        .unwrap();
+        let skipped_form_id = skipped_waiting.checkpoint.interaction.as_ref().unwrap()["id"]
+            .as_str()
+            .unwrap();
+        let skipped = submit_interaction(
+            &root,
+            "run-interaction-skip",
+            skipped_form_id,
+            "skip",
+            json!({ "scope": "invalid-is-ignored" }),
+            "skipped",
+        )
+        .unwrap();
         assert_eq!(skipped.status, "queued");
-        assert_eq!(skipped.checkpoint.tool_result.as_ref().unwrap()["action"], "skip");
-        assert_eq!(skipped.checkpoint.tool_result.as_ref().unwrap()["answers"], json!({}));
+        assert_eq!(
+            skipped.checkpoint.tool_result.as_ref().unwrap()["action"],
+            "skip"
+        );
+        assert_eq!(
+            skipped.checkpoint.tool_result.as_ref().unwrap()["answers"],
+            json!({})
+        );
         assert!(skipped.approval.is_none());
         std::fs::remove_dir_all(root).unwrap();
     }

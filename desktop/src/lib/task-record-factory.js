@@ -1,3 +1,13 @@
+const confirmationOnlyTitle = /^(好|好的|可以|行|继续|开始|执行|就这样|按这个来)$/;
+
+export function taskTitleForPlan(displayTask, requestedTask, plan = {}) {
+  const display = String(displayTask || "").trim();
+  const requested = String(requestedTask || "").trim();
+  if (display && !confirmationOnlyTitle.test(display.replace(/[。！!，,\s]/g, ""))) return display;
+  if (requested && !confirmationOnlyTitle.test(requested.replace(/[。！!，,\s]/g, ""))) return requested;
+  return String(plan?.task || plan?.summary || "").trim() || "未命名任务";
+}
+
 export function createTaskFromPlan(plan, taskText, snapshot = {}, options = {}, {
   now = () => new Date(),
   taskIdForRequest,

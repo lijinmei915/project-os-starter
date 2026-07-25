@@ -1,3 +1,5 @@
+export { isApplicablePatchDraft } from "../lib/patch-draft-state.js";
+
 const definitions = [
   { confirmation: "none", id: "generate-plan", kind: "command", risk: "read-only", targetRequired: false },
   { confirmation: "none", id: "start-agent", kind: "command", risk: "read-only-agent", targetRequired: false },
@@ -29,7 +31,9 @@ export function conversationActionDecision(message) {
   const requestsStructuredQuestion = /(尚未决定|还没决定|没有决定|需要我确认|缺少.*决定|先.*(表单|选项).*(问|询问|确认)|ask_user)/i.test(compact);
   const requestsBaseCheck = /(基础检查|runtime检查|运行时检查|检查runtime)/i.test(compact)
     || (requestsExecution && /^(运行|执行|跑)(一轮|一下|一次)?检查$/.test(compact));
-  const requestsPatchDraft = !/(计划|方案|待办|分析|审查|检查|报告)/.test(compact)
+  const incompleteModification = /^(我)?(还)?(想|要)?(改|修改|调整|优化|修)(一下)?$/.test(compact);
+  const requestsPatchDraft = !incompleteModification
+    && !/(计划|方案|待办|分析|审查|检查|报告)/.test(compact)
     && /(帮我|请|直接|继续)?(改|修|优化|实现|新增|添加|删除|移除|接入|配置|调整|重构|做成)/.test(compact);
   const requestsPlan = !/(是什么|为什么|怎么|如何|风险|问题|进度|看看|看一下)/.test(compact)
     && (/(生成|制定|整理|创建).{0,16}(计划|方案|待办)/.test(compact)
@@ -52,15 +56,6 @@ export function conversationActionDecision(message) {
     mode: "execute",
     risk: definition.risk,
   } : null;
-}
-
-export function isApplicablePatchDraft(patchDraft) {
-  const diff = String(patchDraft?.diff || "");
-  return patchDraft?.notApplicable !== true
-    && !diff.includes("PATCH_DRAFT_PENDING")
-    && /^---\s+\S+/m.test(diff)
-    && /^\+\+\+\s+\S+/m.test(diff)
-    && /^@@(?:\s|$)/m.test(diff);
 }
 
 export async function executeRegisteredConversationAction(action, handlers = {}) {

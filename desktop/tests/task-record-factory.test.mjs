@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createTaskFromPlan } from "../src/lib/task-record-factory.js";
+import { createTaskFromPlan, taskTitleForPlan } from "../src/lib/task-record-factory.js";
 
 const dependencies = {
   now: () => new Date("2026-07-22T08:05:00.000Z"),
@@ -53,4 +53,11 @@ test("uses plan summary and a bounded title when no explicit task text exists", 
   assert.equal(task.title, `${title.slice(0, 48)}...`);
   assert.equal(task.requestTrace, null);
   assert.equal(task.conversationId, "");
+});
+
+test("uses the original request instead of a confirmation word as the task title", () => {
+  assert.equal(taskTitleForPlan("可以", "修复对话状态机"), "修复对话状态机");
+  assert.equal(taskTitleForPlan("继续", "整理发送链路"), "整理发送链路");
+  assert.equal(taskTitleForPlan("可以", "继续", { summary: "修复计划确认状态" }), "修复计划确认状态");
+  assert.equal(taskTitleForPlan("修改发送按钮", "原始请求"), "修改发送按钮");
 });

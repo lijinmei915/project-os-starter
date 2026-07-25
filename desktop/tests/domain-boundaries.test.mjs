@@ -1261,6 +1261,7 @@ test("keeps the App three-column shell outside the lifecycle container", () => {
 
 test("keeps request progress in the conversation surface instead of duplicate global feedback", () => {
   const composer = source("src/components/workbench/chat-composer.jsx");
+  const chatDock = source("src/components/workbench/chat-dock.jsx");
   const workbench = source("src/main.jsx");
   const requestState = source(
     "src/components/workbench/use-conversation-request-state.js",
@@ -1286,6 +1287,29 @@ test("keeps request progress in the conversation surface instead of duplicate gl
   assert.match(requestState, /responseMode: partialReply \? "partial" : ""/);
   assert.match(transcript, /conversationMessage-streaming/);
   assert.equal(composer.includes("正在生成，可继续补充"), false);
+  assert.equal(chatDock.includes("发送将重启"), false);
+  assert.equal(chatDock.includes("输入“停止”可取消"), false);
+});
+
+test("shows a submitted message before loading optional project memory", () => {
+  const submission = source(
+    "src/components/workbench/use-conversation-submission.js",
+  );
+  const optimisticUpdate = submission.indexOf(
+    "onChatTurnsChange([...requestBaseTurns, userTurn]);",
+  );
+  const memoryLoad = submission.indexOf("await getProjectMemory()");
+  assert.notEqual(optimisticUpdate, -1);
+  assert.notEqual(memoryLoad, -1);
+  assert.ok(optimisticUpdate < memoryLoad);
+});
+
+test("does not replace a pending plan while the user is still revising it", () => {
+  const submission = source(
+    "src/components/workbench/use-conversation-submission.js",
+  );
+  assert.match(submission, /runtimeCommand\.decision === "revise"/);
+  assert.match(submission, /!revisingPendingAction && shouldGenerateConversationPlan/);
 });
 
 test("keeps RightRail shared display primitives outside the root Workbench module", () => {
@@ -1509,6 +1533,18 @@ test("keeps Provider chat transport and SSE result normalization outside Tauri c
   assert.match(stream, /pub async fn generate_provider_chat/);
   assert.match(stream, /post_streaming_chat_completion/);
   assert.match(stream, /FnMut\(String, usize\)/);
+});
+
+test("keeps native Provider Function Calling behind one capability owner", () => {
+  const stream = source("src-tauri/src/runtime/chat_stream.rs");
+  const tools = source("src-tauri/src/runtime/provider_tools.rs");
+  const routing = source("src-tauri/src/runtime/chat_routing.rs");
+  assert.match(stream, /use crate::runtime::provider_tools/);
+  assert.match(stream, /ProviderToolMode::NativeFunctionCalling/);
+  assert.match(tools, /pub fn provider_tool_mode/);
+  assert.match(tools, /pub fn conversation_tool_definitions/);
+  assert.match(tools, /additionalProperties/);
+  assert.doesNotMatch(routing, /tool_choice|tool_calls|start_engineering_task/);
 });
 
 test("keeps ordinary chat deadlines in the Rust Runtime instead of a frontend wall-clock race", () => {
@@ -1944,6 +1980,24 @@ test("keeps task workflow presentation helpers outside the Workbench entrypoint"
   assert.match(workbench, /task-workflow-presentation/);
   assert.match(presentation, /export function taskStatusLabel/);
   assert.match(presentation, /export function checksForPlan/);
+});
+
+test("keeps workflow status and verification semantics in one shared projection", () => {
+  const workflow = source("src/lib/workflow-state.js");
+  const taskBoard = source("src/lib/task-board-view-model.js");
+  const taskExecution = source("src/lib/task-execution-mode.js");
+  const conversation = source("src/components/workbench/conversation-transcript.jsx");
+  const agentEvents = source("src/agent-runtime/events.js");
+  const userForm = source("src/components/workbench/agent-user-form-card.jsx");
+  const resultDialog = source("src/components/workbench/task-action-dialog.jsx");
+  for (const consumer of [taskBoard, taskExecution, conversation, agentEvents, userForm, resultDialog]) {
+    assert.match(consumer, /workflow-state/);
+  }
+  assert.match(workflow, /export function taskHasVerificationEvidence/);
+  assert.match(workflow, /export function taskHasPassedVerification/);
+  assert.doesNotMatch(taskBoard, /verificationSummary/);
+  assert.doesNotMatch(taskExecution, /verificationSummary/);
+  assert.doesNotMatch(conversation, />验收通过</);
 });
 
 test("keeps current-goal rendering and decomposition dialog outside the Workbench entrypoint", () => {

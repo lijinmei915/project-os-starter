@@ -29,6 +29,8 @@ export function EngineeringFileTab({
   snapshot,
   tasks = [],
   agentRuns = [],
+  mcpClient,
+  mcpNative,
   activeTaskId,
   provider,
   composerModelAvailability = {},
@@ -37,6 +39,8 @@ export function EngineeringFileTab({
   onGeneratePatchDraft,
   onApplyPatchDraft,
   onApproveAgentRun,
+  onCancelAgentRun,
+  onExportAgentRun,
   onMergeHandoff,
   onRunGuardedCheck,
   onSelectTask,
@@ -66,6 +70,7 @@ export function EngineeringFileTab({
   onGetHermesExecutorStatus,
   onCopyText,
   onRefreshWorkspaceFacts,
+  onRefreshAgentRuns,
   presentation,
 }) {
   const {
@@ -144,7 +149,7 @@ export function EngineeringFileTab({
   const lessonsLearnedPanel = governancePanel(isLessonsLearnedTopic, "lessons-learned");
   const memorySurfacePanel = isMemorySurfaceTopic ? <MemorySurfacePanel onOpenSource={openSourceFile} renderSourceButtons={sourceButtons} type={topicRouteId} /> : null;
   const assetSurfacePanel = isAssetSurfaceTopic ? <AssetSurfacePanel onOpenSource={openSourceFile} renderSourceButtons={sourceButtons} type={topicRouteId} /> : null;
-  const agentConfigSurfacePanel = isAgentConfigSurfaceTopic ? <AgentConfigSurfacePanel onGetHermesExecutorStatus={onGetHermesExecutorStatus} onOpenSource={openSourceFile} renderSourceButtons={sourceButtons} type={topicRouteId} /> : null;
+  const agentConfigSurfacePanel = isAgentConfigSurfaceTopic ? <AgentConfigSurfacePanel agentRuns={agentRuns} mcpClient={mcpClient} mcpNative={mcpNative} onApproveAgentRun={onApproveAgentRun} onCancelAgentRun={onCancelAgentRun} onExportAgentRun={onExportAgentRun} onGetHermesExecutorStatus={onGetHermesExecutorStatus} onOpenSource={openSourceFile} onRefreshAgentRuns={onRefreshAgentRuns} projectId={snapshot?.currentProjectId} projectPath={snapshot?.currentProjectPath} renderSourceButtons={sourceButtons} type={topicRouteId} /> : null;
   const runbookPanel = isRunbookTopic && snapshot?.workspaceFacts
     ? <RunbookPanel onCopyCommand={onCopyText} onOpenSource={openSourceFile} onSendToTerminal={onPrepareTerminalCommand} report={snapshot.workspaceFacts} snapshot={snapshot} />
     : null;
@@ -168,6 +173,8 @@ export function EngineeringFileTab({
     composerModelAvailability={composerModelAvailability}
     handoffLoading={handoffLoading}
     onApproveAgentRun={onApproveAgentRun}
+    onCancelAgentRun={onCancelAgentRun}
+    onExportAgentRun={onExportAgentRun}
     onApplyPatchDraft={onApplyPatchDraft}
     onArchiveGoal={onArchiveGoal}
     onCreateGoal={onCreateGoal}

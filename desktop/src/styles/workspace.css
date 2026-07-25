@@ -3640,6 +3640,247 @@ body.isResizingSidebar {
   width: fit-content;
 }
 
+.mcpManagement {
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+}
+
+.mcpSection {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--line-divider);
+}
+
+.mcpSectionHeader,
+.mcpSubsectionHeader,
+.mcpToolHeader,
+.mcpRunRow,
+.mcpServerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.mcpSectionHeader > div:first-child,
+.mcpSubsectionHeader > div:first-child,
+.mcpToolHeader > div:first-child,
+.mcpRunRow > div:first-child {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.mcpSectionHeader strong,
+.mcpSubsectionHeader strong,
+.mcpToolHeader strong,
+.mcpRunRow strong,
+.mcpSwitchField strong,
+.mcpServerSelect strong {
+  color: var(--desktop-text-primary);
+  font-size: var(--desktop-type-label-size);
+  font-weight: var(--desktop-font-semibold);
+  line-height: 1.4;
+}
+
+.mcpSectionHeader span,
+.mcpSubsectionHeader span,
+.mcpToolHeader span,
+.mcpRunRow span,
+.mcpSwitchField span,
+.mcpEmptyLine,
+.mcpServerSelect > span:last-child {
+  color: var(--desktop-text-muted);
+  font-size: var(--desktop-type-meta-size);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.mcpInlineActions,
+.mcpEditorActions,
+.mcpDialogActions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.mcpInlineActions .uiButton,
+.mcpEditorActions .uiButton,
+.mcpSubsectionHeader .uiButton {
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.mcpServerList,
+.mcpRunList,
+.mcpToolList {
+  display: grid;
+  min-width: 0;
+  border-bottom: 1px solid var(--line-subtle);
+}
+
+.mcpServerRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  padding: 8px 6px;
+  border-top: 1px solid var(--line-subtle);
+}
+
+.mcpServerRow.is-selected {
+  background: var(--desktop-state-selected-bg);
+  box-shadow: inset 2px 0 0 var(--desktop-state-selected-indicator);
+}
+
+.mcpServerSelect {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+  text-align: left;
+}
+
+.mcpServerSelect:focus-visible {
+  border-radius: var(--radius-xs);
+  outline: none;
+  box-shadow: var(--desktop-focus-ring);
+}
+
+.mcpServerSelect > span:first-child {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.mcpServerSelect code {
+  color: var(--desktop-text-secondary);
+  font-size: var(--desktop-type-meta-size);
+}
+
+.mcpEditor {
+  display: grid;
+  gap: 14px;
+  padding: 12px 0 2px;
+  border-top: 1px solid var(--line-subtle);
+}
+
+.mcpEditorGrid,
+.mcpToolFieldGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+}
+
+.mcpEditorCommand {
+  grid-column: 1 / -1;
+}
+
+.mcpSwitchField {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 6px 0;
+}
+
+.mcpSwitchField > div {
+  display: grid;
+  gap: 3px;
+}
+
+.mcpEditorCollection {
+  display: grid;
+  gap: 7px;
+}
+
+.mcpConfigRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.mcpConfigRow.mcpEnvRow {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+}
+
+.mcpRunRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  padding: 9px 0;
+  border-top: 1px solid var(--line-subtle);
+}
+
+.mcpToolRow {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 0;
+  border-top: 1px solid var(--line-subtle);
+}
+
+.mcpToolForm {
+  display: grid;
+  gap: 12px;
+  padding: 10px 0 2px 12px;
+  border-left: 2px solid var(--desktop-border-accent);
+}
+
+.mcpDialogActions {
+  margin-top: 16px;
+}
+
+@media (max-width: 820px) {
+  .mcpServerRow,
+  .mcpRunRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .mcpServerRow > .mcpInlineActions,
+  .mcpRunRow > .mcpInlineActions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
+  .mcpEditorGrid,
+  .mcpToolFieldGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .mcpEditorCommand {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 560px) {
+  .mcpSectionHeader,
+  .mcpSubsectionHeader,
+  .mcpToolHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .mcpConfigRow.mcpEnvRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .mcpConfigRow.mcpEnvRow > .uiInput:nth-child(2) {
+    grid-column: 1;
+  }
+}
+
 .projectMemorySurface {
   gap: 24px;
 }

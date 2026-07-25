@@ -12,7 +12,7 @@ export function projectRuntimeStatus(project, { planLoading = false, projectActi
   if ((project.isCurrent && planLoading) || relatedTasks.some((task) => task.id === terminalRunningId)) {
     return { tone: "running", label: "进行中" };
   }
-  if (relatedTasks.some((task) => [taskStatuses.failed, "interrupted", "canceled", "cancelled", "error"].includes(task.status))) {
+  if (relatedTasks.some((task) => workflowStateIsFailure(taskWorkflowState(task, taskStatuses)) || task.status === "error")) {
     return { tone: "danger", label: "任务或会话中断" };
   }
   const cachedActivity = projectActivities[project.id];
@@ -28,3 +28,4 @@ export function discoverableProjectCapabilities(snapshot, labels = {}) {
     .filter((capability) => labels[capability.id] && (["available", "detected", "recommended"].includes(capability.status)
       || (capability.status === "enabled" && capability.modules?.some((module) => module.status !== "enabled"))));
 }
+import { taskWorkflowState, workflowStateIsFailure } from "./workflow-state.js";

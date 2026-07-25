@@ -1,3 +1,4 @@
+import { taskHasPassedVerification, taskWorkflowState, workflowStateIsFailure } from "../../lib/workflow-state";
 import { Badge } from "../ui/badge";
 import { Notice } from "../ui/notice";
 import { Panel } from "../ui/panel";
@@ -27,7 +28,9 @@ export function ActiveTask({
   onBackToProgress,
 }) {
   const runnableChecks = getRunnableChecks(task.plan);
-  const statusLabel = getStatusLabel(task.status);
+  const statusLabel = getStatusLabel(task);
+  const taskFailed = workflowStateIsFailure(taskWorkflowState(task, { failed: failedStatus }));
+  const verificationPassed = taskHasPassedVerification(task);
   const draftActions = [
     {
       disabled: patchLoading,
@@ -98,7 +101,7 @@ export function ActiveTask({
       {runnerError ? <Notice className="planError" variant="danger">{runnerError}</Notice> : null}
       {task.applyResult ? <Notice className="providerSuccess" variant="success">{task.applyResult.message}</Notice> : null}
       {task.verificationSummary ? (
-        <Notice className={task.status === failedStatus ? "providerError" : "providerSuccess"} variant={task.status === failedStatus ? "danger" : "success"}>
+        <Notice className={taskFailed ? "providerError" : verificationPassed ? "providerSuccess" : "providerHint"} variant={taskFailed ? "danger" : verificationPassed ? "success" : "info"}>
           {task.verificationSummary}
         </Notice>
       ) : null}

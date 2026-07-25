@@ -37,6 +37,11 @@ test("routes explicit modifications to a read-only patch draft", () => {
   assert.equal(conversationActionDecision("当前有什么检查问题"), null);
 });
 
+test("does not execute an incomplete modification intent", () => {
+  assert.equal(conversationActionDecision("我还想改"), null);
+  assert.equal(conversationActionDecision("想调整一下"), null);
+});
+
 test("routes an explicit missing decision through Hermes instead of drafting a patch", () => {
   assert.deepEqual(conversationActionDecision("请调整界面，但我还没决定紧凑还是舒适，请先通过选项表单询问我"), {
     action: { id: "start-agent", task: "请调整界面，但我还没决定紧凑还是舒适，请先通过选项表单询问我" },
@@ -182,6 +187,22 @@ test("does not mark a confirmed task waiting for its next action as interrupted"
   assert.deepEqual(recovered.turns[0].actions, [{ id: "generate-patch", label: "生成改动草稿", taskId: "task-1" }]);
 });
 
+test("projects legacy unusable patch results as failures instead of acceptance", () => {
+  const migrated = migrateConversationRecord({
+    id: "c-invalid-patch",
+    turns: [{
+      events: [{ id: "change-draft-patch", status: "done" }],
+      outcome: "succeeded",
+      role: "assistant",
+      taskId: "task-1",
+      text: "已生成改动草稿，但当前还不是可应用的 diff，未提供写入操作。",
+    }],
+  });
+  assert.equal(migrated.turns[0].outcome, "failed");
+  assert.equal(migrated.turns[0].diagnostic.label, "改动草稿不可应用");
+  assert.equal(migrated.turns[0].events[0].status, "failed");
+});
+
 test("normalizes references and projects execution into one assistant turn", () => {
   assert.equal(normalizeConversationReferences([
     { kind: "file", target: "A" },
@@ -273,6 +294,19 @@ test("runs the task conversation lifecycle without duplicating the assistant tur
   });
   assert.equal(completed.length, awaitingTurns.length);
   assert.equal(completed.find((turn) => turn.role === "assistant").text, "基础检查已通过");
+});
+
+test("keeps plan revisions behind the pending confirmation boundary", () => {
+  const pendingAction = { id: "confirm-task-1", taskId: "task-1", type: "confirm-active-task" };
+  const revision = prepareConversationSubmission({
+    message: "我还想改",
+    now: 300,
+    random: 0.5,
+    turns: [{ id: "assistant-1", pendingAction, role: "assistant", text: "计划已生成" }],
+  });
+  assert.equal(revision.command.command, conversationCommands.answer);
+  assert.equal(revision.command.decision, "revise");
+  assert.equal(revision.command.pendingAction, pendingAction);
 });
 
 test("dispatches commands and registered actions without UI condition chains", async () => {
@@ -387,7 +421,9 @@ test("keeps a preview patch draft read-only in the runtime executor", async () =
     context: { input: "修改按钮", requestId: "request-2", startedAt: 100 },
     now: () => 200,
   });
-  assert.equal(result.requestStatus, "succeeded");
+  assert.equal(result.requestStatus, "failed");
+  assert.equal(result.turn.outcome, "failed");
+  assert.equal(result.turn.diagnostic.label, "改动草稿不可应用");
   assert.equal(result.turn.pendingAction, null);
   assert.deepEqual(result.turn.actions, [{ id: "open-topic", label: "查看改动草稿", target: "execution", taskId: "task-2" }]);
 });

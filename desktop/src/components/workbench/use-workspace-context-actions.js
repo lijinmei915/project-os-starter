@@ -65,7 +65,7 @@ export function useWorkspaceContextActions({
     if (!goal) return;
     const relatedTasks = goalTasksForContext(goal);
     const taskLines = relatedTasks.length
-      ? relatedTasks.map((task, index) => `${index + 1}. ${task.title}（${taskStatusLabel(task.status)}）`).join("\n")
+      ? relatedTasks.map((task, index) => `${index + 1}. ${task.title}（${taskStatusLabel(task)}）`).join("\n")
       : "暂未绑定具体任务。";
     appendContextTurn(
       `已带入目标上下文：${goal.shortTitle || goal.title || "当前目标"}\n\n状态：${goalStatusLabelText(goal.status)}\n说明：${goal.summary || "暂无说明"}\n\n关联任务：\n${taskLines}\n\n你可以直接继续问：下一步先做哪个、要不要拆任务、或者从哪个任务开始执行。`,
@@ -81,7 +81,7 @@ export function useWorkspaceContextActions({
     setReadonlyPlan(task.plan || null);
     setSelectedEngineeringFile(null);
     appendContextTurn(
-      `已带入任务上下文：${task.title}\n\n状态：${taskStatusLabel(task.status)}\n来自目标：${task.goalTitle || todo?.goalTitle || "当前目标"}\n说明：${task.plan?.summary || todo?.description || "暂无说明"}\n\n你可以继续问这个任务怎么做，也可以点下面开始执行。`,
+      `已带入任务上下文：${task.title}\n\n状态：${taskStatusLabel(task)}\n来自目标：${task.goalTitle || todo?.goalTitle || "当前目标"}\n说明：${task.plan?.summary || todo?.description || "暂无说明"}\n\n你可以继续问这个任务怎么做，也可以点下面开始执行。`,
       task.status === taskStatuses.planned ? [{ id: "confirm-active-task", label: "确认并开始", taskId: task.id }] : [{ id: "open-topic", label: "查看任务详情", target: "execution", taskId: task.id }]
     );
     showToast("已发送任务到对话。", "success");
@@ -91,7 +91,7 @@ export function useWorkspaceContextActions({
     if (!goal) return;
     const relatedTasks = goalTasksForContext(goal);
     const taskLines = relatedTasks.length
-      ? relatedTasks.map((task, index) => `  ${index + 1}. ${task.title} [${taskStatusLabel(task.status)}]`)
+      ? relatedTasks.map((task, index) => `  ${index + 1}. ${task.title} [${taskStatusLabel(task)}]`)
       : ["  暂未绑定具体任务"];
     await appendContextToTerminal(["Goal context", `Goal: ${goal.shortTitle || goal.title || "当前目标"}`, `Status: ${goalStatusLabelText(goal.status)}`, `Summary: ${goal.summary || "暂无说明"}`, "Tasks:", ...taskLines]);
     showToast("已发送目标到终端。", "success");
@@ -102,7 +102,7 @@ export function useWorkspaceContextActions({
     if (!task) return;
     setActiveTaskId(task.id);
     setReadonlyPlan(task.plan || null);
-    await appendContextToTerminal(["Task context", `Task: ${task.title}`, `Status: ${taskStatusLabel(task.status)}`, `Goal: ${task.goalTitle || todo?.goalTitle || "当前目标"}`, `Summary: ${task.plan?.summary || todo?.description || "暂无说明"}`, "Next: 在这里手动输入要运行的检查或命令。"]);
+    await appendContextToTerminal(["Task context", `Task: ${task.title}`, `Status: ${taskStatusLabel(task)}`, `Goal: ${task.goalTitle || todo?.goalTitle || "当前目标"}`, `Summary: ${task.plan?.summary || todo?.description || "暂无说明"}`, "Next: 在这里手动输入要运行的检查或命令。"]);
     showToast("已发送任务到终端。", "success");
   };
 

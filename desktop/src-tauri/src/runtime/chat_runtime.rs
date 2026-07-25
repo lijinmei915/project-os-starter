@@ -12,7 +12,51 @@ pub struct RuntimeRequestState {
     requests: Mutex<HashMap<String, CancellationToken>>,
 }
 
+pub struct RuntimeRequestLease<'a> {
+    state: &'a RuntimeRequestState,
+    request_id: String,
+    token: CancellationToken,
+}
+
+impl RuntimeRequestLease<'_> {
+    pub fn token(&self) -> CancellationToken {
+        self.token.clone()
+    }
+}
+
+impl Drop for RuntimeRequestLease<'_> {
+    fn drop(&mut self) {
+        self.state.finish(&self.request_id);
+    }
+}
+
 impl RuntimeRequestState {
+    pub fn try_lease(&self, request_id: &str) -> Result<RuntimeRequestLease<'_>, String> {
+        let token = CancellationToken::new();
+        let mut requests = self
+            .requests
+            .lock()
+            .expect("request registry lock poisoned");
+        if requests.contains_key(request_id) {
+            return Err("该执行请求仍在活动中，请等待或先停止当前请求。".to_string());
+        }
+        requests.insert(request_id.to_string(), token.clone());
+        drop(requests);
+        Ok(RuntimeRequestLease {
+            state: self,
+            request_id: request_id.to_string(),
+            token,
+        })
+    }
+
+    pub fn lease(&self, request_id: &str) -> RuntimeRequestLease<'_> {
+        RuntimeRequestLease {
+            state: self,
+            request_id: request_id.to_string(),
+            token: self.start(request_id),
+        }
+    }
+
     pub fn start(&self, request_id: &str) -> CancellationToken {
         let token = CancellationToken::new();
         self.requests
@@ -96,5 +140,27 @@ mod tests {
         state.finish("request-a");
         assert!(!state.cancel("request-a"));
         assert!(!state.cancel("unknown"));
+    }
+
+    #[test]
+    fn scoped_request_lease_cleans_up_on_early_return() {
+        let state = RuntimeRequestState::default();
+        {
+            let lease = state.lease("request-scoped");
+            assert!(state.cancel("request-scoped"));
+            assert!(lease.token().is_cancelled());
+        }
+        assert!(!state.cancel("request-scoped"));
+    }
+
+    #[test]
+    fn rejects_a_duplicate_scoped_request_without_replacing_its_token() {
+        let state = RuntimeRequestState::default();
+        let first = state.try_lease("request-scoped").unwrap();
+        assert!(state.try_lease("request-scoped").is_err());
+        assert!(state.cancel("request-scoped"));
+        assert!(first.token().is_cancelled());
+        drop(first);
+        assert!(state.try_lease("request-scoped").is_ok());
     }
 }

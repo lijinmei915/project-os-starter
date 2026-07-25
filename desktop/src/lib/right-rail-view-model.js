@@ -1,6 +1,7 @@
 import { resolveWorkspaceContext } from "./workspace-context.js";
 import { collapseDuplicateOpenTasks } from "./task-presentation.js";
 import { groupConversations } from "./conversation-list.js";
+import { taskWorkflowState, workflowStateIsFinished, workflowStates } from "./workflow-state.js";
 import {
   goalMetaFromStatus,
   goalValidationStatusFromActiveGoal,
@@ -63,16 +64,17 @@ export function buildRightRailViewModel({
         };
       })
     : snapshotTodos.map((task) => ({ ...task, subtasks: taskSubtasks(task, taskStatuses) }));
-  const doneCount = goalTodos.filter((todo) => todo.status === taskStatuses.done).length;
-  const runningCount = goalTodos.filter((todo) => [taskStatuses.running, taskStatuses.waitingApproval].includes(todo.status)).length;
+  const stateFor = (todo) => taskWorkflowState(todo.task || todo, taskStatuses);
+  const doneCount = goalTodos.filter((todo) => workflowStateIsFinished(stateFor(todo))).length;
+  const runningCount = goalTodos.filter((todo) => [workflowStates.working, workflowStates.verifying].includes(stateFor(todo))).length;
   const validationGoal = snapshot.goalValidation?.goal || {};
   const validationReportStatus = snapshot.goalValidationReport?.status || "missing";
   const validationStatus = goalValidationStatusFromActiveGoal(activeGoal, validationGoal, validationReportStatus);
   const visibleGoalTodos = taskFilter === "all"
     ? goalTodos
     : taskFilter === "done"
-      ? goalTodos.filter((todo) => todo.status === taskStatuses.done)
-      : goalTodos.filter((todo) => todo.status !== taskStatuses.done);
+      ? goalTodos.filter((todo) => workflowStateIsFinished(stateFor(todo)))
+      : goalTodos.filter((todo) => !workflowStateIsFinished(stateFor(todo)));
   const currentPhaseTodos = visibleGoalTodos.filter((todo) => dialogueTaskIds.has(todo.id));
 
   return {
@@ -88,7 +90,7 @@ export function buildRightRailViewModel({
     goalMeta: runningCount || (activeGoal?.status === "planned" && goalTodos.length)
       ? "进行中"
       : goalMetaFromStatus(activeGoal?.status || validationStatus, validationReportStatus, goalTodos, snapshot.phase, { phaseLabel, taskStatuses }),
-    goalNeedsVerification: goalTodos.length > 0 && goalTodos.every((todo) => todo.status === taskStatuses.done),
+    goalNeedsVerification: goalTodos.length > 0 && goalTodos.every((todo) => workflowStateIsFinished(stateFor(todo))),
     goalSignedOff: validationStatus === "signed-off",
     goalSteps: goalTodos.length
       ? [`完成 ${doneCount}`, `进行 ${runningCount}`, `待办 ${Math.max(goalTodos.length - doneCount - runningCount, 0)}`]

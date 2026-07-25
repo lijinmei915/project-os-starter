@@ -151,7 +151,7 @@ class AppErrorBoundary extends React.Component {
 
 const fallbackPlan = null;
 
-const taskStatusLabel = (status) => taskStatusText(status, taskStatuses);
+const taskStatusLabel = (taskOrStatus) => taskStatusText(taskOrStatus, taskStatuses);
 const checksForPlan = (plan) => planChecksFor(plan, guardedCheckCapabilities);
 const previewChatResult = (message, hasAttachments, snapshot = {}, tasks = [], dialogueContext = {}) => previewChatResultProjection({
   activeGoalFromSnapshot,
@@ -254,6 +254,7 @@ const agentTopicPresentation = {
 
 function AgentWorkspace({
   agentRuns = [],
+  mcpClient,
   snapshot,
   activeTaskId,
   activeConversationTaskId,
@@ -344,8 +345,11 @@ function AgentWorkspace({
   onReadEngineeringFile,
   onGetHermesExecutorStatus,
   onApproveAgentRun,
+  onCancelAgentRun,
+  onExportAgentRun,
   onResumeAgentRun,
   onSubmitAgentInteraction,
+  onRefreshAgentRuns,
 }) {
   const [taskInput, setTaskInput] = useState("");
   const { addImageFiles, attachmentError, attachments, clearAttachments, removeAttachment } = useChatAttachments({ readFileAsDataUrl });
@@ -534,6 +538,8 @@ function AgentWorkspace({
         renderFileTab={(tab) => <TabsContent className="workspaceTabContent fileCanvas" key={tab.id} value={tab.id}><EngineeringFileTab
                 activeTaskId={activeTask?.id}
                 agentRuns={agentRuns}
+                mcpClient={mcpClient}
+                mcpNative={isTauri}
                 selectedEngineeringFile={tab.file}
                 snapshot={snapshot}
                 tasks={tasks}
@@ -544,6 +550,8 @@ function AgentWorkspace({
                 onGeneratePatchDraft={onGeneratePatchDraft}
                 onApplyPatchDraft={onApplyPatchDraft}
                 onApproveAgentRun={onApproveAgentRun}
+                onCancelAgentRun={onCancelAgentRun}
+                onExportAgentRun={onExportAgentRun}
                 onMergeHandoff={onMergeHandoff}
                 onRunGuardedCheck={onRunGuardedCheck}
                 onSelectTask={onSelectTask}
@@ -573,6 +581,7 @@ function AgentWorkspace({
                 onGetHermesExecutorStatus={onGetHermesExecutorStatus}
                 onCopyText={copyTextToSystemClipboard}
                 onRefreshWorkspaceFacts={refreshWorkspaceFactsPreview}
+                onRefreshAgentRuns={onRefreshAgentRuns}
                 presentation={{ agentTopicPresentation, dedicatedSurfaceByTopic, taskStatuses, workspaceRouteById }}
               /></TabsContent>}
         tabs={workspaceTabs}
@@ -612,7 +621,7 @@ function AgentWorkspace({
               onNextTask={nextConversationTask ? () => openTaskConversationWorkspace(nextConversationTask.id) : undefined}
               onPreviousTask={previousConversationTask ? () => openTaskConversationWorkspace(previousConversationTask.id) : undefined}
               position={activeTaskPosition}
-              statusLabel={taskStatusLabel(activeTask.status)}
+              statusLabel={taskStatusLabel(activeTask)}
               task={activeTask}
             />
           ) : null}
@@ -686,7 +695,7 @@ function App() {
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const { beginSidebarResize, leftWidth, rightWidth } = useSidebarLayout();
   const refreshAgentRuns = async () => {
-    const records = await executionClient.listAgentRuns();
+    const records = await executionClient.listScheduledAgentRuns();
     const scoped = (Array.isArray(records) ? records : []).filter((item) => !snapshot?.currentProjectId || item.projectId === snapshot.currentProjectId);
     setAgentRuns(scoped);
     return scoped;
@@ -694,7 +703,7 @@ function App() {
 
   useEffect(() => {
     let active = true;
-    const refresh = () => executionClient.listAgentRuns().then((runs) => {
+    const refresh = () => executionClient.listScheduledAgentRuns().then((runs) => {
       if (!active) return;
       const records = Array.isArray(runs) ? runs : [];
       setAgentRuns(records.filter((run) => !snapshot?.currentProjectId || run.projectId === snapshot.currentProjectId));
@@ -719,6 +728,29 @@ function App() {
     try {
       const result = await executionClient.approveHermesAgent(run);
       await refreshAgentRuns();
+      return result;
+    } catch (error_) {
+      showToast(error_ instanceof Error ? error_.message : String(error_));
+      return null;
+    }
+  };
+
+  const cancelAgentRun = async (run) => {
+    try {
+      const result = await executionClient.cancelAgentRun(run);
+      await refreshAgentRuns();
+      showToast("任务已取消，项目占用已释放。");
+      return result;
+    } catch (error_) {
+      showToast(error_ instanceof Error ? error_.message : String(error_));
+      return null;
+    }
+  };
+
+  const exportAgentRun = async (run) => {
+    try {
+      const result = await executionClient.exportAgentRunTimeline(run);
+      showToast(`调试证据已导出：${result.path}`);
       return result;
     } catch (error_) {
       showToast(error_ instanceof Error ? error_.message : String(error_));
@@ -1170,8 +1202,12 @@ function App() {
           snapshot={snapshot}
           activeTaskId={activeTaskId}
           agentRuns={agentRuns}
+          mcpClient={executionClient}
           onApproveAgentRun={approveAgentRun}
+          onCancelAgentRun={cancelAgentRun}
+          onExportAgentRun={exportAgentRun}
           onResumeAgentRun={resumeAgentRun}
+          onRefreshAgentRuns={refreshAgentRuns}
           onSubmitAgentInteraction={submitAgentInteraction}
           activeConversationTaskId={activeConversationTaskId}
           selectedEngineeringFile={selectedEngineeringFile}

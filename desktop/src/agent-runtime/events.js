@@ -1,25 +1,25 @@
 import { conversationEventTypes, createConversationEvent } from "../conversation-runtime/event-contract.js";
-import { agentRunStatuses, toolCallStatuses } from "./contract.js";
+import { agentRunWorkflowState, workflowStates } from "../lib/workflow-state.js";
+import { toolCallStatuses } from "./contract.js";
 
-const runEventProjection = Object.freeze({
-  [agentRunStatuses.queued]: [conversationEventTypes.inputAccepted, "input", "pending"],
-  [agentRunStatuses.running]: [conversationEventTypes.requestProgress, "execution", "running"],
-  [agentRunStatuses.awaitingApproval]: [conversationEventTypes.approvalRequired, "approval", "pending"],
-  [agentRunStatuses.awaitingUserInput]: [conversationEventTypes.inputAccepted, "input", "pending"],
-  [agentRunStatuses.applying]: [conversationEventTypes.requestProgress, "execution", "running"],
-  [agentRunStatuses.verifying]: [conversationEventTypes.requestProgress, "execution", "running"],
-  [agentRunStatuses.succeeded]: [conversationEventTypes.requestCompleted, "result", "completed"],
-  [agentRunStatuses.failed]: [conversationEventTypes.requestFailed, "result", "failed"],
-  [agentRunStatuses.cancelled]: [conversationEventTypes.requestCancelled, "result", "cancelled"],
-  [agentRunStatuses.interrupted]: [conversationEventTypes.requestFailed, "result", "failed"],
-});
+function runEventProjection(run) {
+  const state = agentRunWorkflowState(run);
+  if (state === workflowStates.planned) return [conversationEventTypes.inputAccepted, "input", "pending"];
+  if (state === workflowStates.waitingUser) return [conversationEventTypes.inputAccepted, "input", "pending"];
+  if (state === workflowStates.waitingApproval) return [conversationEventTypes.approvalRequired, "approval", "pending"];
+  if ([workflowStates.working, workflowStates.verifying].includes(state)) return [conversationEventTypes.requestProgress, "execution", "running"];
+  if ([workflowStates.completed, workflowStates.verified].includes(state)) return [conversationEventTypes.requestCompleted, "result", "completed"];
+  if (state === workflowStates.failed || state === workflowStates.interrupted) return [conversationEventTypes.requestFailed, "result", "failed"];
+  if (state === workflowStates.cancelled) return [conversationEventTypes.requestCancelled, "result", "cancelled"];
+  return null;
+}
 
 function eventIdentity(run, suffix, sequence) {
   return { id: `${run.id}:${suffix}:${sequence}`, requestId: run.requestId, sequence };
 }
 
 export function agentRunConversationEvent(run, { detail = "", sequence = 0, text = "" } = {}) {
-  const projected = runEventProjection[run?.status];
+  const projected = runEventProjection(run);
   if (!projected) throw new Error(`unsupported Agent Run event status: ${run?.status}`);
   return createConversationEvent({
     ...eventIdentity(run, "run", sequence),

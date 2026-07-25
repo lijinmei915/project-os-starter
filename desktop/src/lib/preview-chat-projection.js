@@ -30,9 +30,10 @@ export function previewChatResult({
   const statusLike = /状态|进度|下一步|总结|概况|现在/.test(message);
   const developLike = /开发|改代码|实现|任务|执行|patch|检查|构建|验证/.test(lowerMessage);
   const visibleTasks = Array.isArray(tasks) ? tasks.filter((task) => !isNoiseTask(task)) : [];
-  const activeTasks = visibleTasks.filter((task) => ![taskStatuses.done, taskStatuses.failed].includes(task.status));
-  const failedTasks = visibleTasks.filter((task) => task.status === taskStatuses.failed);
-  const doneTasks = visibleTasks.filter((task) => task.status === taskStatuses.done);
+  const stateFor = (task) => taskWorkflowState(task, taskStatuses);
+  const activeTasks = visibleTasks.filter((task) => workflowStateIsActive(stateFor(task)));
+  const failedTasks = visibleTasks.filter((task) => workflowStateIsFailure(stateFor(task)));
+  const doneTasks = visibleTasks.filter((task) => workflowStateIsFinished(stateFor(task)));
   const activeGoal = activeGoalFromSnapshot(snapshot || {});
   const validationStatus = snapshot?.goalValidationReport?.status || "待生成";
   const changedFiles = snapshot?.workspaceFacts?.git?.changedFiles || snapshot?.git?.changedFiles || [];
@@ -221,3 +222,4 @@ export function conversationDiagnosticForResult(chatResult, providerHealth) {
     detail: chatResult.providerError || providerHealth?.message || "",
   };
 }
+import { taskWorkflowState, workflowStateIsActive, workflowStateIsFailure, workflowStateIsFinished } from "./workflow-state.js";

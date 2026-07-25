@@ -1,14 +1,8 @@
-export function taskStatusLabel(status, taskStatuses) {
-  return {
-    [taskStatuses.planned]: "待确认",
-    [taskStatuses.waitingApproval]: "已确认",
-    [taskStatuses.running]: "进行中",
-    [taskStatuses.done]: "已完成",
-    [taskStatuses.failed]: "失败",
-    [taskStatuses.repairPending]: "待修复",
-    [taskStatuses.waitingRepairApproval]: "待确认修复",
-    [taskStatuses.repairFailed]: "修复失败",
-  }[status] || status || "待确认";
+import { taskWorkflowState, workflowStatePresentation } from "./workflow-state.js";
+
+export function taskStatusLabel(taskOrStatus, taskStatuses) {
+  const task = taskOrStatus && typeof taskOrStatus === "object" ? taskOrStatus : { status: taskOrStatus };
+  return workflowStatePresentation(taskWorkflowState(task, taskStatuses)).label;
 }
 
 export function checksForPlan(plan, guardedCheckCapabilities) {

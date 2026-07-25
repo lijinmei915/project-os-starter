@@ -14,6 +14,24 @@ path = "src/main.rs"
 name = "omnidesk-patch-normalizer"
 path = "src/bin/patch_normalizer.rs"
 
+[[bin]]
+name = "omnidesk-mcp-eval"
+path = "src/bin/mcp_eval.rs"
+test = false
+bench = false
+
+[[bin]]
+name = "omnidesk-provider-timeline-eval"
+path = "src/bin/provider_timeline_eval.rs"
+test = false
+bench = false
+
+[[bin]]
+name = "omnidesk-provider-fallback-eval"
+path = "src/bin/provider_fallback_eval.rs"
+test = false
+bench = false
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 

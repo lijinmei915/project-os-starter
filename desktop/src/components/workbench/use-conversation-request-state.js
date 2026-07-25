@@ -28,6 +28,10 @@ export function useConversationRequestState({ cancelRuntimeRequest, chatTurns, i
       if (payload.type === "request.retrying") {
         setChatLoadingLabel("网络波动，正在重试");
       }
+      if (payload.type === "request.queued") {
+        const position = Math.max(1, Number(payload.payload?.position || 1));
+        setChatLoadingLabel(`任务已排队（第 ${position} 位）`);
+      }
       if (payload.type === "model.delta") {
         receivedChars += Number(payload.payload?.chars || 0);
         setChatLoadingLabel(`正在生成回答（已接收 ${receivedChars} 字）`);

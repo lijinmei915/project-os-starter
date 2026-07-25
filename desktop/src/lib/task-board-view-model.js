@@ -1,15 +1,17 @@
 import { groupTasksByGoal, sortTasksForGoal } from "./task-goal-groups.js";
 import { collapseDuplicateOpenTasks } from "./task-presentation.js";
+import { taskWorkflowState, workflowStates } from "./workflow-state.js";
 
 const completedGoalStatuses = new Set(["archived", "merged", "done"]);
 
 function taskMatchesFilter(task, filter, statuses) {
+  const state = taskWorkflowState(task, statuses);
   if (filter === "all") return true;
-  if (filter === "pending") return [statuses.planned, statuses.waitingApproval, statuses.repairPending, statuses.waitingRepairApproval].includes(task.status);
-  if (filter === "running") return task.status === statuses.running;
-  if (filter === "verify") return task.status === statuses.done && (!task.verificationSummary || task.verificationSummary.includes("待验证"));
-  if (filter === "done") return task.status === statuses.done && Boolean(task.verificationSummary) && !task.verificationSummary.includes("待验证");
-  if (filter === "failed") return [statuses.failed, statuses.repairFailed].includes(task.status);
+  if (filter === "pending") return [workflowStates.planned, workflowStates.waitingUser, workflowStates.waitingApproval].includes(state);
+  if (filter === "running") return [workflowStates.working, workflowStates.verifying].includes(state);
+  if (filter === "verify") return state === workflowStates.completed;
+  if (filter === "done") return state === workflowStates.verified;
+  if (filter === "failed") return [workflowStates.failed, workflowStates.interrupted].includes(state);
   return true;
 }
 
@@ -33,9 +35,16 @@ function taskStatusRank(task, statuses) {
 
 export function buildTaskBoardViewModel({ activeTaskId, filter, isNoiseTask, snapshot, sort, statuses, tasks }) {
   const visibleTasks = collapseDuplicateOpenTasks((tasks || []).filter((task) => !isNoiseTask(task) && !task.archivedAt));
-  const activeTasks = visibleTasks.filter((task) => ![statuses.done, statuses.failed, statuses.repairFailed].includes(task.status));
-  const doneTasks = visibleTasks.filter((task) => task.status === statuses.done);
-  const failedTasks = visibleTasks.filter((task) => [statuses.failed, statuses.repairPending, statuses.repairFailed].includes(task.status));
+  const stateFor = (task) => taskWorkflowState(task, statuses);
+  const activeTasks = visibleTasks.filter((task) => ![
+    workflowStates.completed,
+    workflowStates.verified,
+    workflowStates.failed,
+    workflowStates.cancelled,
+    workflowStates.interrupted,
+  ].includes(stateFor(task)));
+  const doneTasks = visibleTasks.filter((task) => [workflowStates.completed, workflowStates.verified].includes(stateFor(task)));
+  const failedTasks = visibleTasks.filter((task) => [workflowStates.failed, workflowStates.interrupted].includes(stateFor(task)) || task.status === statuses.repairPending);
   const stageGoals = snapshot?.goals?.goals || [];
   const projectGoals = snapshot?.projectGoals?.projectGoals || [];
   const taskGoalOptions = [...stageGoals.filter((goal) => !completedGoalStatuses.has(goal.status)), ...projectGoals]

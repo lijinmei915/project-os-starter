@@ -1,7 +1,7 @@
 import { useRef } from "react";
-import { isApplicablePatchDraft } from "../../conversation-runtime";
 import { executePatchApplyWorkflow } from "../../lib/patch-apply-executor";
 import { executePatchDraftWorkflow } from "../../lib/patch-draft-executor";
+import { patchDraftResultState } from "../../lib/patch-draft-state";
 import { measureDesktopPerformance } from "../../lib/performance-baseline";
 
 /** React lifecycle wrapper for Patch Draft, Apply/verify, and handoff actions. */
@@ -41,8 +41,9 @@ export function usePatchActions({
         task,
       });
       if (result.error) setPatchError(result.error);
-      draftMeasure = { applicable: isApplicablePatchDraft(result.patchDraft), outcome: result.success ? "succeeded" : "failed" };
-      finishActionFeedback(feedbackKey, result.success ? "success" : "failed", result.feedback);
+      const draftState = patchDraftResultState(result);
+      draftMeasure = { applicable: draftState.applicable, outcome: draftState.requestStatus };
+      finishActionFeedback(feedbackKey, draftState.applicable ? "success" : "failed", result.feedback);
       return result;
     } finally {
       finishMeasure(draftMeasure);
@@ -59,7 +60,8 @@ export function usePatchActions({
     if (task.requestId) updateChatTurns(projectExecutionEvent(chatTurns, { events: [{ id: "patch-draft", label: "生成改动草稿", status: "current" }], outcome: "running", requestId: task.requestId, text: "正在生成改动草稿。" }));
     const result = await executePatchDraft(task, `patch-${taskId}`);
     if (task.requestId) {
-      const applicable = result.success && isApplicablePatchDraft(result.patchDraft);
+      const draftState = patchDraftResultState(result);
+      const { applicable } = draftState;
       const pendingAction = applicable
         ? { id: `apply-task-${task.id}`, requestId: task.requestId, taskId: task.id, type: "apply-patch" }
         : null;
@@ -67,8 +69,8 @@ export function usePatchActions({
         actions: applicable
           ? [{ id: "apply-patch", label: "审阅并应用", taskId: task.id }, { id: "open-topic", label: "查看改动详情", target: "execution", taskId: task.id }]
           : [{ id: "open-topic", label: "查看任务详情", target: "execution", taskId: task.id }],
-        events: [{ detail: result.error || "", id: "patch-draft", label: "生成改动草稿", status: result.success ? "done" : "failed" }],
-        outcome: applicable ? "awaiting-confirmation" : result.success ? "succeeded" : "failed",
+        events: [{ detail: result.error || "", id: "patch-draft", label: "生成改动草稿", status: draftState.eventStatus }],
+        outcome: draftState.outcome,
         pendingAction,
         requestId: task.requestId,
         taskId: task.id,
