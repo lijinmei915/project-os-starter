@@ -14,6 +14,14 @@ use_when: "AI 即将做类似操作前检查是否有已知的坑、或犯错后
 > 每次犯错后立即记录。
 > 格式：犯的错 / 根本原因 / 加了什么规则。
 
+### 2026-07-26 可选协议入口存在不等于运行依赖已安装
+
+**犯的错**：受保护 Eval 使用裸 `pip install hermes-agent`。安装包提供了 `hermes-acp` 命令入口，主 Hermes CLI 的 13-case 也全部通过，但 P3 Runtime Timeline 启动 ACP 时因缺少 `agent-client-protocol` 立即崩溃。
+
+**根本原因**：Hermes 将 ACP 依赖声明在 `acp` optional extra 中；只检查可执行文件存在或普通 CLI 成功，无法证明该协议入口的 import graph 完整。工作流还没有固定 Hermes 版本，上游从 `0.18.2` 自动升级到 `0.19.0`，使执行环境不可复现。
+
+**加了什么规则**：受保护 Eval 必须固定安装 `hermes-agent[acp]` 版本，并在消耗 Provider 配额前同时校验版本和 `hermes-acp --check`。任何带 optional extra 的执行器都必须验证实际使用的协议入口，不能以主命令或文件存在替代依赖闭环。
+
 ### 2026-07-24 目标验收不能只信任 activeGoalId 指针
 
 **犯的错**：目标面板能够从目标列表回退显示当前可操作目标，但“验证目标”和“确认完成”直接传递 `snapshot.goals.activeGoalId`。历史或投影状态缺少该指针时，Tauri 收到 `goalId: null` 并在验收开始前报参数错误。
