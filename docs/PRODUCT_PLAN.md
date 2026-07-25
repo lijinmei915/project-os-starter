@@ -1,7 +1,7 @@
 ---
 layer: knowledge
 type: spec
-last_verified: 2026-07-25
+last_verified: 2026-07-26
 depends_on: [PROJECT.md, docs/ARCHITECTURE.md, docs/TESTING.md]
 teaches: "OmniDesk 的产品方向、当前阶段和明确不做事项"
 use_when: "AI 需要判断工作是否服务当前产品阶段或安排后续里程碑时"
@@ -21,9 +21,9 @@ OmniDesk 是本地优先的 AI 工程工作台。用户在一个桌面应用内�
 
 ## 当前阶段判断
 
-当前阶段：`OmniDesk Agent 平台化 v1`。
+当前阶段：`OmniDesk Agent 平台稳定化 v1`。
 
-目标是在现有 Desktop Runtime 上平滑演进为可靠的本地 Agent 平台，不推倒 Tauri、React、Hermes、Tool Gateway、审批和证据骨架。阶段完成必须同时满足 P0 到 P4，不能把单次 Provider 成功或局部 UI 展示当成平台化完成。
+`OmniDesk Agent 平台化 v1` 的 P0-P4 已完成本地、原生和受保护真实验收。当前不扩张架构范围，目标是用真实桌面任务验证组合体验、降低 Eval 重跑成本和首屏负担，并持续守住授权、审批、恢复与证据边界。
 
 ## 阶段路线
 
@@ -37,15 +37,14 @@ OmniDesk 是本地优先的 AI 工程工作台。用户在一个桌面应用内�
 
 - 每个 P 阶段均需要领域单测、完整本地回归和真实桌面端证据。
 - Provider、流式网络和模型工具调用只能由受保护真实 Eval 证明，普通 CI 不伪造 trace。
-- P0-P4 全部完成后，复杂任务才可宣称具备可恢复、可调试、可扩展的 Agent 平台闭环。
+- P0-P4 已由受保护 Agent Eval `30168898557` 和对应桌面证据闭环；后续变更不得回退这些门槛。
 
 ## 当前优先级
 
-1. P0 状态单一事实源和全部工作台消费迁移已完成本地验收。
-2. P1 Provider 原生 Function Calling 能力矩阵、持久化能力证据、兼容降级和受保护 Eval 探针已完成本地验收；下一门槛是提交后运行首个受保护真实 Provider 闭环。
-3. P2 已完成本地与原生验收：完整 Run 入队持久化、全局并发上限、项目互斥、FIFO、队列投影、重启不重放、显式继续/取消、项目释放与迟到结果封口均有证据。
-4. P3 Timeline 聚合、显式 usage/cost 和 `metadata-only` 脱敏导出已完成本地与原生实现；真实 Provider usage/cost 仍待受保护证据。
-5. P4 已完成 Tool Registry、MCP 配置、有界能力发现 transport、`mcp_discover` / `mcp_call` 的独立审批与 Timeline 结果，以及 `Agent 配置 / 受控工具` 最小可见管理入口。调用必须命中同项目且配置未变化的发现证据；下一门槛是以真实第三方 MCP 做受保护验收。
+1. 在真实桌面应用完成复杂任务组合验收，覆盖 Function Call、Scheduler、Agent Run、审批工具、失败恢复和 Timeline 导出。
+2. 将受保护 Eval 拆成独立 P1/P3/P4/13-case job 并维护统一 artifact 索引，允许精确重跑而不重复消耗全部 Provider 配额。
+3. 把首屏入口降回 800 KiB 软预算内，不通过提高阈值隐藏体积增长。
+4. 保持 P0-P4 契约为发布基线；第三方工具、Provider 降级或恢复逻辑不得绕过项目绑定、独立审批、单终态和脱敏证据。
 
 ## 本阶段不做
 
