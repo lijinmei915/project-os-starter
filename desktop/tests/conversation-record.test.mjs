@@ -7,7 +7,7 @@ test("builds a compact project conversation record", () => {
   const record = buildConversationRecord({
     id: "conv-1",
     updatedAt: "2026-07-11T00:00:00Z",
-    turns: [{ id: "u1", role: "user", text: "  检查   对话持久化  " }, { id: "a1", role: "assistant", text: "已完成。" }],
+    turns: [{ id: "u1", role: "user", text: "  检查   对话持久化  " }, { id: "a1", responseMode: "legacy-json", role: "assistant", text: "已完成。" }],
   });
   assert.equal(record.title, "检查 对话持久化");
   assert.equal(record.preview, "已完成。");
@@ -15,6 +15,7 @@ test("builds a compact project conversation record", () => {
   assert.equal(record.contextState.previousConclusion, "已完成。");
   assert.equal(record.summary.version, "omnidesk.turn-summary.v0.1");
   assert.equal(record.summary.coveredTurnCount, 0);
+  assert.equal(record.turns[1].responseMode, "legacy-json");
 });
 
 test("keeps model and connection status turns out of durable conversation context", () => {

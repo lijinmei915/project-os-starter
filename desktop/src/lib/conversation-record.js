@@ -173,8 +173,8 @@ export function buildConversationRecord({ goalId = "", id, projectId = "", summa
     summary: buildTurnSummary(durableTurns, { previousSummary }),
     taskId,
     title,
-    turns: durableTurns.map(({ actions, conversationEvents, diagnostic, durationMs, events, id: turnId, intent, memoryReferences, outcome, pendingAction, references, requestId, resolvedActionId, role, statusLabel, submissionId, taskId, text, workflow }) => ({
-      actions, conversationEvents, diagnostic, durationMs, events, id: turnId, intent, memoryReferences, outcome, pendingAction, references, requestId, resolvedActionId, role, statusLabel, submissionId, taskId, text, workflow,
+    turns: durableTurns.map(({ actions, conversationEvents, diagnostic, durationMs, events, id: turnId, intent, memoryReferences, outcome, pendingAction, references, requestId, resolvedActionId, responseMode, role, statusLabel, submissionId, taskId, text, workflow }) => ({
+      actions, conversationEvents, diagnostic, durationMs, events, id: turnId, intent, memoryReferences, outcome, pendingAction, references, requestId, resolvedActionId, responseMode, role, statusLabel, submissionId, taskId, text, workflow,
     })),
     updatedAt,
   };

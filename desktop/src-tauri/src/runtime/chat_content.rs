@@ -49,6 +49,8 @@ pub struct ChatWithModelResult {
     #[serde(default)]
     pub provider_error: String,
     #[serde(default)]
+    pub response_mode: String,
+    #[serde(default)]
     pub references: Vec<MessageReference>,
 }
 
@@ -62,7 +64,7 @@ pub struct MessageReference {
     pub detail: String,
 }
 
-pub fn chat_router_prompt(
+pub fn chat_reply_prompt(
     project_name: &str,
     stage: &str,
     current_model: &str,
@@ -121,26 +123,14 @@ Verified local project evidence:
 User message:
 {message}
 
-Decide whether this is normal conversation or a concrete project task.
-
-Return strict JSON only:
-{{
-  "reply": "Chinese, natural, concise assistant reply shown in chat",
-  "shouldCreatePlan": false,
-  "intent": "chat | question | inspect | task"
-}}
+Reply directly to the user in natural Chinese text. Do not wrap the answer in JSON or add routing metadata.
 
 Rules:
 - Treat short follow-ups such as "那怎么办", "你判断", "直接告诉我", and "直接修" as continuations of currentTopic and previousConclusion. Do not ask the user to repeat the subject when contextState identifies it.
 - For project questions, answer from verified local project evidence. State the conclusion first, then cite concrete evidence in the prose, then give the smallest useful next action.
 - If evidence is insufficient for a claim, label it as an inference instead of presenting it as fact.
-- Greetings, small talk, broad questions, or "what is X" shouldCreatePlan=false.
-- Questions that ask "why", "how", "what risks", "what happened", "is this ok", or "look at this" shouldCreatePlan=false and should receive a natural answer.
-- Set shouldCreatePlan=true when the user clearly asks OmniDesk to solve, handle, organize, clean up, make a plan, create a task, apply a patch, run commands/checks, or implement/fix code.
-- Phrases like "帮我处理", "处理一下", "看看解决", "整理一下", "制定方案", "侧边栏这么多待办你看看解决呢" are action requests even if they contain question-like words.
 - If the user asks what model you are, mention the current configured model exactly.
-- If shouldCreatePlan=true, reply should briefly acknowledge that you will create a plan.
-- If shouldCreatePlan=false, do not suggest generating a plan, clicking buttons, or asking for confirmation unless the user's request is ambiguous.
+- Do not suggest generating a plan, clicking buttons, or asking for confirmation unless the user's request is ambiguous.
 - Do not tell the user to inspect another page instead of answering when the evidence above already supports an answer.
 - Do not invent completed work.
 - Do not mention internal JSON or routing.
@@ -213,6 +203,7 @@ pub fn local_chat_result(
         provider_status: "local".to_string(),
         provider_model: String::new(),
         provider_error: String::new(),
+        response_mode: "local".to_string(),
         references: Vec::new(),
     }
 }
@@ -399,5 +390,24 @@ mod tests {
         assert!(
             references_for_message("你好", &DialogueContextInput::default(), references).is_empty()
         );
+    }
+
+    #[test]
+    fn provider_prompt_requests_natural_text_without_routing_json() {
+        let prompt = chat_reply_prompt(
+            "OmniDesk",
+            "stabilizing",
+            "test-model",
+            "这个问题是什么",
+            &[],
+            &[],
+            &DialogueContextInput::default(),
+            &json!({}),
+            &[],
+            &json!({}),
+        );
+        assert!(prompt.contains("natural Chinese text"));
+        assert!(!prompt.contains("Return strict JSON"));
+        assert!(!prompt.contains("shouldCreatePlan"));
     }
 }

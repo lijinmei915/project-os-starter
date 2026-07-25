@@ -1613,9 +1613,10 @@ test("keeps local chat content outside the Tauri command assembly", () => {
   const content = source("src-tauri/src/runtime/chat_content.rs");
   assert.match(app, /use crate::runtime::chat_content/);
   assert.doesNotMatch(app, /struct DialogueContextInput/);
-  assert.doesNotMatch(app, /fn chat_router_prompt\(/);
+  assert.doesNotMatch(app, /fn chat_reply_prompt\(/);
   assert.doesNotMatch(app, /fn local_chat_result\(/);
-  assert.match(content, /pub fn chat_router_prompt/);
+  assert.match(content, /pub fn chat_reply_prompt/);
+  assert.doesNotMatch(content, /Return strict JSON only/);
   assert.match(content, /pub fn local_chat_result/);
   assert.match(content, /#\[cfg\(test\)\]/);
 });

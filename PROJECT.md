@@ -73,10 +73,11 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 - 执行 allowlist、Patch Draft 可应用性/授权校验、Git Apply、已批准工具调度与项目绑定、输出截断、审计和任务摘要已归属 `runtime/execution.rs`；Agent Run 的模型阶段创建/恢复校验、running checkpoint、工具结果续接，以及模型完成后的审批/终态/证据收束已归属 `runtime/agent_runs.rs`。`app.rs` 仅保留项目权限解析、Tauri 命令适配、Provider/Hermes transport 与生命周期编排，当前 2261 行。无 Runtime 消费者的旧 schema 已完成独立确认与退役，当前 14 份 schema 均有 Desktop 消费者证据。
 - `复杂任务执行基础 v1` 已完成：Hermes 启动前建立有界只读 Context Pack；确认任务可选择临时 detached worktree，Patch 与检查先在其中运行，源工程合并仍需第二次独立审批与干净源/diff/授权复核；原生终端实时保存脱敏、截断的会话证据，重启后的旧会话明确记录为中断。
 - 受保护真实 Eval [`30081697947`](https://github.com/lijinmei915/project-os-starter/actions/runs/30081697947) 已通过：13/13 标准 case 成功，任务成功率 100%、Patch 可应用率 91.7%、检查通过率 100%、恢复成功率 100%。独立 `isolated-worktree` trace 证明源工程干净、批准 diff 与 worktree 一致、二次审批完成、合并结果通过验证且临时 worktree 已清理。
+- `普通聊天可靠性 v1` 已完成：普通 Provider 只生成自然文本正文，任务意图与是否创建计划由本地确定性路由负责；SSE 文本不再从未完成 JSON 中手工截取。旧 JSON envelope 仅作为兼容输入读取，并以 `responseMode=legacy-json` 随对话记录持久化；Hermes 任务、审批和证据边界未改变。
 
 当前重点：
 
-- 保持普通闲聊为轻量 Provider 链路；只有确认执行的任务进入 Hermes 工具循环，避免两条链路重复扩展复杂能力。
+- 保持普通闲聊为自然文本 Provider 链路；只有确认执行的任务进入 Hermes 工具循环，避免两条链路重复扩展复杂能力。
 - 保持多文件 Patch 的授权、规范化和 trace 门槛，并继续降低模型输出波动。
 
 当前风险：
@@ -88,4 +89,4 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 ## 下一步重点
 
 1. 根据真实 `ask-user-resume` trace 决定是否扩展字段 widget；在证据不足前不把普通聊天迁入复杂 Agent 循环。
-2. 降低多文件 Patch case 的模型输出波动，但不得放宽四文件授权、Patch 规范化或 trace 门槛。
+2. 为普通聊天增加受保护环境的真实 Provider 文本流验收，同时继续降低多文件 Patch 输出波动；不得放宽授权、审批、规范化或 trace 门槛。

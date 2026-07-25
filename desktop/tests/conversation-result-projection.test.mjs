@@ -41,3 +41,12 @@ test("keeps an explicit recommended next step pending until the user confirms it
   assert.deepEqual(result.turn.pendingAction, action);
   assert.match(result.turn.text, /回复“可以”后生成执行计划/);
 });
+
+test("keeps the Provider response mode as non-visual conversation evidence", () => {
+  const result = buildNonPlanConversationTurn({
+    ...base,
+    chatResult: { reply: "兼容回答", responseMode: "legacy-json", shouldCreatePlan: false },
+    stageGoalCandidate: null,
+  });
+  assert.equal(result.turn.responseMode, "legacy-json");
+});

@@ -1,6 +1,6 @@
 {
   "schemaVersion": "omnidesk.repository-file-inventory.v1",
-  "generatedAt": "2026-07-24T09:20:03.963Z",
+  "generatedAt": "2026-07-24T09:53:17.927Z",
   "sourceOfTruth": "git ls-files --cached --others --exclude-standard",
   "scope": "受版本控制文件及准备纳入版本控制的非忽略工作树文件；忽略的本地运行数据和构建输出不在本账本内。",
   "reviewContract": {
@@ -138,7 +138,7 @@
       "path": "HANDOFF.md",
       "kind": "root-document",
       "owner": "Documentation Governance",
-      "bytes": 4869,
+      "bytes": 5339,
       "pathMentions": [
         "desktop/src/components/workbench/current-goal-panel.jsx",
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
@@ -191,7 +191,7 @@
       "path": "PROJECT.md",
       "kind": "root-document",
       "owner": "Documentation Governance",
-      "bytes": 11616,
+      "bytes": 12048,
       "pathMentions": [
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
         "desktop/src/lib/agent-topic-runtime-capability.js",
@@ -1537,7 +1537,7 @@
       "path": "desktop/src-tauri/src/runtime/chat_content.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 15693,
+      "bytes": 15470,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/app.rs",
@@ -1561,6 +1561,7 @@
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/app.rs",
         "desktop/src-tauri/src/runtime/chat_content.rs",
+        "desktop/src-tauri/src/runtime/chat_stream.rs",
         "desktop/src-tauri/src/runtime/mod.rs"
       ],
       "consumerEvidence": "static-module-consumer",
@@ -1593,7 +1594,7 @@
       "path": "desktop/src-tauri/src/runtime/chat_stream.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 8911,
+      "bytes": 13257,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/app.rs",
@@ -5249,7 +5250,7 @@
       "path": "desktop/src/lib/conversation-record.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 9216,
+      "bytes": 9244,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/components/workbench/use-conversation-persistence.js",
@@ -5295,7 +5296,7 @@
       "path": "desktop/src/lib/conversation-result-projection.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 2231,
+      "bytes": 2337,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/components/workbench/use-conversation-submission.js",
@@ -7314,7 +7315,7 @@
       "path": "desktop/tests/conversation-record.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 10119,
+      "bytes": 10209,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -7344,7 +7345,7 @@
       "path": "desktop/tests/conversation-result-projection.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 1681,
+      "bytes": 2022,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -7494,7 +7495,7 @@
       "path": "desktop/tests/domain-boundaries.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 99991,
+      "bytes": 100048,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",

@@ -1,6 +1,7 @@
 use crate::runtime::chat_content::{
-    chat_router_prompt, ChatTurnInput, ChatWithModelResult, DialogueContextInput,
+    chat_reply_prompt, ChatTurnInput, ChatWithModelResult, DialogueContextInput,
 };
+use crate::runtime::chat_routing::{is_question_like_message, should_create_plan_for_message};
 use crate::runtime::planning::PlanAttachment;
 use crate::runtime::provider::{
     chat_completion_content, post_chat_completion, read_secret, require_success, ProviderConfig,
@@ -33,7 +34,7 @@ where
         return Err(format!("环境变量 {} 为空", provider.api_key_env));
     }
 
-    let router_prompt = chat_router_prompt(
+    let reply_prompt = chat_reply_prompt(
         project_name,
         stage,
         &provider.model,
@@ -45,7 +46,7 @@ where
         project_memory,
         project_evidence,
     );
-    let user_content = provider_user_content(router_prompt, attachments);
+    let user_content = provider_user_content(reply_prompt, attachments);
     let response = post_chat_completion(
         provider,
         &api_key,
@@ -54,7 +55,7 @@ where
             "messages": [
                 {
                     "role": "system",
-                    "content": "You are OmniDesk, a local AI project workbench assistant. Return only strict JSON with keys reply, shouldCreatePlan, intent. Do not include markdown fences."
+                    "content": "You are OmniDesk, a local AI project workbench assistant. Answer the user directly in natural Chinese text. Do not wrap the answer in JSON or include routing metadata."
                 },
                 {
                     "role": "user",
@@ -80,25 +81,48 @@ where
     } else {
         let mut content = String::new();
         let mut pending = String::new();
-        let mut emitted_reply_chars = 0usize;
+        let mut stream_mode = StreamMode::Unknown;
         let mut stream = response.bytes_stream();
         while let Some(chunk) = stream.next().await {
             let chunk = chunk.map_err(|err| err.to_string())?;
             let chunk = String::from_utf8_lossy(&chunk);
             for delta in consume_openai_sse_deltas(&mut pending, &chunk) {
                 content.push_str(&delta);
-                let reply = streaming_reply_prefix(&content);
-                let reply_delta = reply.chars().skip(emitted_reply_chars).collect::<String>();
-                emitted_reply_chars += reply_delta.chars().count();
-                on_delta(reply_delta, delta.chars().count());
+                match stream_mode {
+                    StreamMode::Unknown => {
+                        let trimmed = content.trim_start();
+                        if trimmed.is_empty() {
+                            continue;
+                        }
+                        if trimmed.starts_with('{') {
+                            stream_mode = StreamMode::LegacyCandidate;
+                        } else {
+                            stream_mode = StreamMode::Text;
+                            on_delta(content.clone(), content.chars().count());
+                        }
+                    }
+                    StreamMode::Text => on_delta(delta.clone(), delta.chars().count()),
+                    StreamMode::LegacyCandidate => {}
+                }
             }
         }
         if content.trim().is_empty() {
             return Err("provider 流式返回空内容".to_string());
         }
+        if stream_mode == StreamMode::LegacyCandidate {
+            let visible = visible_chat_content(&content)?.0;
+            on_delta(visible.clone(), visible.chars().count());
+        }
         content
     };
-    parse_chat_result(&content)
+    build_chat_result(&content, message, !attachments.is_empty())
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum StreamMode {
+    Unknown,
+    Text,
+    LegacyCandidate,
 }
 
 fn provider_user_content(router_prompt: String, attachments: &[PlanAttachment]) -> Value {
@@ -115,22 +139,46 @@ fn provider_user_content(router_prompt: String, attachments: &[PlanAttachment]) 
     Value::Array(parts)
 }
 
-fn parse_chat_result(content: &str) -> Result<ChatWithModelResult, String> {
-    let mut result: ChatWithModelResult =
-        serde_json::from_str(content).map_err(|err| format!("chat JSON 解析失败: {}", err))?;
-    if result.reply.trim().is_empty() {
-        result.reply =
-            "我在。你可以直接说想做什么，我会先判断是普通对话还是需要创建计划。".to_string();
+fn visible_chat_content(content: &str) -> Result<(String, &'static str), String> {
+    let trimmed = content.trim();
+    if trimmed.is_empty() {
+        return Err("provider 返回空内容".to_string());
     }
-    if result.intent.trim().is_empty() {
-        result.intent = if result.should_create_plan {
+    if let Ok(envelope) = serde_json::from_str::<Value>(trimmed) {
+        if let Some(reply) = envelope.get("reply").and_then(Value::as_str) {
+            let reply = reply.trim();
+            if !reply.is_empty() {
+                return Ok((reply.to_string(), "legacy-json"));
+            }
+        }
+    }
+    Ok((trimmed.to_string(), "text"))
+}
+
+fn build_chat_result(
+    content: &str,
+    message: &str,
+    has_attachments: bool,
+) -> Result<ChatWithModelResult, String> {
+    let (reply, response_mode) = visible_chat_content(content)?;
+    let should_create_plan = should_create_plan_for_message(message, has_attachments);
+    Ok(ChatWithModelResult {
+        reply,
+        should_create_plan,
+        intent: if should_create_plan {
             "task"
+        } else if is_question_like_message(message) {
+            "question"
         } else {
             "chat"
         }
-        .to_string();
-    }
-    Ok(result)
+        .to_string(),
+        provider_status: String::new(),
+        provider_model: String::new(),
+        provider_error: String::new(),
+        response_mode: response_mode.to_string(),
+        references: Vec::new(),
+    })
 }
 
 /// Consumes complete SSE lines only, preserving unfinished transport chunks
@@ -163,46 +211,12 @@ pub fn consume_openai_sse_deltas(pending: &mut String, chunk: &str) -> Vec<Strin
     deltas
 }
 
-/// Extracts a visible reply from an incomplete model JSON envelope. The final
-/// response still has to pass strict JSON parsing before it becomes a result.
-pub fn streaming_reply_prefix(content: &str) -> String {
-    let Some(key_index) = content.find("\"reply\"") else {
-        return String::new();
-    };
-    let Some((_, value)) = content[key_index + "\"reply\"".len()..].split_once(':') else {
-        return String::new();
-    };
-    let Some(value) = value.trim_start().strip_prefix('"') else {
-        return String::new();
-    };
-
-    let mut reply = String::new();
-    let mut escaped = false;
-    for character in value.chars() {
-        if escaped {
-            match character {
-                'n' => reply.push('\n'),
-                'r' => reply.push('\r'),
-                't' => reply.push('\t'),
-                '"' => reply.push('"'),
-                '\\' => reply.push('\\'),
-                other => reply.push(other),
-            }
-            escaped = false;
-        } else if character == '\\' {
-            escaped = true;
-        } else if character == '"' {
-            break;
-        } else {
-            reply.push(character);
-        }
-    }
-    reply
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::{Read as _, Write as _};
+    use std::net::TcpListener;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn handles_transport_splits_and_completion_markers() {
@@ -220,13 +234,12 @@ mod tests {
     }
 
     #[test]
-    fn extracts_a_partial_reply_without_accepting_the_envelope() {
-        assert_eq!(streaming_reply_prefix(r#"{"reply": "正在生成"#), "正在生成");
-        assert_eq!(
-            streaming_reply_prefix(r#"{"reply": "第一行\n第二行", "intent": "chat"}"#),
-            "第一行\n第二行"
-        );
-        assert_eq!(streaming_reply_prefix(r#"{"intent": "chat"}"#), "");
+    fn accepts_natural_text_without_json_parsing() {
+        let result = build_chat_result("这是自然文本回答。", "这是什么", false).unwrap();
+        assert_eq!(result.reply, "这是自然文本回答。");
+        assert_eq!(result.intent, "question");
+        assert!(!result.should_create_plan);
+        assert_eq!(result.response_mode, "text");
     }
 
     #[test]
@@ -251,12 +264,109 @@ mod tests {
     }
 
     #[test]
-    fn normalizes_empty_chat_reply_and_intent_after_strict_json_parsing() {
-        let result =
-            parse_chat_result(r#"{"reply":"","shouldCreatePlan":true,"intent":""}"#).unwrap();
-        assert!(!result.reply.is_empty());
+    fn keeps_legacy_json_as_a_traced_compatibility_input() {
+        let result = build_chat_result(
+            r#"{"reply":"兼容回答","shouldCreatePlan":false,"intent":"chat"}"#,
+            "帮我修复这个问题",
+            false,
+        )
+        .unwrap();
+        assert_eq!(result.reply, "兼容回答");
         assert_eq!(result.intent, "task");
         assert!(result.should_create_plan);
-        assert!(parse_chat_result("not-json").is_err());
+        assert_eq!(result.response_mode, "legacy-json");
+        assert!(build_chat_result("   ", "你好", false).is_err());
+    }
+
+    #[tokio::test]
+    async fn streams_natural_text_from_the_provider_without_a_json_contract() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut request = Vec::new();
+            let mut buffer = [0_u8; 8192];
+            loop {
+                let count = stream.read(&mut buffer).unwrap();
+                if count == 0 {
+                    break;
+                }
+                request.extend_from_slice(&buffer[..count]);
+                let Some(header_end) = request.windows(4).position(|bytes| bytes == b"\r\n\r\n")
+                else {
+                    continue;
+                };
+                let headers = String::from_utf8_lossy(&request[..header_end]);
+                let content_length = headers
+                    .lines()
+                    .find_map(|line| {
+                        line.to_ascii_lowercase()
+                            .strip_prefix("content-length:")
+                            .and_then(|value| value.trim().parse::<usize>().ok())
+                    })
+                    .unwrap_or(0);
+                if request.len() >= header_end + 4 + content_length {
+                    break;
+                }
+            }
+            let request = String::from_utf8_lossy(&request).to_string();
+            let body = concat!(
+                "data: {\"choices\":[{\"delta\":{\"content\":\"自然\"}}]}\n\n",
+                "data: {\"choices\":[{\"delta\":{\"content\":\"文本\"}}]}\n\n",
+                "data: [DONE]\n\n"
+            );
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            )
+            .unwrap();
+            request
+        });
+        let root = std::env::temp_dir().join(format!(
+            "omnidesk-chat-stream-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join(".env.local"), "OMNIDESK_CHAT_TEST_KEY=test-key\n").unwrap();
+        let provider = ProviderConfig {
+            schema_version: "omnidesk.desktop-provider.v0.1".to_string(),
+            provider: "openai-compatible".to_string(),
+            model: "test-model".to_string(),
+            api_base: format!("http://{address}/v1"),
+            api_key_env: "OMNIDESK_CHAT_TEST_KEY".to_string(),
+            enabled: true,
+            active_profile_id: String::new(),
+            profiles: Vec::new(),
+        };
+        let mut deltas = Vec::new();
+        let result = generate_provider_chat(
+            &provider,
+            &root,
+            "OmniDesk",
+            "stabilizing",
+            "这是什么",
+            &[],
+            &[],
+            &DialogueContextInput::default(),
+            &json!({}),
+            &[],
+            &json!({}),
+            |text, _| deltas.push(text),
+        )
+        .await
+        .unwrap();
+        let request = server.join().unwrap();
+        assert_eq!(result.reply, "自然文本");
+        assert_eq!(result.response_mode, "text");
+        assert_eq!(deltas.concat(), "自然文本");
+        assert!(request.contains("natural Chinese text"));
+        assert!(!request.contains("Return only strict JSON"));
+        assert!(!request.contains("shouldCreatePlan"));
+        std::fs::remove_dir_all(root).unwrap();
     }
 }
