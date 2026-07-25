@@ -88,10 +88,8 @@ async function loadDesktopTheme() {
 }
 
 async function saveDesktopTheme(theme) {
-  if (!window.__TAURI_INTERNALS__) {
-    window.localStorage.setItem(storageKey, JSON.stringify(theme));
-    return theme;
-  }
+  window.localStorage.setItem(storageKey, JSON.stringify(theme));
+  if (!window.__TAURI_INTERNALS__) return theme;
   return invoke("save_desktop_theme", { input: theme });
 }
 
@@ -122,6 +120,7 @@ export function ThemeMenu() {
       .then((storedTheme) => {
         if (cancelled) return;
         const nextTheme = normalizeTheme(storedTheme);
+        window.localStorage.setItem(storageKey, JSON.stringify(nextTheme));
         setTheme(nextTheme);
         applyTheme(nextTheme);
       })

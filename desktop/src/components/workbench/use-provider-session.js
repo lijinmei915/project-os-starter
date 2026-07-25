@@ -10,5 +10,6 @@ export function useProviderSession({ fallbackModelCatalog, fallbackProvider }) {
   const [composerModelTests, setComposerModelTests] = useState({});
   const [composerModelTesting, setComposerModelTesting] = useState(false);
   const [providerError, setProviderError] = useState("");
-  return { composerModelTesting, composerModelTests, composerModels, composerModelsKey, composerModelsLoading, composerModelsSource, modelCatalog, provider, providerError, setComposerModelTesting, setComposerModelTests, setComposerModels, setComposerModelsKey, setComposerModelsLoading, setComposerModelsSource, setModelCatalog, setProvider, setProviderError };
+  const [providerReady, setProviderReady] = useState(false);
+  return { composerModelTesting, composerModelTests, composerModels, composerModelsKey, composerModelsLoading, composerModelsSource, modelCatalog, provider, providerError, providerReady, setComposerModelTesting, setComposerModelTests, setComposerModels, setComposerModelsKey, setComposerModelsLoading, setComposerModelsSource, setModelCatalog, setProvider, setProviderError, setProviderReady };
 }

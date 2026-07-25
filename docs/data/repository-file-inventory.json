@@ -1,6 +1,6 @@
 {
   "schemaVersion": "omnidesk.repository-file-inventory.v1",
-  "generatedAt": "2026-07-24T09:53:17.927Z",
+  "generatedAt": "2026-07-25T12:49:29.264Z",
   "sourceOfTruth": "git ls-files --cached --others --exclude-standard",
   "scope": "受版本控制文件及准备纳入版本控制的非忽略工作树文件；忽略的本地运行数据和构建输出不在本账本内。",
   "reviewContract": {
@@ -138,7 +138,7 @@
       "path": "HANDOFF.md",
       "kind": "root-document",
       "owner": "Documentation Governance",
-      "bytes": 5339,
+      "bytes": 6252,
       "pathMentions": [
         "desktop/src/components/workbench/current-goal-panel.jsx",
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
@@ -191,7 +191,7 @@
       "path": "PROJECT.md",
       "kind": "root-document",
       "owner": "Documentation Governance",
-      "bytes": 12048,
+      "bytes": 13457,
       "pathMentions": [
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
         "desktop/src/lib/agent-topic-runtime-capability.js",
@@ -291,7 +291,7 @@
       "path": "desktop/index.html",
       "kind": "desktop-support",
       "owner": "Desktop Platform",
-      "bytes": 854,
+      "bytes": 1585,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -1519,7 +1519,7 @@
       "path": "desktop/src-tauri/src/runtime/app.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 83405,
+      "bytes": 87313,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/main.rs",
@@ -1594,7 +1594,7 @@
       "path": "desktop/src-tauri/src/runtime/chat_stream.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 13257,
+      "bytes": 15778,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/app.rs",
@@ -1612,7 +1612,7 @@
       "path": "desktop/src-tauri/src/runtime/conversations.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 5600,
+      "bytes": 7254,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/app.rs",
@@ -1803,7 +1803,7 @@
       "path": "desktop/src-tauri/src/runtime/provider.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 64544,
+      "bytes": 65699,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/app.rs",
@@ -2757,7 +2757,7 @@
       "path": "desktop/src/components/workbench/agent-workspace-auxiliary-tabs.jsx",
       "kind": "frontend",
       "owner": "Workbench",
-      "bytes": 1632,
+      "bytes": 2406,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/main.jsx"
@@ -2842,7 +2842,7 @@
       "path": "desktop/src/components/workbench/chat-composer.jsx",
       "kind": "frontend",
       "owner": "Workbench",
-      "bytes": 18317,
+      "bytes": 18256,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/components/workbench/chat-dock.jsx"
@@ -3335,7 +3335,7 @@
       "path": "desktop/src/components/workbench/provider-panel.jsx",
       "kind": "frontend",
       "owner": "Workbench",
-      "bytes": 11517,
+      "bytes": 10269,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/main.jsx"
@@ -3594,7 +3594,7 @@
       "path": "desktop/src/components/workbench/theme-menu.jsx",
       "kind": "frontend",
       "owner": "Workbench",
-      "bytes": 7697,
+      "bytes": 7761,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/components/workbench/top-bar.jsx"
@@ -3747,7 +3747,7 @@
       "path": "desktop/src/components/workbench/use-composer-model-actions.js",
       "kind": "frontend",
       "owner": "Workbench",
-      "bytes": 4181,
+      "bytes": 3980,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/main.jsx"
@@ -3798,7 +3798,7 @@
       "path": "desktop/src/components/workbench/use-conversation-request-state.js",
       "kind": "frontend",
       "owner": "Workbench",
-      "bytes": 2900,
+      "bytes": 3734,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/main.jsx"
@@ -3832,7 +3832,7 @@
       "path": "desktop/src/components/workbench/use-conversation-submission.js",
       "kind": "frontend",
       "owner": "Workbench",
-      "bytes": 14235,
+      "bytes": 13969,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/main.jsx"
@@ -4019,7 +4019,7 @@
       "path": "desktop/src/components/workbench/use-provider-data-sync.js",
       "kind": "frontend",
       "owner": "Workbench",
-      "bytes": 1847,
+      "bytes": 1965,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/main.jsx"
@@ -4036,7 +4036,7 @@
       "path": "desktop/src/components/workbench/use-provider-session.js",
       "kind": "frontend",
       "owner": "Workbench",
-      "bytes": 1092,
+      "bytes": 1186,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/main.jsx"
@@ -4291,7 +4291,7 @@
       "path": "desktop/src/components/workbench/use-workspace-session.js",
       "kind": "frontend",
       "owner": "Workbench",
-      "bytes": 1491,
+      "bytes": 1595,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/main.jsx"
@@ -4636,7 +4636,7 @@
       "path": "desktop/src/conversation-runtime/projector.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 2727,
+      "bytes": 2801,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/conversation-runtime/index.js"
@@ -4670,7 +4670,7 @@
       "path": "desktop/src/conversation-runtime/schema.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 3972,
+      "bytes": 4184,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/conversation-runtime/index.js"
@@ -5106,7 +5106,7 @@
       "path": "desktop/src/lib/conversation-chat-result.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 1236,
+      "bytes": 1149,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/components/workbench/use-conversation-submission.js",
@@ -5278,7 +5278,7 @@
       "path": "desktop/src/lib/conversation-result-decision.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 736,
+      "bytes": 840,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/components/workbench/use-conversation-submission.js",
@@ -5654,7 +5654,7 @@
       "path": "desktop/src/lib/preview-chat-projection.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 12708,
+      "bytes": 13531,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/main.jsx",
@@ -5854,13 +5854,12 @@
       "path": "desktop/src/lib/provider-presentation.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 3958,
+      "bytes": 4551,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/scripts/run-agent-eval-recovery.mjs",
         "desktop/src/components/workbench/provider-panel.jsx",
         "desktop/src/components/workbench/use-composer-model-actions.js",
-        "desktop/src/components/workbench/use-conversation-submission.js",
         "desktop/src/components/workbench/use-provider-data-sync.js",
         "desktop/src/lib/agent-topic-view-model.js",
         "desktop/src/main.jsx",
@@ -6618,7 +6617,7 @@
       "path": "desktop/src/main.jsx",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 55233,
+      "bytes": 55626,
       "pathMentions": [
         "desktop/src-tauri/src/runtime/workspace.rs",
         "desktop/src/lib/agent-topic-cards.js"
@@ -6817,7 +6816,7 @@
       "path": "desktop/src/styles/terminal.css",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 36491,
+      "bytes": 37107,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/styles.css"
@@ -6834,7 +6833,7 @@
       "path": "desktop/src/styles/theme.css",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 37922,
+      "bytes": 38464,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/styles.css"
@@ -7330,7 +7329,7 @@
       "path": "desktop/tests/conversation-result-decision.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 736,
+      "bytes": 969,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -7375,7 +7374,7 @@
       "path": "desktop/tests/conversation-runtime.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 21357,
+      "bytes": 21854,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -7495,7 +7494,7 @@
       "path": "desktop/tests/domain-boundaries.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 100048,
+      "bytes": 102123,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -7825,7 +7824,7 @@
       "path": "desktop/tests/preview-chat-projection.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 3299,
+      "bytes": 3845,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -7975,7 +7974,7 @@
       "path": "desktop/tests/provider-presentation.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 2951,
+      "bytes": 3602,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -8830,7 +8829,7 @@
       "path": "docs/LESSONS.md",
       "kind": "documentation",
       "owner": "Documentation Governance",
-      "bytes": 90941,
+      "bytes": 93922,
       "pathMentions": [
         "desktop/src/components/workbench/project-memory-panel.jsx",
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
@@ -9018,7 +9017,7 @@
       "path": "docs/data/schema-contract-inventory.json",
       "kind": "documentation-data",
       "owner": "Documentation Governance",
-      "bytes": 13670,
+      "bytes": 13786,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",

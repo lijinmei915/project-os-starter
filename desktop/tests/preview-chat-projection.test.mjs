@@ -66,6 +66,16 @@ test("preview loading and diagnostics retain their bounded fallback behavior", (
     detail: "连接超时",
   });
   assert.equal(conversationDiagnosticForResult({ providerStatus: "available" }, {}), null);
+  assert.deepEqual(conversationDiagnosticForResult({ providerStatus: "timed-out", providerError: "本轮超时" }, {}), {
+    label: "本轮响应超时",
+    message: "这只影响当前回答，不代表 API Key 或模型连接失效。",
+    detail: "本轮超时",
+  });
+  assert.deepEqual(conversationDiagnosticForResult({ providerStatus: "interrupted", providerError: "流中断" }, {}), {
+    label: "回答生成中断",
+    message: "这只影响当前回答，不代表 API Key 或模型连接失效。",
+    detail: "流中断",
+  });
 });
 
 test("local connection fallback remains read-only and delegates non-status replies", () => {

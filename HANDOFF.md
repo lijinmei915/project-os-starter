@@ -31,6 +31,9 @@ depends_on: [PROJECT.md, AGENTS.md, docs/ARCHITECTURE.md, docs/TESTING.md]
 - 受保护真实 Eval [30071780488](https://github.com/lijinmei915/project-os-starter/actions/runs/30071780488) 已通过：13/13 case 成功，任务成功率 `100%`、Patch 可应用率 `91.7%`、检查通过率 `100%`、恢复成功率 `100%`。`ask-user-resume` artifact 证明首次模型返回 `ask_user`、checkpoint 持久化、交互审批为 0、回答后同 Run 续接、Patch 独立审批并通过检查。
 - `复杂任务执行基础 v1` 已通过受保护真实 Eval [30081697947](https://github.com/lijinmei915/project-os-starter/actions/runs/30081697947)：13/13 标准 case 成功，另有隔离 worktree 证明源工程干净、diff 未变、二次审批合并、源工程验证和 worktree 清理；本地完整回归通过 Node `555/555`、Rust `157/157`、Patch Normalizer `7/7`。
 - `普通聊天可靠性 v1` 已移除 Prompt 强制 JSON：Provider 自然文本直接流式显示，本地路由独立决定任务意图；旧 JSON 仅作为带 `responseMode=legacy-json` 的兼容输入并随对话持久化。模拟 Provider SSE、原生 WebDriver 和完整回归通过：Node `556/556`、Rust `158/158`（新增集成测试后为 `159`）、Patch Normalizer `7/7`。
+- `普通聊天生命周期可靠性 v2` 已移除前端固定 12 秒假超时：Runtime 统一拥有首响应、流空闲、整体上限与取消，终态后拒绝迟到 delta；中断保留部分正文，单轮超时不修改 Provider 健康状态。终端懒加载失败也已限制在终端区域。完整回归通过 Node `557/557`、Rust `160/160`、Patch Normalizer `7/7` 和原生 WebDriver 终端诊断。
+- Provider 健康机制已转为证据驱动：不再每分钟自动探测；首字前网络失败最多自动重试一次，已有正文时不重放；网络类错误不持久改写长期健康状态，认证、额度与模型错误仍保持阻断。
+- 刷新启动不再先渲染演示 fallback：Workspace 与 Provider 首次恢复前显示统一启动壳，主题从本地缓存在绘制前恢复。浏览器首帧/稳定帧已实际验收。
 
 ## 风险与注意
 
@@ -43,5 +46,5 @@ depends_on: [PROJECT.md, AGENTS.md, docs/ARCHITECTURE.md, docs/TESTING.md]
 
 ## 下一步建议
 
-1. 在受保护环境增加真实 Provider 普通文本流验收，确认不同 OpenAI-compatible 服务不会回退到旧 JSON envelope。
+1. 在受保护环境增加普通聊天 v2 的真实慢速流、长回答与中断验收，确认不同 OpenAI-compatible 服务不会回退到旧 JSON envelope，也不会出现双终态。
 2. 根据真实 `ask-user-resume` trace 决定是否扩展字段 widget，并继续降低多文件 Patch 波动；不要放宽授权、独立审批或 trace 门槛。

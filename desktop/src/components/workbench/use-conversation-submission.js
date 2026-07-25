@@ -3,7 +3,6 @@ import { resolveConversationChatResult } from "../../lib/conversation-chat-resul
 import { createBasicConversationImmediateHandlers } from "../../lib/conversation-immediate-handlers";
 import { buildNonPlanConversationTurn } from "../../lib/conversation-result-projection";
 import { modelHealthUpdate, shouldGenerateConversationPlan } from "../../lib/conversation-result-decision";
-import { classifyProviderFailure } from "../../lib/provider-presentation";
 import { syncConversationProfilePatches } from "../../lib/conversation-profile-sync";
 import { getProjectMemory, saveProjectMemory } from "../../lib/project-memory-client";
 import { appendMemoryAudit, projectMemoryReferences, retrieveProjectMemory } from "../../lib/project-memory";
@@ -77,7 +76,6 @@ export function useConversationSubmission({
   taskStatuses,
   tasks,
   taskInput,
-  withTimeout,
 }) {
   return async function submitTask(event) {
     event.preventDefault();
@@ -268,17 +266,15 @@ export function useConversationSubmission({
         requestId,
         snapshot,
         tasks,
-        withTimeout,
       });
     } catch (error) {
       const providerError = error instanceof Error ? error.message : String(error);
-      onModelHealthChange?.(provider?.model, classifyProviderFailure(providerError), providerError);
       chatResult = {
         intent: "chat",
         providerError,
         providerModel: provider?.model || "",
-        providerStatus: "unavailable",
-        reply: "我现在先按本地上下文回答。模型连接暂时不可用，我会把这件事标在状态里，不影响你继续问项目问题。",
+        providerStatus: "request-failed",
+        reply: "本轮请求没有完成，请重新发送。模型连接状态没有因此改变。",
         shouldCreatePlan: false,
       };
     } finally {

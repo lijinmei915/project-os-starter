@@ -5,6 +5,7 @@ export function shouldGenerateConversationPlan({ actionFromCommitment, attachmen
 export function modelHealthUpdate(chatResult, fallbackModel) {
   const model = chatResult?.providerModel || fallbackModel;
   if (chatResult?.providerStatus === "available") return { message: `${model} work`, model, status: "available" };
+  if (["interrupted", "request-failed", "timed-out"].includes(chatResult?.providerStatus)) return null;
   if (chatResult?.providerStatus && chatResult.providerStatus !== "available") {
     return { message: chatResult.providerError || "模型不可用", model, status: chatResult.providerStatus };
   }

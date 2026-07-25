@@ -2,6 +2,11 @@ import { normalizeTurnSummary } from "./summary.js";
 
 export const conversationSchemaVersion = "omnidesk.conversation.v0.3";
 export const legacyConversationSchemaVersion = "project-os.conversation.v0.3";
+const compatibleLegacyConversationSchemaVersions = new Set([
+  legacyConversationSchemaVersion,
+  "project-os.desktop-conversation.v0.1",
+  "omnidesk.desktop-conversation.v0.1",
+]);
 
 function normalizeWaitingForUserActionTurn(turn) {
   if (!isWaitingForUserAction(turn)) return turn;
@@ -23,12 +28,12 @@ export function migrateConversationRecord(record = {}) {
       : normalizeTurnSummary(record.summary),
     turns,
   };
-  if (record.schemaVersion === legacyConversationSchemaVersion) {
+  if (compatibleLegacyConversationSchemaVersions.has(record.schemaVersion)) {
     migrated.schemaMigration = {
-      from: legacyConversationSchemaVersion,
+      from: record.schemaVersion,
       mode: "read-projection",
     };
-  } else {
+  } else if (!record.schemaMigration) {
     delete migrated.schemaMigration;
   }
   return migrated;

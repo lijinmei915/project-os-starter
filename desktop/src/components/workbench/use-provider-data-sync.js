@@ -12,6 +12,7 @@ export function useProviderDataSync({
   setModelCatalog,
   setProvider,
   setProviderError,
+  setProviderReady,
 }) {
   useEffect(() => {
     let cancelled = false;
@@ -41,10 +42,13 @@ export function useProviderDataSync({
       })
       .catch((err) => {
         if (!cancelled) setProviderError(err instanceof Error ? err.message : String(err));
+      })
+      .finally(() => {
+        if (!cancelled) setProviderReady(true);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [fallbackModelCatalog, fallbackProvider, getModelCatalog, getModelHealth, getProviderStatus, setComposerModelTests, setModelCatalog, setProvider, setProviderError]);
+  }, [fallbackModelCatalog, fallbackProvider, getModelCatalog, getModelHealth, getProviderStatus, setComposerModelTests, setModelCatalog, setProvider, setProviderError, setProviderReady]);
 }

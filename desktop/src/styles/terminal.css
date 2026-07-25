@@ -26,6 +26,35 @@
   min-height: 0;
 }
 
+.terminalModuleFailure {
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: var(--space-8);
+  width: 100%;
+  padding: var(--space-24);
+  color: var(--desktop-text-primary);
+}
+
+.terminalModuleFailure p {
+  margin: 0;
+  color: var(--desktop-text-secondary);
+}
+
+.terminalModuleFailure button {
+  min-height: 32px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--desktop-surface-card);
+  color: var(--desktop-text-primary);
+  padding: 0 var(--space-12);
+  cursor: pointer;
+}
+
+.terminalModuleFailure button:hover {
+  background: var(--desktop-surface-hover);
+}
+
 .terminalWorkspace .terminalDock {
   display: flex;
   flex: 1;

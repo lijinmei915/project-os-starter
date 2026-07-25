@@ -171,7 +171,10 @@ export function agentEventsForMessageKind(kind, chatResult, createAgentEvent) {
   } else if (kind === "question" || kind === "chat") {
     events.push(createAgentEvent("thinking", "done", "组织回答", "已按当前对话上下文生成回复。"));
   }
-  if (chatResult?.providerStatus && chatResult.providerStatus !== "available") {
+  if (["interrupted", "request-failed", "timed-out"].includes(chatResult?.providerStatus)) {
+    const label = chatResult.providerStatus === "interrupted" ? "回答生成中断" : chatResult.providerStatus === "timed-out" ? "本轮响应超时" : "本轮请求失败";
+    events.push(createAgentEvent("error", "failed", label, chatResult.providerError || "本轮请求没有完整结束。"));
+  } else if (chatResult?.providerStatus && chatResult.providerStatus !== "available") {
     events.push(createAgentEvent("error", "failed", "模型连接未接通", chatResult.providerError || "Provider 暂时不可用，已切换为本地上下文回复。"));
   }
   return events;
@@ -205,6 +208,13 @@ export function localStatusReply({ activeProviderProfileName, kind, provider, pr
 
 export function conversationDiagnosticForResult(chatResult, providerHealth) {
   if (!chatResult?.providerStatus || chatResult.providerStatus === "available") return null;
+  if (["interrupted", "request-failed", "timed-out"].includes(chatResult.providerStatus)) {
+    return {
+      label: chatResult.providerStatus === "interrupted" ? "回答生成中断" : chatResult.providerStatus === "timed-out" ? "本轮响应超时" : "本轮请求失败",
+      message: "这只影响当前回答，不代表 API Key 或模型连接失效。",
+      detail: chatResult.providerError || "",
+    };
+  }
   return {
     label: "模型连接未接通",
     message: "当前回复使用本地上下文生成。可在顶部连接状态里刷新模型，或继续直接提问。",

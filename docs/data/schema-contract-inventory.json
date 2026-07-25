@@ -1,6 +1,6 @@
 {
   "schemaVersion": "omnidesk.schema-contract-inventory.v1",
-  "generatedAt": "2026-07-24T06:25:26.527Z",
+  "generatedAt": "2026-07-25T12:49:29.826Z",
   "sourceOfTruth": "schemas/*.json plus git grep consumer evidence",
   "totals": {
     "contracts": 14,
@@ -74,11 +74,13 @@
         "docs/data/schema-contract-inventory.json"
       ],
       "versionConsumers": [
+        "desktop/src-tauri/src/runtime/conversations.rs",
         "desktop/src/conversation-runtime/schema.js",
         "desktop/tests/conversation-runtime.test.mjs",
         "docs/data/schema-contract-inventory.json"
       ],
       "runtimeConsumers": [
+        "desktop/src-tauri/src/runtime/conversations.rs",
         "desktop/src/conversation-runtime/schema.js",
         "desktop/tests/conversation-runtime.test.mjs"
       ],

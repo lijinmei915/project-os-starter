@@ -74,10 +74,14 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 - `复杂任务执行基础 v1` 已完成：Hermes 启动前建立有界只读 Context Pack；确认任务可选择临时 detached worktree，Patch 与检查先在其中运行，源工程合并仍需第二次独立审批与干净源/diff/授权复核；原生终端实时保存脱敏、截断的会话证据，重启后的旧会话明确记录为中断。
 - 受保护真实 Eval [`30081697947`](https://github.com/lijinmei915/project-os-starter/actions/runs/30081697947) 已通过：13/13 标准 case 成功，任务成功率 100%、Patch 可应用率 91.7%、检查通过率 100%、恢复成功率 100%。独立 `isolated-worktree` trace 证明源工程干净、批准 diff 与 worktree 一致、二次审批完成、合并结果通过验证且临时 worktree 已清理。
 - `普通聊天可靠性 v1` 已完成：普通 Provider 只生成自然文本正文，任务意图与是否创建计划由本地确定性路由负责；SSE 文本不再从未完成 JSON 中手工截取。旧 JSON envelope 仅作为兼容输入读取，并以 `responseMode=legacy-json` 随对话记录持久化；Hermes 任务、审批和证据边界未改变。
+- `普通聊天生命周期可靠性 v2` 已完成本地实现：删除前端固定 12 秒墙钟超时，普通聊天由 Runtime 统一控制 30 秒首响应、45 秒流空闲与 5 分钟整体上限；超时或取消会销毁 Provider Future，终态后的 delta 被拒绝。流中断保留部分正文并标记 `responseMode=partial`，单轮 `timed-out` / `interrupted` 不再把模型健康状态误判为连接失效。完整回归通过 Node `557/557`、Rust `160/160`、Patch Normalizer `7/7` 与原生 WebDriver。
+- `Provider 主流健康与重试机制 v1` 正在本地验收：取消分钟级后台连接轮询；首字前的网络失败最多自动重试一次并显示重试状态；瞬时网络错误只结束当轮请求，不覆盖上次可用健康证据。认证、额度和模型不存在仍会持久标记阻断状态。
+- 首次启动已增加 Workspace + Provider hydration 门槛：Runtime 恢复前只显示中性启动壳，不再闪现演示 fallback 项目、模型和连接。主题缓存在 React 绘制前应用；浏览器实测首帧为“正在恢复工作区…”，稳定帧一次性显示真实 `OmniDesk / LJM Gateway / gpt-5.6-luna`。
+- 终端懒加载增加局部错误边界；开发服务中断时只影响终端区域，不再由全局错误边界替换整个工作台。原生终端挂载、xterm 创建、打开、聚焦与尺寸适配已通过 WebDriver 诊断。
 
 当前重点：
 
-- 保持普通闲聊为自然文本 Provider 链路；只有确认执行的任务进入 Hermes 工具循环，避免两条链路重复扩展复杂能力。
+- 在受保护环境验证普通聊天 v2 的真实慢速流、长回答和中途网络断开证据；本地不得伪造 Provider trace。
 - 保持多文件 Patch 的授权、规范化和 trace 门槛，并继续降低模型输出波动。
 
 当前风险：
@@ -89,4 +93,4 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 ## 下一步重点
 
 1. 根据真实 `ask-user-resume` trace 决定是否扩展字段 widget；在证据不足前不把普通聊天迁入复杂 Agent 循环。
-2. 为普通聊天增加受保护环境的真实 Provider 文本流验收，同时继续降低多文件 Patch 输出波动；不得放宽授权、审批、规范化或 trace 门槛。
+2. 为普通聊天 v2 增加受保护环境的真实慢速流、长回答和中断验收，同时继续降低多文件 Patch 输出波动；不得放宽授权、审批、规范化或 trace 门槛。

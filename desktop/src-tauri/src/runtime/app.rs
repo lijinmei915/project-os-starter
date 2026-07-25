@@ -5,7 +5,9 @@ use crate::runtime::chat_content::{
 };
 use crate::runtime::chat_routing::should_create_plan_for_message;
 use crate::runtime::chat_runtime::{emit_conversation_event, RuntimeRequestState};
-use crate::runtime::chat_stream::generate_provider_chat;
+use crate::runtime::chat_stream::{
+    generate_provider_chat, should_retry_provider_chat, ChatStreamError,
+};
 use crate::runtime::execution::build_run_summary_markdown;
 #[cfg(test)]
 use crate::runtime::execution::run_git_apply;
@@ -50,6 +52,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::Duration;
 #[cfg(test)]
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, State};
@@ -808,52 +811,68 @@ async fn chat_with_model(
             "running",
             json!({}),
         );
-        let provider_result = if let Some(token) = token {
-            tokio::select! {
-                _ = token.cancelled() => Err("请求已取消".to_string()),
-                result = generate_provider_chat(
-                    &provider,
-                    &root,
-                    &project_name,
-                    &stage,
-                    &message,
-                    &attachments,
-                    &input.recent_turns,
-                    &input.context_state,
-                    &input.summary,
-                    &input.project_memory,
-                    &project_evidence,
-                    |text, chars| emit_conversation_event(
-                        &app, &request_id, "model.delta", "thinking", "running",
-                        json!({ "chars": chars, "text": text }),
-                    ),
-                ) => result,
-            }
-        } else {
-            generate_provider_chat(
-                &provider,
-                &root,
-                &project_name,
-                &stage,
-                &message,
-                &attachments,
-                &input.recent_turns,
-                &input.context_state,
-                &input.summary,
-                &input.project_memory,
-                &project_evidence,
-                |text, chars| {
-                    emit_conversation_event(
-                        &app,
-                        &request_id,
-                        "model.delta",
-                        "thinking",
-                        "running",
-                        json!({ "chars": chars, "text": text }),
-                    )
+        let provider_request = async {
+            tokio::time::timeout(
+                Duration::from_secs(300),
+                async {
+                    let mut attempt = 0;
+                    loop {
+                        let result = generate_provider_chat(
+                            &provider,
+                            &root,
+                            &project_name,
+                            &stage,
+                            &message,
+                            &attachments,
+                            &input.recent_turns,
+                            &input.context_state,
+                            &input.summary,
+                            &input.project_memory,
+                            &project_evidence,
+                            |text, chars| {
+                                emit_conversation_event(
+                                    &app,
+                                    &request_id,
+                                    "model.delta",
+                                    "thinking",
+                                    "running",
+                                    json!({ "chars": chars, "text": text }),
+                                )
+                            },
+                        ).await;
+                        let should_retry = result
+                            .as_ref()
+                            .err()
+                            .is_some_and(|err| should_retry_provider_chat(err, attempt));
+                        if !should_retry {
+                            break result;
+                        }
+                        attempt += 1;
+                        emit_conversation_event(
+                            &app,
+                            &request_id,
+                            "request.retrying",
+                            "thinking",
+                            "running",
+                            json!({ "attempt": attempt + 1, "reason": "network-unavailable" }),
+                        );
+                        tokio::time::sleep(Duration::from_millis(400)).await;
+                    }
                 },
             )
             .await
+            .map_err(|_| ChatStreamError {
+                message: "模型响应超过整体时间上限".to_string(),
+                partial_reply: String::new(),
+            })?
+        };
+        let provider_result = if let Some(token) = token {
+            tokio::select! {
+                _ = token.cancelled() => Err(ChatStreamError { message: "请求已取消".to_string(), partial_reply: String::new() }),
+                result = provider_request => result,
+            }
+        } else {
+            provider_request.await
         };
         if !request_id.is_empty() {
             runtime_requests.finish(&request_id);
@@ -885,7 +904,7 @@ async fn chat_with_model(
                 result.references = evidence_references;
                 return Ok(result);
             }
-            Err(err) if err == "请求已取消" => {
+            Err(err) if err.message == "请求已取消" => {
                 emit_conversation_event(
                     &app,
                     &request_id,
@@ -894,18 +913,66 @@ async fn chat_with_model(
                     "cancelled",
                     json!({}),
                 );
-                return Err(err);
+                return Err(err.message);
             }
             Err(err) => {
-                crate::runtime::provider::record_failure(&app_root, &provider, &err)?;
+                let interrupted = !err.partial_reply.is_empty();
+                let timed_out = err.message.contains("超时") || err.message.contains("时间上限");
+                let failure_status = crate::runtime::provider::classify_failure(&err.message);
+                if !interrupted && !timed_out && crate::runtime::provider::failure_changes_health(failure_status) {
+                    crate::runtime::provider::record_failure(&app_root, &provider, &err.message)?;
+                }
                 emit_conversation_event(
                     &app,
                     &request_id,
                     "request.failed",
                     "result",
                     "failed",
-                    json!({ "message": trim_for_trace(&err) }),
+                    json!({
+                        "message": trim_for_trace(&err.message),
+                        "partial": interrupted,
+                        "timedOut": timed_out,
+                    }),
                 );
+                if interrupted {
+                    return Ok(ChatWithModelResult {
+                        reply: format!(
+                            "{}\n\n（回答生成中断，已保留收到的内容。你可以重试或让我继续。）",
+                            err.partial_reply
+                        ),
+                        should_create_plan: false,
+                        intent: "chat".to_string(),
+                        provider_status: "interrupted".to_string(),
+                        provider_model: provider.model.clone(),
+                        provider_error: err.message,
+                        response_mode: "partial".to_string(),
+                        references: evidence_references,
+                    });
+                }
+                if timed_out {
+                    return Ok(ChatWithModelResult {
+                        reply: "模型本轮响应超时，没有生成可用正文。你可以重新发送。".to_string(),
+                        should_create_plan: false,
+                        intent: "chat".to_string(),
+                        provider_status: "timed-out".to_string(),
+                        provider_model: provider.model.clone(),
+                        provider_error: err.message,
+                        response_mode: "text".to_string(),
+                        references: evidence_references,
+                    });
+                }
+                if failure_status == "network-unavailable" {
+                    return Ok(ChatWithModelResult {
+                        reply: "本轮请求遇到网络异常，自动重试后仍未收到正文。你可以重新发送。".to_string(),
+                        should_create_plan: false,
+                        intent: "chat".to_string(),
+                        provider_status: "request-failed".to_string(),
+                        provider_model: provider.model.clone(),
+                        provider_error: err.message,
+                        response_mode: "text".to_string(),
+                        references: evidence_references,
+                    });
+                }
                 let mut fallback = local_chat_result(
                     &message,
                     !attachments.is_empty(),
@@ -913,9 +980,9 @@ async fn chat_with_model(
                     &project_evidence,
                 );
                 fallback.provider_status =
-                    crate::runtime::provider::classify_failure(&err).to_string();
+                    crate::runtime::provider::classify_failure(&err.message).to_string();
                 fallback.provider_model = provider.model.clone();
-                fallback.provider_error = err;
+                fallback.provider_error = err.message;
                 fallback.references = evidence_references;
                 return Ok(fallback);
             }
@@ -1360,7 +1427,10 @@ async fn run_hermes_agent(
         format!("agent-{request_id}")
     };
     let isolation = if input.run_id.trim().is_empty() && input.isolate {
-        Some(crate::runtime::isolated_workspace::create(&source_root, &run_id)?)
+        Some(crate::runtime::isolated_workspace::create(
+            &source_root,
+            &run_id,
+        )?)
     } else {
         None
     };
@@ -1386,7 +1456,9 @@ async fn run_hermes_agent(
     let execution_root = running_run
         .isolation
         .as_ref()
-        .map(|workspace| crate::runtime::isolated_workspace::execution_root(workspace, &source_root))
+        .map(|workspace| {
+            crate::runtime::isolated_workspace::execution_root(workspace, &source_root)
+        })
         .transpose()?
         .unwrap_or_else(|| source_root.clone());
     let token = if request_id.is_empty() {
@@ -1443,10 +1515,12 @@ async fn run_hermes_agent(
         .unwrap_or_else(|error| json!({ "error": error.to_string() }));
     if status == "succeeded" {
         if let Some(workspace) = running_run.isolation.as_ref() {
-            let diff = crate::runtime::isolated_workspace::integration_diff(workspace, &source_root)?;
+            let diff =
+                crate::runtime::isolated_workspace::integration_diff(workspace, &source_root)?;
             if !diff.trim().is_empty() && running_run.checkpoint.completed_check_ids.is_empty() {
                 status = "failed".to_string();
-                summary = "隔离工作区已有改动，但尚未完成受控检查；拒绝合并回当前工程。".to_string();
+                summary =
+                    "隔离工作区已有改动，但尚未完成受控检查；拒绝合并回当前工程。".to_string();
             } else if !diff.trim().is_empty() {
                 let token = format!(
                     "hermes-integration-{}-{}",
@@ -1736,8 +1810,8 @@ fn stop_terminal_session(
 }
 
 #[tauri::command]
-fn list_terminal_evidence(
-) -> Result<Vec<crate::runtime::terminal::TerminalSessionEvidence>, String> {
+fn list_terminal_evidence() -> Result<Vec<crate::runtime::terminal::TerminalSessionEvidence>, String>
+{
     let app_root = find_workspace_root()?;
     let mut registry = load_or_seed_registry(&app_root)?;
     let current_project = current_registry_project(&mut registry, &app_root)?;
@@ -1788,8 +1862,8 @@ fn seed_native_agent_interaction(
 
 #[cfg(feature = "webdriver")]
 #[tauri::command]
-fn read_native_agent_interaction(
-) -> Result<crate::runtime::agent_runs::PersistedAgentRun, String> {
+fn read_native_agent_interaction() -> Result<crate::runtime::agent_runs::PersistedAgentRun, String>
+{
     let app_root = find_workspace_root()?;
     crate::runtime::agent_runs::load(&app_root, "native-interaction-run")
 }

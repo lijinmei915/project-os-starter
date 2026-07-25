@@ -12,6 +12,22 @@ export function formatModelTestTime(value) {
   return new Date(timestamp).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
 }
 
+export function providerTestStatusLabel(status, checkedAt) {
+  const time = formatModelTestTime(checkedAt);
+  const suffix = time ? ` · ${time}` : "";
+  const labels = {
+    available: "连接可用",
+    "authentication-failed": "认证失败",
+    "model-unavailable": "模型不可用",
+    "network-unavailable": "网络异常",
+    "quota-exhausted": "额度不足",
+    unavailable: "连接不可用",
+  };
+  if (status === "testing") return "正在测试连接";
+  if (labels[status]) return `${labels[status]}${suffix}`;
+  return time ? `最后测试 · ${time}` : "尚未测试";
+}
+
 export function activeProviderProfileName(provider) {
   const activeProfile = provider?.profiles?.find((profile) => profile.id === provider?.activeProfileId);
   return activeProfile?.name || provider?.profileName || provider?.apiBase || "当前 API";

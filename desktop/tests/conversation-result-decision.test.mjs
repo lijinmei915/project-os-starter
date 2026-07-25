@@ -11,4 +11,6 @@ test("keeps provider failure categories visible in the conversation health proje
     modelHealthUpdate({ providerError: "认证失败", providerModel: "gpt-test", providerStatus: "authentication-failed" }, "fallback"),
     { message: "认证失败", model: "gpt-test", status: "authentication-failed" },
   );
+  assert.equal(modelHealthUpdate({ providerError: "本轮超时", providerStatus: "timed-out" }, "gpt-test"), null);
+  assert.equal(modelHealthUpdate({ providerError: "流中断", providerStatus: "interrupted" }, "gpt-test"), null);
 });

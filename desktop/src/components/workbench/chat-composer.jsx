@@ -115,13 +115,11 @@ export function ChatComposer({
     : currentModelStatus === "unavailable"
       ? "Not work"
       : "Checking";
-  const toolbarHint = toolbarHintOverride || (sending
-    ? "正在生成，可继续补充"
-    : isListening
-      ? "正在听写"
-      : attachments.length
-        ? `${attachments.length} 张图片`
-        : "");
+  const toolbarHint = toolbarHintOverride || (isListening
+    ? "正在听写"
+    : attachments.length
+      ? `${attachments.length} 张图片`
+      : "");
 
   React.useEffect(() => {
     setSpeechSupported(Boolean(window.SpeechRecognition || window.webkitSpeechRecognition));

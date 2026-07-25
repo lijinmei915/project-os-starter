@@ -4,6 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OmniDesk</title>
+    <script>
+      try {
+        var storedTheme = JSON.parse(localStorage.getItem("omnidesk-desktop-theme") || "null");
+        var mode = storedTheme && storedTheme.mode === "light" ? "light" : "dark";
+        document.documentElement.classList.add("theme-" + mode);
+        if (storedTheme && storedTheme.accent) {
+          document.documentElement.style.setProperty("--desktop-theme-h", String(storedTheme.accent.h));
+          document.documentElement.style.setProperty("--desktop-theme-s", storedTheme.accent.s);
+          document.documentElement.style.setProperty("--desktop-theme-l", storedTheme.accent.l);
+        }
+      } catch (_) {
+        document.documentElement.classList.add("theme-dark");
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

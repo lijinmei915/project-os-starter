@@ -53,6 +53,7 @@ export function projectExecutionEvent(turns, event) {
     events: mergeExecutionEvents(previousTurn?.events || [], event.events),
     outcome: event.outcome || "running",
     pendingAction: event.pendingAction === undefined ? previousTurn?.pendingAction || null : event.pendingAction,
+    responseMode: event.responseMode ?? previousTurn?.responseMode ?? "",
     taskId: event.taskId || previousTurn?.taskId || "",
     text: event.text || "正在处理。",
   };

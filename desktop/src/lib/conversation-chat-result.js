@@ -12,7 +12,6 @@ export async function resolveConversationChatResult({
   requestId,
   snapshot,
   tasks,
-  withTimeout,
 }) {
   if (messageKind === "task") {
     return { intent: "task", reply: "可以，我先生成计划。", shouldCreatePlan: true };
@@ -25,7 +24,7 @@ export async function resolveConversationChatResult({
     };
   }
   if (!isTauri) return previewChatResult(message, attachments.length > 0, snapshot, tasks, requestContext.contextState);
-  return withTimeout(chatWithModel({
+  return chatWithModel({
     attachments: attachments.map((attachment) => ({ dataUrl: attachment.dataUrl, mimeType: attachment.mimeType, name: attachment.name })),
     contextState: requestContext.contextState,
     message,
@@ -33,5 +32,5 @@ export async function resolveConversationChatResult({
     projectMemory: requestContext.projectMemory || [],
     requestId,
     summary: requestContext.summary,
-  }), 12000, "模型响应超时，已切换到本地回答。");
+  });
 }

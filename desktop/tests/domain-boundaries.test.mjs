@@ -734,6 +734,8 @@ test("keeps TerminalDock rendering and xterm interaction outside AgentWorkspace"
   assert.match(workbench, /<AgentWorkspaceAuxiliaryTabs/);
   assert.match(tabs, /<TerminalDock/);
   assert.match(tabs, /React\.lazy\(\(\) => import\("\.\/terminal-dock"\)/);
+  assert.match(tabs, /<TerminalModuleBoundary>/);
+  assert.match(tabs, /OmniDesk terminal module error/);
   assert.equal(workbench.includes("function TerminalDock"), false);
   assert.equal(workbench.includes("@xterm/xterm"), false);
   assert.match(terminalDock, /export function TerminalDock/);
@@ -827,6 +829,18 @@ test("keeps Provider bootstrap and health projection behind the Provider data sy
   assert.match(sync, /getModelHealth\(\)/);
   assert.equal(sync.includes("provider-client"), false);
   assert.equal(sync.includes("runtime-api"), false);
+});
+
+test("keeps fallback Workspace and Provider data behind the initial hydration gate", () => {
+  const workbench = source("src/main.jsx");
+  const workspaceSession = source("src/components/workbench/use-workspace-session.js");
+  const providerSession = source("src/components/workbench/use-provider-session.js");
+  const providerSync = source("src/components/workbench/use-provider-data-sync.js");
+  assert.match(workbench, /if \(!workspaceReady \|\| !providerReady\)/);
+  assert.match(workbench, /正在恢复工作区/);
+  assert.match(workspaceSession, /setReady\(true\)/);
+  assert.match(providerSession, /providerReady/);
+  assert.match(providerSync, /setProviderReady\(true\)/);
 });
 
 test("keeps AgentWorkspace conversation reset lifecycle in a Conversation hook", () => {
@@ -1267,9 +1281,11 @@ test("keeps request progress in the conversation surface instead of duplicate gl
   assert.match(workbench, /if \(feedback\.status === "running"\) return null;/);
   assert.match(
     requestState,
-    /setStreamingReply\(\(current\) => `\$\{current\}\$\{text\}`\)/,
+    /streamingReplyRef\.current \+= text/,
   );
+  assert.match(requestState, /responseMode: partialReply \? "partial" : ""/);
   assert.match(transcript, /conversationMessage-streaming/);
+  assert.equal(composer.includes("正在生成，可继续补充"), false);
 });
 
 test("keeps RightRail shared display primitives outside the root Workbench module", () => {
@@ -1361,6 +1377,12 @@ test("keeps Provider composer model derivation outside App", () => {
   assert.match(viewModel, /composerModelAvailability/);
   assert.match(viewModel, /currentProviderHealth/);
   assert.equal(viewModel.includes("runtime-api"), false);
+});
+
+test("does not turn transient background probes into automatic Provider disconnects", () => {
+  const actions = source("src/components/workbench/use-composer-model-actions.js");
+  assert.equal(actions.includes("setInterval"), false);
+  assert.match(actions, /if \(!composerModelTests\[key\]\?\.status\) void testComposerModel/);
 });
 
 test("keeps active Task projection inside the Task session boundary", () => {
@@ -1483,10 +1505,24 @@ test("keeps Provider chat transport and SSE result normalization outside Tauri c
   assert.doesNotMatch(app, /async fn generate_provider_chat\(/);
   assert.doesNotMatch(app, /consume_openai_sse_deltas/);
   assert.doesNotMatch(app, /streaming_reply_prefix/);
-  assert.match(app, /use crate::runtime::chat_stream::generate_provider_chat/);
+  assert.match(app, /generate_provider_chat, should_retry_provider_chat, ChatStreamError/);
   assert.match(stream, /pub async fn generate_provider_chat/);
-  assert.match(stream, /post_chat_completion/);
+  assert.match(stream, /post_streaming_chat_completion/);
   assert.match(stream, /FnMut\(String, usize\)/);
+});
+
+test("keeps ordinary chat deadlines in the Rust Runtime instead of a frontend wall-clock race", () => {
+  const result = source("src/lib/conversation-chat-result.js");
+  const requestState = source("src/components/workbench/use-conversation-request-state.js");
+  const stream = source("src-tauri/src/runtime/chat_stream.rs");
+  const app = source("src-tauri/src/runtime/app.rs");
+  assert.doesNotMatch(result, /withTimeout|12000|Promise\.race/);
+  assert.match(stream, /FIRST_RESPONSE_TIMEOUT/);
+  assert.match(stream, /STREAM_IDLE_TIMEOUT/);
+  assert.match(app, /Duration::from_secs\(300\)/);
+  assert.match(app, /provider_status: "interrupted"/);
+  assert.match(app, /provider_status: "timed-out"/);
+  assert.match(requestState, /isRequestRunning\(activeRequestRef, payload\.requestId\)/);
 });
 
 test("keeps Provider status projection in the Provider runtime domain", () => {

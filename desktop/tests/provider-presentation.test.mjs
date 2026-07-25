@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { activeProviderProfileName, catalogModelsForProvider, classifyProviderFailure, compactModelLabel, formatModelTestTime, isolatedProviderKeyEnv, modelAvailabilityKey, providerConnectionLabel, providerModelHealth, providerModelKey, providerModelUpdate } from "../src/lib/provider-presentation.js";
+import { activeProviderProfileName, catalogModelsForProvider, classifyProviderFailure, compactModelLabel, formatModelTestTime, isolatedProviderKeyEnv, modelAvailabilityKey, providerConnectionLabel, providerModelHealth, providerModelKey, providerModelUpdate, providerTestStatusLabel } from "../src/lib/provider-presentation.js";
 
 test("keeps Provider display labels and isolated key names deterministic", () => {
   assert.equal(activeProviderProfileName({ activeProfileId: "team", profiles: [{ id: "team", name: "团队网关" }] }), "团队网关");
@@ -12,6 +12,14 @@ test("formats model test time at minute precision", () => {
   const formatted = formatModelTestTime(Date.UTC(2026, 6, 17, 9, 5));
   assert.match(formatted, /^\d{2}:\d{2}$/);
   assert.equal(formatModelTestTime("invalid"), "");
+});
+
+test("keeps Provider test copy stable before and after a live test", () => {
+  const checkedAt = Date.UTC(2026, 6, 17, 9, 5);
+  assert.equal(providerTestStatusLabel("available", checkedAt), `连接可用 · ${formatModelTestTime(checkedAt)}`);
+  assert.equal(providerTestStatusLabel("testing", checkedAt), "正在测试连接");
+  assert.equal(providerTestStatusLabel("authentication-failed", checkedAt), `认证失败 · ${formatModelTestTime(checkedAt)}`);
+  assert.equal(providerTestStatusLabel("untested", ""), "尚未测试");
 });
 
 test("keeps the active connection identity when switching its model", () => {
@@ -26,6 +34,7 @@ test("classifies quota failures separately from network failures", () => {
   assert.equal(classifyProviderFailure("HTTP 401 invalid token"), "authentication-failed");
   assert.equal(classifyProviderFailure("HTTP 404 model_not_found"), "model-unavailable");
   assert.equal(classifyProviderFailure("连接超时"), "network-unavailable");
+  assert.equal(classifyProviderFailure("DNS connection failed"), "network-unavailable");
 });
 
 test("classifies provider network failures without confusing them with credentials", () => {

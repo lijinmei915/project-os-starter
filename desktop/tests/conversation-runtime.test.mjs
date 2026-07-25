@@ -97,6 +97,20 @@ test("classifies cancel, continue, and redirect while a request is running", () 
   assert.equal(resolveRequestTakeover("改成只做桌面端", { running: false }).decision, "none");
 });
 
+test("preserves a partial streamed reply when cancellation settles the request", () => {
+  const turns = projectExecutionEvent([], {
+    id: "assistant-cancelled",
+    outcome: "cancelled",
+    requestId: "request-1",
+    responseMode: "partial",
+    text: "已经生成的内容\n\n（已停止生成）",
+  });
+
+  assert.equal(turns[0].text, "已经生成的内容\n\n（已停止生成）");
+  assert.equal(turns[0].responseMode, "partial");
+  assert.equal(turns[0].outcome, "cancelled");
+});
+
 test("prepares one submission contract outside React", () => {
   const result = prepareConversationSubmission({ message: "运行一轮检查", now: 100, random: 0.5 });
   assert.equal(result.requestId, "100-8");

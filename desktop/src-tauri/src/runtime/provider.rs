@@ -180,6 +180,27 @@ pub async fn post_chat_completion(
         .map_err(|err| err.to_string())
 }
 
+/// Streaming responses own their first-response, idle, and total deadlines at
+/// the chat Runtime boundary. A client-wide timeout would incorrectly abort a
+/// healthy long response while it is still producing tokens.
+pub async fn post_streaming_chat_completion(
+    provider: &ProviderConfig,
+    api_key: &str,
+    payload: &Value,
+    connect_timeout: Duration,
+) -> Result<reqwest::Response, String> {
+    reqwest::Client::builder()
+        .connect_timeout(connect_timeout)
+        .build()
+        .map_err(|err| err.to_string())?
+        .post(chat_completions_endpoint(&provider.api_base))
+        .bearer_auth(api_key)
+        .json(payload)
+        .send()
+        .await
+        .map_err(|err| err.to_string())
+}
+
 pub async fn get_models(
     api_base: &str,
     api_key: &str,
@@ -441,6 +462,7 @@ pub fn classify_failure(message: &str) -> &'static str {
         "model-unavailable"
     } else if text.contains("timed out")
         || text.contains("timeout")
+        || text.contains("超时")
         || text.contains("connection")
         || text.contains("dns")
         || text.contains("网络")
@@ -450,6 +472,13 @@ pub fn classify_failure(message: &str) -> &'static str {
     } else {
         "unavailable"
     }
+}
+
+pub fn failure_changes_health(status: &str) -> bool {
+    matches!(
+        status,
+        "authentication-failed" | "quota-exhausted" | "model-unavailable"
+    )
 }
 
 pub fn isolated_provider_key_env(base: &str, profile_id: &str) -> String {
@@ -1449,6 +1478,9 @@ mod tests {
             "model-unavailable"
         );
         assert_eq!(classify_failure("request timed out"), "network-unavailable");
+        assert_eq!(classify_failure("模型等待首个响应超时"), "network-unavailable");
+        assert!(!failure_changes_health("network-unavailable"));
+        assert!(failure_changes_health("authentication-failed"));
     }
 
     #[test]

@@ -8,7 +8,7 @@ import { ProviderSubmitControls } from "./provider-submit-controls";
 import { Panel } from "../ui/panel";
 import * as providerClient from "../../lib/provider-client";
 import { providerFormForPreset, providerFormForProfile, providerFormFromStatus } from "../../lib/provider-form-state";
-import { activeProviderProfileName, classifyProviderFailure, formatModelTestTime, isolatedProviderKeyEnv, providerConnectionLabel } from "../../lib/provider-presentation";
+import { activeProviderProfileName, classifyProviderFailure, isolatedProviderKeyEnv, providerConnectionLabel, providerTestStatusLabel } from "../../lib/provider-presentation";
 
 export function ProviderPanel({ fallbackModelCatalog, modelCatalog, modelTestRecord, onDeleteProviderProfile, onModelTestRecorded, onSaveProvider, onSaveProviderSecret, provider, providerError, source }) {
   const [form, setForm] = useState(provider);
@@ -20,7 +20,6 @@ export function ProviderPanel({ fallbackModelCatalog, modelCatalog, modelTestRec
   const [probeError, setProbeError] = useState("");
   const [modelTestLoading, setModelTestLoading] = useState(false);
   const [modelTestCheckedAt, setModelTestCheckedAt] = useState("");
-  const [modelTestMessage, setModelTestMessage] = useState("");
   const [modelTestStatus, setModelTestStatus] = useState("untested");
   const catalogProviders =
     Array.isArray(modelCatalog?.providers) && modelCatalog.providers.length
@@ -38,24 +37,7 @@ export function ProviderPanel({ fallbackModelCatalog, modelCatalog, modelTestRec
     ...(detectedModels.length ? detectedModels : (activePreset?.models || [])),
   ].filter(Boolean)));
   const isPreview = source !== "tauri";
-  const lastTestTime = formatModelTestTime(modelTestCheckedAt || modelTestRecord?.checkedAt);
-  const connectionTestLabel = modelTestStatus === "testing"
-    ? "正在测试当前连接"
-    : modelTestStatus === "available"
-      ? `${modelTestMessage || "当前连接可用"}${lastTestTime ? ` · ${lastTestTime}` : ""}`
-      : modelTestStatus === "quota-exhausted"
-        ? `当前连接额度不足${lastTestTime ? ` · ${lastTestTime}` : ""}`
-        : modelTestStatus === "authentication-failed"
-          ? `当前连接认证失败${lastTestTime ? ` · ${lastTestTime}` : ""}`
-          : modelTestStatus === "model-unavailable"
-            ? `当前模型不可用${lastTestTime ? ` · ${lastTestTime}` : ""}`
-            : modelTestStatus === "network-unavailable"
-              ? `当前连接网络异常${lastTestTime ? ` · ${lastTestTime}` : ""}`
-        : modelTestStatus === "unavailable"
-          ? `当前连接不可用${lastTestTime ? ` · ${lastTestTime}` : ""}`
-        : lastTestTime
-          ? `最后测试 · ${lastTestTime}`
-          : "当前连接尚未测试";
+  const connectionTestLabel = providerTestStatusLabel(modelTestStatus, modelTestCheckedAt || modelTestRecord?.checkedAt);
   const savedProfile = profiles.find((profile) => profile.id === form.profileId);
   const isCreatingProfile = Boolean(form.profileId) && !savedProfile;
   const currentHasApiKey = isCreatingProfile ? Boolean(apiKey.trim()) : Boolean(savedProfile?.hasApiKey ?? provider.hasApiKey);
@@ -74,7 +56,6 @@ export function ProviderPanel({ fallbackModelCatalog, modelCatalog, modelTestRec
     setDetectedModels([]);
     setProbeError("");
     setModelTestCheckedAt(modelTestRecord?.checkedAt || "");
-    setModelTestMessage(modelTestRecord?.message || "");
     setModelTestStatus(modelTestRecord?.status || "untested");
     setCustomModel(false);
   }, [provider, modelCatalog, modelTestRecord]);
@@ -89,7 +70,6 @@ export function ProviderPanel({ fallbackModelCatalog, modelCatalog, modelTestRec
     setCustomModel(true);
     setDetectedModels([]);
     setProbeError("");
-    setModelTestMessage("");
     setSelectedProviderId(preset?.id || "gateway");
     setForm((current) => ({
       ...current,
@@ -123,7 +103,6 @@ export function ProviderPanel({ fallbackModelCatalog, modelCatalog, modelTestRec
       setCustomModel(false);
       setDetectedModels([]);
       setProbeError("");
-      setModelTestMessage("");
     }
   };
 
@@ -147,7 +126,6 @@ export function ProviderPanel({ fallbackModelCatalog, modelCatalog, modelTestRec
 
   const probeModels = async () => {
     setProbeError("");
-    setModelTestMessage("");
     setProbeLoading(true);
     try {
       const previousModel = form.model;
@@ -186,7 +164,6 @@ export function ProviderPanel({ fallbackModelCatalog, modelCatalog, modelTestRec
       const message = result.message || "当前连接可用";
       setModelTestStatus("available");
       setModelTestCheckedAt(checkedAt);
-      setModelTestMessage(message);
       onModelTestRecorded?.({ apiBase: form.apiBase, apiKeyEnv: form.apiKeyEnv, checkedAt, message, model: form.model, status: "available" });
       return true;
     } catch (err) {
@@ -194,7 +171,6 @@ export function ProviderPanel({ fallbackModelCatalog, modelCatalog, modelTestRec
       const message = err instanceof Error ? err.message : String(err);
       setModelTestStatus(classifyProviderFailure(message));
       setModelTestCheckedAt(checkedAt);
-      setModelTestMessage("");
       setProbeError(message);
       onModelTestRecorded?.({ apiBase: form.apiBase, apiKeyEnv: form.apiKeyEnv, checkedAt, message, model: form.model, status: classifyProviderFailure(message) });
       return false;

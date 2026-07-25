@@ -4,6 +4,7 @@ export function useWorkspaceSession({ fallbackSnapshot, loadSnapshot, runtimeSou
   const [snapshot, setSnapshot] = useState(fallbackSnapshot);
   const [source, setSource] = useState(runtimeSource());
   const [loading, setLoading] = useState(true);
+  const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
 
   const applySnapshot = useCallback((nextSnapshot) => {
@@ -28,7 +29,10 @@ export function useWorkspaceSession({ fallbackSnapshot, loadSnapshot, runtimeSou
         }
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setReady(true);
+        }
       });
     return () => { cancelled = true; };
   }, [refreshSnapshot]);
@@ -42,6 +46,7 @@ export function useWorkspaceSession({ fallbackSnapshot, loadSnapshot, runtimeSou
     applySnapshot,
     error,
     loading,
+    ready,
     refreshSnapshot,
     setError,
     setLoading,

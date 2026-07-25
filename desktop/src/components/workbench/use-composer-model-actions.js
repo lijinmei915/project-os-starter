@@ -86,9 +86,7 @@ export function useComposerModelActions({
     if (!provider?.enabled || !provider?.model || !provider?.apiBase || !provider?.apiKeyEnv) return undefined;
     const key = modelAvailabilityKey(provider, provider.model);
     if (!composerModelTests[key]?.status) void testComposerModel(provider.model);
-    if (composerModelTests[key]?.status === "quota-exhausted") return undefined;
-    const timer = window.setInterval(() => { void testComposerModel(provider.model); }, 60000);
-    return () => window.clearInterval(timer);
+    return undefined;
   }, [composerModelTests, source, provider?.enabled, provider?.apiBase, provider?.apiKeyEnv, provider?.model]);
 
   return { loadComposerModels, selectComposerModel, testComposerModel, updateComposerModelHealth };

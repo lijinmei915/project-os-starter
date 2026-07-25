@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { projectExecutionEvent } from "../../conversation-runtime";
 import { listenRuntimeConversationEvents } from "../../lib/desktop-conversation-client";
-import { settleRequest } from "../../lib/request-lifecycle";
+import { isRequestRunning, settleRequest } from "../../lib/request-lifecycle";
 
 export function useConversationRequestState({ cancelRuntimeRequest, chatTurns, initialLoadingEvents = [], onChatTurnsChange, onStopPlan }) {
   const [pendingTurn, setPendingTurn] = useState(null);
@@ -9,7 +9,8 @@ export function useConversationRequestState({ cancelRuntimeRequest, chatTurns, i
   const [chatStartedAt, setChatStartedAt] = useState(Date.now());
   const [chatLoadingLabel, setChatLoadingLabel] = useState("组织回答");
   const [chatLoadingEvents, setChatLoadingEvents] = useState(() => initialLoadingEvents);
-  const [streamingReply, setStreamingReply] = useState("");
+  const [streamingReply, setStreamingReplyState] = useState("");
+  const streamingReplyRef = useRef("");
   const activeRequestRef = useRef(null);
   const lastSubmissionRef = useRef({ at: 0, key: "" });
 
@@ -19,13 +20,22 @@ export function useConversationRequestState({ cancelRuntimeRequest, chatTurns, i
     let receivedChars = 0;
     void listenRuntimeConversationEvents((event) => {
       const payload = event?.payload || {};
-      if (payload.requestId !== activeRequestRef.current?.id) return;
-      if (payload.type === "model.started") setChatLoadingLabel("正在连接模型");
+      if (!isRequestRunning(activeRequestRef, payload.requestId)) return;
+      if (payload.type === "model.started") {
+        receivedChars = 0;
+        setChatLoadingLabel("正在连接模型");
+      }
+      if (payload.type === "request.retrying") {
+        setChatLoadingLabel("网络波动，正在重试");
+      }
       if (payload.type === "model.delta") {
         receivedChars += Number(payload.payload?.chars || 0);
         setChatLoadingLabel(`正在生成回答（已接收 ${receivedChars} 字）`);
         const text = String(payload.payload?.text || "");
-        if (text) setStreamingReply((current) => `${current}${text}`);
+        if (text) {
+          streamingReplyRef.current += text;
+          setStreamingReplyState(streamingReplyRef.current);
+        }
       }
     }).then((nextUnlisten) => {
       if (disposed) nextUnlisten();
@@ -34,23 +44,36 @@ export function useConversationRequestState({ cancelRuntimeRequest, chatTurns, i
     return () => { disposed = true; unlisten(); };
   }, []);
 
+  const setStreamingReply = useCallback((value) => {
+    const nextValue = typeof value === "function" ? value(streamingReplyRef.current) : value;
+    streamingReplyRef.current = String(nextValue || "");
+    setStreamingReplyState(streamingReplyRef.current);
+  }, []);
+
   const resetConversationRequest = useCallback(() => {
     setPendingTurn(null);
     setChatLoading(false);
     setStreamingReply("");
+    streamingReplyRef.current = "";
     activeRequestRef.current = null;
   }, []);
 
   const stopCurrentResponse = useCallback(() => {
     const requestId = activeRequestRef.current?.id;
     if (requestId && settleRequest(activeRequestRef, requestId, "cancelled")) {
+      const partialReply = streamingReplyRef.current.trim();
       onChatTurnsChange(projectExecutionEvent(chatTurns, {
-        id: `${Date.now()}-assistant-cancelled`, outcome: "cancelled", requestId, text: "已取消当前处理。",
+        id: `${Date.now()}-assistant-cancelled`,
+        outcome: "cancelled",
+        requestId,
+        responseMode: partialReply ? "partial" : "",
+        text: partialReply ? `${partialReply}\n\n（已停止生成）` : "已取消当前处理。",
       }));
     }
     setChatLoading(false);
     setPendingTurn(null);
     setStreamingReply("");
+    streamingReplyRef.current = "";
     void cancelRuntimeRequest?.(requestId);
     onStopPlan?.();
   }, [cancelRuntimeRequest, chatTurns, onChatTurnsChange, onStopPlan]);

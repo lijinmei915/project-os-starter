@@ -634,6 +634,7 @@ function App() {
     applySnapshot,
     error,
     loading,
+    ready: workspaceReady,
     refreshSnapshot: refreshSnapshotFromSource,
     setError,
     setLoading,
@@ -665,7 +666,7 @@ function App() {
     setConversationSummary,
     setConversations,
   } = useConversationSession();
-  const { composerModelTesting, composerModelTests, composerModels, composerModelsKey, composerModelsLoading, composerModelsSource, modelCatalog, provider, providerError, setComposerModelTesting, setComposerModelTests, setComposerModels, setComposerModelsKey, setComposerModelsLoading, setComposerModelsSource, setModelCatalog, setProvider, setProviderError } = useProviderSession({ fallbackModelCatalog, fallbackProvider });
+  const { composerModelTesting, composerModelTests, composerModels, composerModelsKey, composerModelsLoading, composerModelsSource, modelCatalog, provider, providerError, providerReady, setComposerModelTesting, setComposerModelTests, setComposerModels, setComposerModelsKey, setComposerModelsLoading, setComposerModelsSource, setModelCatalog, setProvider, setProviderError, setProviderReady } = useProviderSession({ fallbackModelCatalog, fallbackProvider });
   const [projectActionError, setProjectActionError] = useState("");
   const [agentRuns, setAgentRuns] = useState([]);
   const { applyError, applyLoading, handoffError, handoffLoading, patchError, patchLoading, planError, planLoading, runnerError, runnerLoadingId, setApplyError, setApplyLoading, setHandoffError, setHandoffLoading, setPatchError, setPatchLoading, setPlanError, setPlanLoading, setRunnerError, setRunnerLoadingId } = useExecutionSession();
@@ -845,6 +846,7 @@ function App() {
     setModelCatalog,
     setProvider,
     setProviderError,
+    setProviderReady,
   });
 
 
@@ -1099,6 +1101,16 @@ function App() {
     providerModelHealth,
   });
   const recordProviderTest = useProviderTestRecord({ setComposerModelTests });
+
+  if (!workspaceReady || !providerReady) {
+    return (
+      <main className="appBoot" aria-busy="true" aria-label="OmniDesk 正在启动">
+        <div className="appBootMark" aria-hidden="true">O</div>
+        <strong>OmniDesk</strong>
+        <span>正在恢复工作区…</span>
+      </main>
+    );
+  }
 
   return <AppWorkbenchSurface
     actionFeedback={actionFeedback ? <ActionFeedbackToast feedback={actionFeedback} /> : null}

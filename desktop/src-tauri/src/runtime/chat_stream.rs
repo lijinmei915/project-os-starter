@@ -4,12 +4,50 @@ use crate::runtime::chat_content::{
 use crate::runtime::chat_routing::{is_question_like_message, should_create_plan_for_message};
 use crate::runtime::planning::PlanAttachment;
 use crate::runtime::provider::{
-    chat_completion_content, post_chat_completion, read_secret, require_success, ProviderConfig,
+    chat_completion_content, post_streaming_chat_completion, read_secret, require_success,
+    ProviderConfig,
 };
 use futures_util::StreamExt;
 use serde_json::{json, Value};
 use std::path::Path;
 use std::time::Duration;
+
+const FIRST_RESPONSE_TIMEOUT: Duration = Duration::from_secs(30);
+const STREAM_IDLE_TIMEOUT: Duration = Duration::from_secs(45);
+
+#[derive(Debug)]
+pub struct ChatStreamError {
+    pub message: String,
+    pub partial_reply: String,
+}
+
+impl ChatStreamError {
+    fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+            partial_reply: String::new(),
+        }
+    }
+
+    fn with_partial(message: impl Into<String>, partial_reply: &str) -> Self {
+        Self {
+            message: message.into(),
+            partial_reply: partial_reply.trim().to_string(),
+        }
+    }
+}
+
+impl From<String> for ChatStreamError {
+    fn from(message: String) -> Self {
+        Self::new(message)
+    }
+}
+
+pub fn should_retry_provider_chat(error: &ChatStreamError, retry_count: usize) -> bool {
+    retry_count == 0
+        && error.partial_reply.is_empty()
+        && crate::runtime::provider::classify_failure(&error.message) == "network-unavailable"
+}
 
 pub async fn generate_provider_chat<F>(
     provider: &ProviderConfig,
@@ -24,14 +62,17 @@ pub async fn generate_provider_chat<F>(
     project_memory: &[Value],
     project_evidence: &Value,
     mut on_delta: F,
-) -> Result<ChatWithModelResult, String>
+) -> Result<ChatWithModelResult, ChatStreamError>
 where
     F: FnMut(String, usize),
 {
     let api_key = read_secret(root, &provider.api_key_env)
         .ok_or_else(|| format!("环境变量或 .env.local 中未设置 {}", provider.api_key_env))?;
     if api_key.trim().is_empty() {
-        return Err(format!("环境变量 {} 为空", provider.api_key_env));
+        return Err(ChatStreamError::new(format!(
+            "环境变量 {} 为空",
+            provider.api_key_env
+        )));
     }
 
     let reply_prompt = chat_reply_prompt(
@@ -47,27 +88,27 @@ where
         project_evidence,
     );
     let user_content = provider_user_content(reply_prompt, attachments);
-    let response = post_chat_completion(
-        provider,
-        &api_key,
-        &json!({
-            "model": provider.model,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": "You are OmniDesk, a local AI project workbench assistant. Answer the user directly in natural Chinese text. Do not wrap the answer in JSON or include routing metadata."
-                },
-                {
-                    "role": "user",
-                    "content": user_content
-                }
-            ],
-            "temperature": 0.45,
-            "stream": true
-        }),
-        Duration::from_secs(45),
+    let payload = json!({
+        "model": provider.model,
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are OmniDesk, a local AI project workbench assistant. Answer the user directly in natural Chinese text. Do not wrap the answer in JSON or include routing metadata."
+            },
+            {
+                "role": "user",
+                "content": user_content
+            }
+        ],
+        "temperature": 0.45,
+        "stream": true
+    });
+    let response = tokio::time::timeout(
+        FIRST_RESPONSE_TIMEOUT,
+        post_streaming_chat_completion(provider, &api_key, &payload, FIRST_RESPONSE_TIMEOUT),
     )
-    .await?;
+    .await
+    .map_err(|_| ChatStreamError::new("模型等待首个响应超时"))??;
     let response = require_success(response, "provider").await?;
 
     let is_sse = response
@@ -77,14 +118,23 @@ where
         .map(|value| value.contains("text/event-stream"))
         .unwrap_or(false);
     let content = if !is_sse {
-        chat_completion_content(response).await?
+        tokio::time::timeout(STREAM_IDLE_TIMEOUT, chat_completion_content(response))
+            .await
+            .map_err(|_| ChatStreamError::new("模型响应读取超时"))??
     } else {
         let mut content = String::new();
         let mut pending = String::new();
         let mut stream_mode = StreamMode::Unknown;
         let mut stream = response.bytes_stream();
-        while let Some(chunk) = stream.next().await {
-            let chunk = chunk.map_err(|err| err.to_string())?;
+        loop {
+            let next = tokio::time::timeout(STREAM_IDLE_TIMEOUT, stream.next())
+                .await
+                .map_err(|_| {
+                    ChatStreamError::with_partial("模型流式响应长时间没有新内容", &content)
+                })?;
+            let Some(chunk) = next else { break };
+            let chunk =
+                chunk.map_err(|err| ChatStreamError::with_partial(err.to_string(), &content))?;
             let chunk = String::from_utf8_lossy(&chunk);
             for delta in consume_openai_sse_deltas(&mut pending, &chunk) {
                 content.push_str(&delta);
@@ -107,7 +157,7 @@ where
             }
         }
         if content.trim().is_empty() {
-            return Err("provider 流式返回空内容".to_string());
+            return Err(ChatStreamError::new("provider 流式返回空内容"));
         }
         if stream_mode == StreamMode::LegacyCandidate {
             let visible = visible_chat_content(&content)?.0;
@@ -115,7 +165,11 @@ where
         }
         content
     };
-    build_chat_result(&content, message, !attachments.is_empty())
+    Ok(build_chat_result(
+        &content,
+        message,
+        !attachments.is_empty(),
+    )?)
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -276,6 +330,28 @@ mod tests {
         assert!(result.should_create_plan);
         assert_eq!(result.response_mode, "legacy-json");
         assert!(build_chat_result("   ", "你好", false).is_err());
+    }
+
+    #[test]
+    fn preserves_received_text_when_a_stream_is_interrupted() {
+        let error = ChatStreamError::with_partial("stream closed", "已经收到的回答");
+        assert_eq!(error.message, "stream closed");
+        assert_eq!(error.partial_reply, "已经收到的回答");
+    }
+
+    #[test]
+    fn retries_only_the_first_network_failure_before_any_visible_text() {
+        let network = ChatStreamError::new("connection reset");
+        assert!(should_retry_provider_chat(&network, 0));
+        assert!(!should_retry_provider_chat(&network, 1));
+        assert!(!should_retry_provider_chat(
+            &ChatStreamError::with_partial("connection reset", "partial"),
+            0
+        ));
+        assert!(!should_retry_provider_chat(
+            &ChatStreamError::new("provider HTTP 401: invalid token"),
+            0
+        ));
     }
 
     #[tokio::test]
