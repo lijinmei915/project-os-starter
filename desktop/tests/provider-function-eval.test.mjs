@@ -14,6 +14,10 @@ import {
 
 const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const runner = path.join(desktopRoot, "scripts", "run-provider-function-eval.mjs");
+const fallbackRunnerSource = fs.readFileSync(
+  path.join(desktopRoot, "scripts", "run-provider-fallback-eval.mjs"),
+  "utf8",
+);
 
 test("records a redacted real-provider function-call trace", async () => {
   let requestBody = null;
@@ -155,6 +159,13 @@ test("requires one persisted fallback, a stream longer than 12 seconds, and reta
   result.fallback.durationMs = 13_000;
   result.interruption.partialReplyChars = 0;
   assert.throws(() => validateProviderFallbackRuntimeResult(result), /partial text/);
+});
+
+test("separates the cold Cargo build budget from the fallback Runtime timeout", () => {
+  assert.match(fallbackRunnerSource, /spawn\("cargo", \[\s*"build"/);
+  assert.match(fallbackRunnerSource, /600_000/);
+  assert.match(fallbackRunnerSource, /spawn\(runtimeBinaryPath, \[\]/);
+  assert.match(fallbackRunnerSource, /setTimeout\(\(\) => child\.kill\("SIGKILL"\), 120_000\)/);
 });
 
 test("fails closed while retaining trace when native tools are rejected", async () => {

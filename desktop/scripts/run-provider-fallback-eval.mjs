@@ -11,6 +11,15 @@ import {
 
 const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = path.resolve(desktopRoot, "..");
+const cargoManifest = path.join(desktopRoot, "src-tauri", "Cargo.toml");
+const cargoTargetRoot = process.env.CARGO_TARGET_DIR
+  ? path.resolve(repositoryRoot, process.env.CARGO_TARGET_DIR)
+  : path.join(desktopRoot, "src-tauri", "target");
+const runtimeBinaryPath = path.join(
+  cargoTargetRoot,
+  "debug",
+  `omnidesk-provider-fallback-eval${process.platform === "win32" ? ".exe" : ""}`,
+);
 const argument = (name) => {
   const index = process.argv.indexOf(name);
   return index >= 0 ? process.argv[index + 1] : "";
@@ -41,6 +50,8 @@ const started = Date.now();
 let runtimeResult = null;
 let failure = null;
 try {
+  const build = await buildRuntime();
+  if (build.code !== 0) throw new Error(build.stderr || `Provider Fallback Runtime build exited ${build.code}`);
   const execution = await runRuntime({
     schemaVersion: "omnidesk.provider-fallback-eval-request.v0.1",
     projectRoot,
@@ -145,14 +156,7 @@ function validateRelayEvidence(evidence) {
 
 function runRuntime(request) {
   return new Promise((resolve) => {
-    const child = spawn("cargo", [
-      "run",
-      "--quiet",
-      "--manifest-path",
-      path.join(desktopRoot, "src-tauri", "Cargo.toml"),
-      "--bin",
-      "omnidesk-provider-fallback-eval",
-    ], { cwd: repositoryRoot, stdio: ["pipe", "pipe", "pipe"] });
+    const child = spawn(runtimeBinaryPath, [], { cwd: repositoryRoot, stdio: ["pipe", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
     const timeout = setTimeout(() => child.kill("SIGKILL"), 120_000);
@@ -163,6 +167,33 @@ function runRuntime(request) {
       resolve({ code, stderr: redact(stderr, fixtureRoot), stdout });
     });
     child.stdin.end(JSON.stringify(request));
+  });
+}
+
+function buildRuntime() {
+  return new Promise((resolve) => {
+    const child = spawn("cargo", [
+      "build",
+      "--quiet",
+      "--manifest-path",
+      cargoManifest,
+      "--bin",
+      "omnidesk-provider-fallback-eval",
+    ], { cwd: repositoryRoot, stdio: ["ignore", "ignore", "pipe"] });
+    let stderr = "";
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      child.kill("SIGKILL");
+    }, 600_000);
+    child.stderr.on("data", (chunk) => { stderr = `${stderr}${chunk}`.slice(-20_000); });
+    child.on("close", (code) => {
+      clearTimeout(timeout);
+      resolve({
+        code: timedOut ? 124 : code,
+        stderr: timedOut ? "Provider Fallback Runtime build timed out after 600 seconds" : redact(stderr, fixtureRoot),
+      });
+    });
   });
 }
 

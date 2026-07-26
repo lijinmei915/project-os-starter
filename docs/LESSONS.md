@@ -24,6 +24,8 @@ use_when: "AI 即将做类似操作前检查是否有已知的坑、或犯错后
 
 同一轮还发现 artifact 汇总 job 下载了切片，却没有 checkout 仓库，因而无法执行仓库内的索引构建脚本。任何只消费 artifact 的汇总 job，如果仍调用仓库脚本或 schema，也必须显式 checkout，并由工作流契约测试约束步骤顺序。
 
+补齐系统库后，P1 冷缓存编译仍被评测脚本的 120 秒 Runtime 超时杀死。编译准备时间与产品 Runtime 执行时间必须使用两个独立预算：先有界构建二进制，再对已构建进程施加原有执行上限；不得通过放宽 Runtime 超时掩盖构建阶段不确定性。
+
 ### 2026-07-26 可选协议入口存在不等于运行依赖已安装
 
 **犯的错**：受保护 Eval 使用裸 `pip install hermes-agent`。安装包提供了 `hermes-acp` 命令入口，主 Hermes CLI 的 13-case 也全部通过，但 P3 Runtime Timeline 启动 ACP 时因缺少 `agent-client-protocol` 立即崩溃。
