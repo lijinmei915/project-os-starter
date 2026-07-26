@@ -1,6 +1,6 @@
 {
   "schemaVersion": "omnidesk.schema-contract-inventory.v1",
-  "generatedAt": "2026-07-25T18:50:23.000Z",
+  "generatedAt": "2026-07-26T07:52:41.044Z",
   "sourceOfTruth": "schemas/*.json plus git grep consumer evidence",
   "totals": {
     "contracts": 15,
@@ -20,12 +20,16 @@
       ],
       "versionConsumers": [
         "HANDOFF.md",
+        "PROJECT.md",
+        "desktop/scripts/build-agent-eval-artifact-index.mjs",
+        "desktop/tests/agent-eval-artifact-index.test.mjs",
         "desktop/tests/schema-identity.test.mjs",
         "docs/TESTING.md",
         "docs/data/schema-contract-inventory.json"
       ],
       "runtimeConsumers": [
-        "desktop/tests/schema-identity.test.mjs"
+        "desktop/tests/schema-identity.test.mjs",
+        "desktop/tests/agent-eval-artifact-index.test.mjs"
       ],
       "status": "active-contract",
       "migrationRule": "先增加 OmniDesk 版本读取/写入迁移与回归，再退役旧版本。"

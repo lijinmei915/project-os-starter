@@ -18,7 +18,7 @@ depends_on: [AGENTS.md, docs/ARCHITECTURE.md, docs/PRODUCT_PLAN.md]
 - 项目名：`OmniDesk`
 - 产品形态：基于 `Tauri + React + Local Agent Runtime` 的本地 AI 工程工作台
 - 唯一产品核心：`desktop/` 内的 OmniDesk Desktop Runtime
-- 当前阶段：`OmniDesk Agent 平台化 v1 已完成 / 平台稳定化`
+- 当前阶段：`OmniDesk Agent 平台稳定化 v1 已完成`
 
 OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生成计划和 Patch 草稿、执行独立审批、运行检查、有限修复并保存可审计证据。它不是 Project OS 安装器、AI 工程评分工具或跨工具模板分发产品。
 
@@ -91,12 +91,13 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 - P4 最小可见管理入口已接入 `Agent 配置 / 受控工具`：用户可管理 Server、发起发现审批、查看当前项目仍有效的发现证据、按工具 schema 填参数并创建新的调用审批。调用审批创建失败时保留参数表单，Server 删除失败时保留确认框，切换项目或卸载页面后不接受迟到刷新状态。页面复用现有 Agent Run 批准、取消和证据导出操作；Preview 只显示只读提示，不暴露 transport。原生 WebDriver 已从真实页面完成 `lookup` 发现、表单调用、审批前零执行、批准后有界结果写回的闭环。
 - P4 已通过受保护真实验收：官方 `@modelcontextprotocol/server-filesystem@2026.7.10` 的版本与 integrity 固定，发现和 `list_directory` 分别经过 Scheduler、Agent Run、独立审批与 Execution；审批前零执行，两个 Run 与 Timeline 成功，结果有界且 Scheduler 零残留。
 - 平台稳定化受保护 Eval [`30188136814`](https://github.com/lijinmei915/project-os-starter/actions/runs/30188136814) 已在 `dd53d94` 全绿：P1/P3/P4/suite 四个切片可独立运行，13/13 case 与隔离 worktree 通过；统一 `omnidesk.agent-eval-artifact-index.v0.1` 覆盖四个切片、45 个证据文件，下载后逐项复算 SHA-256 无差异。P1 冷构建与 Runtime 超时已分离，未放宽 120 秒执行上限。
+- 平台稳定化真实桌面最终组合验收已完成：原生窗口请求 `1785052066377-0ac18e1d99acc` 由 `gpt-5.6-terra` 接受 `start_engineering_task` Function Call，同一 requestId 绑定 Conversation 与只读 Task，生成真实 `PROVIDER_CALL` 计划并停在 `awaiting-confirmation`。确认前 `approval=null`、`agentRunId=null`，README 哈希保持不变；该证据与同一 MCP Run 的调度、重启不重放、显式恢复、原审批、工具结果和 metadata-only Timeline 原生证据共同闭环。期间修复了编排层用兼容关键词覆盖合法原生 Function Call 的缺陷。
 
 当前重点：
 
-- `OmniDesk Agent 平台化 v1` 的 P0-P4 已全部完成本地、原生与受保护真实验收；当前进入平台稳定化，不继续扩展关键词执行路由或旁路工具 transport。
-- 平台稳定化已完成首屏预算治理和受保护 Eval 矩阵验收；同一原生 MCP Run 已通过调度、待审批、重启不重放、显式恢复、原审批、工具执行与脱敏 Timeline 组合验收，并修复恢复审批未重新领取 Scheduler 租约的缺陷。
-- 保持多文件 Patch 授权、独立审批、恢复不重放、显式 usage/cost 和脱敏 trace 门槛，并以真实桌面复杂任务检验组合体验。
+- `OmniDesk Agent 平台稳定化 v1` 已完成本地、原生与受保护真实验收；P0-P4、首屏预算、Eval 矩阵、artifact 索引和真实桌面组合证据均已闭环。
+- 后续改动继续守住多文件 Patch 授权、独立审批、恢复不重放、单终态、显式 usage/cost 和脱敏 trace 门槛，不扩展关键词执行路由或旁路工具 transport。
+- 下一阶段优先降低真实模型多文件 Patch 输出波动，并以既有 13-case 和隔离 worktree 门槛防止可靠性回退。
 - 受保护 Eval 继续保留失败 artifact；上游模型波动、依赖漂移或软 bundle 超限不能通过放宽门槛掩盖。
 
 当前风险：
@@ -107,5 +108,5 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 
 ## 下一步重点
 
-1. 用真实 Provider 从桌面对话触发一次 Function Call，并与已通过的同 Run 恢复、审批和 Timeline 证据完成最终组合验收。
-2. 继续降低多文件 Patch 输出波动，不放宽授权、审批、规范化或 trace 门槛。
+1. 降低真实模型多文件 Patch 输出波动，不放宽授权、审批、规范化或 trace 门槛。
+2. 保持 P1/P3/P4/suite 可独立重跑，并在 Provider、依赖或 bundle 变化时复核统一 artifact 索引与 800 KiB 预算。

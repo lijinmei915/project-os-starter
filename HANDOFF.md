@@ -16,7 +16,7 @@ depends_on: [PROJECT.md, AGENTS.md, docs/ARCHITECTURE.md, docs/TESTING.md]
 
 - 产品核心：`desktop/` 中的 Tauri + React + Local Agent Runtime。它在用户授权范围内处理项目、对话、Patch、审批、检查、恢复与证据。
 - 状态根：`.omnidesk/` 是唯一活动状态根，分为 `data`、`runtime`、`cache`、`evidence`。历史 `.project-os/` 只能通过显式、非破坏性迁移导入，不能作为运行时回退。
-- 当前分支：`main`，最新远端提交为 `ce881b6 docs: mark agent platform v1 complete`；平台稳定化改动仍在工作树，尚未提交或推送。
+- 当前分支：`main`，最新远端提交为 `cff6af2 fix: trust native task function calls`；本轮自动生成的治理账本和状态文档更新尚未提交或推送。
 - 受控边界不可放松：Patch 写入与检查各自独立审批；恢复不能自动重放；Provider 成功不等于任务成功；Preview 只读，不执行写入、终端、检查或恢复。
 
 ## 最近完成
@@ -48,6 +48,8 @@ depends_on: [PROJECT.md, AGENTS.md, docs/ARCHITECTURE.md, docs/TESTING.md]
 - 原生 WebDriver 已从真实页面完成 `Native Callable / lookup` 流程；P4 的受保护官方 Filesystem MCP Eval 也已通过，证明固定版本/integrity、两次独立审批、审批前零执行、项目互斥、有界结果、成功 Timeline 和零 Scheduler 残留。
 - 同一受保护运行的 13/13 标准 case 与 isolated-worktree 均通过；artifact 含相对 trace、真实 Provider Function Call、Runtime Timeline、慢流/断流和第三方 MCP 证据。`OmniDesk Agent 平台化 v1` 的 P0-P4 验收已闭环。
 - 最新稳定化 Eval [30188136814](https://github.com/lijinmei915/project-os-starter/actions/runs/30188136814) 已在 `dd53d94` 完整通过：P1/P3/P4/suite 与 artifact-index 五个 job 全绿，13/13 case 成功，隔离 worktree 成功；索引覆盖四个切片和 45 个文件，下载复算 SHA-256 无差异。P1 的冷 Cargo 构建与 120 秒 Runtime 执行上限已拆分，未通过放宽门槛掩盖 CI 环境问题。
+- 最终真实桌面组合验收已完成：原生请求 `1785052066377-0ac18e1d99acc` 由 `gpt-5.6-terra` 接受原生 Function Call，同一 requestId 创建只读计划并进入 `awaiting-confirmation`；Task 含真实 `PROVIDER_CALL`，确认前无 approval、无 Agent Run、README 哈希不变。该证据与同一 MCP Run 的调度、待审批、重启不重放、显式恢复、原审批、工具成功和 metadata-only Timeline 原生 smoke 共同闭环。
+- 验收过程中发现原生 Function Call 曾被编排层兼容关键词二次改判；`cff6af2` 已移除该覆盖并增加边界回归。完整本地回归与原生 smoke 均通过，首屏入口仍为 `623.45 KiB / 800 KiB`。
 
 ## 风险与注意
 
@@ -60,5 +62,5 @@ depends_on: [PROJECT.md, AGENTS.md, docs/ARCHITECTURE.md, docs/TESTING.md]
 
 ## 下一步建议
 
-1. 用真实 Provider 从桌面对话触发一次 Function Call，并把它与已通过的同 Run 重启恢复、审批和 Timeline 证据共同验收。
-2. 继续降低多文件 Patch 波动；不要放宽授权、独立审批、规范化或 trace 门槛。
+1. 继续降低多文件 Patch 波动；不要放宽授权、独立审批、规范化或 trace 门槛。
+2. Provider、Hermes、MCP 依赖或前端入口变化时，重跑对应 P1/P3/P4/suite 切片并复核统一 artifact 索引与 800 KiB 预算。
