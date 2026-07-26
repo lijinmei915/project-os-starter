@@ -17,3 +17,17 @@ test("keeps protected Agent Eval independently rerunnable with one artifact inde
   assert.match(indexBuilder, /sha256/);
   assert.match(workflow, /needs: real-agent-eval/);
 });
+
+test("installs native build dependencies for every slice that compiles the Tauri runtime", () => {
+  assert.match(
+    workflow,
+    /Install Patch Normalizer build dependencies[\s\S]*?if: matrix\.target == 'p1' \|\| matrix\.target == 'p3' \|\| matrix\.target == 'p4' \|\| matrix\.target == 'suite'/,
+  );
+});
+
+test("checks out the artifact index builder before executing it", () => {
+  assert.match(
+    workflow,
+    /artifact-index:[\s\S]*?steps:\s*\n\s*- uses: actions\/checkout@v4\s*\n\s*- uses: actions\/download-artifact@v4[\s\S]*?build-agent-eval-artifact-index\.mjs/,
+  );
+});
