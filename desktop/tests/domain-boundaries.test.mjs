@@ -1516,9 +1516,13 @@ test("keeps the style entrypoint as an ordered domain composition", () => {
 
 test("keeps pure chat routing outside the Tauri command assembly", () => {
   const app = source("src-tauri/src/runtime/app.rs");
+  const content = source("src-tauri/src/runtime/chat_content.rs");
+  const stream = source("src-tauri/src/runtime/chat_stream.rs");
   const routing = source("src-tauri/src/runtime/chat_routing.rs");
-  assert.match(app, /use crate::runtime::chat_routing/);
+  assert.doesNotMatch(app, /use crate::runtime::chat_routing/);
   assert.doesNotMatch(app, /fn is_task_like_message\(/);
+  assert.match(content, /use crate::runtime::chat_routing/);
+  assert.match(stream, /use crate::runtime::chat_routing/);
   assert.match(routing, /pub fn should_create_plan_for_message/);
   assert.match(routing, /#\[cfg\(test\)\]/);
 });
@@ -1691,6 +1695,16 @@ test("keeps local chat content outside the Tauri command assembly", () => {
   assert.doesNotMatch(content, /Return strict JSON only/);
   assert.match(content, /pub fn local_chat_result/);
   assert.match(content, /#\[cfg\(test\)\]/);
+});
+
+test("keeps accepted native Function Calls authoritative over compatibility keyword routing", () => {
+  const app = source("src-tauri/src/runtime/app.rs");
+  const chatCommand = app.slice(
+    app.indexOf("async fn chat_with_model("),
+    app.indexOf("#[tauri::command]\nfn cancel_runtime_request"),
+  );
+  assert.doesNotMatch(chatCommand, /should_create_plan_for_message/);
+  assert.doesNotMatch(chatCommand, /result\.should_create_plan\s*=\s*false/);
 });
 
 test("keeps chat evidence projection outside the Tauri command assembly", () => {

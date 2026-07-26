@@ -3,7 +3,6 @@ use crate::runtime::chat_content::{
     local_chat_result, project_evidence, references_for_message, ChatTurnInput,
     ChatWithModelResult, DialogueContextInput,
 };
-use crate::runtime::chat_routing::should_create_plan_for_message;
 use crate::runtime::chat_runtime::{emit_conversation_event, RuntimeRequestState};
 use crate::runtime::chat_stream::{
     generate_provider_chat, should_retry_provider_chat, ChatStreamError,
@@ -1046,14 +1045,6 @@ async fn chat_with_model(
                 result.provider_error = String::new();
                 if !provider_switch_note.is_empty() {
                     result.reply = format!("{}\n\n{}", provider_switch_note, result.reply);
-                }
-                if result.should_create_plan
-                    && !should_create_plan_for_message(&message, !attachments.is_empty())
-                {
-                    result.should_create_plan = false;
-                    if result.intent.trim().is_empty() || result.intent == "task" {
-                        result.intent = "question".to_string();
-                    }
                 }
                 result.references = evidence_references;
                 return Ok(result);

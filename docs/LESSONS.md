@@ -1258,3 +1258,11 @@ use_when: "AI 即将做类似操作前检查是否有已知的坑、或犯错后
 **根本原因**：`resume_agent_run` 只恢复了 Agent Run 状态；普通模型恢复随后会经过 Hermes 入口重新入队，而 `resume-approval` 直接返回前端，漏掉 Scheduler 的重新入队、并发和项目互斥检查。
 
 **新增规则**：恢复入口必须先确认 Run 仍属于当前项目，再由 Runtime 重新入队并领取 Scheduler 租约；跨项目、没有并发槽位或同项目仍被占用时保持中断且不执行。领取成功后才恢复原 approval 并重新建立 `waiting-approval` 占用。原生验收必须让同一 Run 跨越重启，并证明恢复前零执行、原 token 保留、显式批准后成功、Scheduler 可结算且 Timeline 同时包含调度、恢复、审批和工具事件。
+
+### 2026-07-26 原生 Function Call 不能再被兼容关键词路由改判
+
+**现象**：真实桌面对话中，Provider 已合法返回 `start_engineering_task`，界面也显示 `native-function-call`，但没有创建执行计划，随后直接回到空闲。
+
+**根本原因**：Provider transport 已把原生 Function Call 判定为工程任务，Tauri command 编排层却再次调用旧 `should_create_plan_for_message` 关键词规则；用户表达未命中旧词表时，合法结构化调用被强制改回普通对话。
+
+**新增规则**：原生工具调用通过工具名、封闭参数 schema 和单调用校验后，就是任务意图的权威证据，编排层不得再用关键词二次改判。兼容关键词路由只服务于已明确不支持 tools 的 Provider；它不能覆盖 `native-function-call`。该调用仍只进入只读计划，Patch、检查和写入继续要求独立确认。
