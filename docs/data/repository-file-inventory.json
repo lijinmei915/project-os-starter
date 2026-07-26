@@ -1,6 +1,6 @@
 {
   "schemaVersion": "omnidesk.repository-file-inventory.v1",
-  "generatedAt": "2026-07-25T18:15:08.095Z",
+  "generatedAt": "2026-07-25T18:53:57.040Z",
   "sourceOfTruth": "git ls-files --cached --others --exclude-standard",
   "scope": "受版本控制文件及准备纳入版本控制的非忽略工作树文件；忽略的本地运行数据和构建输出不在本账本内。",
   "reviewContract": {
@@ -24,27 +24,27 @@
     "rule": "没有消费者证据的文件不自动删除；必须由对应 Owner 审核并通过验证后才能退役。"
   },
   "totals": {
-    "files": 569,
+    "files": 573,
     "byKind": {
       "repository": 2,
       "ci": 2,
       "root-document": 6,
       "desktop-support": 15,
-      "eval": 9,
+      "eval": 11,
       "native": 68,
       "runtime": 31,
       "eval-support": 10,
       "frontend": 260,
-      "test": 123,
+      "test": 125,
       "documentation": 19,
       "documentation-data": 5,
       "schema": 14,
       "repository-tooling": 5
     },
-    "classified": 4,
+    "classified": 6,
     "candidates": 0,
     "inProgress": 2,
-    "reviewed": 563
+    "reviewed": 565
   },
   "files": [
     {
@@ -66,7 +66,7 @@
       "path": ".github/workflows/agent-eval.yml",
       "kind": "ci",
       "owner": "Release Engineering",
-      "bytes": 6647,
+      "bytes": 9893,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -138,7 +138,7 @@
       "path": "HANDOFF.md",
       "kind": "root-document",
       "owner": "Documentation Governance",
-      "bytes": 10048,
+      "bytes": 10637,
       "pathMentions": [
         "desktop/src/components/workbench/current-goal-panel.jsx",
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
@@ -191,7 +191,7 @@
       "path": "PROJECT.md",
       "kind": "root-document",
       "owner": "Documentation Governance",
-      "bytes": 19105,
+      "bytes": 19283,
       "pathMentions": [
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
         "desktop/src/lib/agent-topic-runtime-capability.js",
@@ -372,6 +372,23 @@
       "decisionEvidence": "manual-review-registry"
     },
     {
+      "path": "desktop/scripts/build-agent-eval-artifact-index.mjs",
+      "kind": "eval",
+      "owner": "Agent Reliability",
+      "bytes": 2169,
+      "pathMentions": [],
+      "moduleConsumers": [
+        "desktop/tests/agent-eval-artifact-index.test.mjs"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
+    },
+    {
       "path": "desktop/scripts/check-agent-eval-report.mjs",
       "kind": "eval",
       "owner": "Agent Reliability",
@@ -495,7 +512,7 @@
       "path": "desktop/scripts/run-native-webdriver-smoke.mjs",
       "kind": "desktop-support",
       "owner": "Desktop Platform",
-      "bytes": 28822,
+      "bytes": 30513,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -1606,7 +1623,7 @@
       "path": "desktop/src-tauri/src/runtime/agent_scheduler.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 18064,
+      "bytes": 18886,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/bin/mcp_eval.rs",
@@ -1645,7 +1662,7 @@
       "path": "desktop/src-tauri/src/runtime/app.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 100327,
+      "bytes": 101565,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/main.rs",
@@ -6988,7 +7005,7 @@
       "path": "desktop/src/main.jsx",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 56828,
+      "bytes": 57233,
       "pathMentions": [
         "desktop/src-tauri/src/runtime/workspace.rs",
         "desktop/src/lib/agent-topic-cards.js"
@@ -7292,6 +7309,21 @@
       "decisionEvidence": "manual-review-registry"
     },
     {
+      "path": "desktop/tests/agent-eval-artifact-index.test.mjs",
+      "kind": "test",
+      "owner": "Desktop Quality",
+      "bytes": 1852,
+      "pathMentions": [],
+      "moduleConsumers": [],
+      "consumerEvidence": "no-static-module-consumer",
+      "consumerReview": "没有静态 import/mod 关系；路径提及、Owner 和领域回归构成保留证据，删除前必须补运行时或发布消费者复核。",
+      "decision": "keep",
+      "rationale": "Desktop Runtime、Workbench、Preview 与 Agent 闭环回归套件；Node 测试覆盖 tests/*.test.mjs，E2E smoke 由 Playwright 独立运行。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop test && npm --prefix desktop run test:smoke；原生窗口行为另运行 npm --prefix desktop run test:native。",
+      "decisionEvidence": "manual-review-rule:desktop-test-suites"
+    },
+    {
       "path": "desktop/tests/agent-eval-recovery-runner.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
@@ -7356,6 +7388,21 @@
       "kind": "test",
       "owner": "Desktop Quality",
       "bytes": 4784,
+      "pathMentions": [],
+      "moduleConsumers": [],
+      "consumerEvidence": "no-static-module-consumer",
+      "consumerReview": "没有静态 import/mod 关系；路径提及、Owner 和领域回归构成保留证据，删除前必须补运行时或发布消费者复核。",
+      "decision": "keep",
+      "rationale": "Desktop Runtime、Workbench、Preview 与 Agent 闭环回归套件；Node 测试覆盖 tests/*.test.mjs，E2E smoke 由 Playwright 独立运行。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop test && npm --prefix desktop run test:smoke；原生窗口行为另运行 npm --prefix desktop run test:native。",
+      "decisionEvidence": "manual-review-rule:desktop-test-suites"
+    },
+    {
+      "path": "desktop/tests/agent-eval-workflow.test.mjs",
+      "kind": "test",
+      "owner": "Desktop Quality",
+      "bytes": 974,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -7865,7 +7912,7 @@
       "path": "desktop/tests/domain-boundaries.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 104875,
+      "bytes": 104923,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -8540,7 +8587,7 @@
       "path": "desktop/tests/schema-identity.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 1594,
+      "bytes": 1910,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -9275,7 +9322,7 @@
       "path": "docs/LESSONS.md",
       "kind": "documentation",
       "owner": "Documentation Governance",
-      "bytes": 101154,
+      "bytes": 102125,
       "pathMentions": [
         "desktop/src/components/workbench/project-memory-panel.jsx",
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
@@ -9377,7 +9424,7 @@
       "path": "docs/TESTING.md",
       "kind": "documentation",
       "owner": "Documentation Governance",
-      "bytes": 14690,
+      "bytes": 14979,
       "pathMentions": [
         "desktop/scripts/run-native-webdriver-smoke.mjs",
         "desktop/src-tauri/src/runtime/workspace.rs",
@@ -9463,7 +9510,7 @@
       "path": "docs/data/schema-contract-inventory.json",
       "kind": "documentation-data",
       "owner": "Documentation Governance",
-      "bytes": 13786,
+      "bytes": 14663,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -9533,6 +9580,21 @@
       "reviewStatus": "reviewed",
       "verification": "npm --prefix desktop run web:build && bash scripts/check-frontmatter.sh .",
       "decisionEvidence": "manual-review-registry"
+    },
+    {
+      "path": "schemas/agent-eval-artifact-index.schema.json",
+      "kind": "eval",
+      "owner": "Agent Reliability",
+      "bytes": 1138,
+      "pathMentions": [],
+      "moduleConsumers": [],
+      "consumerEvidence": "no-static-module-consumer",
+      "consumerReview": "没有静态 import/mod 关系；路径提及、Owner 和领域回归构成保留证据，删除前必须补运行时或发布消费者复核。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
     },
     {
       "path": "schemas/agent-run.schema.json",

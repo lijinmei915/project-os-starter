@@ -13,10 +13,13 @@ function readSchema(name) {
 
 test("uses OmniDesk identities for Runtime contracts that already write OmniDesk versions", () => {
   const agentRun = readSchema("agent-run.schema.json");
+  const agentEvalArtifactIndex = readSchema("agent-eval-artifact-index.schema.json");
   const conversationEvent = readSchema("conversation-event.schema.json");
 
   assert.equal(agentRun.$id, "https://omnidesk.local/schemas/agent-run.schema.json");
   assert.equal(agentRun.properties.schemaVersion.const, "omnidesk.agent-run.v0.1");
+  assert.equal(agentEvalArtifactIndex.$id, "https://omnidesk.local/schemas/agent-eval-artifact-index.schema.json");
+  assert.equal(agentEvalArtifactIndex.properties.schemaVersion.const, "omnidesk.agent-eval-artifact-index.v0.1");
   assert.equal(conversationEvent.$id, "https://omnidesk.local/schemas/conversation-event.schema.json");
   assert.equal(conversationEvent.properties.schemaVersion.const, "omnidesk.conversation-event.v0.1");
 });

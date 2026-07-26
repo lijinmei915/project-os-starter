@@ -1,13 +1,35 @@
 {
   "schemaVersion": "omnidesk.schema-contract-inventory.v1",
-  "generatedAt": "2026-07-25T12:49:29.826Z",
+  "generatedAt": "2026-07-25T18:50:23.000Z",
   "sourceOfTruth": "schemas/*.json plus git grep consumer evidence",
   "totals": {
-    "contracts": 14,
-    "active": 14,
+    "contracts": 15,
+    "active": 15,
     "candidates": 0
   },
   "contracts": [
+    {
+      "path": "schemas/agent-eval-artifact-index.schema.json",
+      "id": "https://omnidesk.local/schemas/agent-eval-artifact-index.schema.json",
+      "title": "OmniDesk Agent Eval Artifact Index",
+      "schemaVersion": "omnidesk.agent-eval-artifact-index.v0.1",
+      "pathConsumers": [
+        "desktop/tests/schema-identity.test.mjs",
+        "docs/data/repository-file-inventory.json",
+        "docs/data/schema-contract-inventory.json"
+      ],
+      "versionConsumers": [
+        "HANDOFF.md",
+        "desktop/tests/schema-identity.test.mjs",
+        "docs/TESTING.md",
+        "docs/data/schema-contract-inventory.json"
+      ],
+      "runtimeConsumers": [
+        "desktop/tests/schema-identity.test.mjs"
+      ],
+      "status": "active-contract",
+      "migrationRule": "先增加 OmniDesk 版本读取/写入迁移与回归，再退役旧版本。"
+    },
     {
       "path": "schemas/agent-run.schema.json",
       "id": "https://omnidesk.local/schemas/agent-run.schema.json",

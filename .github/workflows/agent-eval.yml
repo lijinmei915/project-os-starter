@@ -4,16 +4,32 @@ on:
   schedule:
     - cron: "17 2 * * *"
   workflow_dispatch:
+    inputs:
+      target:
+        description: Evaluation slice to run
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - p1
+          - p3
+          - p4
+          - suite
 
 permissions:
   contents: read
 
 jobs:
   real-agent-eval:
-    name: Protected real Agent Eval
+    name: Protected real Agent Eval (${{ matrix.target }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: agent-eval
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.target != 'all' && format('["{0}"]', inputs.target) || '["p1","p3","p4","suite"]') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,7 +37,10 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: desktop/package-lock.json
+      - name: Install Desktop dependencies
+        run: npm ci --prefix desktop
       - name: Install Patch Normalizer build dependencies
+        if: matrix.target == 'p3' || matrix.target == 'p4' || matrix.target == 'suite'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -29,8 +48,8 @@ jobs:
             libglib2.0-dev \
             libgtk-3-dev \
             libwebkit2gtk-4.1-dev
-      - run: npm ci --prefix desktop
       - name: Install pinned Hermes ACP runtime
+        if: matrix.target == 'p3' || matrix.target == 'suite'
         env:
           HERMES_VERSION: "0.19.0"
         run: |
@@ -39,24 +58,13 @@ jobs:
           "$HOME/.local/bin/hermes-acp" --check
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Verify Patch Normalizer
+        if: matrix.target == 'p3' || matrix.target == 'p4' || matrix.target == 'suite'
         run: |
           printf '%s' '{"diff":"--- README.md\n+++ README.md\n@@ -1 +1 @@\n-before\n+after\n","contexts":[{"path":"README.md","content":"before\n"}]}' \
             | cargo run --quiet --manifest-path desktop/src-tauri/Cargo.toml --bin omnidesk-patch-normalizer \
             | node -e 'let body=""; process.stdin.on("data", (chunk) => body += chunk).on("end", () => { const result = JSON.parse(body); if (!result.normalizedDiff.includes("+after")) process.exit(1); })'
-      - name: Run protected third-party MCP evaluation
-        env:
-          MCP_FILESYSTEM_VERSION: "2026.7.10"
-          MCP_FILESYSTEM_INTEGRITY: "sha512-Mmjg4anFBD5OzbPnGJOA0jPPN8645ERhQk38HQLpSenx1ox9bfdPkmAzUnNjeQtqQGFLtKe13J20RtLBmUKMZA=="
-        run: |
-          export eval_root=".omnidesk/evidence/agent-eval/${{ github.run_id }}"
-          export mcp_root="$RUNNER_TEMP/omnidesk-third-party-mcp"
-          test "$(npm view "@modelcontextprotocol/server-filesystem@$MCP_FILESYSTEM_VERSION" dist.integrity)" = "$MCP_FILESYSTEM_INTEGRITY"
-          mkdir -p "$eval_root" "$mcp_root"
-          npm install --prefix "$mcp_root" --ignore-scripts --no-audit --no-fund --no-save "@modelcontextprotocol/server-filesystem@$MCP_FILESYSTEM_VERSION"
-          npm --prefix desktop run eval:mcp:third-party -- \
-            --server-entry "$mcp_root/node_modules/@modelcontextprotocol/server-filesystem/dist/index.js" \
-            --trace "../$eval_root/traces/third-party-mcp.trace.json"
-      - name: Run the registered real evaluation suite
+      - name: Prepare protected Provider state
+        if: matrix.target == 'p1' || matrix.target == 'p3' || matrix.target == 'suite'
         env:
           OMNIDESK_AGENT_EVAL_KEY: ${{ secrets.OMNIDESK_AGENT_EVAL_KEY }}
           OMNIDESK_AGENT_EVAL_API_BASE: ${{ vars.OMNIDESK_AGENT_EVAL_API_BASE }}
@@ -65,25 +73,92 @@ jobs:
           test -n "$OMNIDESK_AGENT_EVAL_KEY"
           test -n "$OMNIDESK_AGENT_EVAL_API_BASE"
           test -n "$OMNIDESK_AGENT_EVAL_MODEL"
-          export eval_root=".omnidesk/evidence/agent-eval/${{ github.run_id }}"
-          mkdir -p .omnidesk/data "$eval_root"
+          mkdir -p .omnidesk/data ".omnidesk/evidence/agent-eval/${{ github.run_id }}/${{ matrix.target }}/traces"
           node -e 'const fs=require("fs"); fs.writeFileSync(".omnidesk/namespace.json", JSON.stringify({schemaVersion:"omnidesk.state-namespace.v1",activeNamespace:"omnidesk",mode:"ci-eval"})); const p={schemaVersion:"omnidesk.desktop-provider.v0.1",provider:"openai-compatible",model:process.env.OMNIDESK_AGENT_EVAL_MODEL,apiBase:process.env.OMNIDESK_AGENT_EVAL_API_BASE,apiKeyEnv:"OMNIDESK_AGENT_EVAL_KEY",enabled:true,activeProfileId:"agent-eval",profiles:[{id:"agent-eval",name:"Protected Agent Eval",note:"",website:"",provider:"openai-compatible",model:process.env.OMNIDESK_AGENT_EVAL_MODEL,apiBase:process.env.OMNIDESK_AGENT_EVAL_API_BASE,apiKeyEnv:"OMNIDESK_AGENT_EVAL_KEY"}]}; fs.writeFileSync(".omnidesk/data/desktop-provider.json", JSON.stringify(p));'
+      - name: Configure Hermes ACP Provider
+        if: matrix.target == 'p3' || matrix.target == 'suite'
+        env:
+          OMNIDESK_AGENT_EVAL_API_BASE: ${{ vars.OMNIDESK_AGENT_EVAL_API_BASE }}
+          OMNIDESK_AGENT_EVAL_MODEL: ${{ vars.OMNIDESK_AGENT_EVAL_MODEL }}
+        run: |
           mkdir -p "$HOME/.hermes"
           node -e 'const fs=require("fs"); const base=JSON.stringify(process.env.OMNIDESK_AGENT_EVAL_API_BASE); const model=JSON.stringify(process.env.OMNIDESK_AGENT_EVAL_MODEL); fs.writeFileSync(process.env.HOME+"/.hermes/config.yaml", `model:\n  provider: "omnidesk-gateway"\n  base_url: ${base}\n  api_mode: "chat_completions"\n  default: ${model}\n  key_env: "OMNIDESK_AGENT_EVAL_KEY"\ncustom_providers:\n  - name: "omnidesk-gateway"\n    base_url: ${base}\n    model: ${model}\n    api_mode: "chat_completions"\n    key_env: "OMNIDESK_AGENT_EVAL_KEY"\n`);'
+      - name: Run P1 Function Calling and compatibility evaluation
+        if: matrix.target == 'p1'
+        env:
+          OMNIDESK_AGENT_EVAL_KEY: ${{ secrets.OMNIDESK_AGENT_EVAL_KEY }}
+          OMNIDESK_AGENT_EVAL_API_BASE: ${{ vars.OMNIDESK_AGENT_EVAL_API_BASE }}
+          OMNIDESK_AGENT_EVAL_MODEL: ${{ vars.OMNIDESK_AGENT_EVAL_MODEL }}
+        run: |
+          export eval_root=".omnidesk/evidence/agent-eval/${{ github.run_id }}/p1"
+          npm --prefix desktop run eval:provider:function -- --trace "../$eval_root/traces/provider-function-calling.trace.json"
+          npm --prefix desktop run eval:provider:fallback -- --trace "../$eval_root/traces/provider-fallback-slow-stream.trace.json"
+      - name: Run P3 Runtime Timeline evaluation
+        if: matrix.target == 'p3'
+        env:
+          OMNIDESK_AGENT_EVAL_KEY: ${{ secrets.OMNIDESK_AGENT_EVAL_KEY }}
+          OMNIDESK_AGENT_EVAL_API_BASE: ${{ vars.OMNIDESK_AGENT_EVAL_API_BASE }}
+          OMNIDESK_AGENT_EVAL_MODEL: ${{ vars.OMNIDESK_AGENT_EVAL_MODEL }}
+        run: |
+          export eval_root=".omnidesk/evidence/agent-eval/${{ github.run_id }}/p3"
+          npm --prefix desktop run eval:provider:timeline -- --trace "../$eval_root/traces/provider-runtime-timeline.trace.json"
+      - name: Run P4 third-party MCP evaluation
+        if: matrix.target == 'p4'
+        env:
+          MCP_FILESYSTEM_VERSION: "2026.7.10"
+          MCP_FILESYSTEM_INTEGRITY: "sha512-Mmjg4anFBD5OzbPnGJOA0jPPN8645ERhQk38HQLpSenx1ox9bfdPkmAzUnNjeQtqQGFLtKe13J20RtLBmUKMZA=="
+        run: |
+          export eval_root=".omnidesk/evidence/agent-eval/${{ github.run_id }}/p4"
+          export mcp_root="$RUNNER_TEMP/omnidesk-third-party-mcp"
+          mkdir -p "$eval_root/traces" "$mcp_root"
+          test "$(npm view "@modelcontextprotocol/server-filesystem@$MCP_FILESYSTEM_VERSION" dist.integrity)" = "$MCP_FILESYSTEM_INTEGRITY"
+          npm install --prefix "$mcp_root" --ignore-scripts --no-audit --no-fund --no-save "@modelcontextprotocol/server-filesystem@$MCP_FILESYSTEM_VERSION"
+          npm --prefix desktop run eval:mcp:third-party -- \
+            --server-entry "$mcp_root/node_modules/@modelcontextprotocol/server-filesystem/dist/index.js" \
+            --trace "../$eval_root/traces/third-party-mcp.trace.json"
+      - name: Run registered 13-case and isolated-worktree suite
+        if: matrix.target == 'suite'
+        env:
+          OMNIDESK_AGENT_EVAL_KEY: ${{ secrets.OMNIDESK_AGENT_EVAL_KEY }}
+          OMNIDESK_AGENT_EVAL_API_BASE: ${{ vars.OMNIDESK_AGENT_EVAL_API_BASE }}
+          OMNIDESK_AGENT_EVAL_MODEL: ${{ vars.OMNIDESK_AGENT_EVAL_MODEL }}
+        run: |
+          export eval_root=".omnidesk/evidence/agent-eval/${{ github.run_id }}/suite"
           OMNIDESK_AGENT_EVAL_API_KEY_ENV=OMNIDESK_AGENT_EVAL_KEY npm --prefix desktop run eval:agent:suite -- --output "../$eval_root/results.json" --trace-dir "../$eval_root/traces"
           node desktop/scripts/check-agent-eval-traces.mjs --results "$eval_root/results.json" --trace-dir "$eval_root/traces"
-          npm --prefix desktop run eval:provider:function -- --trace "../$eval_root/traces/provider-function-calling.trace.json"
-          npm --prefix desktop run eval:provider:timeline -- --trace "../$eval_root/traces/provider-runtime-timeline.trace.json"
-          npm --prefix desktop run eval:provider:fallback -- --trace "../$eval_root/traces/provider-fallback-slow-stream.trace.json"
           OMNIDESK_AGENT_EVAL_API_KEY_ENV=OMNIDESK_AGENT_EVAL_KEY npm --prefix desktop run eval:agent:isolated -- --output "../$eval_root/isolated-worktree-results.json"
           node -e 'const fs=require("fs"); const path=require("path"); const root=process.argv[1]; const result=JSON.parse(fs.readFileSync(path.join(root,"isolated-worktree-results.json"),"utf8")).results[0]; const trace=JSON.parse(fs.readFileSync(result.execution.tracePath,"utf8")); fs.writeFileSync(path.join(root,"traces","isolated-worktree.trace.json"), JSON.stringify(trace,null,2)+"\n"); result.execution.tracePath="traces/isolated-worktree.trace.json"; fs.writeFileSync(path.join(root,"isolated-worktree-results.json"), JSON.stringify({results:[result]},null,2)+"\n");' "$eval_root"
           node desktop/scripts/check-agent-eval-traces.mjs --results "$eval_root/isolated-worktree-results.json" --trace-dir "$eval_root/traces"
           npm --prefix desktop run eval:agent -- --results "../$eval_root/results.json" --output "../$eval_root/report.json"
           npm --prefix desktop run check:agent-eval -- --baseline evals/agent-eval-report.json --candidate "../$eval_root/report.json"
-      - if: always()
+      - name: Upload evaluation slice
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: agent-eval-traces
-          path: |
-            .omnidesk/evidence/agent-eval
-          if-no-files-found: ignore
+          name: agent-eval-${{ matrix.target }}
+          path: .omnidesk/evidence/agent-eval/${{ github.run_id }}/${{ matrix.target }}
+          if-no-files-found: warn
+
+  artifact-index:
+    name: Agent Eval artifact index
+    if: always()
+    needs: real-agent-eval
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: agent-eval-*
+          path: slices
+          merge-multiple: false
+      - name: Build artifact index
+        run: |
+          node desktop/scripts/build-agent-eval-artifact-index.mjs \
+            --root slices \
+            --output index/index.json \
+            --run-id "${{ github.run_id }}" \
+            --commit "${{ github.sha }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agent-eval-index
+          path: index/index.json
+          if-no-files-found: error

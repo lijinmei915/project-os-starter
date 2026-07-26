@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://omnidesk.local/schemas/agent-eval-artifact-index.schema.json",
+  "title": "OmniDesk Agent Eval Artifact Index",
+  "type": "object",
+  "required": ["schemaVersion", "runId", "commit", "slices", "files"],
+  "properties": {
+    "schemaVersion": { "const": "omnidesk.agent-eval-artifact-index.v0.1" },
+    "runId": { "type": "string", "minLength": 1 },
+    "commit": { "type": "string", "minLength": 1 },
+    "slices": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "enum": ["p1", "p3", "p4", "suite"] }
+    },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["slice", "path", "bytes", "sha256"],
+        "properties": {
+          "slice": { "enum": ["p1", "p3", "p4", "suite"] },
+          "path": { "type": "string", "minLength": 1 },
+          "bytes": { "type": "integer", "minimum": 0 },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -9,7 +9,6 @@ import { AgentWorkspaceAuxiliaryTabs } from "./components/workbench/agent-worksp
 import { PatchDraft, ReadonlyPlan } from "./components/workbench/plan-views";
 import { AgentProcessingStatus } from "./components/workbench/conversation";
 import { visibleConversationPreview } from "./lib/conversation-list";
-import { ProviderPanel } from "./components/workbench/provider-panel";
 import { TopBar } from "./components/workbench/top-bar";
 import { StatusBar } from "./components/workbench/status-bar";
 import { TaskCard } from "./components/workbench/task-card";
@@ -46,7 +45,6 @@ import { useProviderDataSync } from "./components/workbench/use-provider-data-sy
 import { useConversationSurfaceReset } from "./components/workbench/use-conversation-surface-reset";
 import { useWorkspaceEphemeralReset } from "./components/workbench/use-workspace-ephemeral-reset";
 import { useWorkspaceGoalActions } from "./components/workbench/use-workspace-goal-actions";
-import { EngineeringFileTab } from "./components/workbench/engineering-file-tab";
 import { RightRail } from "./components/workbench/right-rail";
 import { ProjectSidebar } from "./components/workbench/project-sidebar";
 import { useSidebarLayout } from "./components/workbench/use-sidebar-layout";
@@ -116,6 +114,8 @@ import { archiveWorkspaceGoal, confirmGoalDecomposition, confirmWorkspaceGoal, c
 import "./styles.css";
 
 const AssistantUiConversationPoc = React.lazy(() => import("./components/workbench/assistant-ui-conversation-poc").then((module) => ({ default: module.AssistantUiConversationPoc })));
+const EngineeringFileTab = React.lazy(() => import("./components/workbench/engineering-file-tab").then((module) => ({ default: module.EngineeringFileTab })));
+const ProviderPanel = React.lazy(() => import("./components/workbench/provider-panel").then((module) => ({ default: module.ProviderPanel })));
 
 class AppErrorBoundary extends React.Component {
   constructor(props) {
@@ -535,7 +535,7 @@ function AgentWorkspace({
 
       <AgentWorkspaceAuxiliaryTabs
         activeWorkspaceTab={activeWorkspaceTab}
-        renderFileTab={(tab) => <TabsContent className="workspaceTabContent fileCanvas" key={tab.id} value={tab.id}><EngineeringFileTab
+        renderFileTab={(tab) => <TabsContent className="workspaceTabContent fileCanvas" key={tab.id} value={tab.id}><React.Suspense fallback={<Notice variant="muted">正在载入工程文件...</Notice>}><EngineeringFileTab
                 activeTaskId={activeTask?.id}
                 agentRuns={agentRuns}
                 mcpClient={mcpClient}
@@ -583,7 +583,7 @@ function AgentWorkspace({
                 onRefreshWorkspaceFacts={refreshWorkspaceFactsPreview}
                 onRefreshAgentRuns={onRefreshAgentRuns}
                 presentation={{ agentTopicPresentation, dedicatedSurfaceByTopic, taskStatuses, workspaceRouteById }}
-              /></TabsContent>}
+              /></React.Suspense></TabsContent>}
         tabs={workspaceTabs}
         terminal={{ activeSessionId: activeTerminalSessionId, chunks: terminalChunks, draftRequest: terminalDraftRequest, error: terminalError, evidence: terminalEvidence, logs: terminalLogs, onCloseTerminalSession, onNewTerminalSession, onOpenNativeTerminal, onRestartTerminalSession, onResizeTerminalSession, onRunCheck: onRunTerminalCheck, onSaveTerminalImage, onSelectTerminalSession, onWriteTerminalData, runningId: terminalRunningId, session: terminalSession, sessions: terminalSessions, text: terminalText }}
         trace={snapshot.trace}
@@ -1152,18 +1152,20 @@ function App() {
         providerButtonLabel={activeProviderProfileName(provider)}
         providerHealth={currentProviderHealth}
         providerPanel={(
-          <ProviderPanel
-            fallbackModelCatalog={fallbackModelCatalog}
-            provider={provider}
-            modelCatalog={modelCatalog}
-            modelTestRecord={currentProviderTestRecord}
-            source={source}
-            onSaveProvider={saveProvider}
-            onSaveProviderSecret={saveProviderSecret}
-            onDeleteProviderProfile={deleteProviderProfile}
-            onModelTestRecorded={recordProviderTest}
-            providerError={providerError}
-          />
+          <React.Suspense fallback={<Notice variant="muted">正在载入模型设置...</Notice>}>
+            <ProviderPanel
+              fallbackModelCatalog={fallbackModelCatalog}
+              provider={provider}
+              modelCatalog={modelCatalog}
+              modelTestRecord={currentProviderTestRecord}
+              source={source}
+              onSaveProvider={saveProvider}
+              onSaveProviderSecret={saveProviderSecret}
+              onDeleteProviderProfile={deleteProviderProfile}
+              onModelTestRecorded={recordProviderTest}
+              providerError={providerError}
+            />
+          </React.Suspense>
         )}
       />
     )}

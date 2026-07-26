@@ -46,7 +46,7 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 - `ask_user` 与 Patch/Check 审批严格隔离：回答不会创建、消费或替代工程审批；相同回答幂等，冲突重复回答拒绝，桌面应用重启后仍可恢复待回答表单。
 - Workspace、Conversation、Task、Goal、Provider、Execution 的 Runtime 模块与 Repository 事务边界。
 - 正式 13-case Eval：任务成功率 100%、Patch 可应用率 91.7%、检查通过率 100%、恢复成功率 100%。新增 `ask-user-resume` 真实证明模型结构化追问、checkpoint 持久化、零交互审批、回答后同 Run 续接、独立 Patch 审批与检查。
-- 当前工作树回归：Desktop Node 597/597、Runtime Rust 205/205、Patch Normalizer 7/7、原生 WebDriver smoke 与 Web build 通过；文件账本覆盖 569 个文件且无待分类候选。首屏产物 813.34 KiB 超出 800 KiB 软预算，警告保留且未提高阈值。
+- 平台稳定化工作树回归：Desktop Node `600/600`、Runtime Rust `206/206`、Patch Normalizer `7/7`、原生 WebDriver smoke 与 Web build 通过；文件账本覆盖 573 个文件、15 个 active schema 且无候选。模型设置与工程文件按需加载后，首屏入口为 623.45 KiB，已低于 800 KiB 软预算且未提高阈值。
 - `.omnidesk/` v1 四分区 schema、非破坏性迁移器和启动激活已接入生产 Runtime：支持幂等复制、冲突拒绝、符号链接跳过和 legacy 回退。
 - Repository、Workspace、Provider、Task、Conversation、Agent Run 与 Preview 均按分区直接读写；文件树和 Agent 读取工具隐藏 Runtime 状态目录与可能遗留的旧目录。
 - Desktop Runtime 已停止编译旧 `governance` bridge，不再暴露 `run_project_os_action`，受控检查只执行 Desktop Node、Web build 与 Cargo 检查；浏览器 Preview 的事实刷新只重新读取只读 snapshot。
@@ -94,6 +94,7 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 当前重点：
 
 - `OmniDesk Agent 平台化 v1` 的 P0-P4 已全部完成本地、原生与受保护真实验收；当前进入平台稳定化，不继续扩展关键词执行路由或旁路工具 transport。
+- 平台稳定化已完成首屏预算治理和本地 Eval 矩阵拆分；同一原生 MCP Run 已通过调度、待审批、重启不重放、显式恢复、原审批、工具执行与脱敏 Timeline 组合验收，并修复恢复审批未重新领取 Scheduler 租约的缺陷。
 - 保持多文件 Patch 授权、独立审批、恢复不重放、显式 usage/cost 和脱敏 trace 门槛，并以真实桌面复杂任务检验组合体验。
 - 受保护 Eval 继续保留失败 artifact；上游模型波动、依赖漂移或软 bundle 超限不能通过放宽门槛掩盖。
 
@@ -105,6 +106,6 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 
 ## 下一步重点
 
-1. 用桌面应用在一个真实工程完成“原生 Function Call → Scheduler → Agent Run → 审批工具 → Timeline 导出”的整轮体验验收，重点检查失败恢复和用户可理解性。
-2. 将受保护 Eval 拆成可独立失败和重跑的 P1/P3/P4/13-case job，同时保持统一 artifact 索引，降低单点失败导致的重复 Provider 消耗。
-3. 在不提高阈值的前提下把首屏入口降回 800 KiB 软预算内；继续降低多文件 Patch 输出波动，不放宽授权、审批、规范化或 trace 门槛。
+1. 推送并运行新版受保护 Eval，确认 P1/P3/P4/suite 四个独立 job 和统一 SHA-256 artifact index 均成功。
+2. 用真实 Provider 从桌面对话触发一次 Function Call，并与已通过的同 Run 恢复、审批和 Timeline 证据完成最终组合验收。
+3. 继续降低多文件 Patch 输出波动，不放宽授权、审批、规范化或 trace 门槛。

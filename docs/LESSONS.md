@@ -1238,3 +1238,11 @@ use_when: "AI 即将做类似操作前检查是否有已知的坑、或犯错后
 **根本原因**：MCP 配置允许连字符，而 Registry 工具名只允许小写字母、数字和下划线；跨契约组合时只规范化了远端工具名，没有规范化 Server ID。
 
 **新增规则**：生成外部工具 ID 时必须分别规范化所有命名片段，原始 `serverId` 与 `remoteName` 作为独立元数据保留；规范化后还要检查长度与碰撞，不能用显示名称承担路由身份。
+
+### 2026-07-26 恢复原审批必须同时恢复 Scheduler 租约
+
+**现象**：待审批 MCP Run 在桌面重启后可恢复原 approval，但工具执行成功时 Scheduler 拒绝把 `interrupted` 覆盖为 `completed`。
+
+**根本原因**：`resume_agent_run` 只恢复了 Agent Run 状态；普通模型恢复随后会经过 Hermes 入口重新入队，而 `resume-approval` 直接返回前端，漏掉 Scheduler 的重新入队、并发和项目互斥检查。
+
+**新增规则**：恢复入口必须先确认 Run 仍属于当前项目，再由 Runtime 重新入队并领取 Scheduler 租约；跨项目、没有并发槽位或同项目仍被占用时保持中断且不执行。领取成功后才恢复原 approval 并重新建立 `waiting-approval` 占用。原生验收必须让同一 Run 跨越重启，并证明恢复前零执行、原 token 保留、显式批准后成功、Scheduler 可结算且 Timeline 同时包含调度、恢复、审批和工具事件。

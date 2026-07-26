@@ -111,7 +111,7 @@ test("keeps the cross-project dashboard outside the Workspace facts refresh boun
   const dashboard = source("src/components/workbench/workspace-dashboard.jsx");
   const engineeringFile = source("src/components/workbench/engineering-file-tab.jsx");
   const facts = engineeringFile;
-  assert.match(workbench, /import \{ EngineeringFileTab \}/);
+  assert.match(workbench, /React\.lazy\(\(\) => import\("\.\/components\/workbench\/engineering-file-tab"\)/);
   assert.match(engineeringFile, /<WorkspaceDashboard/);
   assert.equal(workbench.includes('className="portfolioCommandBar"'), false);
   assert.equal(facts.includes("globalOverview"), false);
@@ -471,7 +471,7 @@ test("keeps the Provider form surface outside App while preserving the Provider 
   assert.equal(workbench.includes("function ProviderPanel"), false);
   assert.match(
     workbench,
-    /import \{ ProviderPanel \} from "\.\/components\/workbench\/provider-panel"/,
+    /React\.lazy\(\(\) => import\("\.\/components\/workbench\/provider-panel"\)/,
   );
   assert.match(providerPanel, /export function ProviderPanel/);
   assert.match(providerPanel, /providerClient\.probeProviderModels/);

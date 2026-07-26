@@ -16,18 +16,20 @@ depends_on: [PROJECT.md, AGENTS.md, docs/ARCHITECTURE.md, docs/TESTING.md]
 
 - 产品核心：`desktop/` 中的 Tauri + React + Local Agent Runtime。它在用户授权范围内处理项目、对话、Patch、审批、检查、恢复与证据。
 - 状态根：`.omnidesk/` 是唯一活动状态根，分为 `data`、`runtime`、`cache`、`evidence`。历史 `.project-os/` 只能通过显式、非破坏性迁移导入，不能作为运行时回退。
-- 当前分支：`main`，最新远端提交为 `a5980ac fix(eval): install Hermes ACP dependencies`；Agent 平台化 v1 的实现与 Eval 修复均已推送。
+- 当前分支：`main`，最新远端提交为 `ce881b6 docs: mark agent platform v1 complete`；平台稳定化改动仍在工作树，尚未提交或推送。
 - 受控边界不可放松：Patch 写入与检查各自独立审批；恢复不能自动重放；Provider 成功不等于任务成功；Preview 只读，不执行写入、终端、检查或恢复。
 
 ## 最近完成
 
 - `OmniDesk 结构化追问表单闭环 v1` 已完成实现：确认执行的任务先启动 Hermes；Agent 可发起持久化 `ask_user` interaction，对话内渲染 schema 表单，提交或跳过后从 checkpoint 重新请求同一 Run。
 - 表单回答与 Patch/Check approval 独立；相同回答幂等、冲突回答拒绝。原生 WebDriver 已覆盖真实窗口提交、无 approval/无工程写入、应用重启恢复待回答表单，以及原 Patch approval 恢复不受影响。
-- `OmniDesk 仓库文件治理与架构收敛 v1` 的账本覆盖 569 个受管文件与 14 个 active schema，均已具备 Owner、消费者、决策与验证记录；没有待分类候选。
+- `OmniDesk 仓库文件治理与架构收敛 v1` 的账本覆盖 573 个受管文件与 15 个 active schema，均已具备 Owner、消费者、决策与验证记录；没有待分类候选。
 - 旧 Project OS CLI、installer、模板、adapter、routing skill、评分与报告入口已从生产路径退役；旧命名只保留在迁移、兼容读取、路径隔离或回归夹具中。
 - `runtime/app.rs` 已收束为 Tauri command adapter、Provider/Hermes transport 与生命周期编排。Agent Run、Patch Draft、Planning、Execution、Provider、Chat Stream、Terminal、Workspace watcher 与系统集成都各有 Runtime Owner。
 - `main.jsx` 只保留 controller 与 surface 装配；Workbench 默认值、Preview 只读投影与 Workspace transport 已下沉。样式入口按 theme、workspace、conversation、terminal、provider rail 分域。
-- 最新本地回归已通过：Desktop Node `597/597`、Runtime Rust `205/205`、Patch Normalizer `7/7`、Web build、离线 Eval 与原生 WebDriver smoke。首屏产物为 `813.34 KiB / 800 KiB`，仍有软预算警告，未提高阈值；MCP 按需块为 `16.74 KiB`。
+- 平台稳定化本地回归已通过：Desktop Node `600/600`、Runtime Rust `206/206`、Patch Normalizer `7/7`、Web build、离线 Eval 与原生 WebDriver smoke 均成功。模型设置与工程文件改为按需加载，首屏入口从 `813.34 KiB` 降至 `623.45 KiB / 800 KiB`，未提高阈值。
+- 受保护 Eval 已拆为可单独选择和重跑的 `p1 / p3 / p4 / suite` 矩阵切片；每项上传独立 artifact，汇总 job 生成正式 `omnidesk.agent-eval-artifact-index.v0.1` 索引，记录 commit、切片、文件大小与 SHA-256。该工作流仍需推送后完成首次受保护运行。
+- 原生复杂任务组合验收已让同一 MCP Run 经历 Scheduler 占用、待审批、桌面重启、零自动重放、显式恢复、原审批、工具成功和 metadata-only Timeline 导出；过程中发现并修复 `resume-approval` 未重新领取 Scheduler 租约的问题。
 - 受保护真实 Eval [30071780488](https://github.com/lijinmei915/project-os-starter/actions/runs/30071780488) 已通过：13/13 case 成功，任务成功率 `100%`、Patch 可应用率 `91.7%`、检查通过率 `100%`、恢复成功率 `100%`。`ask-user-resume` artifact 证明首次模型返回 `ask_user`、checkpoint 持久化、交互审批为 0、回答后同 Run 续接、Patch 独立审批并通过检查。
 - `复杂任务执行基础 v1` 已通过受保护真实 Eval [30081697947](https://github.com/lijinmei915/project-os-starter/actions/runs/30081697947)：13/13 标准 case 成功，另有隔离 worktree 证明源工程干净、diff 未变、二次审批合并、源工程验证和 worktree 清理；本地完整回归通过 Node `555/555`、Rust `157/157`、Patch Normalizer `7/7`。
 - `普通聊天可靠性 v1` 已移除 Prompt 强制 JSON：Provider 自然文本直接流式显示，本地路由独立决定任务意图；旧 JSON 仅作为带 `responseMode=legacy-json` 的兼容输入并随对话持久化。模拟 Provider SSE、原生 WebDriver 和完整回归通过：Node `556/556`、Rust `158/158`（新增集成测试后为 `159`）、Patch Normalizer `7/7`。
@@ -57,6 +59,6 @@ depends_on: [PROJECT.md, AGENTS.md, docs/ARCHITECTURE.md, docs/TESTING.md]
 
 ## 下一步建议
 
-1. 在真实桌面应用完成一轮复杂任务组合验收，覆盖 Function Call、排队、工具审批、失败恢复与 Timeline 导出。
-2. 将受保护 Eval 拆为可独立失败和重跑的 P1/P3/P4/13-case job，并维护统一 artifact 索引，减少重复 Provider 消耗。
-3. 把首屏入口降回 800 KiB 软预算内，并继续降低多文件 Patch 波动；不要放宽授权、独立审批、规范化或 trace 门槛。
+1. 提交并推送平台稳定化工作树，手动运行 `all` 目标，确认 P1/P3/P4/suite 四个矩阵 job 与 artifact index 全部成功。
+2. 用真实 Provider 从桌面对话触发一次 Function Call，并把它与已通过的同 Run 重启恢复、审批和 Timeline 证据共同验收。
+3. 继续降低多文件 Patch 波动；不要放宽授权、独立审批、规范化或 trace 门槛。

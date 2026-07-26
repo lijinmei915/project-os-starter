@@ -1498,7 +1498,37 @@ fn export_agent_run_timeline(input: ContinueAgentRunInput) -> Result<Value, Stri
 #[tauri::command]
 fn resume_agent_run(input: ResumeAgentRunInput) -> Result<PersistedAgentRun, String> {
     let app_root = find_workspace_root()?;
-    crate::runtime::agent_runs::resume(&app_root, &input.id, &current_timestamp_string())
+    let timestamp = current_timestamp_string();
+    let existing = crate::runtime::agent_runs::load(&app_root, &input.id)?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let current_project = current_registry_project(&mut registry, &app_root)?;
+    if existing.project_id != current_project.id {
+        return Err("Agent Run 属于其他项目，不能在当前工作区恢复。".to_string());
+    }
+    if existing.status == "interrupted"
+        && existing.checkpoint.next_action == "resume-approval"
+        && existing.approval.is_some()
+    {
+        crate::runtime::agent_scheduler::enqueue(
+            &app_root,
+            &existing.id,
+            &existing.project_id,
+            &timestamp,
+        )?;
+        let (outcome, lease) = crate::runtime::agent_scheduler::try_claim(
+            &app_root,
+            &existing.id,
+            &timestamp,
+        )?;
+        if outcome != crate::runtime::agent_scheduler::ClaimOutcome::Claimed {
+            return Err("Agent Run 已进入恢复队列，等待当前项目与并发槽位释放。".to_string());
+        }
+        let lease = lease.ok_or_else(|| "调度器领取成功但没有返回租约。".to_string())?;
+        let resumed = crate::runtime::agent_runs::resume(&app_root, &input.id, &timestamp)?;
+        lease.settle("waiting-approval", &timestamp)?;
+        return Ok(resumed);
+    }
+    crate::runtime::agent_runs::resume(&app_root, &input.id, &timestamp)
 }
 
 #[tauri::command]
@@ -2143,13 +2173,11 @@ fn read_native_agent_run_for_recovery(
 fn seed_native_agent_scheduler(
 ) -> Result<crate::runtime::agent_scheduler::AgentSchedulerSnapshot, String> {
     let app_root = find_workspace_root()?;
-    let mut registry = load_or_seed_registry(&app_root)?;
-    let project = current_registry_project(&mut registry, &app_root)?;
     let timestamp = current_timestamp_string();
     let fixtures = [
-        ("native-scheduler-active", project.id.as_str(), "running"),
+        ("native-scheduler-active", "native-project-a", "running"),
         ("native-scheduler-active-b", "native-project-b", "running"),
-        ("native-scheduler-queued", project.id.as_str(), "queued"),
+        ("native-scheduler-queued", "native-project-a", "queued"),
         ("native-scheduler-cap-queued", "native-project-c", "queued"),
     ];
     for (run_id, project_id, status) in fixtures {

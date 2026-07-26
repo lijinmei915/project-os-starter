@@ -475,6 +475,24 @@ mod tests {
     }
 
     #[test]
+    fn interrupted_approval_can_reacquire_a_reservation_before_execution() {
+        let root = root("resume-approval-reservation");
+        enqueue(&root, "run-a", "project-a", "1").unwrap();
+        let (_, lease) = try_claim(&root, "run-a", "2").unwrap();
+        lease.unwrap().settle("waiting-approval", "3").unwrap();
+        recover_stale(&root, "4").unwrap();
+
+        enqueue(&root, "run-a", "project-a", "5").unwrap();
+        let (outcome, lease) = try_claim(&root, "run-a", "6").unwrap();
+        assert_eq!(outcome, ClaimOutcome::Claimed);
+        lease.unwrap().settle("waiting-approval", "7").unwrap();
+
+        let state = load_from_repository(&Repository::new(&root)).unwrap();
+        assert_eq!(state.entries[0].status, "waiting-approval");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn snapshot_exposes_only_active_work_and_stable_queue_positions() {
         let root = root("snapshot");
         enqueue(&root, "run-a", "project-a", "1").unwrap();

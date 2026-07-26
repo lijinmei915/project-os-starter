@@ -349,20 +349,7 @@ esac
     throw new Error(`MCP 工具调用没有停在独立审批前：${JSON.stringify(callPending)}`);
   }
   await waitForElement(`[data-mcp-run-id="${callPending.id}"]`);
-  await clickButtonByText("批准并执行", `[data-mcp-run-id="${callPending.id}"]`);
-  const callCompletedDeadline = Date.now() + 10_000;
-  let callCompleted;
-  while (Date.now() < callCompletedDeadline) {
-    const runs = await invokeNative("list_agent_runs");
-    callCompleted = runs.find((run) => run.id === callPending.id);
-    if (callCompleted?.status === "succeeded") break;
-    await new Promise((resolve) => setTimeout(resolve, 200));
-  }
-  const callResult = callCompleted?.checkpoint?.toolResult;
-  if (!fs.existsSync(mcpCallMarker) || callCompleted?.status !== "succeeded" || callResult?.remoteName !== "lookup" || callResult?.content?.[0]?.text !== "found") {
-    throw new Error(`MCP 工具调用审批后没有形成受控结果：${JSON.stringify(callCompleted)}`);
-  }
-  await invokeNative("remove_mcp_server", { input: { id: "native-callable" } });
+  const callApprovalToken = callPending.approval.token;
 
   currentStage = "创建结构化追问夹具";
   const closeMcpTab = await waitForElement(".workspaceTab.fileTab .workspaceTabClose");
@@ -420,11 +407,16 @@ esac
   }
   currentStage = "创建原生 Agent 调度夹具";
   const schedulerBeforeRestart = await invokeNative("seed_native_agent_scheduler");
+  const mcpReservationBeforeRestart = schedulerBeforeRestart?.entries?.find((entry) => entry.runId === callPending.id);
+  const activeBeforeRestart = schedulerBeforeRestart?.entries?.find((entry) => entry.runId === "native-scheduler-active");
+  const crossProjectQueuedBeforeRestart = schedulerBeforeRestart?.entries?.find((entry) => entry.runId === "native-scheduler-active-b");
   const queuedBeforeRestart = schedulerBeforeRestart?.entries?.find((entry) => entry.runId === "native-scheduler-queued");
   const capQueuedBeforeRestart = schedulerBeforeRestart?.entries?.find((entry) => entry.runId === "native-scheduler-cap-queued");
   if (schedulerBeforeRestart?.activeCount !== 2 || schedulerBeforeRestart?.maxConcurrentRuns !== 2
-    || queuedBeforeRestart?.status !== "queued" || queuedBeforeRestart?.queuePosition !== 1
-    || capQueuedBeforeRestart?.status !== "queued" || capQueuedBeforeRestart?.queuePosition !== 2) {
+    || mcpReservationBeforeRestart?.status !== "waiting-approval" || activeBeforeRestart?.status !== "running"
+    || crossProjectQueuedBeforeRestart?.status !== "queued" || crossProjectQueuedBeforeRestart?.queuePosition !== 1
+    || queuedBeforeRestart?.status !== "queued" || queuedBeforeRestart?.queuePosition !== 2
+    || capQueuedBeforeRestart?.status !== "queued" || capQueuedBeforeRestart?.queuePosition !== 3) {
     throw new Error(`原生调度夹具没有保留跨项目并发上限、项目互斥和队列位置：${JSON.stringify(schedulerBeforeRestart)}`);
   }
   currentStage = "重启原生应用";
@@ -451,10 +443,13 @@ esac
   }
   currentStage = "验证重启后的 Agent 调度恢复";
   const schedulerAfterRestart = await invokeNative("read_native_agent_scheduler");
+  const interruptedMcpScheduler = schedulerAfterRestart?.find(
+    (entry) => entry.runId === callPending.id,
+  );
   const interruptedScheduler = schedulerAfterRestart?.find(
     (entry) => entry.runId === "native-scheduler-active",
   );
-  const interruptedSchedulerB = schedulerAfterRestart?.find(
+  const queuedSchedulerB = schedulerAfterRestart?.find(
     (entry) => entry.runId === "native-scheduler-active-b",
   );
   const queuedScheduler = schedulerAfterRestart?.find(
@@ -463,19 +458,48 @@ esac
   const capQueuedScheduler = schedulerAfterRestart?.find(
     (entry) => entry.runId === "native-scheduler-cap-queued",
   );
-  if (interruptedScheduler?.status !== "interrupted" || interruptedSchedulerB?.status !== "interrupted"
+  if (interruptedMcpScheduler?.status !== "interrupted" || interruptedScheduler?.status !== "interrupted"
+    || queuedSchedulerB?.status !== "queued"
     || queuedScheduler?.status !== "queued" || capQueuedScheduler?.status !== "queued") {
     throw new Error(`重启后调度恢复不正确：${JSON.stringify(schedulerAfterRestart)}`);
   }
   const persistedRunsAfterRestart = await invokeNative("list_agent_runs");
+  const interruptedMcpCall = persistedRunsAfterRestart?.find((run) => run.id === callPending.id);
   const queuedRunAfterRestart = persistedRunsAfterRestart?.find((run) => run.id === "native-scheduler-queued");
   const interruptedRunAfterRestart = persistedRunsAfterRestart?.find((run) => run.id === "native-scheduler-active");
-  if (queuedRunAfterRestart?.status !== "queued"
+  if (interruptedMcpCall?.status !== "interrupted" || interruptedMcpCall?.approval?.token !== callApprovalToken
+    || fs.existsSync(mcpCallMarker)
+    || queuedRunAfterRestart?.status !== "queued"
     || queuedRunAfterRestart?.evidence?.[0]?.schemaVersion !== "omnidesk.run-event.v0.1"
     || queuedRunAfterRestart?.evidence?.[0]?.kind !== "scheduling"
     || interruptedRunAfterRestart?.evidence?.at(-1)?.kind !== "recovery") {
-    throw new Error(`重启后 Agent Run 与 Scheduler 的 queued 状态不一致：${JSON.stringify(queuedRunAfterRestart)}`);
+    throw new Error(`重启后复杂任务没有保留待审批工具或调度状态：${JSON.stringify({ interruptedMcpCall, queuedRunAfterRestart })}`);
   }
+  currentStage = "恢复并批准同一 MCP Agent Run";
+  const resumedMcpCall = await invokeNative("resume_agent_run", { input: { id: callPending.id } });
+  if (resumedMcpCall?.status !== "awaiting-approval" || resumedMcpCall?.approval?.token !== callApprovalToken
+    || fs.existsSync(mcpCallMarker)) {
+    throw new Error(`恢复 MCP Run 时重放了工具或丢失原审批：${JSON.stringify(resumedMcpCall)}`);
+  }
+  const approvedMcpCall = await invokeNative("approve_agent_run", { input: { id: callPending.id } });
+  await invokeNative("execute_approved_agent_tool", {
+    input: { id: approvedMcpCall.id, token: approvedMcpCall.approvalToken },
+  });
+  const callCompleted = (await invokeNative("list_agent_runs")).find((run) => run.id === callPending.id);
+  const callResult = callCompleted?.checkpoint?.toolResult;
+  if (!fs.existsSync(mcpCallMarker) || callCompleted?.status !== "succeeded"
+    || callResult?.remoteName !== "lookup" || callResult?.content?.[0]?.text !== "found") {
+    throw new Error(`恢复后的 MCP 工具调用没有形成受控结果：${JSON.stringify(callCompleted)}`);
+  }
+  const complexTimelineExport = await invokeNative("export_agent_run_timeline", { input: { id: callPending.id } });
+  const complexTimeline = complexTimelineExport?.timeline;
+  const complexEventKinds = new Set(complexTimeline?.events?.map((event) => event.kind));
+  if (complexTimeline?.redaction?.policy !== "metadata-only" || complexTimeline?.status !== "succeeded"
+    || !complexEventKinds.has("scheduling") || !complexEventKinds.has("recovery")
+    || !complexEventKinds.has("approval") || !complexEventKinds.has("tool")) {
+    throw new Error(`复杂任务 Timeline 未覆盖调度、恢复、审批与工具执行：${JSON.stringify(complexTimeline)}`);
+  }
+  await invokeNative("remove_mcp_server", { input: { id: "native-callable" } });
   currentStage = "取消重启后仍在排队的 Agent Run";
   const cancelledQueuedRun = await invokeNative("cancel_agent_run", { input: { id: "native-scheduler-queued" } });
   const schedulerAfterCancel = await invokeNative("read_native_agent_scheduler");
@@ -506,11 +530,6 @@ esac
       throw new Error(`脱敏时间线泄露了排除内容：${excludedContent}`);
     }
   }
-  const resumed = await invokeNative("resume_agent_run", { input: { id: "native-recovery-run" } });
-  if (resumed?.status !== "awaiting-approval" || resumed?.approval?.token !== "native-recovery-approval") {
-    throw new Error(`原生恢复没有回到原审批：${JSON.stringify(resumed)}`);
-  }
-
   if (diagnoseTerminal) {
     let trace = [];
     try {
@@ -541,7 +560,7 @@ esac
     }
   }
 
-  console.log(`原生 WebDriver smoke 通过：可发现版本化内置工具及其风险/schema，MCP 配置零自动执行，发现与调用分别取得项目互斥和独立审批，tools/call 审批前 marker 不存在、批准后才执行并写回有界结果；提交持久化 ask_user 表单并验证幂等，验证跨项目并发与稳定队列位置，并在重启后恢复表单与原审批；Run Timeline 可按 metadata-only 策略脱敏导出${diagnoseTerminal ? "，并完成终端诊断" : ""}；未写入工程文件。`);
+  console.log(`原生 WebDriver smoke 通过：可发现版本化内置工具及其风险/schema，MCP 配置零自动执行；同一 MCP Run 经过调度、待审批、桌面重启、不重放、显式恢复、原审批、工具成功与 metadata-only Timeline 导出；提交持久化 ask_user 表单并验证幂等，验证跨项目并发与稳定队列位置${diagnoseTerminal ? "，并完成终端诊断" : ""}；未写入工程文件。`);
 } catch (error) {
   failure = error instanceof Error ? error : new Error(String(error));
   console.error(`原生 WebDriver smoke 失败（${currentStage}）：${failure.message}`);
