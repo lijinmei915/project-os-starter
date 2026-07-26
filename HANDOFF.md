@@ -28,7 +28,7 @@ depends_on: [PROJECT.md, AGENTS.md, docs/ARCHITECTURE.md, docs/TESTING.md]
 - `runtime/app.rs` 已收束为 Tauri command adapter、Provider/Hermes transport 与生命周期编排。Agent Run、Patch Draft、Planning、Execution、Provider、Chat Stream、Terminal、Workspace watcher 与系统集成都各有 Runtime Owner。
 - `main.jsx` 只保留 controller 与 surface 装配；Workbench 默认值、Preview 只读投影与 Workspace transport 已下沉。样式入口按 theme、workspace、conversation、terminal、provider rail 分域。
 - 平台稳定化本地回归已通过：Desktop Node `600/600`、Runtime Rust `206/206`、Patch Normalizer `7/7`、Web build、离线 Eval 与原生 WebDriver smoke 均成功。模型设置与工程文件改为按需加载，首屏入口从 `813.34 KiB` 降至 `623.45 KiB / 800 KiB`，未提高阈值。
-- 受保护 Eval 已拆为可单独选择和重跑的 `p1 / p3 / p4 / suite` 矩阵切片；每项上传独立 artifact，汇总 job 生成正式 `omnidesk.agent-eval-artifact-index.v0.1` 索引，记录 commit、切片、文件大小与 SHA-256。该工作流仍需推送后完成首次受保护运行。
+- 受保护 Eval 已拆为可单独选择和重跑的 `p1 / p3 / p4 / suite` 矩阵切片；每项上传独立 artifact，汇总 job 生成正式 `omnidesk.agent-eval-artifact-index.v0.1` 索引，记录 commit、切片、文件大小与 SHA-256。
 - 原生复杂任务组合验收已让同一 MCP Run 经历 Scheduler 占用、待审批、桌面重启、零自动重放、显式恢复、原审批、工具成功和 metadata-only Timeline 导出；过程中发现并修复 `resume-approval` 未重新领取 Scheduler 租约的问题。
 - 受保护真实 Eval [30071780488](https://github.com/lijinmei915/project-os-starter/actions/runs/30071780488) 已通过：13/13 case 成功，任务成功率 `100%`、Patch 可应用率 `91.7%`、检查通过率 `100%`、恢复成功率 `100%`。`ask-user-resume` artifact 证明首次模型返回 `ask_user`、checkpoint 持久化、交互审批为 0、回答后同 Run 续接、Patch 独立审批并通过检查。
 - `复杂任务执行基础 v1` 已通过受保护真实 Eval [30081697947](https://github.com/lijinmei915/project-os-starter/actions/runs/30081697947)：13/13 标准 case 成功，另有隔离 worktree 证明源工程干净、diff 未变、二次审批合并、源工程验证和 worktree 清理；本地完整回归通过 Node `555/555`、Rust `157/157`、Patch Normalizer `7/7`。
@@ -47,6 +47,7 @@ depends_on: [PROJECT.md, AGENTS.md, docs/ARCHITECTURE.md, docs/TESTING.md]
 - `Agent 配置 / 受控工具` 已提供最小可见 MCP 管理：Server 配置、发现审批、当前有效工具、schema 参数表单、调用审批、取消和证据导出均复用现有 Workbench/Agent Run 边界。调用审批失败不会误收起表单，Server 删除失败不会误关确认框，项目切换或页面卸载后迟到刷新不会覆盖当前状态。页面不会直接启动 transport，Preview 明确只读拒绝。
 - 原生 WebDriver 已从真实页面完成 `Native Callable / lookup` 流程；P4 的受保护官方 Filesystem MCP Eval 也已通过，证明固定版本/integrity、两次独立审批、审批前零执行、项目互斥、有界结果、成功 Timeline 和零 Scheduler 残留。
 - 同一受保护运行的 13/13 标准 case 与 isolated-worktree 均通过；artifact 含相对 trace、真实 Provider Function Call、Runtime Timeline、慢流/断流和第三方 MCP 证据。`OmniDesk Agent 平台化 v1` 的 P0-P4 验收已闭环。
+- 最新稳定化 Eval [30188136814](https://github.com/lijinmei915/project-os-starter/actions/runs/30188136814) 已在 `dd53d94` 完整通过：P1/P3/P4/suite 与 artifact-index 五个 job 全绿，13/13 case 成功，隔离 worktree 成功；索引覆盖四个切片和 45 个文件，下载复算 SHA-256 无差异。P1 的冷 Cargo 构建与 120 秒 Runtime 执行上限已拆分，未通过放宽门槛掩盖 CI 环境问题。
 
 ## 风险与注意
 
@@ -59,6 +60,5 @@ depends_on: [PROJECT.md, AGENTS.md, docs/ARCHITECTURE.md, docs/TESTING.md]
 
 ## 下一步建议
 
-1. 提交并推送平台稳定化工作树，手动运行 `all` 目标，确认 P1/P3/P4/suite 四个矩阵 job 与 artifact index 全部成功。
-2. 用真实 Provider 从桌面对话触发一次 Function Call，并把它与已通过的同 Run 重启恢复、审批和 Timeline 证据共同验收。
-3. 继续降低多文件 Patch 波动；不要放宽授权、独立审批、规范化或 trace 门槛。
+1. 用真实 Provider 从桌面对话触发一次 Function Call，并把它与已通过的同 Run 重启恢复、审批和 Timeline 证据共同验收。
+2. 继续降低多文件 Patch 波动；不要放宽授权、独立审批、规范化或 trace 门槛。

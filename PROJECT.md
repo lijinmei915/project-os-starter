@@ -32,7 +32,7 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 - 状态事务：Runtime Repository 使用 schema、锁和原子事务维护跨实体一致性。
 - 浏览器 Preview：仅用于只读预览和 UI 验证，不执行文件写入、终端或受控检查。
 - 当前状态根：`.omnidesk/` 是唯一物理状态根；旧 `.project-os/` 已迁移、归档并删除。Runtime 与 Preview 仅接受 native `.omnidesk/data|runtime|cache|evidence` 路径；历史导入由迁移器单独处理。
-- 评测：`desktop/evals/` 保存已登记 13-case 基线；最新受保护 Agent Eval [`30168898557`](https://github.com/lijinmei915/project-os-starter/actions/runs/30168898557) 已通过并上传 P1、P3、P4、慢流/断流、隔离 worktree 与 13-case artifact。
+- 评测：`desktop/evals/` 保存已登记 13-case 基线；最新受保护 Agent Eval [`30188136814`](https://github.com/lijinmei915/project-os-starter/actions/runs/30188136814) 已在 `dd53d94` 通过 P1、P3、P4、suite 与统一 artifact index。
 
 详细模块边界见 `docs/ARCHITECTURE.md`，测试与发布门槛见 `docs/TESTING.md`。
 
@@ -90,11 +90,12 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 - P4 的 MCP Runtime 已完成本地闭环：只接受 command/args 分离的 stdio Server，环境只保存宿主变量引用，审批策略固定 `always`；有界 `tools/list` 与 `tools/call` 仅由消费独立 Agent Run 审批后的 Tool Gateway 启动。发现证据绑定当前项目与无密钥 Server 配置快照，配置变化、跨项目、未知工具或 schema 不匹配都会在进程启动前拒绝。
 - P4 最小可见管理入口已接入 `Agent 配置 / 受控工具`：用户可管理 Server、发起发现审批、查看当前项目仍有效的发现证据、按工具 schema 填参数并创建新的调用审批。调用审批创建失败时保留参数表单，Server 删除失败时保留确认框，切换项目或卸载页面后不接受迟到刷新状态。页面复用现有 Agent Run 批准、取消和证据导出操作；Preview 只显示只读提示，不暴露 transport。原生 WebDriver 已从真实页面完成 `lookup` 发现、表单调用、审批前零执行、批准后有界结果写回的闭环。
 - P4 已通过受保护真实验收：官方 `@modelcontextprotocol/server-filesystem@2026.7.10` 的版本与 integrity 固定，发现和 `list_directory` 分别经过 Scheduler、Agent Run、独立审批与 Execution；审批前零执行，两个 Run 与 Timeline 成功，结果有界且 Scheduler 零残留。
+- 平台稳定化受保护 Eval [`30188136814`](https://github.com/lijinmei915/project-os-starter/actions/runs/30188136814) 已在 `dd53d94` 全绿：P1/P3/P4/suite 四个切片可独立运行，13/13 case 与隔离 worktree 通过；统一 `omnidesk.agent-eval-artifact-index.v0.1` 覆盖四个切片、45 个证据文件，下载后逐项复算 SHA-256 无差异。P1 冷构建与 Runtime 超时已分离，未放宽 120 秒执行上限。
 
 当前重点：
 
 - `OmniDesk Agent 平台化 v1` 的 P0-P4 已全部完成本地、原生与受保护真实验收；当前进入平台稳定化，不继续扩展关键词执行路由或旁路工具 transport。
-- 平台稳定化已完成首屏预算治理和本地 Eval 矩阵拆分；同一原生 MCP Run 已通过调度、待审批、重启不重放、显式恢复、原审批、工具执行与脱敏 Timeline 组合验收，并修复恢复审批未重新领取 Scheduler 租约的缺陷。
+- 平台稳定化已完成首屏预算治理和受保护 Eval 矩阵验收；同一原生 MCP Run 已通过调度、待审批、重启不重放、显式恢复、原审批、工具执行与脱敏 Timeline 组合验收，并修复恢复审批未重新领取 Scheduler 租约的缺陷。
 - 保持多文件 Patch 授权、独立审批、恢复不重放、显式 usage/cost 和脱敏 trace 门槛，并以真实桌面复杂任务检验组合体验。
 - 受保护 Eval 继续保留失败 artifact；上游模型波动、依赖漂移或软 bundle 超限不能通过放宽门槛掩盖。
 
@@ -106,6 +107,5 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 
 ## 下一步重点
 
-1. 推送并运行新版受保护 Eval，确认 P1/P3/P4/suite 四个独立 job 和统一 SHA-256 artifact index 均成功。
-2. 用真实 Provider 从桌面对话触发一次 Function Call，并与已通过的同 Run 恢复、审批和 Timeline 证据完成最终组合验收。
-3. 继续降低多文件 Patch 输出波动，不放宽授权、审批、规范化或 trace 门槛。
+1. 用真实 Provider 从桌面对话触发一次 Function Call，并与已通过的同 Run 恢复、审批和 Timeline 证据完成最终组合验收。
+2. 继续降低多文件 Patch 输出波动，不放宽授权、审批、规范化或 trace 门槛。
