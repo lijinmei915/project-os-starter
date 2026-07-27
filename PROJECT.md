@@ -18,7 +18,7 @@ depends_on: [AGENTS.md, docs/ARCHITECTURE.md, docs/PRODUCT_PLAN.md]
 - 项目名：`OmniDesk`
 - 产品形态：基于 `Tauri + React + Local Agent Runtime` 的本地 AI 工程工作台
 - 唯一产品核心：`desktop/` 内的 OmniDesk Desktop Runtime
-- 当前阶段：`OmniDesk Agent 平台稳定化 v1 已完成`
+- 当前阶段：`Hermes 单执行器生产可靠性 v1 已完成`
 
 OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生成计划和 Patch 草稿、执行独立审批、运行检查、有限修复并保存可审计证据。它不是 Project OS 安装器、AI 工程评分工具或跨工具模板分发产品。
 
@@ -101,10 +101,11 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 - Agent Executor Adapter v1 已建立：通用契约统一能力探测、`Start / Resume`、取消、状态与结构化结果；Registry 当前登记默认 `HermesAcpExecutor` 和可选 `GeminiAcpExecutor`。通用 JSON-RPC、结构化工具循环、usage 与取消位于 `acp_protocol / acp_execution`，供应商 Adapter 只负责程序发现、参数和环境。新 Run 持久化 Registry 选择及一致 evidence，恢复严格使用原 `executorId`，未知或能力不足的执行器明确失败。真实 Gemini 0.44.1 进程启动/取消、独立 ACP 恢复/结构化结果/usage 已验证；Gemini 模型凭据端到端调用尚未验收。Scheduler、Agent Run、Tool Gateway、审批、Patch、恢复和 evidence 继续由 OmniDesk 独占。
 - Agent Executor 契约防膨胀 v1 已落地：公开状态携带稳定 `omnidesk.agent-executor.v1` 版本；Runtime 准入只读取冻结的核心能力，执行器特有能力只能进入不透明 `extensions`。通用 Runtime 禁止读取扩展或根据 Hermes/Gemini 身份改变调度、审批、恢复、Patch、检查与证据规则，源码边界测试持续约束该规则。
 - Agent Event 标准化 v1 已落地：共享 ACP 层把生命周期、工具请求/结果、等待追问、等待审批和终态归一化为有序 `omnidesk.agent-event.v1`；每次执行只允许一个终态。Runtime Timeline 只消费标准事件，不再读取执行器 `trace/observations`；metadata-only 导出再次按白名单裁剪事件详情。事件只保存公开阶段摘要，不保存 Prompt、正文、工具输出或模型完整思维链。
+- `Hermes 单执行器生产可靠性 v1` 已完成受保护真实验收：[`30280519155`](https://github.com/lijinmei915/project-os-starter/actions/runs/30280519155) 的 suite 通过 13/13 场景与隔离 worktree，覆盖 `ask_user` 恢复、独立审批、Patch、检查和中断恢复；严格 P3 [`30281795504`](https://github.com/lijinmei915/project-os-starter/actions/runs/30281795504) 在 `f008f1e` 证明真实 `hermes-acp` 事件 sequence `1 -> 2`、唯一 `succeeded` terminal、显式 `11121 / 109 / 11230` token、Scheduler 零残留及无 `content/reasoning` 的 metadata-only Timeline。首次 P3 虽通过 usage 与调度门槛但 artifact 漏收事件，现已改为缺失标准事件即失败。
 
 当前重点：
 
-- 当前产品阶段暂停 Gemini 接入和执行器选择界面；Registry 中的 Gemini Adapter 仅作为已验证的架构边界保留，不宣称产品可用。默认生产链只推进 Hermes，直到真实桌面任务的追问、审批、Patch、检查、恢复、取消和标准事件证据达到稳定门槛。
+- Hermes 继续作为唯一默认生产执行器；其真实追问、审批、Patch、检查、恢复、取消和标准事件证据已达到当前稳定门槛。Gemini 接入和执行器选择界面仍暂停，Registry 中的 Adapter 仅作为已验证架构边界保留，不宣称产品可用。
 - `OmniDesk Agent 平台稳定化 v1` 已完成本地、原生与受保护真实验收；P0-P4、首屏预算、Eval 矩阵、artifact 索引和真实桌面组合证据均已闭环。
 - 后续改动继续守住多文件 Patch 授权、独立审批、恢复不重放、单终态、显式 usage/cost 和脱敏 trace 门槛，不扩展关键词执行路由或旁路工具 transport。
 - 下一阶段优先降低真实模型多文件 Patch 输出波动，并以既有 13-case 和隔离 worktree 门槛防止可靠性回退。
