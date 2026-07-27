@@ -1482,6 +1482,17 @@ pub fn seed_native_recovery_run(
     let authorized_files = run.checkpoint.allowed_files.clone();
     append_evidence(
         &mut run,
+        "draft",
+        "Native WebDriver Agent Event fixture completed.",
+        json!({ "agentEvents": [
+            { "schemaVersion": crate::runtime::agent_executor::AGENT_EVENT_SCHEMA_VERSION, "sequence": 1, "kind": "lifecycle", "phase": "model", "status": "running", "summary": "Agent Executor 开始处理。", "details": { "mode": "Start" } },
+            { "schemaVersion": crate::runtime::agent_executor::AGENT_EVENT_SCHEMA_VERSION, "sequence": 2, "kind": "tool-call", "phase": "tool", "status": "requested", "summary": "Agent 请求工具 apply_patch。", "details": { "name": "apply_patch", "step": 1 } },
+            { "schemaVersion": crate::runtime::agent_executor::AGENT_EVENT_SCHEMA_VERSION, "sequence": 3, "kind": "terminal", "phase": "model", "status": "awaiting-approval", "summary": "等待用户审批受控操作。", "details": { "step": 1 } }
+        ] }),
+        timestamp,
+    );
+    append_evidence(
+        &mut run,
         "approval",
         "Native WebDriver multi-file recovery fixture created.",
         json!({ "fixture": true, "authorizedFiles": authorized_files }),
@@ -1702,7 +1713,20 @@ mod tests {
                 "durationMs": 125,
                 "usage": { "inputTokens": 10, "outputTokens": 5, "totalTokens": 15, "costUsd": 0.002 },
                 "observations": [{ "content": "private file body" }],
-                "trace": ["HERMES_STEP: 1 final"]
+                "trace": ["HERMES_STEP: 1 final"],
+                "agentEvents": [{
+                    "schemaVersion": "omnidesk.agent-event.v1",
+                    "sequence": 1,
+                    "kind": "terminal",
+                    "phase": "model",
+                    "status": "succeeded",
+                    "summary": "处理完成。",
+                    "details": {
+                        "step": 1,
+                        "content": "private model content",
+                        "reasoning": "private chain of thought"
+                    }
+                }]
             }),
             "later",
         );
@@ -1715,6 +1739,9 @@ mod tests {
         let serialized = serde_json::to_string(timeline).unwrap();
         assert!(!serialized.contains("secret prompt"));
         assert!(!serialized.contains("private file body"));
+        assert!(!serialized.contains("private model content"));
+        assert!(!serialized.contains("private chain of thought"));
+        assert!(serialized.contains("omnidesk.agent-event.v1"));
         assert!(serialized.contains("HERMES_STEP: 1 final"));
         assert!(root.join(exported["path"].as_str().unwrap()).is_file());
         std::fs::remove_dir_all(root).unwrap();

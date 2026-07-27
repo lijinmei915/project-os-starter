@@ -1,6 +1,6 @@
 {
   "schemaVersion": "omnidesk.repository-file-inventory.v1",
-  "generatedAt": "2026-07-27T10:00:43.335Z",
+  "generatedAt": "2026-07-27T10:16:20.213Z",
   "sourceOfTruth": "git ls-files --cached --others --exclude-standard",
   "scope": "受版本控制文件及准备纳入版本控制的非忽略工作树文件；忽略的本地运行数据和构建输出不在本账本内。",
   "reviewContract": {
@@ -138,7 +138,7 @@
       "path": "HANDOFF.md",
       "kind": "root-document",
       "owner": "Documentation Governance",
-      "bytes": 16768,
+      "bytes": 16760,
       "pathMentions": [
         "desktop/src/components/workbench/current-goal-panel.jsx",
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
@@ -191,7 +191,7 @@
       "path": "PROJECT.md",
       "kind": "root-document",
       "owner": "Documentation Governance",
-      "bytes": 24710,
+      "bytes": 25028,
       "pathMentions": [
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
         "desktop/src/lib/agent-topic-runtime-capability.js",
@@ -512,7 +512,7 @@
       "path": "desktop/scripts/run-native-webdriver-smoke.mjs",
       "kind": "desktop-support",
       "owner": "Desktop Platform",
-      "bytes": 32316,
+      "bytes": 33141,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -1640,6 +1640,7 @@
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/acp_execution.rs",
+        "desktop/src-tauri/src/runtime/agent_runs.rs",
         "desktop/src-tauri/src/runtime/app.rs",
         "desktop/src-tauri/src/runtime/gemini_executor.rs",
         "desktop/src-tauri/src/runtime/hermes_execution.rs",
@@ -1660,7 +1661,7 @@
       "path": "desktop/src-tauri/src/runtime/agent_runs.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 89780,
+      "bytes": 91463,
       "pathMentions": [
         "desktop/src/lib/agent-topic-agent-config.js",
         "desktop/src/workspace-outline.js"
@@ -9595,7 +9596,7 @@
       "path": "docs/TESTING.md",
       "kind": "documentation",
       "owner": "Documentation Governance",
-      "bytes": 14979,
+      "bytes": 15128,
       "pathMentions": [
         "desktop/scripts/run-native-webdriver-smoke.mjs",
         "desktop/src-tauri/src/runtime/workspace.rs",
@@ -9681,7 +9682,7 @@
       "path": "docs/data/schema-contract-inventory.json",
       "kind": "documentation-data",
       "owner": "Documentation Governance",
-      "bytes": 15714,
+      "bytes": 16027,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",

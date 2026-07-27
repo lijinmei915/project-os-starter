@@ -75,5 +75,5 @@ depends_on: [PROJECT.md, AGENTS.md, docs/ARCHITECTURE.md, docs/TESTING.md]
 
 ## 下一步建议
 
-1. 在受保护环境为 Gemini ACP 配置独立模型凭据，运行同一只读任务并核对 `executorId`、取消、恢复、usage 与 metadata-only Timeline；未提供凭据时不得冒充真实模型验收。
-2. 继续降低多文件 Patch 波动；不要放宽授权、独立审批、规范化或 trace 门槛。
+1. 暂停 Gemini 产品接入；在受保护环境重跑 Hermes `suite / p3`，确认新版 `omnidesk.agent-event.v1` 随真实追问、审批、Patch、检查和恢复进入 metadata-only Timeline。
+2. 继续降低 Hermes 多文件 Patch 波动；不要放宽授权、独立审批、规范化或 trace 门槛。

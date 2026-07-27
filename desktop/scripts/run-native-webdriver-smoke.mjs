@@ -465,6 +465,15 @@ esac
     || JSON.stringify(interrupted?.checkpoint?.allowedFiles) !== JSON.stringify(expectedAuthorizedFiles)) {
     throw new Error(`原生重启未保留审批 checkpoint：${JSON.stringify(interrupted)}`);
   }
+  const recoveryTimelineExport = await invokeNative("export_agent_run_timeline", { input: { id: "native-recovery-run" } });
+  const recoveryAgentEvents = recoveryTimelineExport?.timeline?.events
+    ?.flatMap((event) => event?.details?.agentEvents || []);
+  const recoveryTerminals = recoveryAgentEvents?.filter((event) => event.kind === "terminal") || [];
+  if (recoveryAgentEvents?.length !== 3
+    || recoveryAgentEvents.some((event, index) => event.schemaVersion !== "omnidesk.agent-event.v1" || event.sequence !== index + 1)
+    || recoveryTerminals.length !== 1 || recoveryTerminals[0]?.status !== "awaiting-approval") {
+    throw new Error(`原生重启后 Agent Event 顺序或单终态失真：${JSON.stringify(recoveryAgentEvents)}`);
+  }
   currentStage = "验证重启后的 Agent 调度恢复";
   const schedulerAfterRestart = await invokeNative("read_native_agent_scheduler");
   const interruptedMcpScheduler = schedulerAfterRestart?.find(
@@ -584,7 +593,7 @@ esac
     }
   }
 
-  console.log(`原生 WebDriver smoke 通过：原生 structured recommendation 映射为 start-agent，并由“那开始吧”确认；可发现版本化内置工具及其风险/schema，MCP 配置零自动执行；同一 MCP Run 经过调度、待审批、桌面重启、不重放、显式恢复、原审批、工具成功与 metadata-only Timeline 导出；提交持久化 ask_user 表单并验证幂等，验证跨项目并发与稳定队列位置${diagnoseTerminal ? "，并完成终端诊断" : ""}；未写入工程文件。`);
+  console.log(`原生 WebDriver smoke 通过：原生 structured recommendation 映射为 start-agent，并由“那开始吧”确认；可发现版本化内置工具及其风险/schema，MCP 配置零自动执行；Hermes 标准事件经待审批与桌面重启后保持顺序和单终态；同一 MCP Run 经过调度、待审批、桌面重启、不重放、显式恢复、原审批、工具成功与 metadata-only Timeline 导出；提交持久化 ask_user 表单并验证幂等，验证跨项目并发与稳定队列位置${diagnoseTerminal ? "，并完成终端诊断" : ""}；未写入工程文件。`);
 } catch (error) {
   failure = error instanceof Error ? error : new Error(String(error));
   console.error(`原生 WebDriver smoke 失败（${currentStage}）：${failure.message}`);
