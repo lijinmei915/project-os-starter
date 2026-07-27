@@ -1,6 +1,6 @@
 {
   "schemaVersion": "omnidesk.repository-file-inventory.v1",
-  "generatedAt": "2026-07-27T15:57:15.979Z",
+  "generatedAt": "2026-07-27T16:15:56.101Z",
   "sourceOfTruth": "git ls-files --cached --others --exclude-standard",
   "scope": "受版本控制文件及准备纳入版本控制的非忽略工作树文件；忽略的本地运行数据和构建输出不在本账本内。",
   "reviewContract": {
@@ -138,7 +138,7 @@
       "path": "HANDOFF.md",
       "kind": "root-document",
       "owner": "Documentation Governance",
-      "bytes": 17163,
+      "bytes": 17891,
       "pathMentions": [
         "desktop/src/components/workbench/current-goal-panel.jsx",
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
@@ -191,7 +191,7 @@
       "path": "PROJECT.md",
       "kind": "root-document",
       "owner": "Documentation Governance",
-      "bytes": 25726,
+      "bytes": 26697,
       "pathMentions": [
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
         "desktop/src/lib/agent-topic-runtime-capability.js",
@@ -407,7 +407,7 @@
       "path": "desktop/scripts/check-agent-eval-traces.mjs",
       "kind": "eval",
       "owner": "Agent Reliability",
-      "bytes": 3491,
+      "bytes": 4110,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -437,11 +437,13 @@
       "path": "desktop/scripts/run-agent-eval-hermes-cli.mjs",
       "kind": "eval",
       "owner": "Agent Reliability",
-      "bytes": 29267,
+      "bytes": 34665,
       "pathMentions": [],
-      "moduleConsumers": [],
-      "consumerEvidence": "no-static-module-consumer",
-      "consumerReview": "没有静态 import/mod 关系；路径提及、Owner 和领域回归构成保留证据，删除前必须补运行时或发布消费者复核。",
+      "moduleConsumers": [
+        "desktop/tests/agent-eval-trace-check.test.mjs"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
       "decision": "keep",
       "rationale": "受保护环境 Hermes CLI Eval executor。",
       "reviewStatus": "reviewed",
@@ -482,7 +484,7 @@
       "path": "desktop/scripts/run-agent-eval-suite.mjs",
       "kind": "eval",
       "owner": "Agent Reliability",
-      "bytes": 3557,
+      "bytes": 4066,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -2011,7 +2013,7 @@
       "path": "desktop/src-tauri/src/runtime/patch.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 26775,
+      "bytes": 35323,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/bin/patch_normalizer.rs",
@@ -2034,7 +2036,7 @@
       "path": "desktop/src-tauri/src/runtime/patch_draft.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 13903,
+      "bytes": 15689,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/app.rs",
@@ -2052,7 +2054,7 @@
       "path": "desktop/src-tauri/src/runtime/planning.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 13079,
+      "bytes": 13961,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/app.rs",
@@ -3530,7 +3532,7 @@
       "path": "desktop/src/components/workbench/plan-views.jsx",
       "kind": "frontend",
       "owner": "Workbench",
-      "bytes": 2360,
+      "bytes": 2499,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/components/workbench/active-task.jsx",
@@ -7529,7 +7531,7 @@
       "path": "desktop/tests/agent-eval-trace-check.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 4784,
+      "bytes": 6028,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -9494,7 +9496,7 @@
       "path": "docs/LESSONS.md",
       "kind": "documentation",
       "owner": "Documentation Governance",
-      "bytes": 117525,
+      "bytes": 118789,
       "pathMentions": [
         "desktop/src/components/workbench/project-memory-panel.jsx",
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
@@ -9596,7 +9598,7 @@
       "path": "docs/TESTING.md",
       "kind": "documentation",
       "owner": "Documentation Governance",
-      "bytes": 15366,
+      "bytes": 15740,
       "pathMentions": [
         "desktop/scripts/run-native-webdriver-smoke.mjs",
         "desktop/src-tauri/src/runtime/workspace.rs",

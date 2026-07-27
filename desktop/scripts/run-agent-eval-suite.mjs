@@ -46,6 +46,14 @@ function copyEvidence(caseId, result) {
       const source = String(interaction?.[field] || "").trim();
       if (source && fs.existsSync(source)) fs.copyFileSync(source, path.join(traceDirectory, `${caseId}.${suffix}`));
     }
+    for (const attempt of Array.isArray(trace.attempts) ? trace.attempts : []) {
+      const attemptNumber = Number(attempt?.attempt || 0);
+      if (!attemptNumber) continue;
+      for (const [field, suffix] of [["rawOutputPath", "raw-model-output.txt"], ["usagePath", "usage.json"]]) {
+        const source = String(attempt?.[field] || "").trim();
+        if (source && fs.existsSync(source)) fs.copyFileSync(source, path.join(traceDirectory, `${caseId}.attempt-${attemptNumber}.${suffix}`));
+      }
+    }
   } catch {
     // The trace itself remains the authoritative artifact when optional detail files are absent.
   }

@@ -109,7 +109,7 @@ const patchCases = Object.freeze({
       "task-index.json": "{\n  \"taskToGoal\": { \"task-1\": \"goal-old\" },\n  \"goalToTasks\": { \"goal-old\": [\"task-1\"], \"goal-new\": [] }\n}\n",
       "goal-audit.json": "{\n  \"entries\": [{ \"taskId\": \"task-1\", \"goalId\": \"goal-old\", \"goalTitle\": \"Old goal\", \"event\": \"bound\" }]\n}\n",
     },
-    minimumChangedFiles: 4,
+    requiredFiles: ["task.json", "goals.json", "task-index.json", "goal-audit.json"],
     prompt: "Return only unified diffs that rebind task-1 from goal-old / Old goal to goal-new / New goal consistently in all four authorized files. In task.json update goalId and goalTitle. In goals.json remove task-1 from goal-old taskIds and add it to goal-new taskIds. In task-index.json update taskToGoal.task-1, remove task-1 from goalToTasks.goal-old, and add it to goalToTasks.goal-new. In goal-audit.json update the only entry's goalId, goalTitle, and event to `rebound`. Do not modify any other data. Do not use tools, do not explain, and do not use markdown fences.",
     verify(fixture) {
       const task = JSON.parse(fs.readFileSync(path.join(fixture, "task.json"), "utf8"));
@@ -236,6 +236,74 @@ function normalizeWithDesktopRuntime(diff, contexts) {
   }
 }
 
+export function requiredFileCoverage(diff, requiredFiles = []) {
+  const changed = new Set();
+  let currentFile = "";
+  let removed = [];
+  let added = [];
+  let inHunk = false;
+  let oldRemaining = 0;
+  let newRemaining = 0;
+  const settleHunk = () => {
+    if ((removed.length || added.length) && JSON.stringify(removed) !== JSON.stringify(added) && currentFile) changed.add(currentFile);
+    removed = [];
+    added = [];
+  };
+  const lines = String(diff || "").split(/\r?\n/);
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (!inHunk && line.startsWith("--- ") && lines[index + 1]?.startsWith("+++ ")) {
+      settleHunk();
+      const file = lines[index + 1].slice(4).trim().split(/\s+/)[0].replace(/^b\//, "");
+      currentFile = file && file !== "/dev/null" ? file : "";
+      inHunk = false;
+      index += 1;
+    } else if (line.startsWith("@@")) {
+      settleHunk();
+      const match = line.match(/^@@ -\d+(?:,(\d+))? \+\d+(?:,(\d+))? @@/);
+      oldRemaining = match ? Number(match[1] ?? 1) : 0;
+      newRemaining = match ? Number(match[2] ?? 1) : 0;
+      inHunk = oldRemaining > 0 || newRemaining > 0;
+    } else if (inHunk) {
+      if (line.startsWith("-")) {
+        removed.push(line.slice(1));
+        oldRemaining = Math.max(0, oldRemaining - 1);
+      } else if (line.startsWith("+")) {
+        added.push(line.slice(1));
+        newRemaining = Math.max(0, newRemaining - 1);
+      } else if (line.startsWith(" ")) {
+        oldRemaining = Math.max(0, oldRemaining - 1);
+        newRemaining = Math.max(0, newRemaining - 1);
+      }
+      if (oldRemaining === 0 && newRemaining === 0) inHunk = false;
+    }
+  }
+  settleHunk();
+  const changedFiles = [...changed].sort();
+  const required = [...new Set(requiredFiles.map((file) => String(file || "").trim()).filter(Boolean))].sort();
+  const missingFiles = required.filter((file) => !changedFiles.includes(file));
+  return { changedFiles, complete: missingFiles.length === 0, missingFiles, requiredFiles: required };
+}
+
+export function boundedPatchRetryPrompt(prompt, reason, requiredFiles = []) {
+  const required = requiredFiles.length ? requiredFiles.join(", ") : "the files explicitly required by the task";
+  return `${prompt}\n\nThe previous draft was rejected by Runtime validation: ${String(reason || "invalid patch").slice(0, 2000)}\nReturn one complete replacement unified diff covering all required files (${required}), not a partial follow-up. Keep exactly the same authorized file scope. Do not add no-op edits, tools, explanation, or markdown fences.`;
+}
+
+function readUsage(file) {
+  try { return JSON.parse(fs.readFileSync(file, "utf8")); } catch { return {}; }
+}
+
+function summarizeAttemptsUsage(attempts) {
+  const values = attempts.map((attempt) => readUsage(attempt.usagePath));
+  return {
+    apiCalls: values.reduce((total, usage) => total + Number(usage.api_calls || 0), 0),
+    completed: values.length > 0 && values.every((usage) => Boolean(usage.completed)),
+    estimatedCostUsd: values.reduce((total, usage) => total + Number(usage.estimated_cost_usd || 0), 0),
+    model: String(values.at(-1)?.model || ""),
+  };
+}
+
 async function runPatchCase(caseId, definition) {
   const started = Date.now();
   const isolation = definition.isolated ? createIsolatedFixture(caseId, definition) : null;
@@ -245,8 +313,6 @@ async function runPatchCase(caseId, definition) {
   const evidenceFixture = isolation
     ? fs.mkdtempSync(path.join(os.tmpdir(), `omnidesk-eval-${caseId}-evidence-`))
     : fixture;
-  const rawOutputPath = path.join(evidenceFixture, "raw-model-output.txt");
-  const usagePath = path.join(evidenceFixture, "usage.json");
   const interactionOutputPath = path.join(evidenceFixture, "interaction-model-output.txt");
   const interactionUsagePath = path.join(evidenceFixture, "interaction-usage.json");
   const tracePath = path.join(evidenceFixture, "trace.json");
@@ -290,24 +356,64 @@ async function runPatchCase(caseId, definition) {
     };
     prompt = `${definition.interaction.followup}\n\nPersisted ask_user result for the same Agent Run:\n${JSON.stringify({ runId, interactionId: interaction?.id || "", ...definition.interaction.response })}\n\nThe following is the complete authorized file context. Use it exactly; do not invent lines or paths:${contextText}`;
   }
-  const model = spawnSync("hermes", ["--provider", provider.provider, "--model", provider.model, "-z", prompt, "--usage-file", usagePath], {
-    cwd: fixture,
-    encoding: "utf8",
-    env: provider.env,
-    timeout: 90_000,
-  });
-  const raw = String(model.stdout || "").trim();
-  fs.writeFileSync(rawOutputPath, `${raw}\n`);
-  const rawDiff = raw.endsWith("\n") ? raw : `${raw}\n`;
   const contexts = Object.keys(definition.files).map((file) => ({ path: file, content: fs.readFileSync(path.join(fixture, file), "utf8") }));
   const authorizedFiles = contexts.map((context) => context.path);
-  const rawApplyCheck = model.status === 0 && raw ? runGit(fixture, ["apply", "--check"], rawDiff) : { status: 1, stderr: "模型未返回补丁。" };
-  const normalization = model.status === 0 && raw ? normalizeWithDesktopRuntime(rawDiff, contexts) : { ok: false, error: "模型未返回补丁。" };
+  const requiredFiles = [...new Set((definition.requiredFiles || []).map((file) => String(file).trim()).filter(Boolean))].sort();
+  if (requiredFiles.some((file) => !authorizedFiles.includes(file))) {
+    throw new Error(`${caseId} 的必改文件超出授权范围`);
+  }
+  const attempts = [];
+  const runDraftAttempt = (attempt, attemptPrompt) => {
+    const rawOutputPath = path.join(evidenceFixture, `raw-model-output-attempt-${attempt}.txt`);
+    const usagePath = path.join(evidenceFixture, `usage-attempt-${attempt}.json`);
+    const model = spawnSync("hermes", ["--provider", provider.provider, "--model", provider.model, "-z", attemptPrompt, "--usage-file", usagePath], {
+      cwd: fixture,
+      encoding: "utf8",
+      env: provider.env,
+      timeout: 90_000,
+    });
+    const raw = String(model.stdout || "").trim();
+    fs.writeFileSync(rawOutputPath, `${raw}\n`);
+    const rawDiff = raw.endsWith("\n") ? raw : `${raw}\n`;
+    const rawApplyCheck = model.status === 0 && raw ? runGit(fixture, ["apply", "--check"], rawDiff) : { status: 1, stderr: "模型未返回补丁。" };
+    const normalization = model.status === 0 && raw ? normalizeWithDesktopRuntime(rawDiff, contexts) : { ok: false, error: "模型未返回补丁。" };
+    const coverage = requiredFileCoverage(normalization.ok ? normalization.diff : "", requiredFiles);
+    const rejectionReason = model.status !== 0
+      ? `Hermes 退出码 ${String(model.status)}`
+      : !raw
+        ? "模型未返回补丁。"
+        : !normalization.ok
+          ? normalization.error
+          : !coverage.complete
+            ? `Patch 未覆盖必改文件：${coverage.missingFiles.join(", ")}`
+            : "";
+    const result = {
+      acceptedForApproval: !rejectionReason,
+      attempt,
+      coverage,
+      model,
+      normalization,
+      prompt: attemptPrompt,
+      raw,
+      rawApplyCheck,
+      rawOutputPath,
+      rejectionReason,
+      usagePath,
+    };
+    attempts.push(result);
+    return result;
+  };
+  let draftAttempt = runDraftAttempt(1, prompt);
+  if (!draftAttempt.acceptedForApproval) {
+    prompt = boundedPatchRetryPrompt(prompt, draftAttempt.rejectionReason, requiredFiles);
+    draftAttempt = runDraftAttempt(2, prompt);
+  }
+  const { model, normalization, raw, rawApplyCheck, rawOutputPath, usagePath } = draftAttempt;
   const diff = normalization.ok ? normalization.diff : "";
   let applied = false;
   let approvalCount = 0;
   let applyResult = { status: "not-requested", stderr: "" };
-  if (model.status === 0 && raw && normalization.ok) {
+  if (model.status === 0 && raw && normalization.ok && draftAttempt.coverage.complete) {
     const gateway = createToolGateway({
       accessMode: "controlled",
       projectRoot: fixture,
@@ -340,8 +446,11 @@ async function runPatchCase(caseId, definition) {
     ? String(runGit(fixture, ["diff", "--name-only"]).stdout || "").split(/\r?\n/).filter(Boolean)
     : [];
   const changedFilesAuthorized = changedFiles.every((file) => authorizedFiles.includes(file));
-  const requiredChangedFileCount = Number(definition.minimumChangedFiles || 1);
-  const changedRequiredFiles = changedFiles.length >= requiredChangedFileCount;
+  const missingRequiredFiles = requiredFiles.filter((file) => !changedFiles.includes(file));
+  const requiredChangedFileCount = requiredFiles.length || Number(definition.minimumChangedFiles || 1);
+  const changedRequiredFiles = requiredFiles.length
+    ? missingRequiredFiles.length === 0
+    : changedFiles.length >= requiredChangedFileCount;
   let fixtureCheckPassed = false;
   let fixtureCheckError = "";
   if (applied && gitDiffCheck.status === 0) {
@@ -395,8 +504,7 @@ async function runPatchCase(caseId, definition) {
     const removed = runGit(isolation.source, ["worktree", "remove", "--force", isolation.worktree]);
     integration.worktreeRemoved = removed.status === 0 && !fs.existsSync(isolation.worktree);
   }
-  let usage = {};
-  try { usage = JSON.parse(fs.readFileSync(usagePath, "utf8")); } catch { /* evidence is still recorded */ }
+  const usage = summarizeAttemptsUsage(attempts);
   const trace = {
     caseId,
     fixture,
@@ -414,13 +522,26 @@ async function runPatchCase(caseId, definition) {
     authorizedFiles,
     changedFiles,
     changedFilesAuthorized,
+    requiredFiles,
+    missingRequiredFiles,
     requiredChangedFileCount,
     changedRequiredFiles,
+    draftAttempts: attempts.length,
+    attempts: attempts.map((attempt) => ({
+      acceptedForApproval: attempt.acceptedForApproval,
+      attempt: attempt.attempt,
+      missingRequiredFiles: attempt.coverage.missingFiles,
+      model: { exitCode: attempt.model.status, signal: attempt.model.signal, stderr: String(attempt.model.stderr || "").slice(0, 4000) },
+      normalization: attempt.normalization.ok ? "normalized" : "rejected",
+      rawOutputPath: attempt.rawOutputPath,
+      rejectionReason: attempt.rejectionReason,
+      usagePath: attempt.usagePath,
+    })),
     gitDiffCheck: { exitCode: gitDiffCheck.status, stderr: String(gitDiffCheck.stderr || "").slice(0, 4000) },
     fixtureCheckPassed,
     fixtureCheckError,
     isolation: integration,
-    usage: { apiCalls: Number(usage.api_calls || 0), completed: Boolean(usage.completed), estimatedCostUsd: Number(usage.estimated_cost_usd || 0), model: String(usage.model || "") },
+    usage,
   };
   fs.writeFileSync(tracePath, `${JSON.stringify(trace, null, 2)}\n`);
   return {
@@ -435,7 +556,7 @@ async function runPatchCase(caseId, definition) {
     recovered: Boolean(definition.interaction),
     approvalCount,
     durationMs: Date.now() - started,
-    costUsd: Number(usage.estimated_cost_usd || 0),
+    costUsd: usage.estimatedCostUsd,
     execution: { executor: "hermes-cli", fixture, executedAt: new Date().toISOString(), tracePath },
   };
 }
@@ -477,11 +598,13 @@ async function awaitGateway(gateway, prepared) {
   return { status: result.toolCall.status, stderr: "" };
 }
 
-const caseId = argument("--case") || "readme-copy";
-const outputPath = path.resolve(argument("--output") || path.join(os.tmpdir(), "omnidesk-agent-eval-hermes-results.json"));
-const definition = patchCases[caseId];
-if (!definition) throw new Error(`当前 runner 尚未实现 case：${caseId}`);
-const result = await runPatchCase(caseId, definition);
-fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-fs.writeFileSync(outputPath, `${JSON.stringify({ results: [result] }, null, 2)}\n`);
-process.stdout.write(`${JSON.stringify({ outputPath, result })}\n`);
+if (path.resolve(process.argv[1] || "") === fileURLToPath(import.meta.url)) {
+  const caseId = argument("--case") || "readme-copy";
+  const outputPath = path.resolve(argument("--output") || path.join(os.tmpdir(), "omnidesk-agent-eval-hermes-results.json"));
+  const definition = patchCases[caseId];
+  if (!definition) throw new Error(`当前 runner 尚未实现 case：${caseId}`);
+  const result = await runPatchCase(caseId, definition);
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, `${JSON.stringify({ results: [result] }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ outputPath, result })}\n`);
+}

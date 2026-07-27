@@ -16,7 +16,7 @@ depends_on: [PROJECT.md, AGENTS.md, docs/ARCHITECTURE.md, docs/TESTING.md]
 
 - 产品核心：`desktop/` 中的 Tauri + React + Local Agent Runtime。它在用户授权范围内处理项目、对话、Patch、审批、检查、恢复与证据。
 - 状态根：`.omnidesk/` 是唯一活动状态根，分为 `data`、`runtime`、`cache`、`evidence`。历史 `.project-os/` 只能通过显式、非破坏性迁移导入，不能作为运行时回退。
-- 当前分支：`main`，Hermes 标准事件与严格受保护 Eval 的功能基线为 `f008f1e`；状态同步完成后应保持工作树干净。
+- 当前分支：`main`，Hermes 单执行器可靠性基线为 `de8fbd0`；多文件 Patch 稳定化正在工作树中等待提交和受保护 Eval。
 - 受控边界不可放松：Patch 写入与检查各自独立审批；恢复不能自动重放；Provider 成功不等于任务成功；Preview 只读，不执行写入、终端、检查或恢复。
 
 ## 最近完成
@@ -33,6 +33,7 @@ depends_on: [PROJECT.md, AGENTS.md, docs/ARCHITECTURE.md, docs/TESTING.md]
 - Agent Executor 契约已冻结为 `omnidesk.agent-executor.v1`：核心能力由 Runtime 统一校验，供应商私有能力只能放入 `extensions`；扩展字段不得参与调度、审批、恢复、Patch、检查或 evidence 决策。边界测试禁止通用 Runtime 按 Hermes/Gemini 身份分支，并用无供应商类型的 fixture 验证替代执行器契约。
 - Agent Event 标准化 v1 已接入共享 ACP 执行层：公开生命周期、工具请求/结果、等待状态与终态使用 `omnidesk.agent-event.v1`，sequence 从 1 递增且只允许一个 terminal。`app.rs` 只把 `agentEvents` 交给 Agent Run Timeline，不再消费供应商形状的 `trace/observations`；导出只保留事件固定元数据。完整思维链、Prompt、正文和工具输出不得进入该事件契约。
 - Hermes 单执行器生产可靠性 v1 已完成：受保护 suite [`30280519155`](https://github.com/lijinmei915/project-os-starter/actions/runs/30280519155) 通过 13/13 场景与隔离 worktree；严格 P3 [`30281795504`](https://github.com/lijinmei915/project-os-starter/actions/runs/30281795504) 从最终 artifact 证明真实 Hermes 标准事件连续、唯一成功终态、显式 token、Scheduler 释放和 metadata-only 脱敏。Eval 收集器漏传事件的问题已在 `f008f1e` 修复，后续没有 `AgentEvent` 的成功结果会被门槛拒绝。
+- Hermes 多文件 Patch 稳定化已完成本地和原生切片：计划使用 `requiredFiles` 明确必改文件，允许读取的上下文文件可以不改；Hermes 与 Provider 草稿漏改必改文件、只放文件头或生成 `-same/+same` 空改动时，都会在审批前拒绝并在同一授权范围内最多重生成一次。受保护 `goal-rebind` 也采用相同四文件覆盖和单次重试证据，逐次原始输出与 usage 会进入 artifact。当前回归为 Node `619/619`、Rust `232/232`、Patch Normalizer `9/9`、Web build、完整仓库门槛与原生 WebDriver 全绿；尚未提交、推送或运行受保护真实 Eval。
 - 工具参数中的 `reply` 现可安全增量解码；当前 LJM Gateway 真实请求仍在最后一次返回完整 Function Call，因此要跨 Provider 保证真流式需要后续决策是否采用“流式正文 + 第二次结构化动作判断”。真实桌面对话 `conv-1785125756632` 已验证新消息直接接管并取消旧请求，无额外取消消息和迟到旧结果。Agent 开始文案现明确说明读取项目、询问/审批边界和当前零写入。
 
 - `OmniDesk 结构化追问表单闭环 v1` 已完成实现：确认执行的任务先启动 Hermes；Agent 可发起持久化 `ask_user` interaction，对话内渲染 schema 表单，提交或跳过后从 checkpoint 重新请求同一 Run。
@@ -76,5 +77,5 @@ depends_on: [PROJECT.md, AGENTS.md, docs/ARCHITECTURE.md, docs/TESTING.md]
 
 ## 下一步建议
 
-1. 继续降低 Hermes 多文件 Patch 波动；不要放宽授权、独立审批、规范化或 trace 门槛。
+1. 经用户确认后提交并推送当前改动，运行受保护 `goal-rebind` 与 suite；从最终 artifact 核对四个必改文件、重试次数、独立审批和检查结果。
 2. Gemini 产品接入继续暂停，成熟后再作为独立目标评估。

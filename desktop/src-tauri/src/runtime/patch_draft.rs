@@ -2,7 +2,8 @@ use crate::runtime::agent_executor::{
     default_agent_executor, AgentExecutionMode, AgentExecutionRequest,
 };
 use crate::runtime::patch::{
-    files_from_unified_diff, normalize_hermes_unified_diff, provider_draft_prompt, PatchDraft,
+    files_from_unified_diff, files_with_substantive_changes, normalize_hermes_unified_diff,
+    plan_required_files, provider_draft_prompt, validate_required_file_coverage, PatchDraft,
 };
 #[cfg(not(test))]
 use crate::runtime::provider::sync_hermes_runtime_config;
@@ -48,14 +49,24 @@ pub async fn generate_draft(input: GenerateDraftInput<'_>) -> Result<PatchDraft,
             &title, &files, &reason,
         ));
     }
+    let required_files = match plan_required_files(plan, input.project_root, &files) {
+        Ok(required_files) => required_files,
+        Err(reason) => {
+            return Ok(crate::runtime::patch::not_applicable_draft(
+                &title, &files, &reason,
+            ))
+        }
+    };
     let contexts = crate::runtime::patch::read_context_files(input.project_root, &files)?;
     if !input.configured_provider.enabled {
-        return Ok(crate::runtime::patch::local_placeholder_draft(
+        let mut draft = crate::runtime::patch::local_placeholder_draft(
             &title,
             &files,
             &contexts,
             "未配置可用模型；这是不可应用的占位草稿。",
-        ));
+        );
+        draft.required_files = required_files;
+        return Ok(draft);
     }
 
     let (provider, provider_switch_note) =
@@ -72,6 +83,7 @@ pub async fn generate_draft(input: GenerateDraftInput<'_>) -> Result<PatchDraft,
                 draft
                     .trace
                     .push(format!("PROVIDER_PRECHECK_FAILED: {error}"));
+                draft.required_files = required_files;
                 return Ok(draft);
             }
         };
@@ -84,7 +96,7 @@ pub async fn generate_draft(input: GenerateDraftInput<'_>) -> Result<PatchDraft,
         let cancellation = token.clone();
         tokio::select! {
             _ = cancellation.cancelled() => Err("请求已取消".to_string()),
-            result = generate_hermes_draft(&provider, input.project_root, &title, plan, &contexts, None, Some(token)) => result,
+            result = generate_hermes_draft(&provider, input.project_root, &title, plan, &contexts, &required_files, None, Some(token)) => result,
         }
     } else {
         generate_hermes_draft(
@@ -93,6 +105,7 @@ pub async fn generate_draft(input: GenerateDraftInput<'_>) -> Result<PatchDraft,
             &title,
             plan,
             &contexts,
+            &required_files,
             None,
             None,
         )
@@ -114,6 +127,7 @@ pub async fn generate_draft(input: GenerateDraftInput<'_>) -> Result<PatchDraft,
             &title,
             plan,
             &contexts,
+            &required_files,
             Some(&error),
             None,
         )
@@ -137,7 +151,7 @@ pub async fn generate_draft(input: GenerateDraftInput<'_>) -> Result<PatchDraft,
     let provider_result = if let Some(token) = input.cancellation {
         tokio::select! {
             _ = token.cancelled() => Err("请求已取消".to_string()),
-            result = generate_provider_draft(&provider, input.project_root, &title, plan, &contexts, Some(&hermes_error)) => result,
+            result = generate_provider_draft(&provider, input.project_root, &title, plan, &contexts, &required_files, Some(&hermes_error)) => result,
         }
     } else {
         generate_provider_draft(
@@ -146,6 +160,7 @@ pub async fn generate_draft(input: GenerateDraftInput<'_>) -> Result<PatchDraft,
             &title,
             plan,
             &contexts,
+            &required_files,
             Some(&hermes_error),
         )
         .await
@@ -177,6 +192,7 @@ pub async fn generate_draft(input: GenerateDraftInput<'_>) -> Result<PatchDraft,
                 trim_for_trace(&hermes_error)
             ));
             draft.trace.push(format!("PROVIDER_FALLBACK: {error}"));
+            draft.required_files = required_files;
             Ok(draft)
         }
     }
@@ -191,6 +207,7 @@ pub async fn generate_provider_draft(
     title: &str,
     plan: &Value,
     contexts: &[(String, String)],
+    required_files: &[String],
     retry_reason: Option<&str>,
 ) -> Result<PatchDraft, String> {
     let api_key = read_secret(root, &provider.api_key_env)
@@ -199,7 +216,7 @@ pub async fn generate_provider_draft(
         return Err(format!("环境变量 {} 为空", provider.api_key_env));
     }
 
-    let prompt = provider_draft_prompt(title, plan, contexts, retry_reason);
+    let prompt = provider_draft_prompt(title, plan, contexts, required_files, retry_reason);
     let response = post_chat_completion(
         provider,
         &api_key,
@@ -225,8 +242,10 @@ pub async fn generate_provider_draft(
         .map_err(|err| format!("patch draft JSON 解析失败: {}", err))?;
     draft.diff = normalize_hermes_unified_diff(&draft.diff, contexts)?;
     draft.files = files_from_unified_diff(&draft.diff);
+    validate_required_file_coverage(&files_with_substantive_changes(&draft.diff), required_files)?;
     draft.allowed_files = contexts.iter().map(|(path, _)| path.clone()).collect();
     draft.context_files = draft.allowed_files.clone();
+    draft.required_files = required_files.to_vec();
     draft.draft_attempt = usize::from(retry_reason.is_some()) + 1;
     draft.failure_reason = retry_reason.unwrap_or("").to_string();
     draft.not_applicable = false;
@@ -236,6 +255,11 @@ pub async fn generate_provider_draft(
     draft
         .trace
         .push(format!("PROVIDER_PATCH: {}", provider.model));
+    draft.trace.push(format!(
+        "PATCH_REQUIRED_COVERAGE: {}/{}",
+        required_files.len(),
+        required_files.len()
+    ));
     Ok(draft)
 }
 
@@ -245,6 +269,7 @@ pub async fn generate_hermes_draft(
     title: &str,
     plan: &Value,
     contexts: &[(String, String)],
+    required_files: &[String],
     retry_reason: Option<&str>,
     cancellation: Option<CancellationToken>,
 ) -> Result<PatchDraft, String> {
@@ -258,12 +283,17 @@ pub async fn generate_hermes_draft(
         .map(|(path, _)| path.as_str())
         .collect::<Vec<_>>()
         .join(", ");
+    let required = if required_files.is_empty() {
+        "none explicitly".to_string()
+    } else {
+        required_files.join(", ")
+    };
     let retry_instruction = retry_reason
         .map(|reason| format!(" The previous draft was rejected: {reason}. Regenerate a corrected diff; do not change the allowed file list."))
         .unwrap_or_default();
     let prompt = format!(
-        "Implement the coding task `{title}` according to this plan: {plan}. You are in a governed project. First use only read_file, list_files, search_project, or git_status tool calls to inspect the minimum context. Then return ONLY a final JSON envelope: {{\"type\":\"final\",\"result\":{{\"summary\":\"...\",\"diff\":\"unified diff\",\"files\":[\"...\"]}}}}. Never apply changes or run checks. Only these planned context files may appear in the final diff: {allowed}.{retry_instruction}",
-        title = title, plan = plan, allowed = allowed, retry_instruction = retry_instruction
+        "Implement the coding task `{title}` according to this plan: {plan}. You are in a governed project. First use only read_file, list_files, search_project, or git_status tool calls to inspect the minimum context. Then return ONLY a final JSON envelope: {{\"type\":\"final\",\"result\":{{\"summary\":\"...\",\"diff\":\"unified diff\",\"files\":[\"...\"]}}}}. Never apply changes or run checks. Only these planned context files may appear in the final diff: {allowed}. Files that must receive substantive changes: {required}. Context-only files may remain unchanged; never add no-op edits merely to mention a file.{retry_instruction}",
+        title = title, plan = plan, allowed = allowed, required = required, retry_instruction = retry_instruction
     );
     let root = root.to_path_buf();
     let api_base = provider.api_base.clone();
@@ -300,12 +330,14 @@ pub async fn generate_hermes_draft(
         .ok_or_else(|| "Hermes structured final 缺少 diff".to_string())?;
     let diff = normalize_hermes_unified_diff(diff, contexts)?;
     let files = files_from_unified_diff(&diff);
+    validate_required_file_coverage(&files_with_substantive_changes(&diff), required_files)?;
     Ok(PatchDraft {
         summary,
         diff,
         files,
         allowed_files: contexts.iter().map(|(path, _)| path.clone()).collect(),
         context_files: contexts.iter().map(|(path, _)| path.clone()).collect(),
+        required_files: required_files.to_vec(),
         draft_attempt: usize::from(retry_reason.is_some()) + 1,
         failure_reason: retry_reason.unwrap_or("").to_string(),
         not_applicable: false,
@@ -316,6 +348,11 @@ pub async fn generate_hermes_draft(
         trace: vec![
             "PATCH_MODE: hermes-acp governed structured loop".to_string(),
             format!("HERMES_STEPS: {}", result.step),
+            format!(
+                "PATCH_REQUIRED_COVERAGE: {}/{}",
+                required_files.len(),
+                required_files.len()
+            ),
         ],
     })
 }
@@ -344,7 +381,8 @@ mod tests {
             "title": "更新实现",
             "plan": {
                 "candidateChanges": ["调整返回值"],
-                "filesToRead": ["src/lib.rs", ".env.local"]
+                "filesToRead": ["src/lib.rs", ".env.local"],
+                "requiredFiles": ["src/lib.rs"]
             }
         });
 
@@ -361,6 +399,7 @@ mod tests {
         assert!(draft.diff.contains("PATCH_DRAFT_PENDING"));
         assert_eq!(draft.allowed_files, vec!["src/lib.rs"]);
         assert_eq!(draft.context_files, vec!["src/lib.rs"]);
+        assert_eq!(draft.required_files, vec!["src/lib.rs"]);
         assert!(draft.failure_reason.contains("未配置可用模型"));
         fs::remove_dir_all(root).unwrap();
     }

@@ -50,10 +50,18 @@ for (const result of results) {
   if (caseId === "goal-rebind") {
     const authorized = Array.isArray(trace?.authorizedFiles) ? trace.authorizedFiles : [];
     const changed = Array.isArray(trace?.changedFiles) ? trace.changedFiles : [];
-    if (trace?.changedFilesAuthorized !== true || trace?.changedRequiredFiles !== true || changed.length < 4) {
+    const required = Array.isArray(trace?.requiredFiles) ? trace.requiredFiles : [];
+    const attempts = Array.isArray(trace?.attempts) ? trace.attempts : [];
+    if (trace?.changedFilesAuthorized !== true || trace?.changedRequiredFiles !== true || changed.length < 4
+      || required.length !== 4 || required.some((file) => !changed.includes(file))) {
       fail("goal-rebind must prove four authorized file changes");
     }
     if (changed.some((file) => !authorized.includes(file))) fail("goal-rebind changed a file outside its authorization");
+    if (!Number.isInteger(trace?.draftAttempts) || trace.draftAttempts < 1 || trace.draftAttempts > 2
+      || attempts.length !== trace.draftAttempts || attempts.at(-1)?.acceptedForApproval !== true
+      || (attempts.length === 2 && attempts[0]?.acceptedForApproval !== false)) {
+      fail("goal-rebind must prove one accepted draft within the single-retry budget");
+    }
   }
 
   if (caseId === "ask-user-resume") {

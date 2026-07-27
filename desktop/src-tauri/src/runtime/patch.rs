@@ -19,6 +19,8 @@ pub struct PatchDraft {
     #[serde(default)]
     pub context_files: Vec<String>,
     #[serde(default)]
+    pub required_files: Vec<String>,
+    #[serde(default)]
     pub draft_attempt: usize,
     #[serde(default)]
     pub failure_reason: String,
@@ -115,6 +117,72 @@ pub fn plan_context_files(plan: &Value, root: &Path) -> Vec<String> {
     files
 }
 
+/// Reads the optional must-change contract without widening the existing read
+/// authorization. Legacy plans omit this field and keep their previous
+/// behavior; new plans fail closed when a required path is invalid or not
+/// included in the bounded context set.
+#[allow(dead_code)] // The standalone patch-normalizer does not read project plans.
+pub fn plan_required_files(
+    plan: &Value,
+    root: &Path,
+    allowed_files: &[String],
+) -> Result<Vec<String>, String> {
+    let Some(value) = plan
+        .get("requiredFiles")
+        .or_else(|| plan.get("required_files"))
+    else {
+        return Ok(Vec::new());
+    };
+    let items = value
+        .as_array()
+        .ok_or_else(|| "任务计划的 requiredFiles 必须是文件路径数组。".to_string())?;
+    let mut files = Vec::new();
+    for item in items {
+        let path = item
+            .as_str()
+            .map(str::trim)
+            .filter(|path| !path.is_empty())
+            .ok_or_else(|| "任务计划的 requiredFiles 包含无效文件路径。".to_string())?;
+        if !is_context_path(path) || !root.join(path).is_file() {
+            return Err(format!("任务计划的必改文件无效或不存在：{path}"));
+        }
+        if !allowed_files.iter().any(|allowed| allowed == path) {
+            return Err(format!(
+                "任务计划的必改文件未包含在已授权读取范围内：{path}"
+            ));
+        }
+        files.push(path.to_string());
+    }
+    files.sort();
+    files.dedup();
+    if files.len() > 8 {
+        return Err("任务计划的必改文件超过 8 个的安全上限。".to_string());
+    }
+    Ok(files)
+}
+
+/// Ensures a model cannot finish a multi-file task after changing only a
+/// subset of the explicitly required files.
+#[allow(dead_code)] // The standalone patch-normalizer validates syntax, not plan coverage.
+pub fn validate_required_file_coverage(
+    changed_files: &[String],
+    required_files: &[String],
+) -> Result<(), String> {
+    let missing = required_files
+        .iter()
+        .filter(|required| !changed_files.iter().any(|changed| changed == *required))
+        .cloned()
+        .collect::<Vec<_>>();
+    if missing.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "Patch 未覆盖计划要求的必改文件：{}。请在原授权范围内生成完整替代 Patch。",
+            missing.join(", ")
+        ))
+    }
+}
+
 #[allow(dead_code)] // The standalone patch-normalizer receives already-bounded context.
 pub fn read_context_files(root: &Path, files: &[String]) -> Result<Vec<(String, String)>, String> {
     let mut contexts = Vec::new();
@@ -152,6 +220,7 @@ pub fn local_placeholder_draft(
         files: files.to_vec(),
         allowed_files: files.to_vec(),
         context_files: contexts.iter().map(|(path, _)| path.clone()).collect(),
+        required_files: Vec::new(),
         draft_attempt: 1,
         failure_reason: failure_reason.to_string(),
         not_applicable: false,
@@ -175,6 +244,7 @@ pub fn not_applicable_draft(title: &str, files: &[String], reason: &str) -> Patc
         files: files.to_vec(),
         allowed_files: files.to_vec(),
         context_files: Vec::new(),
+        required_files: Vec::new(),
         draft_attempt: 0,
         failure_reason: reason.to_string(),
         not_applicable: true,
@@ -191,6 +261,7 @@ pub fn provider_draft_prompt(
     title: &str,
     plan: &Value,
     contexts: &[(String, String)],
+    required_files: &[String],
     retry_reason: Option<&str>,
 ) -> String {
     let context_text = contexts
@@ -198,6 +269,14 @@ pub fn provider_draft_prompt(
         .map(|(path, content)| format!("--- FILE: {path} ---\n{content}"))
         .collect::<Vec<_>>()
         .join("\n\n");
+    let required_text = if required_files.is_empty() {
+        "No files are explicitly required; change only files needed for the task.".to_string()
+    } else {
+        format!(
+            "The final diff must make substantive changes to every required file: {}.",
+            required_files.join(", ")
+        )
+    };
     format!(
         r#"Generate a safe unified diff draft for this local coding task.
 
@@ -215,6 +294,8 @@ Return strict JSON with this exact shape:
 Rules:
 - Return a unified diff draft, but do not claim it has been applied.
 - Only modify files included in FILE CONTEXT.
+- {required_text}
+- Files in FILE CONTEXT that are not required may remain unchanged. Do not add no-op edits just to list a file.
 - If the context is insufficient, return a small placeholder diff and explain the missing context in summary.
 - Do not include secrets, API keys, or .env content.
 - Prefer small, reviewable changes.
@@ -376,6 +457,80 @@ pub fn files_from_unified_diff(diff: &str) -> Vec<String> {
         .collect::<Vec<_>>();
     files.sort();
     files.dedup();
+    files
+}
+
+/// Returns only files with at least one hunk whose removed and added content
+/// differ. File headers or no-op `-same/+same` hunks cannot satisfy a required
+/// file contract.
+#[allow(dead_code)] // The standalone patch-normalizer does not receive a plan contract.
+pub fn files_with_substantive_changes(diff: &str) -> Vec<String> {
+    fn settle_hunk(
+        changed: &mut HashSet<String>,
+        current_path: &Option<String>,
+        removed: &mut Vec<String>,
+        added: &mut Vec<String>,
+    ) {
+        if (!removed.is_empty() || !added.is_empty()) && removed != added {
+            if let Some(path) = current_path {
+                changed.insert(path.clone());
+            }
+        }
+        removed.clear();
+        added.clear();
+    }
+
+    let mut changed = HashSet::new();
+    let mut current_path = None;
+    let mut removed = Vec::new();
+    let mut added = Vec::new();
+    let mut in_hunk = false;
+    let mut old_remaining = 0usize;
+    let mut new_remaining = 0usize;
+    let lines = diff.lines().collect::<Vec<_>>();
+    let mut index = 0;
+    while index < lines.len() {
+        let line = lines[index];
+        if !in_hunk && is_hermes_file_header_at(&lines, index) {
+            settle_hunk(&mut changed, &current_path, &mut removed, &mut added);
+            let path = unified_diff_header_path(lines[index + 1], "+++ ", "b/").ok();
+            current_path = path.filter(|path| is_context_path(path));
+            in_hunk = false;
+            index += 2;
+            continue;
+        }
+        if line.starts_with("@@") {
+            settle_hunk(&mut changed, &current_path, &mut removed, &mut added);
+            if let Ok((_, old_count, _, new_count, _)) = parse_unified_hunk_header(line) {
+                old_remaining = old_count;
+                new_remaining = new_count;
+                in_hunk = old_count > 0 || new_count > 0;
+            } else {
+                in_hunk = false;
+            }
+            index += 1;
+            continue;
+        }
+        if in_hunk {
+            if let Some(content) = line.strip_prefix('-') {
+                removed.push(content.to_string());
+                old_remaining = old_remaining.saturating_sub(1);
+            } else if let Some(content) = line.strip_prefix('+') {
+                added.push(content.to_string());
+                new_remaining = new_remaining.saturating_sub(1);
+            } else if line.starts_with(' ') {
+                old_remaining = old_remaining.saturating_sub(1);
+                new_remaining = new_remaining.saturating_sub(1);
+            }
+            if old_remaining == 0 && new_remaining == 0 {
+                in_hunk = false;
+            }
+        }
+        index += 1;
+    }
+    settle_hunk(&mut changed, &current_path, &mut removed, &mut added);
+    let mut files = changed.into_iter().collect::<Vec<_>>();
+    files.sort();
     files
 }
 fn hermes_diff_header_paths(diff: &str) -> Result<Vec<String>, String> {
@@ -614,8 +769,9 @@ fn parse_unified_hunk_range(value: &str, prefix: char) -> Result<(usize, usize),
 #[cfg(test)]
 mod tests {
     use super::{
-        draft_ineligibility_reason, is_context_path, local_placeholder_draft,
-        normalize_hermes_unified_diff, plan_context_files, read_context_files,
+        draft_ineligibility_reason, files_with_substantive_changes, is_context_path,
+        local_placeholder_draft, normalize_hermes_unified_diff, plan_context_files,
+        plan_required_files, read_context_files, validate_required_file_coverage,
     };
     use serde_json::json;
     use std::fs;
@@ -668,6 +824,70 @@ mod tests {
         assert!(draft.diff.contains("PATCH_DRAFT_PENDING"));
         assert_eq!(draft.allowed_files, vec!["src/app.rs"]);
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn required_files_are_an_explicit_subset_of_authorized_context() {
+        let root = std::env::temp_dir().join(format!(
+            "omnidesk-required-files-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(root.join("src")).unwrap();
+        fs::write(root.join("src/app.rs"), "fn app() {}\n").unwrap();
+        fs::write(root.join("src/context.rs"), "fn context() {}\n").unwrap();
+        let allowed = vec!["src/app.rs".to_string(), "src/context.rs".to_string()];
+
+        let legacy = json!({ "filesToRead": allowed });
+        assert!(plan_required_files(&legacy, &root, &allowed)
+            .unwrap()
+            .is_empty());
+
+        let scoped = json!({
+            "filesToRead": allowed,
+            "requiredFiles": ["src/app.rs", "src/app.rs"]
+        });
+        assert_eq!(
+            plan_required_files(&scoped, &root, &allowed).unwrap(),
+            vec!["src/app.rs"]
+        );
+
+        let unauthorized = json!({
+            "filesToRead": ["src/context.rs"],
+            "requiredFiles": ["src/app.rs"]
+        });
+        let error =
+            plan_required_files(&unauthorized, &root, &["src/context.rs".to_string()]).unwrap_err();
+        assert!(error.contains("未包含在已授权读取范围"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn required_file_coverage_rejects_partial_multi_file_drafts() {
+        let required = vec![
+            "task.json".to_string(),
+            "goals.json".to_string(),
+            "task-index.json".to_string(),
+            "goal-audit.json".to_string(),
+        ];
+        let partial = vec!["task.json".to_string(), "goals.json".to_string()];
+        let error = validate_required_file_coverage(&partial, &required).unwrap_err();
+        assert!(error.contains("task-index.json"));
+        assert!(error.contains("goal-audit.json"));
+
+        let complete = required.clone();
+        assert!(validate_required_file_coverage(&complete, &required).is_ok());
+        assert!(validate_required_file_coverage(&["src/app.rs".to_string()], &[]).is_ok());
+
+        let no_op = "--- a/task.json\n+++ b/task.json\n@@ -1 +1 @@\n-same\n+same\n";
+        assert!(files_with_substantive_changes(no_op).is_empty());
+        let substantive = "--- a/task.json\n+++ b/task.json\n@@ -1 +1 @@\n-old\n+new\n";
+        assert_eq!(
+            files_with_substantive_changes(substantive),
+            vec!["task.json"]
+        );
     }
 
     #[test]

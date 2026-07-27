@@ -18,7 +18,7 @@ depends_on: [AGENTS.md, docs/ARCHITECTURE.md, docs/PRODUCT_PLAN.md]
 - 项目名：`OmniDesk`
 - 产品形态：基于 `Tauri + React + Local Agent Runtime` 的本地 AI 工程工作台
 - 唯一产品核心：`desktop/` 内的 OmniDesk Desktop Runtime
-- 当前阶段：`Hermes 单执行器生产可靠性 v1 已完成`
+- 当前阶段：`Hermes 多文件 Patch 稳定性 v1 / 本地与原生已通过，受保护 Eval 待运行`
 
 OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生成计划和 Patch 草稿、执行独立审批、运行检查、有限修复并保存可审计证据。它不是 Project OS 安装器、AI 工程评分工具或跨工具模板分发产品。
 
@@ -102,13 +102,14 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 - Agent Executor 契约防膨胀 v1 已落地：公开状态携带稳定 `omnidesk.agent-executor.v1` 版本；Runtime 准入只读取冻结的核心能力，执行器特有能力只能进入不透明 `extensions`。通用 Runtime 禁止读取扩展或根据 Hermes/Gemini 身份改变调度、审批、恢复、Patch、检查与证据规则，源码边界测试持续约束该规则。
 - Agent Event 标准化 v1 已落地：共享 ACP 层把生命周期、工具请求/结果、等待追问、等待审批和终态归一化为有序 `omnidesk.agent-event.v1`；每次执行只允许一个终态。Runtime Timeline 只消费标准事件，不再读取执行器 `trace/observations`；metadata-only 导出再次按白名单裁剪事件详情。事件只保存公开阶段摘要，不保存 Prompt、正文、工具输出或模型完整思维链。
 - `Hermes 单执行器生产可靠性 v1` 已完成受保护真实验收：[`30280519155`](https://github.com/lijinmei915/project-os-starter/actions/runs/30280519155) 的 suite 通过 13/13 场景与隔离 worktree，覆盖 `ask_user` 恢复、独立审批、Patch、检查和中断恢复；严格 P3 [`30281795504`](https://github.com/lijinmei915/project-os-starter/actions/runs/30281795504) 在 `f008f1e` 证明真实 `hermes-acp` 事件 sequence `1 -> 2`、唯一 `succeeded` terminal、显式 `11121 / 109 / 11230` token、Scheduler 零残留及无 `content/reasoning` 的 metadata-only Timeline。首次 P3 虽通过 usage 与调度门槛但 artifact 漏收事件，现已改为缺失标准事件即失败。
+- `Hermes 多文件 Patch 稳定性 v1` 已完成本地与原生实现：计划契约新增向后兼容的 `requiredFiles`，把“允许读取”和“必须修改”分开；Hermes 与普通 Provider 的草稿都必须覆盖每个必改文件且包含真实内容变化，漏改、无效路径或越权必改文件会在审批前被拒绝。Runtime 只在原授权范围内精准重生成一次，旧计划未声明 `requiredFiles` 时保持兼容。受保护 `goal-rebind` Eval 同样在审批前检查四文件覆盖、保留逐次输出与 usage，并把重试限制为最多一次。完整本地回归为 Desktop Node `619/619`、Runtime Rust `232/232`、Patch Normalizer `9/9`、Web build、仓库治理和原生 WebDriver smoke 全部通过；受保护真实 Eval 尚待提交推送后运行。
 
 当前重点：
 
 - Hermes 继续作为唯一默认生产执行器；其真实追问、审批、Patch、检查、恢复、取消和标准事件证据已达到当前稳定门槛。Gemini 接入和执行器选择界面仍暂停，Registry 中的 Adapter 仅作为已验证架构边界保留，不宣称产品可用。
 - `OmniDesk Agent 平台稳定化 v1` 已完成本地、原生与受保护真实验收；P0-P4、首屏预算、Eval 矩阵、artifact 索引和真实桌面组合证据均已闭环。
 - 后续改动继续守住多文件 Patch 授权、独立审批、恢复不重放、单终态、显式 usage/cost 和脱敏 trace 门槛，不扩展关键词执行路由或旁路工具 transport。
-- 下一阶段优先降低真实模型多文件 Patch 输出波动，并以既有 13-case 和隔离 worktree 门槛防止可靠性回退。
+- 当前正在用显式必改文件覆盖与单次有界重生成降低真实模型多文件 Patch 输出波动；尚需受保护 `goal-rebind` / suite artifact 证明真实模型闭环。
 - 受保护 Eval 继续保留失败 artifact；上游模型波动、依赖漂移或软 bundle 超限不能通过放宽门槛掩盖。
 - 第三个执行器接入应只增加 Adapter 与 Registry 项；若必须修改 Runtime 核心能力，需要发布新的契约版本，而不能向 v1 持续追加供应商字段。
 
@@ -120,5 +121,5 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 
 ## 下一步重点
 
-1. 降低真实模型多文件 Patch 输出波动，不放宽授权、审批、规范化或 trace 门槛。
+1. 提交并推送当前多文件 Patch 稳定化改动，运行受保护 `goal-rebind` 与 suite，逐项检查四文件覆盖、最多一次重试、独立审批和最终 artifact。
 2. 保持 P1/P3/P4/suite 可独立重跑，并在 Provider、依赖或 bundle 变化时复核统一 artifact 索引与 800 KiB 预算。

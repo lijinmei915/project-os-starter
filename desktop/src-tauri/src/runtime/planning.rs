@@ -23,6 +23,8 @@ pub struct ReadonlyPlan {
     pub summary: String,
     pub steps: Vec<String>,
     pub files_to_read: Vec<String>,
+    #[serde(default)]
+    pub required_files: Vec<String>,
     pub candidate_changes: Vec<String>,
     pub checks: Vec<String>,
     pub guardrails: Vec<String>,
@@ -211,6 +213,7 @@ pub fn build_local_readonly_plan(context: PlanContext) -> ReadonlyPlan {
         ),
         steps,
         files_to_read,
+        required_files: Vec::new(),
         candidate_changes,
         checks,
         guardrails: vec![
@@ -283,6 +286,7 @@ Return strict JSON with this exact shape:
   "summary": "string",
   "steps": ["string"],
   "filesToRead": ["string"],
+  "requiredFiles": ["string"],
   "candidateChanges": ["string"],
   "checks": ["string"],
   "guardrails": ["string"],
@@ -292,6 +296,8 @@ Return strict JSON with this exact shape:
 Constraints:
 - Do not propose automatic file writes.
 - Do not propose arbitrary shell commands.
+- `filesToRead` is the bounded read context. `requiredFiles` is only the subset that the task explicitly requires changing; use an empty array when the exact changed files are not yet certain.
+- Every `requiredFiles` entry must also appear in `filesToRead`. Do not add speculative paths merely to make the list non-empty.
 - Prefer OmniDesk checks: npm --prefix desktop test, npm --prefix desktop run web:build, cargo check --manifest-path desktop/src-tauri/Cargo.toml.
 - Keep the plan concise and actionable.
 - Use Chinese for user-facing plan text.
@@ -330,6 +336,16 @@ mod tests {
             .checks
             .iter()
             .any(|item| item == "npm --prefix desktop run web:build"));
+        assert!(plan.required_files.is_empty());
+        assert!(provider_prompt(&PlanContext {
+            task: "同步四个状态文件".to_string(),
+            attachments: Vec::new(),
+            project_name: "OmniDesk".to_string(),
+            stage: "执行".to_string(),
+            root: PathBuf::from("."),
+            provider: crate::runtime::provider::default_config(),
+        })
+        .contains("requiredFiles"));
     }
 
     #[test]
