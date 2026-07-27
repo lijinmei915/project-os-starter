@@ -1,7 +1,28 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { agentInteractionPresentation, composerResponseForPendingInteraction, conversationTranscriptItems, projectConversationAgentEvents } from "../src/lib/conversation-agent-events.js";
+import { agentInteractionPresentation, composerResponseForPendingInteraction, conversationReadonlyPlanTaskId, conversationTranscriptItems, projectConversationAgentEvents } from "../src/lib/conversation-agent-events.js";
+
+test("renders a readonly plan only after confirmation becomes actionable", () => {
+  assert.equal(conversationReadonlyPlanTaskId({
+    events: [{ id: "confirmation", status: "pending" }],
+    taskId: "task-failed",
+  }), "");
+  assert.equal(conversationReadonlyPlanTaskId({
+    events: [{ id: "confirmation", status: "current" }],
+    taskId: "task-waiting",
+  }), "task-waiting");
+  assert.equal(conversationReadonlyPlanTaskId({
+    events: [{ id: "confirmation", status: "done" }],
+    taskId: "task-confirmed",
+  }), "task-confirmed");
+  assert.equal(conversationReadonlyPlanTaskId({
+    pendingAction: { taskId: "task-action", type: "confirm-active-task" },
+  }), "task-action");
+  assert.equal(conversationReadonlyPlanTaskId({
+    events: [{ id: "confirmation", status: "current" }],
+  }), "");
+});
 
 test("replaces a stale execution event while the same Task waits for user input", () => {
   const turn = {

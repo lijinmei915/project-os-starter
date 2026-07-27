@@ -1,6 +1,6 @@
 {
   "schemaVersion": "omnidesk.repository-file-inventory.v1",
-  "generatedAt": "2026-07-27T16:15:56.101Z",
+  "generatedAt": "2026-07-27T16:32:45.517Z",
   "sourceOfTruth": "git ls-files --cached --others --exclude-standard",
   "scope": "受版本控制文件及准备纳入版本控制的非忽略工作树文件；忽略的本地运行数据和构建输出不在本账本内。",
   "reviewContract": {
@@ -3315,7 +3315,7 @@
       "path": "desktop/src/components/workbench/conversation-transcript.jsx",
       "kind": "frontend",
       "owner": "Workbench",
-      "bytes": 8423,
+      "bytes": 8267,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/components/workbench/agent-workspace-conversation-canvas.jsx"
@@ -5528,7 +5528,7 @@
       "path": "desktop/src/lib/conversation-agent-events.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 3227,
+      "bytes": 3624,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/components/workbench/agent-user-form-card.jsx",
@@ -7756,7 +7756,7 @@
       "path": "desktop/tests/conversation-agent-events.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 2889,
+      "bytes": 3726,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -9496,7 +9496,7 @@
       "path": "docs/LESSONS.md",
       "kind": "documentation",
       "owner": "Documentation Governance",
-      "bytes": 118789,
+      "bytes": 119726,
       "pathMentions": [
         "desktop/src/components/workbench/project-memory-panel.jsx",
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",

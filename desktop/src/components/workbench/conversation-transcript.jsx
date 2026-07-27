@@ -1,6 +1,6 @@
 import { FileText } from "lucide-react";
 import { conversationTextForDisplay } from "../../conversation-runtime";
-import { conversationTranscriptItems, projectConversationAgentEvents } from "../../lib/conversation-agent-events";
+import { conversationReadonlyPlanTaskId, conversationTranscriptItems, projectConversationAgentEvents } from "../../lib/conversation-agent-events";
 import { conversationTurnWorkflowState, workflowStatePresentation, workflowStates } from "../../lib/workflow-state";
 import { Badge } from "../ui/badge";
 import { PatchDraft, ReadonlyPlan } from "./plan-views";
@@ -13,11 +13,6 @@ function shouldShowAgentTimeline(turn, interactions) {
     events.length
     && (turn.intent === "task" || turn.workflow?.length || events.some((event) => ["current", "failed"].includes(event.status)))
   );
-}
-
-function shouldShowReadonlyPlan(turn) {
-  return turn?.pendingAction?.type === "confirm-active-task"
-    || projectConversationAgentEvents(turn).some((event) => event.id === "confirmation");
 }
 
 function referenceSignature(references = []) {
@@ -86,13 +81,13 @@ export function ConversationTranscript({
       ) : (() => {
         const turn = item.turn;
         const turnIndex = turns.indexOf(turn);
+        const readonlyPlanTaskId = conversationReadonlyPlanTaskId(turn);
         return <ConversationMessage key={item.key} role={turn.role}>
         {shouldShowAgentTimeline(turn, interactions) ? (
           <AgentProcessingStatus conversationEvents={turn.conversationEvents} durationMs={turn.durationMs} events={projectConversationAgentEvents(turn, interactions)} />
         ) : null}
-          {shouldShowReadonlyPlan(turn) ? (() => {
-            const taskId = turn.taskId || turn.pendingAction.taskId;
-            const task = tasks.find((item) => item.id === taskId);
+          {readonlyPlanTaskId ? (() => {
+            const task = tasks.find((item) => item.id === readonlyPlanTaskId);
             return task?.plan ? <ReadonlyPlan className="conversationReadonlyPlan" plan={task.plan} statusLabel={turn.pendingAction ? "计划待确认" : "已确认"} /> : null;
           })() : null}
           {turn.stageGoal ? (

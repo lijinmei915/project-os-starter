@@ -23,6 +23,14 @@ export function conversationTranscriptItems(turns = [], interactions = []) {
   ].sort((left, right) => left.timestamp - right.timestamp || left.order - right.order);
 }
 
+export function conversationReadonlyPlanTaskId(turn = {}) {
+  const taskId = String(turn.taskId || turn.pendingAction?.taskId || "");
+  if (!taskId) return "";
+  if (turn.pendingAction?.type === "confirm-active-task") return taskId;
+  const confirmation = turnEvents(turn).find((event) => event.id === "confirmation");
+  return ["current", "done"].includes(confirmation?.status) ? taskId : "";
+}
+
 export function composerResponseForPendingInteraction(interactions = [], text = "", attachmentCount = 0) {
   const pending = interactions.filter(({ interaction, run } = {}) => (
     run?.status === "awaiting-user-input" && interaction?.status === "pending"
