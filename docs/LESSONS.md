@@ -1348,3 +1348,11 @@ Executor 可替换不能只停留在 trait：所有生产执行器必须进入�
 **根因**：虽然 Agent Run 已有统一 Timeline，模型阶段仍由 `app.rs` 读取执行器返回的 `trace/observations`。一旦执行器事件粒度不同，上层会重新出现供应商适配，审计和展示也会产生两套语义。
 
 **新增规则**：执行器过程必须先在共享协议层归一化为版本化 `AgentEvent`，具有单调 sequence、固定公开类型和单一终态；Runtime Timeline 只消费标准事件。供应商原始诊断只可作为兼容调试信息，不得驱动治理或展示。不得把模型完整思维链当作事件保存；Prompt、正文、工具输出和私有推理均排除，导出再按白名单裁剪。
+
+### 2026-07-27：真实 Eval 必须断言新契约进入最终 artifact
+
+**现象**：受保护 P3 已真实调用 Hermes，并证明 usage、Scheduler 和 metadata-only Timeline 全部正常，但 Eval 专用 Runtime 在组装 evidence 时漏传 `AgentEvent`；校验器没有要求该字段，因此工作流仍然显示成功。
+
+**根本原因**：生产入口和 Eval 入口分别组装同一种模型阶段 evidence。新契约只接入生产入口，Eval 仍验证旧指标，导致“代码生成了事件”与“受保护证据证明事件”之间出现空档。
+
+**新增规则**：受保护 Eval 验收新运行时契约时，必须从最终上传的 artifact 反向断言该契约。P3 必须校验真实 Hermes `omnidesk.agent-event.v1` 的版本、连续 sequence、唯一 terminal、终态一致性和隐私字段缺失；没有标准事件的成功 Runtime 结果必须失败。新增或修改 evidence 字段时，生产入口、Eval 收集器和 artifact 校验器必须作为同一变更检查。

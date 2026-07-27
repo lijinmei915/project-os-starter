@@ -1,6 +1,6 @@
 {
   "schemaVersion": "omnidesk.repository-file-inventory.v1",
-  "generatedAt": "2026-07-27T10:16:20.213Z",
+  "generatedAt": "2026-07-27T15:43:35.897Z",
   "sourceOfTruth": "git ls-files --cached --others --exclude-standard",
   "scope": "受版本控制文件及准备纳入版本控制的非忽略工作树文件；忽略的本地运行数据和构建输出不在本账本内。",
   "reviewContract": {
@@ -1561,7 +1561,7 @@
       "path": "desktop/src-tauri/src/bin/provider_timeline_eval.rs",
       "kind": "native",
       "owner": "Desktop Shell",
-      "bytes": 7759,
+      "bytes": 7805,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -2495,7 +2495,7 @@
       "path": "desktop/src/agent-runtime/provider-evaluation.js",
       "kind": "eval-support",
       "owner": "Agent Reliability",
-      "bytes": 4544,
+      "bytes": 5677,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/scripts/run-provider-fallback-eval.mjs",
@@ -8609,7 +8609,7 @@
       "path": "desktop/tests/provider-function-eval.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 8427,
+      "bytes": 9708,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -9494,7 +9494,7 @@
       "path": "docs/LESSONS.md",
       "kind": "documentation",
       "owner": "Documentation Governance",
-      "bytes": 116506,
+      "bytes": 117525,
       "pathMentions": [
         "desktop/src/components/workbench/project-memory-panel.jsx",
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
@@ -9596,7 +9596,7 @@
       "path": "docs/TESTING.md",
       "kind": "documentation",
       "owner": "Documentation Governance",
-      "bytes": 15128,
+      "bytes": 15366,
       "pathMentions": [
         "desktop/scripts/run-native-webdriver-smoke.mjs",
         "desktop/src-tauri/src/runtime/workspace.rs",
@@ -9682,7 +9682,7 @@
       "path": "docs/data/schema-contract-inventory.json",
       "kind": "documentation-data",
       "owner": "Documentation Governance",
-      "bytes": 16027,
+      "bytes": 16288,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",

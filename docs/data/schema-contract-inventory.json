@@ -1,6 +1,6 @@
 {
   "schemaVersion": "omnidesk.schema-contract-inventory.v1",
-  "generatedAt": "2026-07-27T10:16:03.874Z",
+  "generatedAt": "2026-07-27T15:43:21.301Z",
   "sourceOfTruth": "schemas/*.json plus git grep consumer evidence",
   "totals": {
     "contracts": 16,
@@ -50,15 +50,20 @@
         "desktop/scripts/run-native-webdriver-smoke.mjs",
         "desktop/src-tauri/src/runtime/agent_executor.rs",
         "desktop/src-tauri/src/runtime/agent_runs.rs",
+        "desktop/src/agent-runtime/provider-evaluation.js",
+        "desktop/tests/provider-function-eval.test.mjs",
         "desktop/tests/schema-identity.test.mjs",
         "docs/ARCHITECTURE.md",
+        "docs/LESSONS.md",
         "docs/TESTING.md",
         "docs/data/schema-contract-inventory.json"
       ],
       "runtimeConsumers": [
         "desktop/tests/schema-identity.test.mjs",
         "desktop/src-tauri/src/runtime/agent_executor.rs",
-        "desktop/src-tauri/src/runtime/agent_runs.rs"
+        "desktop/src-tauri/src/runtime/agent_runs.rs",
+        "desktop/src/agent-runtime/provider-evaluation.js",
+        "desktop/tests/provider-function-eval.test.mjs"
       ],
       "status": "active-contract",
       "migrationRule": "先增加 OmniDesk 版本读取/写入迁移与回归，再退役旧版本。"

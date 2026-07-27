@@ -130,14 +130,39 @@ test("requires real ACP usage in a successful metadata-only Run Timeline", () =>
     usage: { inputTokens: 8, outputTokens: 4, totalTokens: 12, source: "acp-response" },
     timeline: {
       schemaVersion: "omnidesk.run-timeline-export.v0.1",
+      executorId: "hermes-acp",
       status: "succeeded",
       redaction: { policy: "metadata-only" },
       metrics: { modelEventCount: 1, inputTokens: 8, outputTokens: 4, totalTokens: 12 },
+      events: [{
+        details: {
+          agentEvents: [
+            { schemaVersion: "omnidesk.agent-event.v1", sequence: 1, kind: "lifecycle", phase: "model", status: "running", summary: "Agent Executor started.", details: { mode: "Start" } },
+            { schemaVersion: "omnidesk.agent-event.v1", sequence: 2, kind: "terminal", phase: "model", status: "succeeded", summary: "Agent Executor completed.", details: { step: 1 } },
+          ],
+        },
+      }],
     },
   };
   assert.equal(validateProviderTimelineRuntimeResult(result).status, "passed");
   result.timeline.metrics.totalTokens = 0;
   assert.throws(() => validateProviderTimelineRuntimeResult(result), /totalTokens/);
+  result.timeline.metrics.totalTokens = 12;
+  result.timeline.events[0].details.agentEvents.push({
+    schemaVersion: "omnidesk.agent-event.v1",
+    sequence: 3,
+    kind: "terminal",
+    phase: "model",
+    status: "succeeded",
+    summary: "Duplicate terminal.",
+    details: { step: 1 },
+  });
+  assert.throws(() => validateProviderTimelineRuntimeResult(result), /one successful terminal/);
+  result.timeline.events[0].details.agentEvents.pop();
+  result.timeline.events[0].details.agentEvents[1].details.reasoning = "private";
+  assert.throws(() => validateProviderTimelineRuntimeResult(result), /private model data/);
+  result.timeline.events[0].details.agentEvents = [];
+  assert.throws(() => validateProviderTimelineRuntimeResult(result), /complete AgentEvent sequence/);
 });
 
 test("requires one persisted fallback, a stream longer than 12 seconds, and retained partial text", () => {

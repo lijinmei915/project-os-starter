@@ -125,6 +125,7 @@ fn run(request: EvalRequest) -> Result<Value, String> {
             let details = json!({
                 "step": result.step,
                 "transportStatus": transport_status,
+                "agentEvents": result.events,
                 "trace": result.trace,
                 "observations": result.observations,
                 "interaction": result.interaction,

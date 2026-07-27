@@ -45,6 +45,20 @@ export function validateProviderTimelineRuntimeResult(result) {
   if (metrics.totalTokens < metrics.inputTokens + metrics.outputTokens) throw new Error("Provider Timeline totalTokens is inconsistent");
   if (metrics.costUsd != null && !(typeof metrics.costUsd === "number" && Number.isFinite(metrics.costUsd) && metrics.costUsd >= 0)) throw new Error("Provider Timeline cost is invalid");
   if (result?.usage?.source !== "acp-response") throw new Error("Provider usage was not sourced from the real ACP response");
+  if (timeline?.executorId !== "hermes-acp") throw new Error("Provider Timeline was not produced by Hermes");
+  const agentEvents = (Array.isArray(timeline?.events) ? timeline.events : [])
+    .flatMap((event) => Array.isArray(event?.details?.agentEvents) ? event.details.agentEvents : []);
+  if (agentEvents.length < 2) throw new Error("Provider Timeline contains no complete AgentEvent sequence");
+  if (agentEvents.some((event, index) => (
+    event?.schemaVersion !== "omnidesk.agent-event.v1"
+    || event?.sequence !== index + 1
+    || typeof event?.summary !== "string"
+    || !event.summary.trim()
+  ))) throw new Error("Provider Timeline AgentEvent sequence is invalid");
+  const terminalEvents = agentEvents.filter((event) => event.kind === "terminal");
+  if (terminalEvents.length !== 1 || terminalEvents[0]?.status !== "succeeded") throw new Error("Provider Timeline must contain one successful terminal AgentEvent");
+  const serializedAgentEvents = JSON.stringify(agentEvents);
+  if (/\"(?:content|reasoning)\"\s*:/.test(serializedAgentEvents)) throw new Error("Provider Timeline AgentEvent leaked private model data");
   return result;
 }
 
