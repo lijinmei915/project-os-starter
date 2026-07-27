@@ -16,7 +16,6 @@ export function usePlanAction({
   setPlanError,
   setPlanLoading,
   finishActionFeedback,
-  withTimeout,
 }) {
   const activeRequestRef = useRef(null);
   const generatePlan = async (request) => {
@@ -45,7 +44,6 @@ export function usePlanAction({
         persistTask,
         remote: isTauri,
         requestId,
-        runWithTimeout: withTimeout,
       });
       if (result.error) setPlanError(result.error);
       if (result.feedback) finishActionFeedback(feedbackKey, result.status === "succeeded" ? "success" : "failed", result.feedback);

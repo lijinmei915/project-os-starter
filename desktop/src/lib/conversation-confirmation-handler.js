@@ -1,6 +1,7 @@
 export function addConversationConfirmationHandler({
   activeProjectGoalTitle,
   executePendingPatchApply,
+  executePendingAgent,
   executePendingPlan,
   executionReadyEvents,
   handlers,
@@ -27,6 +28,8 @@ export function addConversationConfirmationHandler({
     };
   } else if (pendingAction?.type === "generate-plan") {
     handlers["confirm-action"] = async () => executePendingPlan?.(pendingAction) || false;
+  } else if (pendingAction?.type === "start-agent") {
+    handlers["confirm-action"] = async () => executePendingAgent?.(pendingAction) || false;
   } else if (pendingAction?.type === "confirm-active-task") {
     handlers["confirm-action"] = async () => {
       if (!await onRunChatAction?.({ id: "confirm-active-task", taskId: pendingAction.taskId })) return false;

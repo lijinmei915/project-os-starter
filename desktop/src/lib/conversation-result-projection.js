@@ -1,3 +1,21 @@
+function boundedStreamTrace(value) {
+  if (!value || typeof value !== "object") return null;
+  const boundedInteger = (field, nullable = false) => {
+    if (nullable && field == null) return null;
+    const number = Number(field);
+    return Number.isFinite(number) && number >= 0 ? Math.min(Number.MAX_SAFE_INTEGER, Math.floor(number)) : nullable ? null : 0;
+  };
+  const trace = {
+    charCount: boundedInteger(value.charCount),
+    deltaCount: boundedInteger(value.deltaCount),
+    firstDeltaMs: boundedInteger(value.firstDeltaMs, true),
+    lastDeltaMs: boundedInteger(value.lastDeltaMs, true),
+  };
+  return trace.deltaCount || trace.charCount || trace.firstDeltaMs != null || trace.lastDeltaMs != null
+    ? trace
+    : null;
+}
+
 export function buildNonPlanConversationTurn({
   activeProjectGoalTitle,
   actionPromptsForMessage,
@@ -49,12 +67,15 @@ export function buildNonPlanConversationTurn({
       intent: chatResult?.intent || "chat",
       ephemeral: ["model-status", "connection-status"].includes(messageKind),
       pendingAction,
+      providerStreamTrace: boundedStreamTrace(chatResult?.providerStreamTrace),
       references: Array.isArray(chatResult?.references) ? chatResult.references : [],
       responseMode: chatResult?.responseMode || "",
       requestId,
       role: "assistant",
       statusLabel: statusLabelForMessage(messageKind),
-      text: pendingAction ? `${reply}\n\n回复“可以”后生成执行计划。` : reply,
+      text: pendingAction
+        ? `${reply}\n\n${pendingAction.type === "start-agent" ? "回复“可以”后启动受控任务。" : "回复“可以”后生成执行计划。"}`
+        : reply,
     },
   };
 }

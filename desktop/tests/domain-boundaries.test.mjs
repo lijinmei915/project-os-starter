@@ -16,6 +16,15 @@ const componentSource = (workbench, start, end) =>
     workbench.indexOf(`function ${end}`),
   );
 
+test("keeps streaming conversations pinned to the real scroll viewport", () => {
+  const conversation = source("src/components/workbench/conversation.jsx");
+  assert.match(conversation, /const viewport = node\?\.parentElement/);
+  assert.match(conversation, /viewport\.scrollTop = viewport\.scrollHeight/);
+  assert.match(conversation, /remaining <= 48/);
+  assert.match(conversation, /new ResizeObserver\(scrollToBottom\)/);
+  assert.equal(conversation.includes("scrollIntoView"), false);
+});
+
 test("keeps the Workbench shell away from direct runtime commands and the retired task workspace", () => {
   const workbench = source("src/main.jsx");
   assert.equal(workbench.includes("invokeRuntimeCommand"), false);
@@ -1064,14 +1073,14 @@ test("keeps App Workspace goal lifecycle behind an injected Workspace hook", () 
   assert.equal(goals.includes("runtime-api"), false);
 });
 
-test("keeps engineering previews and Hermes status behind injected Workspace and Execution actions", () => {
+test("keeps engineering previews and Agent Executor status behind injected Workspace and Execution actions", () => {
   const workbench = source("src/main.jsx");
   const engineeringFile = source("src/components/workbench/engineering-file-tab.jsx");
   const agentConfig = source(
     "src/components/workbench/agent-config-surface-panel.jsx",
   );
   assert.match(engineeringFile, /onReadEngineeringFile/);
-  assert.match(engineeringFile, /onGetHermesExecutorStatus/);
+  assert.match(engineeringFile, /onGetAgentExecutorStatus/);
   assert.equal(engineeringFile.includes("workspaceFileClient"), false);
   assert.equal(agentConfig.includes("executionClient"), false);
   assert.equal(agentConfig.includes("runtime-api"), false);
@@ -1081,7 +1090,7 @@ test("keeps engineering previews and Hermes status behind injected Workspace and
   );
   assert.match(
     workbench,
-    /onGetHermesExecutorStatus=\{executionClient\.getHermesExecutorStatus\}/,
+    /onGetAgentExecutorStatus=\{executionClient\.getAgentExecutorStatus\}/,
   );
 });
 
@@ -1565,6 +1574,16 @@ test("keeps ordinary chat deadlines in the Rust Runtime instead of a frontend wa
   assert.match(requestState, /isRequestRunning\(activeRequestRef, payload\.requestId\)/);
 });
 
+test("keeps read-only planning deadlines in the Rust Runtime", () => {
+  const executor = source("src/lib/plan-executor.js");
+  const hook = source("src/components/workbench/use-plan-action.js");
+  const planning = source("src-tauri/src/runtime/planning.rs");
+  assert.doesNotMatch(executor, /planGenerationTimeoutMs|runWithTimeout|Promise\.race|15000/);
+  assert.doesNotMatch(hook, /withTimeout|runWithTimeout/);
+  assert.match(planning, /Duration::from_secs\(45\)/);
+  assert.match(planning, /token\.cancelled\(\)/);
+});
+
 test("keeps Provider status projection in the Provider runtime domain", () => {
   const app = source("src-tauri/src/runtime/app.rs");
   const provider = source("src-tauri/src/runtime/provider.rs");
@@ -1827,53 +1846,83 @@ test("keeps Workspace file watching outside the Tauri command assembly", () => {
 test("keeps Agent read-tool argument validation and dispatch in the Agent Tools domain", () => {
   const app = source("src-tauri/src/runtime/app.rs");
   const tools = source("src-tauri/src/runtime/agent_tools.rs");
-  const hermesExecution = source(
-    "src-tauri/src/runtime/hermes_execution.rs",
-  );
+  const acpExecution = source("src-tauri/src/runtime/acp_execution.rs");
   assert.doesNotMatch(app, /match input\.name\.trim\(\)/);
   assert.match(app, /agent_tools::execute_read_tool\(&root, &input.name, &input.arguments\)/);
-  assert.doesNotMatch(app, /agent_tools::execute_hermes_read_tool\(root, name, &args\)/);
+  assert.doesNotMatch(app, /agent_tools::execute_read_tool\(root, name, &args\)/);
   assert.doesNotMatch(app, /fn hermes_read_tool_observation\(/);
   assert.match(tools, /pub fn execute_read_tool/);
-  assert.match(tools, /pub fn execute_hermes_read_tool/);
   assert.match(tools, /Native Core 只接受已登记的只读 Agent Tool/);
-  assert.match(hermesExecution, /execute_hermes_read_tool\(root, name, &args\)/);
+  assert.match(acpExecution, /execute_read_tool\(root, name, &args\)/);
 });
 
-test("keeps Hermes ACP child-process and structured-loop mechanics outside Tauri commands", () => {
+test("keeps Agent Executor generic while shared ACP mechanics stay outside vendor adapters", () => {
   const app = source("src-tauri/src/runtime/app.rs");
-  const hermesExecution = source(
-    "src-tauri/src/runtime/hermes_execution.rs",
-  );
-  assert.match(app, /hermes_execution::\{run_structured_loop, HermesAgentLoopResult\}/);
-  assert.match(app, /run_structured_loop\(/);
+  const agentExecutor = source("src-tauri/src/runtime/agent_executor.rs");
+  const hermesAdapter = source("src-tauri/src/runtime/hermes_executor.rs");
+  const geminiAdapter = source("src-tauri/src/runtime/gemini_executor.rs");
+  const acpExecution = source("src-tauri/src/runtime/acp_execution.rs");
+  assert.match(app, /agent_executor::\{[\s\S]*select_agent_executor,[\s\S]*AgentExecutionRequest,[\s\S]*AgentExecutionResult/);
+  assert.match(app, /executor\.execute\(AgentExecutionRequest/);
+  assert.doesNotMatch(app, /run_structured_loop\(/);
   assert.doesNotMatch(app, /fn run_hermes_acp_structured_loop\(/);
   assert.doesNotMatch(app, /fn run_hermes_acp_prompt\(/);
   assert.doesNotMatch(app, /fn generate_hermes_patch_draft\(/);
   assert.doesNotMatch(app, /HERMES_ACP: structured tool loop/);
-  assert.match(hermesExecution, /pub fn run_structured_loop\(/);
-  assert.match(hermesExecution, /Command::new\(program\)/);
-  assert.match(hermesExecution, /execute_hermes_read_tool\(root, name, &args\)/);
-  assert.match(hermesExecution, /validate_unified_diff_authorized/);
+  assert.match(agentExecutor, /pub trait AgentExecutor/);
+  assert.match(agentExecutor, /AGENT_EVENT_SCHEMA_VERSION/);
+  assert.match(agentExecutor, /pub struct AgentEvent/);
+  assert.match(agentExecutor, /select_agent_executor/);
+  assert.match(agentExecutor, /validate_governed_capabilities/);
+  assert.match(agentExecutor, /AGENT_EXECUTOR_CONTRACT_VERSION/);
+  assert.match(agentExecutor, /extensions: BTreeMap<String, Value>/);
+  assert.doesNotMatch(agentExecutor, /pub extensions: BTreeMap<String, Value>/);
+  assert.match(agentExecutor, /pub fn with_extension/);
+  assert.match(agentExecutor, /Runtime admission deliberately reads only the frozen v1 core/);
+  assert.match(agentExecutor, /fn execute\(&self, request: AgentExecutionRequest\)/);
+  assert.match(hermesAdapter, /impl AgentExecutor for HermesAcpExecutor/);
+  assert.match(hermesAdapter, /hermes_execution::run_structured_loop/);
+  assert.match(geminiAdapter, /impl AgentExecutor for GeminiAcpExecutor/);
+  assert.match(geminiAdapter, /acp_execution::\{run_acp_structured_loop/);
+  assert.match(acpExecution, /pub fn run_acp_structured_loop\(/);
+  assert.match(acpExecution, /Command::new\(&config\.program\)/);
+  assert.match(acpExecution, /execute_read_tool\(root, name, &args\)/);
+  assert.match(acpExecution, /validate_unified_diff_authorized/);
+  assert.match(acpExecution, /push_terminal/);
+  assert.match(app, /"agentEvents": value\.events/);
+  assert.doesNotMatch(app, /"trace": value\.trace/);
+  assert.doesNotMatch(app, /"observations": value\.observations/);
 });
 
-test("keeps Agent Run model-stage persistence outside the Hermes command adapter", () => {
+test("forbids executor-specific governance branches in the generic Runtime path", () => {
+  const genericRuntime = [
+    "src-tauri/src/runtime/app.rs",
+    "src-tauri/src/runtime/acp_execution.rs",
+    "src-tauri/src/runtime/agent_scheduler.rs",
+    "src-tauri/src/runtime/execution.rs",
+    "src-tauri/src/runtime/tool_registry.rs",
+  ].map(source).join("\n");
+  assert.doesNotMatch(genericRuntime, /executor(?:_id|\.id\(\))\s*(?:==|!=|match(?:es)?!)\s*[\s\S]{0,40}["'](?:hermes|gemini)/i);
+  assert.doesNotMatch(genericRuntime, /extensions\s*(?:\.|\[|\.get\()/);
+});
+
+test("keeps Agent Run model-stage persistence outside the generic command adapter", () => {
   const app = source("src-tauri/src/runtime/app.rs");
   const runs = source("src-tauri/src/runtime/agent_runs.rs");
-  const hermesCommand = app.slice(
-    app.indexOf("async fn run_hermes_agent("),
+  const agentCommand = app.slice(
+    app.indexOf("async fn run_agent("),
     app.indexOf("#[tauri::command]\nfn get_provider_status"),
   );
   assert.match(app, /agent_runs::prepare_model_run\(/);
   assert.match(app, /agent_runs::settle_model_run\(/);
   assert.doesNotMatch(app, /Hermes 正在读取上下文并形成结果/);
   assert.doesNotMatch(app, /OmniDesk 已执行上一受控工具，结果如下/);
-  assert.doesNotMatch(hermesCommand, /resume-approval/);
-  assert.doesNotMatch(hermesCommand, /checkpoint\.next_action/);
+  assert.doesNotMatch(agentCommand, /resume-approval/);
+  assert.doesNotMatch(agentCommand, /checkpoint\.next_action/);
   assert.match(runs, /pub fn prepare_model_run/);
   assert.match(runs, /pub fn settle_model_run/);
   assert.match(runs, /Agent Run 不属于当前项目，拒绝继续/);
-  assert.match(runs, /Hermes 开始生成受控草稿/);
+  assert.match(runs, /Agent Executor 开始生成受控草稿/);
   assert.match(runs, /resume-approval/);
 });
 

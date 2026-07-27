@@ -32,6 +32,8 @@ export function conversationActionDecision(message) {
   const requestsBaseCheck = /(基础检查|runtime检查|运行时检查|检查runtime)/i.test(compact)
     || (requestsExecution && /^(运行|执行|跑)(一轮|一下|一次)?检查$/.test(compact));
   const incompleteModification = /^(我)?(还)?(想|要)?(改|修改|调整|优化|修)(一下)?$/.test(compact);
+  const ambiguousModification = /(改|修改|调整|优化)/.test(compact)
+    && !/(改成|改为|调整为|优化为|变成|替换成|替换为|新增|添加|删除|移除|隐藏|显示|支持|修复|解决|避免|对齐|从.+到|把.+(改|换|调整)成)/.test(compact);
   const requestsPatchDraft = !incompleteModification
     && !/(计划|方案|待办|分析|审查|检查|报告)/.test(compact)
     && /(帮我|请|直接|继续)?(改|修|优化|实现|新增|添加|删除|移除|接入|配置|调整|重构|做成)/.test(compact);
@@ -39,7 +41,7 @@ export function conversationActionDecision(message) {
     && (/(生成|制定|整理|创建).{0,16}(计划|方案|待办)/.test(compact)
       || /(帮我|请)?(给|出)(我)?(一份|一个|个)?(执行)?(计划|方案|待办)/.test(compact)
       || /(帮我|请)?(规划|拆解)(一下)?(这个|这项)?(任务|需求|工作)?/.test(compact));
-  const action = requestsStructuredQuestion && requestsPatchDraft
+  const action = (requestsStructuredQuestion || ambiguousModification) && requestsPatchDraft
     ? { id: "start-agent", task: text }
     : requestsExecution && requestsBaseCheck
     ? { checkId: "runtime", id: "run-check" }

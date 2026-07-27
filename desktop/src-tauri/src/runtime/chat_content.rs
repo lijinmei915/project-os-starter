@@ -52,6 +52,25 @@ pub struct ChatWithModelResult {
     pub response_mode: String,
     #[serde(default)]
     pub references: Vec<MessageReference>,
+    #[serde(default)]
+    pub recommended_action: Option<ChatRecommendedAction>,
+    #[serde(default)]
+    pub provider_stream_trace: ProviderStreamTrace,
+}
+
+#[derive(Default, Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderStreamTrace {
+    pub delta_count: u64,
+    pub char_count: u64,
+    pub first_delta_ms: Option<u64>,
+    pub last_delta_ms: Option<u64>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatRecommendedAction {
+    pub task: String,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -75,6 +94,7 @@ pub fn chat_reply_prompt(
     summary: &Value,
     project_memory: &[Value],
     project_evidence: &Value,
+    stream_visible_recommendation: bool,
 ) -> String {
     let attachment_note = if attachments.is_empty() {
         "No image attachments.".to_string()
@@ -99,6 +119,11 @@ pub fn chat_reply_prompt(
     let memory_json = serde_json::to_string(project_memory).unwrap_or_else(|_| "[]".to_string());
     let evidence_json =
         serde_json::to_string_pretty(project_evidence).unwrap_or_else(|_| "{}".to_string());
+    let response_contract = if stream_visible_recommendation {
+        "Answer directly in natural Chinese text so the response can stream to the user. Select one best implementation or smallest next step and end by saying that the user can reply “可以” to start it. Do not emit JSON, routing metadata, or a function call in this visible response; a separate bounded classifier will create the action after the answer is complete."
+    } else {
+        "Return every non-execution answer through the required respond_to_user function. Put the complete natural Chinese answer in reply. If the answer selects or recommends one implementation, priority, improvement, or smallest next step, you MUST use action=start-agent and provide that self-contained outcome in task. It is invalid to recommend a concrete next step in reply while returning action=none. Use action=none with an empty task only for pure explanation or multiple unranked alternatives with no selected engineering outcome. When the user asks for improvement suggestions, select the best next implementation and return it as start-agent unless the user explicitly asks not to act. For an explicit engineering execution request, use start_engineering_task instead. Never return conversational content outside a function call when functions are available."
+    };
     format!(
         r#"Current project: {project_name}
 Current stage: {stage}
@@ -123,7 +148,7 @@ Verified local project evidence:
 User message:
 {message}
 
-Reply directly to the user in natural Chinese text. Do not wrap the answer in JSON or add routing metadata.
+{response_contract}
 
 Rules:
 - Treat short follow-ups such as "那怎么办", "你判断", "直接告诉我", and "直接修" as continuations of currentTopic and previousConclusion. Do not ask the user to repeat the subject when contextState identifies it.
@@ -205,6 +230,8 @@ pub fn local_chat_result(
         provider_error: String::new(),
         response_mode: "local".to_string(),
         references: Vec::new(),
+        recommended_action: None,
+        provider_stream_trace: ProviderStreamTrace::default(),
     }
 }
 
@@ -393,7 +420,7 @@ mod tests {
     }
 
     #[test]
-    fn provider_prompt_requests_natural_text_without_routing_json() {
+    fn provider_prompt_requires_a_structured_function_response() {
         let prompt = chat_reply_prompt(
             "OmniDesk",
             "stabilizing",
@@ -405,9 +432,31 @@ mod tests {
             &json!({}),
             &[],
             &json!({}),
+            false,
         );
-        assert!(prompt.contains("natural Chinese text"));
+        assert!(prompt.contains("required respond_to_user function"));
+        assert!(prompt.contains("MUST use action=start-agent"));
         assert!(!prompt.contains("Return strict JSON"));
         assert!(!prompt.contains("shouldCreatePlan"));
+    }
+
+    #[test]
+    fn recommendation_prompt_keeps_the_visible_answer_streamable() {
+        let prompt = chat_reply_prompt(
+            "OmniDesk",
+            "stabilizing",
+            "test-model",
+            "给出三个建议",
+            &[],
+            &[],
+            &DialogueContextInput::default(),
+            &json!({}),
+            &[],
+            &json!({}),
+            true,
+        );
+        assert!(prompt.contains("Answer directly in natural Chinese text"));
+        assert!(prompt.contains("separate bounded classifier"));
+        assert!(!prompt.contains("required respond_to_user function"));
     }
 }

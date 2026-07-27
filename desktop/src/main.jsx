@@ -104,7 +104,7 @@ import * as workspaceGoalClient from "./lib/workspace-goal-client";
 import * as workspaceRegistryClient from "./lib/workspace-registry-client";
 import * as workspaceCapabilityClient from "./lib/workspace-capability-client";
 import * as workspaceFileClient from "./lib/workspace-file-client";
-import { actionFromAssistantCommitment, actionFromAssistantRecommendation, buildChatRequestContext, buildConversationRecord, contextualizeUserMessage, mergeConversationRecords } from "./lib/conversation-record";
+import { buildChatRequestContext, buildConversationRecord, contextualizeUserMessage, mergeConversationRecords } from "./lib/conversation-record";
 import { taskIdForRequest } from "./lib/request-lifecycle";
 import { resolveWorkspaceContext, resolveWorkspaceGoal } from "./lib/workspace-context";
 import { conversationStates, executeRegisteredConversationAction, guardedCheckCapabilities, guardedCheckCapability, migrateConversationRecord, normalizeConversationReferences, normalizeConversationTurns, planProgressEvents, projectExecutionEvent, recoverConversationRuntime } from "./conversation-runtime";
@@ -196,20 +196,6 @@ function createAgentEvent(type, status, title, detail = "") {
     title,
     type,
   };
-}
-
-function withTimeout(promise, timeoutMs, message) {
-  let timer = null;
-  const timeout = new Promise((_, reject) => {
-    timer = window.setTimeout(() => {
-      const error = new Error(message);
-      error.code = "REQUEST_TIMEOUT";
-      reject(error);
-    }, timeoutMs);
-  });
-  return Promise.race([promise, timeout]).finally(() => {
-    if (timer) window.clearTimeout(timer);
-  });
 }
 
 function safeDisplayText(value, fallback = "") {
@@ -343,11 +329,12 @@ function AgentWorkspace({
   onRequestProjectAccess,
   onRefreshWorkspace,
   onReadEngineeringFile,
-  onGetHermesExecutorStatus,
+  onGetAgentExecutorStatus,
   onApproveAgentRun,
   onCancelAgentRun,
   onExportAgentRun,
   onResumeAgentRun,
+  onRetryAgentInteraction,
   onSubmitAgentInteraction,
   onRefreshAgentRuns,
 }) {
@@ -443,12 +430,11 @@ function AgentWorkspace({
     activeProjectGoalTitle: activeProjectGoal?.title,
     activeRequestRef,
     activeTask,
-    actionFromAssistantCommitment,
-    actionFromAssistantRecommendation,
     actionPromptsForMessage,
     agentEventsForMessageKind,
     attachments,
     buildChatRequestContext,
+    cancelRuntimeRequest,
     chatTurns,
     chatWithModel,
     conversationDiagnosticForResult,
@@ -457,6 +443,7 @@ function AgentWorkspace({
     executePendingPatchApply,
     isActionRequestMessage,
     isTauri,
+    interactions,
     lastSubmissionRef,
     loadingEventsForMessageKind,
     loadingLabelForMessageKind,
@@ -464,6 +451,7 @@ function AgentWorkspace({
     onChatTurnsChange,
     onGeneratePlan,
     onModelHealthChange,
+    onSubmitAgentInteraction,
     onProfileUpdated,
     onRunChatAction,
     onStopPlan,
@@ -490,7 +478,6 @@ function AgentWorkspace({
     taskStatuses,
     tasks,
     taskInput,
-    withTimeout,
   });
 
   const handleConversationTurnAction = useConversationTurnActions({
@@ -511,7 +498,7 @@ function AgentWorkspace({
       <WorkspaceTabStrip onCloseTab={closeWorkspaceTab} tabs={workspaceTabs} />
 
       <AgentWorkspaceConversationCanvas
-        assistantUi={useAssistantUiPoc ? <React.Suspense fallback={<AgentProcessingStatus label="载入对话 POC" running />}><AssistantUiConversationPoc interactions={interactions} isRunning={chatLoading || Boolean(pendingTurn)} onAction={handleAssistantUiAction} onSubmitInteraction={onSubmitAgentInteraction} turns={chatTurns} /></React.Suspense> : null}
+        assistantUi={useAssistantUiPoc ? <React.Suspense fallback={<AgentProcessingStatus label="载入对话 POC" running />}><AssistantUiConversationPoc interactions={interactions} isRunning={chatLoading || Boolean(pendingTurn)} onAction={handleAssistantUiAction} onRetryInteraction={onRetryAgentInteraction} onSubmitInteraction={onSubmitAgentInteraction} turns={chatTurns} /></React.Suspense> : null}
         chatLoading={chatLoading}
         chatLoadingEvents={chatLoadingEvents}
         chatLoadingLabel={chatLoadingLabel}
@@ -523,6 +510,7 @@ function AgentWorkspace({
         isEmpty={isConversationEmpty}
         loading={loading}
         onTurnAction={(action, turn) => handleConversationTurnAction(action, turn, { projectExecution: true })}
+        onRetryInteraction={onRetryAgentInteraction}
         onSubmitInteraction={onSubmitAgentInteraction}
         onUseStarterPrompt={useStarterPrompt}
         pendingTurn={pendingTurn}
@@ -578,7 +566,7 @@ function AgentWorkspace({
                 onRefreshWorkspace={onRefreshWorkspace}
                 onReadEngineeringFile={onReadEngineeringFile}
                 onResumeAgentRun={onResumeAgentRun}
-                onGetHermesExecutorStatus={onGetHermesExecutorStatus}
+                onGetAgentExecutorStatus={onGetAgentExecutorStatus}
                 onCopyText={copyTextToSystemClipboard}
                 onRefreshWorkspaceFacts={refreshWorkspaceFactsPreview}
                 onRefreshAgentRuns={onRefreshAgentRuns}
@@ -715,7 +703,7 @@ function App() {
 
   const resumeAgentRun = async (run) => {
     try {
-      const result = await executionClient.resumeHermesAgent(run);
+      const result = await executionClient.resumeAgent(run);
       await refreshAgentRuns();
       return result;
     } catch (error_) {
@@ -726,7 +714,7 @@ function App() {
 
   const approveAgentRun = async (run) => {
     try {
-      const result = await executionClient.approveHermesAgent(run);
+      const result = await executionClient.approveAgent(run);
       await refreshAgentRuns();
       return result;
     } catch (error_) {
@@ -763,7 +751,7 @@ function App() {
       const result = await executionClient.acceptAgentInteraction(run, response);
       await refreshAgentRuns();
       if (result?.status === "queued") {
-        void executionClient.continueHermesAgent(result).then(refreshAgentRuns).catch(async (error_) => {
+        void executionClient.continueAgent(result).then(refreshAgentRuns).catch(async (error_) => {
           await refreshAgentRuns().catch(() => setAgentRuns([]));
           showToast(`回答已保存，但 Agent 继续失败：${error_ instanceof Error ? error_.message : String(error_)}`);
         });
@@ -921,10 +909,9 @@ function App() {
     persistTask: setAndPersistTask,
     setPlanError,
     setPlanLoading,
-    withTimeout,
   });
 
-  const startHermesTaskAgent = async (task) => {
+  const startTaskAgent = async (task) => {
     const rawRequestId = `task-${task.id}-${Date.now()}`;
     const requestId = rawRequestId.replace(/[^a-zA-Z0-9_-]/g, "-");
     const plan = task.plan || {};
@@ -941,7 +928,7 @@ function App() {
         showToast(existingRun.status === "awaiting-user-input" ? "等待回答。" : "任务运行中。");
         return true;
       }
-      const result = await executionClient.runHermesAgent(prompt, requestId, 20, "", {
+      const result = await executionClient.runAgent(prompt, requestId, 20, "", {
         conversationId: agentRunConversationId(activeConversationId, task),
         isolate: task?.executionMode === "isolated",
         taskId: task.id,
@@ -954,6 +941,15 @@ function App() {
       showToast(message);
       return false;
     }
+  };
+
+  const retryAgentInteraction = async (run) => {
+    const task = tasks.find((item) => item.id === run?.taskId);
+    if (!task) {
+      showToast("原任务记录不存在，无法重新开始。");
+      return false;
+    }
+    return startTaskAgent(task);
   };
 
   const runChatAction = createConversationActionController({
@@ -977,7 +973,7 @@ function App() {
     selectTask: (...args) => selectTask(...args),
     setError,
     setSelectedEngineeringFile,
-    startHermesAgent: startHermesTaskAgent,
+    startAgent: startTaskAgent,
     stopPlanGeneration,
     taskStatuses,
     tasks,
@@ -1209,6 +1205,7 @@ function App() {
           onCancelAgentRun={cancelAgentRun}
           onExportAgentRun={exportAgentRun}
           onResumeAgentRun={resumeAgentRun}
+          onRetryAgentInteraction={retryAgentInteraction}
           onRefreshAgentRuns={refreshAgentRuns}
           onSubmitAgentInteraction={submitAgentInteraction}
           activeConversationTaskId={activeConversationTaskId}
@@ -1297,7 +1294,7 @@ function App() {
           onRequestProjectAccess={requestProjectAccess}
           onRefreshWorkspace={refreshSnapshotFromSource}
           onReadEngineeringFile={workspaceFileClient.readEngineeringFile}
-          onGetHermesExecutorStatus={executionClient.getHermesExecutorStatus}
+          onGetAgentExecutorStatus={executionClient.getAgentExecutorStatus}
         />
     )}
     rightRail={(

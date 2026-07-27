@@ -8,6 +8,7 @@ test("routes action language before inspection keywords", () => {
   assert.equal(classifyConversationIntent("当前检查有什么问题"), "project-inspect");
   assert.equal(classifyConversationIntent("接下来要把对话体验打磨好"), "stage-goal");
   assert.equal(classifyConversationIntent("下一阶段应该怎么做？"), "question");
+  assert.equal(classifyConversationIntent("分析当前对话模块，并给出三个改进建议"), "question");
 });
 
 test("decides a safe check action before the generic task route", () => {
@@ -22,8 +23,8 @@ test("decides a safe check action before the generic task route", () => {
 });
 
 test("routes explicit modifications to a read-only patch draft", () => {
-  assert.deepEqual(conversationActionDecision("帮我修改按钮"), {
-    action: { id: "generate-patch", task: "帮我修改按钮" },
+  assert.deepEqual(conversationActionDecision("请把按钮文案改成保存"), {
+    action: { id: "generate-patch", task: "请把按钮文案改成保存" },
     confirmation: "none",
     mode: "execute",
     risk: "read-only-draft",
@@ -40,6 +41,18 @@ test("routes explicit modifications to a read-only patch draft", () => {
 test("does not execute an incomplete modification intent", () => {
   assert.equal(conversationActionDecision("我还想改"), null);
   assert.equal(conversationActionDecision("想调整一下"), null);
+  assert.deepEqual(conversationActionDecision("修改项目概览里的核心能力"), {
+    action: { id: "start-agent", task: "修改项目概览里的核心能力" },
+    confirmation: "none",
+    mode: "execute",
+    risk: "read-only-agent",
+  });
+  assert.deepEqual(conversationActionDecision("帮我修改按钮"), {
+    action: { id: "start-agent", task: "帮我修改按钮" },
+    confirmation: "none",
+    mode: "execute",
+    risk: "read-only-agent",
+  });
 });
 
 test("routes an explicit missing decision through Hermes instead of drafting a patch", () => {
@@ -75,6 +88,7 @@ test("resolves short follow-ups against the pending action", () => {
   assert.equal(resolveConversationCommand({ message: "好", pendingAction }).command, conversationCommands.confirmAction);
   assert.equal(resolveConversationCommand({ message: "然后呢", pendingAction }).command, conversationCommands.inspectAction);
   assert.equal(resolveConversationCommand({ message: "不用了", pendingAction }).command, conversationCommands.cancelAction);
+  assert.equal(resolveConversationCommand({ message: "那开始吧", pendingAction }).command, conversationCommands.confirmAction);
 });
 
 test("derives the visible runtime state from machine facts", () => {
@@ -425,7 +439,48 @@ test("keeps a preview patch draft read-only in the runtime executor", async () =
   assert.equal(result.turn.outcome, "failed");
   assert.equal(result.turn.diagnostic.label, "改动草稿不可应用");
   assert.equal(result.turn.pendingAction, null);
-  assert.deepEqual(result.turn.actions, [{ id: "open-topic", label: "查看改动草稿", target: "execution", taskId: "task-2" }]);
+  assert.deepEqual(result.turn.actions, [
+    { id: "open-topic", label: "查看失败详情", target: "execution", taskId: "task-2" },
+    { id: "retry", label: "重新生成草稿", task: "修改按钮" },
+  ]);
+  assert.equal(result.turn.events.at(-1).id, "change-draft-patch");
+});
+
+test("stops an auto-continued Patch when the Runtime returned a fallback plan", async () => {
+  let patchCalls = 0;
+  const task = { id: "task-fallback", plan: { trace: ["PROVIDER_FALLBACK: request timed out"] } };
+  const result = await executeConversationActionRequest({
+    action: { id: "generate-patch", task: "把按钮文案改成保存" },
+    adapters: {
+      generatePlan: async () => ({ status: "succeeded", task, taskId: task.id }),
+      generatePatch: async () => { patchCalls += 1; },
+    },
+    context: { input: "把按钮文案改成保存", requestId: "request-fallback", startedAt: 100 },
+    now: () => 200,
+  });
+  assert.equal(result.requestStatus, "failed");
+  assert.equal(result.turn.diagnostic.label, "远程计划未生成");
+  assert.equal(result.turn.pendingAction, null);
+  assert.equal(result.turn.events.at(-1).id, "change-draft-generate");
+  assert.equal(patchCalls, 0);
+});
+
+test("shows a semantic gate reason instead of claiming that a draft was generated", async () => {
+  const reason = "任务计划明确不修改工程文件。";
+  const result = await executeConversationActionRequest({
+    action: { id: "generate-patch", task: "把按钮文案改成保存" },
+    adapters: {
+      generatePlan: async () => ({ status: "succeeded", task: { id: "task-gate", plan: { trace: ["PROVIDER_CALL: test"] } }, taskId: "task-gate" }),
+      generatePatch: async () => ({ error: reason, patchDraft: { diff: "", failureReason: reason, notApplicable: true }, success: false }),
+    },
+    context: { input: "把按钮文案改成保存", requestId: "request-gate", startedAt: 100 },
+    now: () => 200,
+  });
+  assert.equal(result.turn.diagnostic.label, "当前计划不能生成改动");
+  assert.equal(result.turn.diagnostic.detail, reason);
+  assert.match(result.turn.text, /没有生成文件改动/);
+  assert.equal(result.turn.events.at(-1).id, "change-draft-patch");
+  assert.equal(result.turn.events.some((event) => event.id === "change-draft-review"), false);
 });
 
 test("starts Hermes directly when an engineering request needs a user decision", async () => {
@@ -446,7 +501,9 @@ test("starts Hermes directly when an engineering request needs a user decision",
   assert.equal(startedTask, task);
   assert.equal(result.requestStatus, "succeeded");
   assert.equal(result.turn.taskId, task.id);
-  assert.match(result.turn.text, /当前对话中询问/);
+  assert.match(result.turn.text, /Agent 已开始处理/);
+  assert.match(result.turn.text, /当前不会自动写入文件/);
+  assert.equal(result.turn.events.at(-1).label, "Agent 已启动");
 });
 
 test("requires confirmation for an applicable patch in the runtime executor", async () => {

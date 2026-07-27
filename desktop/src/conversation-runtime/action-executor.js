@@ -44,8 +44,8 @@ export function completedPlanAgentEvents() {
 
 export function executionReadyAgentEvents() {
   return [
-    { detail: "已确认执行计划。", id: "confirmation", label: "计划已确认", status: "done" },
-    { detail: "任务已进入受控执行态，当前尚未改动文件。", id: "execution-ready", label: "等待生成改动", status: "current" },
+    { detail: "已确认把这个目标交给 Agent 处理。", id: "confirmation", label: "任务已确认", status: "done" },
+    { detail: "Agent 正在读取项目并判断下一步；当前尚未改动文件。", id: "execution-ready", label: "Agent 已启动", status: "current" },
   ];
 }
 
@@ -69,12 +69,19 @@ export function checkProgressEvents(checkLabel, currentStage = "run", currentSta
 
 export function changeDraftProgressEvents(currentStage, currentStatus = "current", detail = "") {
   const currentIndex = changeDraftStages.findIndex((stage) => stage.id === currentStage);
-  return changeDraftStages.map((stage, index) => ({
+  const stages = currentStatus === "failed" ? changeDraftStages.slice(0, currentIndex + 1) : changeDraftStages;
+  return stages.map((stage, index) => ({
     detail: index === currentIndex ? detail : "",
     id: `change-draft-${stage.id}`,
     label: stage.label,
     status: index < currentIndex ? "done" : index === currentIndex ? currentStatus : "pending",
   }));
+}
+
+function providerFallbackReason(task = {}) {
+  const trace = Array.isArray(task?.plan?.trace) ? task.plan.trace.map(String) : [];
+  const fallback = trace.find((entry) => /^(?:LOCAL_FALLBACK|PROVIDER_FALLBACK|PROVIDER_PRECHECK_FAILED):/.test(entry));
+  return fallback ? "远程计划没有成功生成，已停止自动生成文件改动。" : "";
 }
 
 function checkOutputSummary(output = "") {
@@ -171,11 +178,36 @@ async function executePatchAction(action, adapters, context, emitProgress, now) 
       },
     };
   }
+  const fallbackReason = providerFallbackReason(planOutcome.task);
+  if (fallbackReason) {
+    return {
+      handled: true,
+      requestStatus: "failed",
+      turn: {
+        ...turnBase(context, "patch-plan-fallback", now),
+        actions: [{ id: "retry", label: "重新生成计划", task: action.task || context.input }],
+        diagnostic: {
+          detail: fallbackReason,
+          label: "远程计划未生成",
+          message: "没有生成 Patch，也没有写入文件。可以重试，或补充更具体的要求。",
+        },
+        events: changeDraftProgressEvents("generate", "failed", fallbackReason),
+        outcome: "failed",
+        pendingAction: null,
+        taskId: planOutcome.taskId || planOutcome.task.id,
+        text: "远程计划没有生成成功，已停止后续改动。",
+      },
+    };
+  }
   emitProgress({ events: changeDraftProgressEvents("patch"), label: "生成改动草稿" });
   const patchResult = await adapters.generatePatch({ action, requestId: context.requestId, task: planOutcome.task });
   const success = Boolean(patchResult?.success);
   const draftState = patchDraftResultState(patchResult);
   const { applicable } = draftState;
+  const notApplicable = patchResult?.patchDraft?.notApplicable === true;
+  const failureReason = patchResult?.error
+    || patchResult?.patchDraft?.failureReason
+    || (notApplicable ? "当前计划不具备可执行的文件改动。" : "模型返回的草稿不是可应用的 unified diff。");
   const taskId = planOutcome.taskId || planOutcome.task.id;
   const pendingAction = applicable ? {
     id: `apply-task-${taskId || context.requestId}`,
@@ -193,23 +225,28 @@ async function executePatchAction(action, adapters, context, emitProgress, now) 
           { id: "open-topic", label: "查看 AI 建议的改动", target: "execution", taskId },
           { id: "apply-patch", label: "确认应用改动", taskId },
         ]
-        : [{ id: "open-topic", label: "查看改动草稿", target: "execution", taskId }],
+        : [
+          { id: "open-topic", label: "查看失败详情", target: "execution", taskId },
+          { id: "retry", label: notApplicable ? "补充要求后重试" : "重新生成草稿", task: action.task || context.input },
+        ],
       diagnostic: applicable ? null : {
-        detail: patchResult?.error || "模型返回的草稿不是可应用的 unified diff。",
-        label: success ? "改动草稿不可应用" : "改动草稿生成失败",
-        message: "任务和失败证据已保留，可补充要求后重新生成。",
+        detail: failureReason,
+        label: notApplicable ? "当前计划不能生成改动" : success ? "改动草稿不可应用" : "改动草稿生成失败",
+        message: notApplicable ? "请补充具体修改目标后重试。" : "任务和失败证据已保留，可补充要求后重新生成。",
       },
       events: changeDraftProgressEvents(
         applicable ? "review" : "patch",
         draftState.eventStatus,
-        applicable ? "草稿已就绪，确认后才会写入文件。" : patchResult?.error || "当前草稿尚不可应用。",
+        applicable ? "草稿已就绪，确认后才会写入文件。" : failureReason,
       ),
       outcome: draftState.outcome,
       pendingAction,
       taskId,
       text: applicable
         ? "AI 已准备好建议的改动。请先查看内容；确认无误后再应用。"
-        : success
+        : notApplicable
+          ? "当前计划没有生成文件改动，已停止后续操作。"
+          : success
           ? "已生成改动草稿，但当前还不是可应用的 diff，未提供写入操作。"
           : "改动草稿没有生成成功，未写入任何文件。",
     },
@@ -249,7 +286,7 @@ async function executeAgentAction(action, adapters, context, emitProgress, now) 
       events: executionReadyAgentEvents(),
       outcome: started ? "awaiting-confirmation" : "failed",
       taskId: outcome.taskId || outcome.task.id,
-      text: started ? "任务已交给 Agent；如缺少必要信息，会在当前对话中询问你。" : "任务已保存，但 Agent 没有成功启动。",
+      text: started ? "Agent 已开始处理这个目标。它会先读取项目并判断下一步；需要你补充信息，或批准改动、检查时，会在这里明确询问。当前不会自动写入文件。" : "任务已保存，但 Agent 没有成功启动。",
     },
   };
 }

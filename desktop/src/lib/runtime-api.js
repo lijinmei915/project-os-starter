@@ -32,23 +32,23 @@ export async function invokePreviewCommand(command, payload) {
   if (command === "open_native_terminal") {
     throw new Error("浏览器预览不能打开系统终端，请在桌面 App 窗口里使用。");
   }
-  if (command === "run_hermes_agent") {
-    throw new Error("浏览器预览不能运行 Hermes，请在桌面 App 窗口里使用。");
+  if (["run_agent", "run_hermes_agent"].includes(command)) {
+    throw new Error("浏览器预览不能运行 Agent，请在桌面 App 窗口里使用。");
   }
   if (command === "resume_agent_run") {
-    throw new Error("浏览器预览不能恢复 Hermes 运行，请在桌面 App 窗口里使用。");
+    throw new Error("浏览器预览不能恢复 Agent 运行，请在桌面 App 窗口里使用。");
   }
   if (command === "cancel_agent_run") {
-    throw new Error("浏览器预览不能取消 Hermes 运行，请在桌面 App 窗口里使用。");
+    throw new Error("浏览器预览不能取消 Agent 运行，请在桌面 App 窗口里使用。");
   }
   if (command === "export_agent_run_timeline") {
     throw new Error("浏览器预览不能导出 Agent 运行证据，请在桌面 App 窗口里使用。");
   }
   if (command === "continue_agent_run") {
-    throw new Error("浏览器预览不能继续 Hermes 运行，请在桌面 App 窗口里使用。");
+    throw new Error("浏览器预览不能继续 Agent 运行，请在桌面 App 窗口里使用。");
   }
   if (command === "approve_agent_run") {
-    throw new Error("浏览器预览不能批准 Hermes 运行，请在桌面 App 窗口里使用。");
+    throw new Error("浏览器预览不能批准 Agent 运行，请在桌面 App 窗口里使用。");
   }
   if (command === "submit_agent_interaction") {
     throw new Error("浏览器预览不能提交 Agent 追问，请在桌面 App 窗口里使用。");

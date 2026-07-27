@@ -1,4 +1,6 @@
-use crate::runtime::hermes_execution::run_structured_loop;
+use crate::runtime::agent_executor::{
+    default_agent_executor, AgentExecutionMode, AgentExecutionRequest,
+};
 use crate::runtime::patch::{
     files_from_unified_diff, normalize_hermes_unified_diff, provider_draft_prompt, PatchDraft,
 };
@@ -266,19 +268,21 @@ pub async fn generate_hermes_draft(
     let root = root.to_path_buf();
     let api_base = provider.api_base.clone();
     let api_key_env = provider.api_key_env.clone();
+    let executor = default_agent_executor();
     let result = tauri::async_runtime::spawn_blocking(move || {
-        run_structured_loop(
-            &root,
-            &api_key,
-            &api_base,
-            &api_key_env,
-            &prompt,
-            20,
-            cancellation.as_ref(),
-        )
+        executor.execute(AgentExecutionRequest {
+            mode: AgentExecutionMode::Start,
+            root,
+            api_key,
+            api_base,
+            api_key_env,
+            prompt,
+            max_steps: 20,
+            cancellation,
+        })
     })
     .await
-    .map_err(|err| format!("Hermes structured worker 中断: {err}"))??;
+    .map_err(|err| format!("Agent Executor worker 中断: {err}"))??;
     if result.status != "succeeded" {
         return Err(result.summary);
     }

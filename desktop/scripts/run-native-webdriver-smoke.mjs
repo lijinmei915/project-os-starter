@@ -236,6 +236,30 @@ try {
   if (currentValue !== prompt) throw new Error("原生输入事件没有更新 React 状态。");
   const enabledAfterInput = await request(`/session/${sessionId}/element/${send}/enabled`);
   if (enabledAfterInput !== true) throw new Error("填写输入后发送按钮应可用。");
+  currentStage = "验证建议到执行确认契约";
+  const recommendationContractSource = `Promise.all([
+    import('/src/lib/conversation-recommended-action.js'),
+    import('/src/conversation-runtime/orchestrator.js')
+  ]).then(([recommendations, orchestrator]) => {
+    const action = recommendations.recommendedActionFromChatResult({
+      recommendedAction: { task: '在会话消息旁加入统一任务状态标签和任务引用' },
+      responseMode: 'native-recommendation-call'
+    }, 'native-recommendation');
+    const command = orchestrator.resolveConversationCommand({ message: '那开始吧', pendingAction: action });
+    window.__omnideskRecommendationContract = { action, command: command.command };
+  }, (error) => { window.__omnideskRecommendationContract = { error: String(error) }; });`;
+  await script(`window.__omnideskRecommendationContract = null; const module = document.createElement('script'); module.type = 'module'; module.textContent = ${JSON.stringify(recommendationContractSource)}; document.head.appendChild(module); return true;`);
+  let recommendationContract = null;
+  const recommendationDeadline = Date.now() + 5_000;
+  while (!recommendationContract && Date.now() < recommendationDeadline) {
+    recommendationContract = await script("return window.__omnideskRecommendationContract");
+    if (!recommendationContract) await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  if (recommendationContract?.error
+    || recommendationContract?.action?.type !== "start-agent"
+    || recommendationContract?.command !== "confirm-action") {
+    throw new Error(`建议到执行确认契约未在原生 WebView 生效：${JSON.stringify(recommendationContract)}`);
+  }
   const startupTrace = await waitForPersistedTerminalStage("terminal-session.effect-start");
   const startupLocalTrace = await readTerminalTrace();
   if (!startupTrace.some((entry) => entry?.stage === "terminal-session.effect-start")
@@ -560,7 +584,7 @@ esac
     }
   }
 
-  console.log(`原生 WebDriver smoke 通过：可发现版本化内置工具及其风险/schema，MCP 配置零自动执行；同一 MCP Run 经过调度、待审批、桌面重启、不重放、显式恢复、原审批、工具成功与 metadata-only Timeline 导出；提交持久化 ask_user 表单并验证幂等，验证跨项目并发与稳定队列位置${diagnoseTerminal ? "，并完成终端诊断" : ""}；未写入工程文件。`);
+  console.log(`原生 WebDriver smoke 通过：原生 structured recommendation 映射为 start-agent，并由“那开始吧”确认；可发现版本化内置工具及其风险/schema，MCP 配置零自动执行；同一 MCP Run 经过调度、待审批、桌面重启、不重放、显式恢复、原审批、工具成功与 metadata-only Timeline 导出；提交持久化 ask_user 表单并验证幂等，验证跨项目并发与稳定队列位置${diagnoseTerminal ? "，并完成终端诊断" : ""}；未写入工程文件。`);
 } catch (error) {
   failure = error instanceof Error ? error : new Error(String(error));
   console.error(`原生 WebDriver smoke 失败（${currentStage}）：${failure.message}`);

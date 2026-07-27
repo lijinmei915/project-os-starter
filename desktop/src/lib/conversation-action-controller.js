@@ -6,7 +6,7 @@ export function createConversationActionController({
   activeTaskId, applySnapshot, beginActionFeedback, confirmWorkspaceGoal, createWorkspaceGoal,
   executeGuardedCheck, executePatchApply, executePatchDraft, executeRegisteredConversationAction,
   finishActionFeedback, generatePlan, markTaskWaiting, selectEngineeringFile, selectTask,
-  createRepairTask, generatePatchDraft, onEnsureModelAvailable, runGuardedCheck, setError, setSelectedEngineeringFile, startHermesAgent, stopPlanGeneration, taskStatuses, tasks, topicPayloadFromOutline,
+  createRepairTask, generatePatchDraft, onEnsureModelAvailable, runGuardedCheck, setError, setSelectedEngineeringFile, startAgent, startHermesAgent, stopPlanGeneration, taskStatuses, tasks, topicPayloadFromOutline,
 }) {
   return async function runChatAction(action) {
     return executeRegisteredConversationAction(action, {
@@ -61,7 +61,8 @@ export function createConversationActionController({
               finishActionFeedback(feedbackKey, "failed", "模型不可用，任务未启动。");
               return false;
             }
-            if (startHermesAgent && !await startHermesAgent(task)) {
+            const executeAgent = startAgent || startHermesAgent;
+            if (executeAgent && !await executeAgent(task)) {
               finishActionFeedback(feedbackKey, "failed", "Agent 没有成功启动，任务状态未改变。");
               return false;
             }

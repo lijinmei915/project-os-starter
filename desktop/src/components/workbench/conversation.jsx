@@ -4,11 +4,34 @@ import { presentConversationActivity } from "../../conversation-runtime/presenta
 
 export function Conversation({ children, className, ...props }) {
   const conversationRef = React.useRef(null);
+  const pinnedToBottomRef = React.useRef(true);
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     const node = conversationRef.current;
-    if (!node) return;
-    node.scrollIntoView({ block: "end" });
+    const viewport = node?.parentElement;
+    if (!node || !viewport) return undefined;
+
+    const scrollToBottom = () => {
+      if (pinnedToBottomRef.current) viewport.scrollTop = viewport.scrollHeight;
+    };
+    const updatePinnedState = () => {
+      const remaining = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+      pinnedToBottomRef.current = remaining <= 48;
+    };
+
+    scrollToBottom();
+    viewport.addEventListener("scroll", updatePinnedState, { passive: true });
+    const observer = new ResizeObserver(scrollToBottom);
+    observer.observe(node);
+    return () => {
+      viewport.removeEventListener("scroll", updatePinnedState);
+      observer.disconnect();
+    };
+  }, []);
+
+  React.useLayoutEffect(() => {
+    const viewport = conversationRef.current?.parentElement;
+    if (viewport && pinnedToBottomRef.current) viewport.scrollTop = viewport.scrollHeight;
   }, [children]);
 
   return (

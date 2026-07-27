@@ -35,9 +35,14 @@ test("forwards only the selected project memory to the desktop chat request", as
   await resolveConversationChatResult({
     ...base,
     isTauri: true,
-    requestContext: { ...base.requestContext, projectMemory: [{ id: "memory-1", content: "不要修改生产配置" }] },
+    requestContext: {
+      ...base.requestContext,
+      contextState: { expectedNextAction: "recommend-next" },
+      projectMemory: [{ id: "memory-1", content: "不要修改生产配置" }],
+    },
     chatWithModel: async (value) => { input = value; return { intent: "chat", reply: "模型回答" }; },
     messageKind: "chat",
   });
   assert.deepEqual(input.projectMemory, [{ id: "memory-1", content: "不要修改生产配置" }]);
+  assert.equal(input.responseContract, "recommendation-required");
 });

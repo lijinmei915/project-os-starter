@@ -30,6 +30,9 @@ export async function resolveConversationChatResult({
     message,
     recentTurns: requestContext.recentTurns.slice(0, -1),
     projectMemory: requestContext.projectMemory || [],
+    responseContract: requestContext.contextState.expectedNextAction === "recommend-next"
+      ? "recommendation-required"
+      : "standard",
     requestId,
     summary: requestContext.summary,
   });

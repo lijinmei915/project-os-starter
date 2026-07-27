@@ -1,6 +1,6 @@
 {
   "schemaVersion": "omnidesk.repository-file-inventory.v1",
-  "generatedAt": "2026-07-26T07:52:53.211Z",
+  "generatedAt": "2026-07-27T10:00:43.335Z",
   "sourceOfTruth": "git ls-files --cached --others --exclude-standard",
   "scope": "受版本控制文件及准备纳入版本控制的非忽略工作树文件；忽略的本地运行数据和构建输出不在本账本内。",
   "reviewContract": {
@@ -24,7 +24,7 @@
     "rule": "没有消费者证据的文件不自动删除；必须由对应 Owner 审核并通过验证后才能退役。"
   },
   "totals": {
-    "files": 573,
+    "files": 583,
     "byKind": {
       "repository": 2,
       "ci": 2,
@@ -32,19 +32,19 @@
       "desktop-support": 15,
       "eval": 11,
       "native": 68,
-      "runtime": 31,
+      "runtime": 36,
       "eval-support": 10,
-      "frontend": 260,
-      "test": 125,
+      "frontend": 262,
+      "test": 127,
       "documentation": 19,
       "documentation-data": 5,
-      "schema": 14,
+      "schema": 15,
       "repository-tooling": 5
     },
-    "classified": 6,
+    "classified": 7,
     "candidates": 0,
     "inProgress": 2,
-    "reviewed": 565
+    "reviewed": 574
   },
   "files": [
     {
@@ -113,7 +113,7 @@
       "path": "AGENTS.md",
       "kind": "root-document",
       "owner": "Documentation Governance",
-      "bytes": 4488,
+      "bytes": 4752,
       "pathMentions": [
         "desktop/src-tauri/src/runtime/workspace.rs",
         "desktop/src/components/workbench/agent-config-surface-panel.jsx",
@@ -138,7 +138,7 @@
       "path": "HANDOFF.md",
       "kind": "root-document",
       "owner": "Documentation Governance",
-      "bytes": 11572,
+      "bytes": 16768,
       "pathMentions": [
         "desktop/src/components/workbench/current-goal-panel.jsx",
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
@@ -191,7 +191,7 @@
       "path": "PROJECT.md",
       "kind": "root-document",
       "owner": "Documentation Governance",
-      "bytes": 20059,
+      "bytes": 24710,
       "pathMentions": [
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
         "desktop/src/lib/agent-topic-runtime-capability.js",
@@ -512,7 +512,7 @@
       "path": "desktop/scripts/run-native-webdriver-smoke.mjs",
       "kind": "desktop-support",
       "owner": "Desktop Platform",
-      "bytes": 30513,
+      "bytes": 32316,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -1546,7 +1546,7 @@
       "path": "desktop/src-tauri/src/bin/provider_fallback_eval.rs",
       "kind": "native",
       "owner": "Desktop Shell",
-      "bytes": 5226,
+      "bytes": 5256,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -1594,10 +1594,73 @@
       "decisionEvidence": "manual-review-rule:tauri-core-entrypoints"
     },
     {
+      "path": "desktop/src-tauri/src/runtime/acp_execution.rs",
+      "kind": "runtime",
+      "owner": "Local Agent Runtime",
+      "bytes": 25705,
+      "pathMentions": [],
+      "moduleConsumers": [
+        "desktop/src-tauri/src/runtime/gemini_executor.rs",
+        "desktop/src-tauri/src/runtime/hermes_execution.rs",
+        "desktop/src-tauri/src/runtime/mod.rs"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
+      "decision": "keep",
+      "rationale": "Tauri Native Shell、Runtime 模块注册和离线 Patch normalizer 入口；具体领域规则归 runtime 子模块，app.rs 单独持续拆分。",
+      "reviewStatus": "reviewed",
+      "verification": "cargo check --manifest-path desktop/src-tauri/Cargo.toml && bash tests/run-tests.sh",
+      "decisionEvidence": "manual-review-rule:tauri-core-entrypoints"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/acp_protocol.rs",
+      "kind": "runtime",
+      "owner": "Local Agent Runtime",
+      "bytes": 7920,
+      "pathMentions": [],
+      "moduleConsumers": [
+        "desktop/src-tauri/src/runtime/acp_execution.rs",
+        "desktop/src-tauri/src/runtime/agent_executor.rs",
+        "desktop/src-tauri/src/runtime/app.rs",
+        "desktop/src-tauri/src/runtime/mod.rs"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
+      "decision": "keep",
+      "rationale": "Tauri Native Shell、Runtime 模块注册和离线 Patch normalizer 入口；具体领域规则归 runtime 子模块，app.rs 单独持续拆分。",
+      "reviewStatus": "reviewed",
+      "verification": "cargo check --manifest-path desktop/src-tauri/Cargo.toml && bash tests/run-tests.sh",
+      "decisionEvidence": "manual-review-rule:tauri-core-entrypoints"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/agent_executor.rs",
+      "kind": "runtime",
+      "owner": "Local Agent Runtime",
+      "bytes": 10826,
+      "pathMentions": [],
+      "moduleConsumers": [
+        "desktop/src-tauri/src/runtime/acp_execution.rs",
+        "desktop/src-tauri/src/runtime/app.rs",
+        "desktop/src-tauri/src/runtime/gemini_executor.rs",
+        "desktop/src-tauri/src/runtime/hermes_execution.rs",
+        "desktop/src-tauri/src/runtime/hermes_executor.rs",
+        "desktop/src-tauri/src/runtime/hermes_protocol.rs",
+        "desktop/src-tauri/src/runtime/mod.rs",
+        "desktop/src-tauri/src/runtime/patch_draft.rs"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
+      "decision": "keep",
+      "rationale": "Tauri Native Shell、Runtime 模块注册和离线 Patch normalizer 入口；具体领域规则归 runtime 子模块，app.rs 单独持续拆分。",
+      "reviewStatus": "reviewed",
+      "verification": "cargo check --manifest-path desktop/src-tauri/Cargo.toml && bash tests/run-tests.sh",
+      "decisionEvidence": "manual-review-rule:tauri-core-entrypoints"
+    },
+    {
       "path": "desktop/src-tauri/src/runtime/agent_runs.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 87349,
+      "bytes": 89780,
       "pathMentions": [
         "desktop/src/lib/agent-topic-agent-config.js",
         "desktop/src/workspace-outline.js"
@@ -1605,9 +1668,9 @@
       "moduleConsumers": [
         "desktop/src-tauri/src/bin/mcp_eval.rs",
         "desktop/src-tauri/src/bin/provider_timeline_eval.rs",
+        "desktop/src-tauri/src/runtime/acp_execution.rs",
         "desktop/src-tauri/src/runtime/app.rs",
         "desktop/src-tauri/src/runtime/execution.rs",
-        "desktop/src-tauri/src/runtime/hermes_execution.rs",
         "desktop/src-tauri/src/runtime/mod.rs",
         "desktop/src-tauri/src/runtime/tasks.rs"
       ],
@@ -1643,11 +1706,11 @@
       "path": "desktop/src-tauri/src/runtime/agent_tools.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 19218,
+      "bytes": 21284,
       "pathMentions": [],
       "moduleConsumers": [
+        "desktop/src-tauri/src/runtime/acp_execution.rs",
         "desktop/src-tauri/src/runtime/app.rs",
-        "desktop/src-tauri/src/runtime/hermes_execution.rs",
         "desktop/src-tauri/src/runtime/mod.rs"
       ],
       "consumerEvidence": "static-module-consumer",
@@ -1662,7 +1725,7 @@
       "path": "desktop/src-tauri/src/runtime/app.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 101103,
+      "bytes": 105044,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/main.rs",
@@ -1680,7 +1743,7 @@
       "path": "desktop/src-tauri/src/runtime/chat_content.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 15470,
+      "bytes": 18130,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/bin/provider_fallback_eval.rs",
@@ -1737,7 +1800,7 @@
       "path": "desktop/src-tauri/src/runtime/chat_stream.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 28658,
+      "bytes": 40164,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/bin/provider_fallback_eval.rs",
@@ -1794,6 +1857,24 @@
       "decisionEvidence": "manual-review-registry"
     },
     {
+      "path": "desktop/src-tauri/src/runtime/gemini_executor.rs",
+      "kind": "runtime",
+      "owner": "Local Agent Runtime",
+      "bytes": 5259,
+      "pathMentions": [],
+      "moduleConsumers": [
+        "desktop/src-tauri/src/runtime/agent_executor.rs",
+        "desktop/src-tauri/src/runtime/mod.rs"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
+      "decision": "keep",
+      "rationale": "Tauri Native Shell、Runtime 模块注册和离线 Patch normalizer 入口；具体领域规则归 runtime 子模块，app.rs 单独持续拆分。",
+      "reviewStatus": "reviewed",
+      "verification": "cargo check --manifest-path desktop/src-tauri/Cargo.toml && bash tests/run-tests.sh",
+      "decisionEvidence": "manual-review-rule:tauri-core-entrypoints"
+    },
+    {
       "path": "desktop/src-tauri/src/runtime/goals.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
@@ -1816,13 +1897,30 @@
       "path": "desktop/src-tauri/src/runtime/hermes_execution.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 14715,
+      "bytes": 1535,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/bin/provider_timeline_eval.rs",
-        "desktop/src-tauri/src/runtime/app.rs",
-        "desktop/src-tauri/src/runtime/mod.rs",
-        "desktop/src-tauri/src/runtime/patch_draft.rs"
+        "desktop/src-tauri/src/runtime/hermes_executor.rs",
+        "desktop/src-tauri/src/runtime/mod.rs"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
+      "decision": "keep",
+      "rationale": "Tauri Native Shell、Runtime 模块注册和离线 Patch normalizer 入口；具体领域规则归 runtime 子模块，app.rs 单独持续拆分。",
+      "reviewStatus": "reviewed",
+      "verification": "cargo check --manifest-path desktop/src-tauri/Cargo.toml && bash tests/run-tests.sh",
+      "decisionEvidence": "manual-review-rule:tauri-core-entrypoints"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/hermes_executor.rs",
+      "kind": "runtime",
+      "owner": "Local Agent Runtime",
+      "bytes": 1476,
+      "pathMentions": [],
+      "moduleConsumers": [
+        "desktop/src-tauri/src/runtime/agent_executor.rs",
+        "desktop/src-tauri/src/runtime/mod.rs"
       ],
       "consumerEvidence": "static-module-consumer",
       "consumerReview": "静态 import/mod 关系已记录。",
@@ -1836,11 +1934,13 @@
       "path": "desktop/src-tauri/src/runtime/hermes_protocol.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 13163,
+      "bytes": 5474,
       "pathMentions": [],
       "moduleConsumers": [
+        "desktop/src-tauri/src/runtime/acp_execution.rs",
         "desktop/src-tauri/src/runtime/app.rs",
         "desktop/src-tauri/src/runtime/hermes_execution.rs",
+        "desktop/src-tauri/src/runtime/hermes_executor.rs",
         "desktop/src-tauri/src/runtime/mod.rs"
       ],
       "consumerEvidence": "static-module-consumer",
@@ -1895,7 +1995,7 @@
       "path": "desktop/src-tauri/src/runtime/mod.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 640,
+      "bytes": 759,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -1914,9 +2014,9 @@
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/bin/patch_normalizer.rs",
+        "desktop/src-tauri/src/runtime/acp_execution.rs",
         "desktop/src-tauri/src/runtime/app.rs",
         "desktop/src-tauri/src/runtime/execution.rs",
-        "desktop/src-tauri/src/runtime/hermes_execution.rs",
         "desktop/src-tauri/src/runtime/isolated_workspace.rs",
         "desktop/src-tauri/src/runtime/mod.rs",
         "desktop/src-tauri/src/runtime/patch_draft.rs"
@@ -1933,7 +2033,7 @@
       "path": "desktop/src-tauri/src/runtime/patch_draft.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 13745,
+      "bytes": 13903,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/app.rs",
@@ -1975,11 +2075,14 @@
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/bin/provider_fallback_eval.rs",
+        "desktop/src-tauri/src/runtime/acp_execution.rs",
+        "desktop/src-tauri/src/runtime/agent_executor.rs",
         "desktop/src-tauri/src/runtime/agent_scheduler.rs",
         "desktop/src-tauri/src/runtime/app.rs",
         "desktop/src-tauri/src/runtime/chat_content.rs",
         "desktop/src-tauri/src/runtime/chat_stream.rs",
-        "desktop/src-tauri/src/runtime/hermes_execution.rs",
+        "desktop/src-tauri/src/runtime/gemini_executor.rs",
+        "desktop/src-tauri/src/runtime/hermes_executor.rs",
         "desktop/src-tauri/src/runtime/mod.rs",
         "desktop/src-tauri/src/runtime/patch_draft.rs",
         "desktop/src-tauri/src/runtime/planning.rs",
@@ -1997,7 +2100,7 @@
       "path": "desktop/src-tauri/src/runtime/provider_tools.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 14933,
+      "bytes": 31216,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/chat_stream.rs",
@@ -2150,10 +2253,11 @@
       "path": "desktop/src-tauri/src/runtime/tool_registry.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 9225,
+      "bytes": 11012,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/bin/mcp_eval.rs",
+        "desktop/src-tauri/src/runtime/acp_execution.rs",
         "desktop/src-tauri/src/runtime/agent_tools.rs",
         "desktop/src-tauri/src/runtime/app.rs",
         "desktop/src-tauri/src/runtime/mcp_runtime.rs",
@@ -3020,7 +3124,7 @@
       "path": "desktop/src/components/workbench/agent-user-form-card.jsx",
       "kind": "frontend",
       "owner": "Workbench",
-      "bytes": 4608,
+      "bytes": 5347,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/components/workbench/assistant-ui-conversation-poc.jsx",
@@ -3055,7 +3159,7 @@
       "path": "desktop/src/components/workbench/agent-workspace-conversation-canvas.jsx",
       "kind": "frontend",
       "owner": "Workbench",
-      "bytes": 1654,
+      "bytes": 1726,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/main.jsx"
@@ -3106,7 +3210,7 @@
       "path": "desktop/src/components/workbench/assistant-ui-conversation-poc.jsx",
       "kind": "frontend",
       "owner": "Workbench",
-      "bytes": 4382,
+      "bytes": 4456,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/main.jsx"
@@ -3208,7 +3312,7 @@
       "path": "desktop/src/components/workbench/conversation-transcript.jsx",
       "kind": "frontend",
       "owner": "Workbench",
-      "bytes": 8163,
+      "bytes": 8423,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/components/workbench/agent-workspace-conversation-canvas.jsx"
@@ -3225,7 +3329,7 @@
       "path": "desktop/src/components/workbench/conversation.jsx",
       "kind": "frontend",
       "owner": "Workbench",
-      "bytes": 4145,
+      "bytes": 5035,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/components/workbench/conversation-transcript.jsx",
@@ -3277,7 +3381,7 @@
       "path": "desktop/src/components/workbench/engineering-file-tab.jsx",
       "kind": "frontend",
       "owner": "Workbench",
-      "bytes": 13712,
+      "bytes": 13709,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/main.jsx"
@@ -4130,7 +4234,7 @@
       "path": "desktop/src/components/workbench/use-conversation-submission.js",
       "kind": "frontend",
       "owner": "Workbench",
-      "bytes": 14212,
+      "bytes": 15046,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/main.jsx"
@@ -4249,7 +4353,7 @@
       "path": "desktop/src/components/workbench/use-plan-action.js",
       "kind": "frontend",
       "owner": "Workbench",
-      "bytes": 2526,
+      "bytes": 2474,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/main.jsx"
@@ -4742,7 +4846,7 @@
       "path": "desktop/src/conversation-runtime/action-executor.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 15080,
+      "bytes": 17079,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/conversation-runtime/index.js"
@@ -4759,7 +4863,7 @@
       "path": "desktop/src/conversation-runtime/action-registry.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 3919,
+      "bytes": 4220,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/conversation-runtime/action-executor.js",
@@ -4896,7 +5000,7 @@
       "path": "desktop/src/conversation-runtime/intent-router.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 1429,
+      "bytes": 1497,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/conversation-runtime/index.js",
@@ -5403,7 +5507,7 @@
       "path": "desktop/src/lib/conversation-action-controller.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 6184,
+      "bytes": 6253,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/main.jsx",
@@ -5418,10 +5522,30 @@
       "decisionEvidence": "manual-review-rule:frontend-domain-libraries"
     },
     {
+      "path": "desktop/src/lib/conversation-agent-events.js",
+      "kind": "frontend",
+      "owner": "Desktop Frontend",
+      "bytes": 3227,
+      "pathMentions": [],
+      "moduleConsumers": [
+        "desktop/src/components/workbench/agent-user-form-card.jsx",
+        "desktop/src/components/workbench/conversation-transcript.jsx",
+        "desktop/src/components/workbench/use-conversation-submission.js",
+        "desktop/tests/conversation-agent-events.test.mjs"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
+      "decision": "keep",
+      "rationale": "对话、任务、目标、Provider、终端与工作区的纯投影、客户端和状态协调模块；由 Workbench surface 或测试消费。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop test && node scripts/audit-repository-files.mjs --check",
+      "decisionEvidence": "manual-review-rule:frontend-domain-libraries"
+    },
+    {
       "path": "desktop/src/lib/conversation-chat-result.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 1149,
+      "bytes": 1293,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/components/workbench/use-conversation-submission.js",
@@ -5439,7 +5563,7 @@
       "path": "desktop/src/lib/conversation-confirmation-handler.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 2730,
+      "bytes": 2899,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/components/workbench/use-conversation-submission.js",
@@ -5562,10 +5686,28 @@
       "decisionEvidence": "manual-review-rule:frontend-domain-libraries"
     },
     {
+      "path": "desktop/src/lib/conversation-recommended-action.js",
+      "kind": "frontend",
+      "owner": "Desktop Frontend",
+      "bytes": 366,
+      "pathMentions": [],
+      "moduleConsumers": [
+        "desktop/src/components/workbench/use-conversation-submission.js",
+        "desktop/tests/conversation-recommended-action.test.mjs"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
+      "decision": "keep",
+      "rationale": "对话、任务、目标、Provider、终端与工作区的纯投影、客户端和状态协调模块；由 Workbench surface 或测试消费。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop test && node scripts/audit-repository-files.mjs --check",
+      "decisionEvidence": "manual-review-rule:frontend-domain-libraries"
+    },
+    {
       "path": "desktop/src/lib/conversation-record.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 9244,
+      "bytes": 8244,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/components/workbench/use-conversation-persistence.js",
@@ -5593,7 +5735,7 @@
       "path": "desktop/src/lib/conversation-result-decision.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 840,
+      "bytes": 712,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/components/workbench/use-conversation-submission.js",
@@ -5611,7 +5753,7 @@
       "path": "desktop/src/lib/conversation-result-projection.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 2337,
+      "bytes": 3259,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/components/workbench/use-conversation-submission.js",
@@ -5685,7 +5827,7 @@
       "path": "desktop/src/lib/conversation-takeover-controller.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 1416,
+      "bytes": 1320,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/components/workbench/use-conversation-submission.js",
@@ -5777,7 +5919,7 @@
       "path": "desktop/src/lib/execution-client.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 6084,
+      "bytes": 6467,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/main.jsx",
@@ -5927,7 +6069,7 @@
       "path": "desktop/src/lib/patch-draft-executor.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 2233,
+      "bytes": 2361,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/components/workbench/use-patch-actions.js",
@@ -5989,7 +6131,7 @@
       "path": "desktop/src/lib/plan-executor.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 3144,
+      "bytes": 2456,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/components/workbench/use-plan-action.js",
@@ -6289,7 +6431,7 @@
       "path": "desktop/src/lib/runtime-api.js",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 3278,
+      "bytes": 3294,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/components/workbench/terminal-dock.jsx",
@@ -7004,7 +7146,7 @@
       "path": "desktop/src/main.jsx",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 57233,
+      "bytes": 57142,
       "pathMentions": [
         "desktop/src-tauri/src/runtime/workspace.rs",
         "desktop/src/lib/agent-topic-cards.js"
@@ -7169,7 +7311,7 @@
       "path": "desktop/src/styles/conversation.css",
       "kind": "frontend",
       "owner": "Desktop Frontend",
-      "bytes": 31495,
+      "bytes": 32144,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src/styles.css"
@@ -7608,10 +7750,25 @@
       "decisionEvidence": "manual-review-rule:desktop-test-suites"
     },
     {
+      "path": "desktop/tests/conversation-agent-events.test.mjs",
+      "kind": "test",
+      "owner": "Desktop Quality",
+      "bytes": 2889,
+      "pathMentions": [],
+      "moduleConsumers": [],
+      "consumerEvidence": "no-static-module-consumer",
+      "consumerReview": "没有静态 import/mod 关系；路径提及、Owner 和领域回归构成保留证据，删除前必须补运行时或发布消费者复核。",
+      "decision": "keep",
+      "rationale": "Desktop Runtime、Workbench、Preview 与 Agent 闭环回归套件；Node 测试覆盖 tests/*.test.mjs，E2E smoke 由 Playwright 独立运行。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop test && npm --prefix desktop run test:smoke；原生窗口行为另运行 npm --prefix desktop run test:native。",
+      "decisionEvidence": "manual-review-rule:desktop-test-suites"
+    },
+    {
       "path": "desktop/tests/conversation-chat-result.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 1920,
+      "bytes": 2066,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -7626,7 +7783,7 @@
       "path": "desktop/tests/conversation-confirmation-handler.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 2801,
+      "bytes": 3695,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -7728,10 +7885,25 @@
       "decisionEvidence": "manual-review-rule:desktop-test-suites"
     },
     {
+      "path": "desktop/tests/conversation-recommended-action.test.mjs",
+      "kind": "test",
+      "owner": "Desktop Quality",
+      "bytes": 897,
+      "pathMentions": [],
+      "moduleConsumers": [],
+      "consumerEvidence": "no-static-module-consumer",
+      "consumerReview": "没有静态 import/mod 关系；路径提及、Owner 和领域回归构成保留证据，删除前必须补运行时或发布消费者复核。",
+      "decision": "keep",
+      "rationale": "Desktop Runtime、Workbench、Preview 与 Agent 闭环回归套件；Node 测试覆盖 tests/*.test.mjs，E2E smoke 由 Playwright 独立运行。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop test && npm --prefix desktop run test:smoke；原生窗口行为另运行 npm --prefix desktop run test:native。",
+      "decisionEvidence": "manual-review-rule:desktop-test-suites"
+    },
+    {
       "path": "desktop/tests/conversation-record.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 10209,
+      "bytes": 10091,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -7746,7 +7918,7 @@
       "path": "desktop/tests/conversation-result-decision.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 969,
+      "bytes": 1093,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -7761,7 +7933,7 @@
       "path": "desktop/tests/conversation-result-projection.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 2022,
+      "bytes": 3184,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -7791,7 +7963,7 @@
       "path": "desktop/tests/conversation-runtime.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 23390,
+      "bytes": 26419,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -7836,7 +8008,7 @@
       "path": "desktop/tests/conversation-takeover-controller.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 2636,
+      "bytes": 2787,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -7911,7 +8083,7 @@
       "path": "desktop/tests/domain-boundaries.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 105641,
+      "bytes": 108730,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -8226,7 +8398,7 @@
       "path": "desktop/tests/patch-draft-executor.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 3994,
+      "bytes": 4098,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -8271,7 +8443,7 @@
       "path": "desktop/tests/plan-executor.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 5275,
+      "bytes": 4797,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -8571,7 +8743,7 @@
       "path": "desktop/tests/runtime-request-cancellation.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 1643,
+      "bytes": 1828,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -8586,7 +8758,7 @@
       "path": "desktop/tests/schema-identity.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 1910,
+      "bytes": 2221,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -9188,7 +9360,7 @@
       "path": "docs/ARCHITECTURE.md",
       "kind": "documentation",
       "owner": "Documentation Governance",
-      "bytes": 11658,
+      "bytes": 12950,
       "pathMentions": [
         "desktop/src-tauri/src/runtime/workspace.rs",
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
@@ -9210,7 +9382,7 @@
       "path": "docs/BACKEND.md",
       "kind": "documentation",
       "owner": "Documentation Governance",
-      "bytes": 8846,
+      "bytes": 9251,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -9321,7 +9493,7 @@
       "path": "docs/LESSONS.md",
       "kind": "documentation",
       "owner": "Documentation Governance",
-      "bytes": 104465,
+      "bytes": 116506,
       "pathMentions": [
         "desktop/src/components/workbench/project-memory-panel.jsx",
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
@@ -9509,7 +9681,7 @@
       "path": "docs/data/schema-contract-inventory.json",
       "kind": "documentation-data",
       "owner": "Documentation Governance",
-      "bytes": 14868,
+      "bytes": 15714,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -9585,6 +9757,21 @@
       "kind": "eval",
       "owner": "Agent Reliability",
       "bytes": 1138,
+      "pathMentions": [],
+      "moduleConsumers": [],
+      "consumerEvidence": "no-static-module-consumer",
+      "consumerReview": "没有静态 import/mod 关系；路径提及、Owner 和领域回归构成保留证据，删除前必须补运行时或发布消费者复核。",
+      "decision": "keep",
+      "rationale": "未列为遗留或重写候选；按当前 Owner 默认保留，后续改动或删除必须复核消费者证据。",
+      "reviewStatus": "classified",
+      "verification": "自动审计：git ls-files、路径提及与静态模块消费者扫描；变更前执行所属领域回归。",
+      "decisionEvidence": "inventory-default-retention"
+    },
+    {
+      "path": "schemas/agent-event.schema.json",
+      "kind": "schema",
+      "owner": "Runtime Contracts",
+      "bytes": 1118,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",

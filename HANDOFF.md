@@ -1,7 +1,7 @@
 ---
 layer: knowledge
 type: status
-last_verified: 2026-07-26
+last_verified: 2026-07-27
 teaches: "当前接手上下文、运行边界、验证证据和下一步"
 use_when: "新的 AI 或工程师需要继续 OmniDesk 工作时"
 depends_on: [PROJECT.md, AGENTS.md, docs/ARCHITECTURE.md, docs/TESTING.md]
@@ -16,10 +16,23 @@ depends_on: [PROJECT.md, AGENTS.md, docs/ARCHITECTURE.md, docs/TESTING.md]
 
 - 产品核心：`desktop/` 中的 Tauri + React + Local Agent Runtime。它在用户授权范围内处理项目、对话、Patch、审批、检查、恢复与证据。
 - 状态根：`.omnidesk/` 是唯一活动状态根，分为 `data`、`runtime`、`cache`、`evidence`。历史 `.project-os/` 只能通过显式、非破坏性迁移导入，不能作为运行时回退。
-- 当前分支：`main`，最新远端提交为 `cff6af2 fix: trust native task function calls`；本轮自动生成的治理账本和状态文档更新尚未提交或推送。
+- 当前分支：`main`，最新远端提交为 `ce40591 docs: complete agent platform stabilization`；本轮模糊修改追问与计划/Patch 失败状态修复尚未提交或推送。
 - 受控边界不可放松：Patch 写入与检查各自独立审批；恢复不能自动重放；Provider 成功不等于任务成功；Preview 只读，不执行写入、终端、检查或恢复。
 
 ## 最近完成
+
+- 模糊修改请求已从源头改走 Hermes：`修改项目概览里的核心能力`、`帮我修改按钮` 等缺少目标值的输入不再直接生成 Patch，而是启动 Agent 并通过标准 `ask_user` 收集必要内容；`请把按钮文案改成保存` 等信息完整的请求仍可直接生成只读草稿。
+- 前端固定 15 秒计划超时及静默本地 fallback 已移除，计划期限与取消继续由 Rust Runtime 单点负责。任何带 `LOCAL_FALLBACK`、`PROVIDER_FALLBACK` 或 `PROVIDER_PRECHECK_FAILED` 的计划都不能自动进入 Patch。
+- Patch 语义闸门返回 `notApplicable` 时现按失败处理并显示真实 `failureReason`；失败时间线在实际失败阶段结束，不再伪造“草稿已生成”或“等待确认应用”。同一 Task 存在待回答 Run 时，对话状态投影为“等待你的回答”。
+- 真实原生桌面复测请求 `1785054065688-24f4935c60a0c` 已进入 `awaiting-user-input`，展示“确认‘核心能力’改动目标”结构化表单；对应 Run 的 interaction 为 `ask_user`、approval 数为 0，没有创建 Patch 或执行工程写入。修复后本地验证为 Desktop Node `607/607`、Web build、Cargo check 与原生 WebDriver smoke 全部通过。
+- `ask_user` 后续交互已继续收口：历史表单与消息按真实时间交错；单个待回答文本问题可直接从底部输入框提交，不再另起任务；已提交或跳过的表单折叠为摘要，若恢复失败则优先显示 Run 失败和有界原因。`search_project.maxResults` 已纳入 Tool Registry 的封闭整数 schema（`1..100`）并由执行器实际限幅。完整回归为 Desktop Node `612/612`、Rust `206/206`、Patch Normalizer `7/7`、Web build 与原生 WebDriver smoke 全部通过。
+- Tool Call 自修复 v1 已完成：`read_file` 提供最多 2000 行、80 KiB 的 `startLine/endLine` 有界读取；Hermes prompt 携带完整内置 Tool Registry，未知工具或非法只读参数会写入包含预期 schema 的失败 observation，并在同一 Run 内最多纠正两次。合法调用重置预算，耗尽后才失败；该机制不适用于 Patch、检查或终端，不会旁路审批。完整回归为 Node `612/612`、Rust `210/210`、Patch Normalizer `7/7`、Web build、离线 Eval 和原生 WebDriver smoke 全部通过。
+- 建议到执行的确认闭环 v2 已改为双调用协议：`recommendation-required` 先用无工具 SSE 请求流式展示完整回答，再用隐藏的 `respond_with_recommendation` Function Call 只生成 `task`。分类失败保留正文并降级为 `native-text`；前端只消费 `native-recommendation-call`，不从正文或历史猜测动作。用户回复“可以”后通过同一 `pendingAction` 启动受控 Hermes，Patch、检查和终端仍独立审批。
+- 对话视口已改为维护父级 `.agentCanvas` 的条件粘底：底部用户跟随流式增长，向上阅读时不抢滚动。每轮结果持久化不含正文的 `providerStreamTrace`。真实桌面请求 `1785130460943-15b47c0435f228` 记录 393 个 delta / 613 字，首段 1116ms、末段 8277ms；推荐双调用、真实流式和持久化动作均已成立。
+- Agent Executor Adapter v1 已接入第二实现边界：Registry 登记默认 Hermes ACP 与可选 Gemini ACP；通用 `acp_protocol / acp_execution` 拥有 JSON-RPC、结构化循环、取消和 usage，两个 Adapter 只保留供应商启动细节。执行请求显式区分 `Start / Resume`，能力闸门要求结构化工具、取消、checkpoint 恢复、追问和审批请求。新 Run 的 `executorId` 与创建 evidence 一致，恢复服从历史绑定。Gemini 0.44.1 真实进程启动并由 Runtime 取消已通过，独立 ACP fixture 已完成恢复、结构化结果和 usage；Gemini 真实模型凭据调用尚未验收。
+- Agent Executor 契约已冻结为 `omnidesk.agent-executor.v1`：核心能力由 Runtime 统一校验，供应商私有能力只能放入 `extensions`；扩展字段不得参与调度、审批、恢复、Patch、检查或 evidence 决策。边界测试禁止通用 Runtime 按 Hermes/Gemini 身份分支，并用无供应商类型的 fixture 验证替代执行器契约。
+- Agent Event 标准化 v1 已接入共享 ACP 执行层：公开生命周期、工具请求/结果、等待状态与终态使用 `omnidesk.agent-event.v1`，sequence 从 1 递增且只允许一个 terminal。`app.rs` 只把 `agentEvents` 交给 Agent Run Timeline，不再消费供应商形状的 `trace/observations`；导出只保留事件固定元数据。完整思维链、Prompt、正文和工具输出不得进入该事件契约。
+- 工具参数中的 `reply` 现可安全增量解码；当前 LJM Gateway 真实请求仍在最后一次返回完整 Function Call，因此要跨 Provider 保证真流式需要后续决策是否采用“流式正文 + 第二次结构化动作判断”。真实桌面对话 `conv-1785125756632` 已验证新消息直接接管并取消旧请求，无额外取消消息和迟到旧结果。Agent 开始文案现明确说明读取项目、询问/审批边界和当前零写入。
 
 - `OmniDesk 结构化追问表单闭环 v1` 已完成实现：确认执行的任务先启动 Hermes；Agent 可发起持久化 `ask_user` interaction，对话内渲染 schema 表单，提交或跳过后从 checkpoint 重新请求同一 Run。
 - 表单回答与 Patch/Check approval 独立；相同回答幂等、冲突回答拒绝。原生 WebDriver 已覆盖真实窗口提交、无 approval/无工程写入、应用重启恢复待回答表单，以及原 Patch approval 恢复不受影响。
@@ -62,5 +75,5 @@ depends_on: [PROJECT.md, AGENTS.md, docs/ARCHITECTURE.md, docs/TESTING.md]
 
 ## 下一步建议
 
-1. 继续降低多文件 Patch 波动；不要放宽授权、独立审批、规范化或 trace 门槛。
-2. Provider、Hermes、MCP 依赖或前端入口变化时，重跑对应 P1/P3/P4/suite 切片并复核统一 artifact 索引与 800 KiB 预算。
+1. 在受保护环境为 Gemini ACP 配置独立模型凭据，运行同一只读任务并核对 `executorId`、取消、恢复、usage 与 metadata-only Timeline；未提供凭据时不得冒充真实模型验收。
+2. 继续降低多文件 Patch 波动；不要放宽授权、独立审批、规范化或 trace 门槛。

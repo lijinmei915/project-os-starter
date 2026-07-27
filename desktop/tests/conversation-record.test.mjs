@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { actionFromAssistantCommitment, actionFromAssistantRecommendation, buildChatRequestContext, buildConversationRecord, buildDialogueContextState, contextualizeUserMessage, derivePendingAction, followUpDecision, isEphemeralConversation, isEphemeralConversationTurn, mergeConversationRecords } from "../src/lib/conversation-record.js";
+import { buildChatRequestContext, buildConversationRecord, buildDialogueContextState, contextualizeUserMessage, derivePendingAction, followUpDecision, isEphemeralConversation, isEphemeralConversationTurn, mergeConversationRecords } from "../src/lib/conversation-record.js";
 import { buildTurnSummary } from "../src/conversation-runtime/summary.js";
 
 test("builds a compact project conversation record", () => {
@@ -76,6 +76,17 @@ test("persists processing progress with the assistant turn", () => {
   assert.deepEqual(record.turns[0].events, events);
 });
 
+test("persists bounded Provider stream metadata with its assistant turn", () => {
+  const providerStreamTrace = { charCount: 320, deltaCount: 4, firstDeltaMs: 900, lastDeltaMs: 1400 };
+  const record = buildConversationRecord({
+    id: "conv-stream-trace",
+    updatedAt: "2026-07-27T00:00:00Z",
+    turns: [{ id: "a1", providerStreamTrace, requestId: "request-1", role: "assistant", text: "回答" }],
+  });
+  assert.deepEqual(record.turns[0].providerStreamTrace, providerStreamTrace);
+  assert.equal(record.turns[0].requestId, "request-1");
+});
+
 test("keeps the prior conclusion and user delegation for follow-up turns", () => {
   const state = buildDialogueContextState([
     { id: "u1", role: "user", text: "这个项目当前有什么风险？" },
@@ -147,39 +158,31 @@ test("keeps one unresolved action in conversation state", () => {
   ]), null);
 });
 
-test("recovers a confirmable recommendation from legacy conversation text", () => {
-  const action = derivePendingAction([{
+test("does not infer executable actions from legacy assistant prose", () => {
+  assert.equal(derivePendingAction([{
     id: "assistant-legacy",
     role: "assistant",
     text: "当前风险已整理。最小下一步是运行一轮基础检查，并补齐回归证据。",
-  }]);
-  assert.deepEqual(action, {
-    id: "recommended-assistant-legacy",
-    task: "运行一轮基础检查，并补齐回归证据",
-    type: "generate-plan",
-  });
+  }]), null);
 });
 
 test("maps short follow-ups to pending-action decisions", () => {
   assert.equal(followUpDecision("好"), "confirm");
   assert.equal(followUpDecision("继续"), "confirm");
+  assert.equal(followUpDecision("那开始吧"), "confirm");
+  assert.equal(followUpDecision("就这么做"), "confirm");
   assert.equal(followUpDecision("然后呢"), "inspect");
   assert.equal(followUpDecision("不用了"), "cancel");
   assert.equal(followUpDecision("这个方案为什么这样设计"), "none");
 });
 
-test("turns an assistant action promise into a machine action", () => {
-  const action = actionFromAssistantCommitment("好的，下一步我会创建一轮检查计划。", "运行检查", "action-1");
-  assert.deepEqual(action, { id: "action-1", task: "运行检查", type: "generate-plan" });
-  assert.equal(actionFromAssistantCommitment("当前检查有三项。", "检查"), null);
-});
-
-test("turns an explicit recommended next step into a confirmation action", () => {
-  const action = actionFromAssistantRecommendation("最小下一步是运行一轮基础检查，并优先清理重复任务。", "检查风险", "action-2");
-  assert.deepEqual(action, { id: "action-2", task: "运行一轮基础检查，并优先清理重复任务", type: "generate-plan" });
-  assert.equal(actionFromAssistantRecommendation("当前存在三类风险。", "检查风险"), null);
-  assert.equal(
-    actionFromAssistantRecommendation("那就先收口，优先合并重复任务并补一次构建。", "检查风险")?.task,
-    "收口，优先合并重复任务并补一次构建",
-  );
+test("keeps acknowledgements out of the current topic anchor", () => {
+  const context = buildDialogueContextState([
+    { role: "user", text: "分析当前对话模块，并给出三个改进建议" },
+    { role: "assistant", text: "这里有三项建议。" },
+    { role: "user", text: "可以" },
+    { role: "assistant", text: "建议优先推进当前任务摘要。" },
+    { role: "user", text: "那开始吧" },
+  ]);
+  assert.equal(context.currentTopic, "分析当前对话模块，并给出三个改进建议");
 });

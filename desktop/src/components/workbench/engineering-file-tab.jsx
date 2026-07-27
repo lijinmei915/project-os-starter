@@ -67,7 +67,7 @@ export function EngineeringFileTab({
   onRefreshWorkspace,
   onReadEngineeringFile,
   onResumeAgentRun,
-  onGetHermesExecutorStatus,
+  onGetAgentExecutorStatus,
   onCopyText,
   onRefreshWorkspaceFacts,
   onRefreshAgentRuns,
@@ -149,7 +149,7 @@ export function EngineeringFileTab({
   const lessonsLearnedPanel = governancePanel(isLessonsLearnedTopic, "lessons-learned");
   const memorySurfacePanel = isMemorySurfaceTopic ? <MemorySurfacePanel onOpenSource={openSourceFile} renderSourceButtons={sourceButtons} type={topicRouteId} /> : null;
   const assetSurfacePanel = isAssetSurfaceTopic ? <AssetSurfacePanel onOpenSource={openSourceFile} renderSourceButtons={sourceButtons} type={topicRouteId} /> : null;
-  const agentConfigSurfacePanel = isAgentConfigSurfaceTopic ? <AgentConfigSurfacePanel agentRuns={agentRuns} mcpClient={mcpClient} mcpNative={mcpNative} onApproveAgentRun={onApproveAgentRun} onCancelAgentRun={onCancelAgentRun} onExportAgentRun={onExportAgentRun} onGetHermesExecutorStatus={onGetHermesExecutorStatus} onOpenSource={openSourceFile} onRefreshAgentRuns={onRefreshAgentRuns} projectId={snapshot?.currentProjectId} projectPath={snapshot?.currentProjectPath} renderSourceButtons={sourceButtons} type={topicRouteId} /> : null;
+  const agentConfigSurfacePanel = isAgentConfigSurfaceTopic ? <AgentConfigSurfacePanel agentRuns={agentRuns} mcpClient={mcpClient} mcpNative={mcpNative} onApproveAgentRun={onApproveAgentRun} onCancelAgentRun={onCancelAgentRun} onExportAgentRun={onExportAgentRun} onGetAgentExecutorStatus={onGetAgentExecutorStatus} onOpenSource={openSourceFile} onRefreshAgentRuns={onRefreshAgentRuns} projectId={snapshot?.currentProjectId} projectPath={snapshot?.currentProjectPath} renderSourceButtons={sourceButtons} type={topicRouteId} /> : null;
   const runbookPanel = isRunbookTopic && snapshot?.workspaceFacts
     ? <RunbookPanel onCopyCommand={onCopyText} onOpenSource={openSourceFile} onSendToTerminal={onPrepareTerminalCommand} report={snapshot.workspaceFacts} snapshot={snapshot} />
     : null;

@@ -44,6 +44,9 @@ React 只通过登记的 Tauri command 或事件与 Runtime 交互。Runtime com
 | `provider` | Profile、密钥隔离、OpenAI-compatible transport、响应解析、预检与错误分类 |
 | `provider_tools` | Provider 原生 Function Calling 能力矩阵、持久化能力证据、工具 schema、SSE/非流式完整调用解析与参数校验 |
 | `hermes_protocol` | ACP 程序发现、只读健康探测、协议帧、超时/取消、结构化响应与拒绝响应 |
+| `agent_executor` | 通用执行契约、能力闸门与唯一 Registry；按稳定 ID 选择执行器并约束 Run 恢复绑定 |
+| `acp_protocol` / `acp_execution` | 供应商无关的 ACP JSON-RPC、结构化工具循环、取消、usage 与 Tool Gateway 委托 |
+| `hermes_executor` / `gemini_executor` | Registry 中的薄 Adapter；只负责供应商程序发现、状态、参数与环境准备 |
 | `patch` | Patch Draft 语义门槛、上下文文件范围、提示词、占位草稿、unified diff、路径、hunk 与授权校验 |
 | `patch_draft` | Patch Draft 模型连接选择、Hermes 重生成、Provider 降级、失败审计与草稿证据 |
 | `planning` | 只读计划的本地回退、连接选择、Provider 降级与只读证据 |

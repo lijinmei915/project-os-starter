@@ -1,4 +1,4 @@
-export function applyConversationTakeover({ chatTurns, clearInput, onChatTurnsChange, onStopPlan, projectExecutionEvent, requestRef, runningRequest, setChatLoading, setPendingTurn, settleRequest, takeover, userTurn }) {
+export function applyConversationTakeover({ cancelRequest, chatTurns, clearInput, onChatTurnsChange, onStopPlan, projectExecutionEvent, requestRef, runningRequest, setChatLoading, setPendingTurn, settleRequest, takeover, userTurn }) {
   if (takeover.decision === "continue-current") {
     setPendingTurn((current) => current ? { ...current, label: "继续当前请求" } : current);
     clearInput();
@@ -7,6 +7,7 @@ export function applyConversationTakeover({ chatTurns, clearInput, onChatTurnsCh
   if (takeover.decision === "cancel") {
     let turns = chatTurns;
     if (settleRequest(requestRef, runningRequest.id, "cancelled")) {
+      void cancelRequest?.(runningRequest.id);
       turns = projectExecutionEvent([...chatTurns, userTurn], { id: `${Date.now()}-assistant-cancelled`, outcome: "cancelled", requestId: runningRequest.id, text: "已按你的要求停止当前处理。" });
       onChatTurnsChange(turns);
     }
@@ -14,10 +15,9 @@ export function applyConversationTakeover({ chatTurns, clearInput, onChatTurnsCh
     return { handled: true, turns };
   }
   if (takeover.decision === "redirect") {
-    settleRequest(requestRef, runningRequest.id, "cancelled");
-    const turns = projectExecutionEvent(chatTurns, { id: `${Date.now()}-assistant-superseded`, outcome: "cancelled", requestId: runningRequest.id, text: "已停止旧方向，正在按你的新要求处理。" });
+    if (settleRequest(requestRef, runningRequest.id, "cancelled")) void cancelRequest?.(runningRequest.id);
     setChatLoading(false); setPendingTurn(null); onStopPlan?.();
-    return { handled: false, turns };
+    return { handled: false, turns: chatTurns };
   }
   return { handled: false, turns: chatTurns };
 }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { executeReadonlyPlanWorkflow, planGenerationTimeoutMs } from "../src/lib/plan-executor.js";
+import { executeReadonlyPlanWorkflow } from "../src/lib/plan-executor.js";
 
 function timeoutError(message = "计划生成等待超时") {
   const error = new Error(message);
@@ -31,10 +31,6 @@ function createHarness(overrides = {}) {
       },
       remote: false,
       requestId: "request-1",
-      runWithTimeout: async (promise, timeoutMs, message) => {
-        calls.push({ id: "timeout", message, timeoutMs });
-        return promise;
-      },
       ...overrides,
     },
     progress,
@@ -53,26 +49,24 @@ test("persists a local read-only plan without invoking the remote provider", asy
   assert.deepEqual(harness.progress.map((event) => event.stage), ["context", "generate", "persist"]);
 });
 
-test("runs a remote plan through the fixed 15 second timeout", async () => {
+test("lets the Rust Runtime own the remote planning deadline", async () => {
   const harness = createHarness({ remote: true });
   const result = await executeReadonlyPlanWorkflow(harness.input);
 
   assert.equal(result.task.plan.source, "remote");
-  assert.equal(harness.calls.find((call) => call.id === "timeout").timeoutMs, planGenerationTimeoutMs);
-  assert.equal(planGenerationTimeoutMs, 15000);
+  assert.deepEqual(harness.calls.map((call) => call.id), ["remote", "persist"]);
 });
 
-test("falls back to a deterministic local plan after a remote timeout", async () => {
+test("does not hide a Runtime timeout behind a local plan", async () => {
   const harness = createHarness({
     remote: true,
-    runWithTimeout: async () => { throw timeoutError(); },
+    generateRemotePlan: async () => { throw timeoutError(); },
   });
   const result = await executeReadonlyPlanWorkflow(harness.input);
 
-  assert.equal(result.status, "succeeded");
-  assert.equal(result.task.plan.source, "local");
-  assert.deepEqual(result.task.plan.trace, ["LOCAL_FALLBACK: provider plan timed out"]);
-  assert.equal(harness.progress.at(-2).label, "使用本地计划");
+  assert.equal(result.status, "timed-out");
+  assert.equal(result.error, "计划生成等待超时");
+  assert.equal(harness.calls.some((call) => call.id === "persist"), false);
 });
 
 test("retries an old backend with the legacy task argument and attachment note", async () => {
@@ -123,14 +117,9 @@ test("returns a timed-out terminal outcome when the legacy retry times out", asy
     generateRemotePlan: async () => {
       attempt += 1;
       if (attempt === 1) throw new Error("generate_readonly_plan missing required key task");
-      return { source: "unused" };
-    },
-    remote: true,
-    runWithTimeout: async (promise) => {
-      if (attempt === 1) return promise;
-      await promise;
       throw timeoutError();
     },
+    remote: true,
   });
   const result = await executeReadonlyPlanWorkflow(harness.input);
 

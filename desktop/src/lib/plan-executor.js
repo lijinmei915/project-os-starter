@@ -1,7 +1,5 @@
 import { requestOutcome } from "./request-lifecycle.js";
 
-export const planGenerationTimeoutMs = 15000;
-
 function isLegacyPlanArgumentsError(error) {
   const message = error instanceof Error ? error.message : String(error);
   return message.includes("generate_readonly_plan")
@@ -27,7 +25,6 @@ export async function executeReadonlyPlanWorkflow({
   persistTask,
   remote = false,
   requestId,
-  runWithTimeout,
 } = {}) {
   try {
     onProgress?.({ label: "读取项目上下文", stage: "context" });
@@ -35,28 +32,10 @@ export async function executeReadonlyPlanWorkflow({
     onProgress?.({ label: "生成执行计划", stage: "generate" });
     if (remote) {
       try {
-        plan = await runWithTimeout(
-          generateRemotePlan({ input: commandInput }),
-          planGenerationTimeoutMs,
-          "计划生成等待超时",
-        );
+        plan = await generateRemotePlan({ input: commandInput });
       } catch (error) {
-        if (error?.code === "REQUEST_TIMEOUT") {
-          onProgress?.({
-            detail: "远程生成响应较慢，已切换到本地确定性计划。",
-            label: "使用本地计划",
-            stage: "generate",
-          });
-          plan = {
-            ...buildLocalPlan(commandInput),
-            trace: ["LOCAL_FALLBACK: provider plan timed out"],
-          };
-        } else if (isLegacyPlanArgumentsError(error)) {
-          plan = await runWithTimeout(
-            generateRemotePlan({ task: legacyPlanTask(commandInput) }),
-            planGenerationTimeoutMs,
-            "计划生成等待超时",
-          );
+        if (isLegacyPlanArgumentsError(error)) {
+          plan = await generateRemotePlan({ task: legacyPlanTask(commandInput) });
         } else {
           throw error;
         }

@@ -49,10 +49,11 @@ test("keeps a validation-only task out of the approval state", async () => {
     task: { id: "check-1", status: "planned" },
   });
 
-  assert.equal(result.success, true);
+  assert.equal(result.success, false);
+  assert.equal(result.error, "任务计划明确不修改工程文件；当前应先运行检查。");
   assert.equal(result.task.status, "planned");
   assert.equal(result.task.executionEvidence.at(-1).status, "not-applicable");
-  assert.match(result.feedback, /不生成文件改动/);
+  assert.match(result.feedback, /未生成文件改动/);
 });
 
 test("rejects a generated Patch Draft when the request was superseded", async () => {

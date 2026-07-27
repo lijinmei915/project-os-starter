@@ -31,9 +31,10 @@ export async function executePatchDraftWorkflow({ generatePatch, isActive, persi
     };
     const persistedTask = await persistTask(projectedTask, { durable: true });
     return {
-      feedback: notApplicable ? "当前任务不生成文件改动；请先运行检查或调整计划。" : "改动草稿已生成。",
+      error: notApplicable ? patchDraft?.failureReason || "当前任务不具备可执行的文件改动。" : "",
+      feedback: notApplicable ? "当前任务未生成文件改动；请补充要求或重新生成计划。" : "改动草稿已生成。",
       patchDraft,
-      success: true,
+      success: !notApplicable,
       task: persistedTask || projectedTask,
     };
   } catch (error) {

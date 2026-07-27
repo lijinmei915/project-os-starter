@@ -1,7 +1,7 @@
 ---
 layer: knowledge
 type: status
-last_verified: 2026-07-26
+last_verified: 2026-07-27
 teaches: "OmniDesk 当前产品内核、阶段、可靠性基线和唯一下一步"
 use_when: "AI 需要判断 OmniDesk 当前状态、架构边界或下一步工作时"
 depends_on: [AGENTS.md, docs/ARCHITECTURE.md, docs/PRODUCT_PLAN.md]
@@ -92,6 +92,15 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 - P4 已通过受保护真实验收：官方 `@modelcontextprotocol/server-filesystem@2026.7.10` 的版本与 integrity 固定，发现和 `list_directory` 分别经过 Scheduler、Agent Run、独立审批与 Execution；审批前零执行，两个 Run 与 Timeline 成功，结果有界且 Scheduler 零残留。
 - 平台稳定化受保护 Eval [`30188136814`](https://github.com/lijinmei915/project-os-starter/actions/runs/30188136814) 已在 `dd53d94` 全绿：P1/P3/P4/suite 四个切片可独立运行，13/13 case 与隔离 worktree 通过；统一 `omnidesk.agent-eval-artifact-index.v0.1` 覆盖四个切片、45 个证据文件，下载后逐项复算 SHA-256 无差异。P1 冷构建与 Runtime 超时已分离，未放宽 120 秒执行上限。
 - 平台稳定化真实桌面最终组合验收已完成：原生窗口请求 `1785052066377-0ac18e1d99acc` 由 `gpt-5.6-terra` 接受 `start_engineering_task` Function Call，同一 requestId 绑定 Conversation 与只读 Task，生成真实 `PROVIDER_CALL` 计划并停在 `awaiting-confirmation`。确认前 `approval=null`、`agentRunId=null`，README 哈希保持不变；该证据与同一 MCP Run 的调度、重启不重放、显式恢复、原审批、工具结果和 metadata-only Timeline 原生证据共同闭环。期间修复了编排层用兼容关键词覆盖合法原生 Function Call 的缺陷。
+- 模糊修改追问与计划/Patch 失败状态已完成根因修复：缺少替换内容的修改请求进入 Hermes `ask_user`，明确修改仍可直接生成只读草稿；前端不再拥有独立 15 秒计划超时，Provider 降级计划不得自动进入 Patch，语义闸门失败会显示真实原因并在失败阶段封口。真实原生请求 `1785054065688-24f4935c60a0c` 已验证进入 `awaiting-user-input`、零审批、零 Patch 和零工程写入。
+- `ask_user` 提交后的恢复与展示已闭环：历史 interaction 按请求时间进入对话；单文本追问可从底部输入框回答；已处理卡片折叠且 Run 失败优先显示。`search_project.maxResults` 使用封闭 `1..100` 整数契约并被执行器实际遵守，避免回答或跳过后因工具参数漂移中断。
+- Tool Call 自修复 v1 已完成本地与原生验收：`read_file` 支持有界 `startLine/endLine`，Hermes 收到完整内置工具 schema；只读工具参数错误会作为 observation 返回模型并最多纠正两次，连续预算耗尽后才以单一失败终态结束。Patch、检查和终端审批边界不变。完整回归为 Node `612/612`、Rust `210/210`、Patch Normalizer `7/7`、Web build、离线 Eval 与原生 WebDriver smoke 全部通过。
+- 建议到执行的确认闭环 v2 已收敛为双调用协议：`recommendation-required` 首次调用只输出可见自然语言并通过 SSE 真流式展示，正文完成后再用隐藏的 `respond_with_recommendation` Function Call 生成唯一 `task`；分类失败时保留完整正文并降级为 `native-text`。前端只把校验通过的 `native-recommendation-call` 映射为 `start-agent` 待确认动作，不从正文或历史猜测动作。用户确认后通过 Conversation Action Executor 启动受控 Hermes，Patch、检查和终端保持独立审批。
+- 普通对话仍通过 `respond_to_user` 单次结构化出口；其 SSE 工具参数可按顶层 `reply` 增量解码，但 Provider 若缓冲完整 Function Call，Runtime 不伪造上游增量。生成中的新消息会立即建立新请求并取消旧 Runtime 请求，不再插入低信号取消消息；被接管的旧异步准备也不能重新抢占 requestId。Agent 启动投影明确为“先读取项目和判断下一步”，不误报“等待生成改动”。
+- 对话流式视口现直接维护真实滚动父级：用户停留底部时随 delta 与内容尺寸变化粘底，主动向上阅读后停止抢滚动；不再对整块长对话使用 `scrollIntoView`。每轮助手结果会持久化 metadata-only `providerStreamTrace`，只记录分片数、字符数和首末分片耗时。真实桌面请求 `1785130460943-15b47c0435f228` 已验证 `native-recommendation-call` 在 1116ms 收到首段、8277ms 收到末段，共 393 个 delta / 613 字，真实 Provider 流式链路成立。
+- Agent Executor Adapter v1 已建立：通用契约统一能力探测、`Start / Resume`、取消、状态与结构化结果；Registry 当前登记默认 `HermesAcpExecutor` 和可选 `GeminiAcpExecutor`。通用 JSON-RPC、结构化工具循环、usage 与取消位于 `acp_protocol / acp_execution`，供应商 Adapter 只负责程序发现、参数和环境。新 Run 持久化 Registry 选择及一致 evidence，恢复严格使用原 `executorId`，未知或能力不足的执行器明确失败。真实 Gemini 0.44.1 进程启动/取消、独立 ACP 恢复/结构化结果/usage 已验证；Gemini 模型凭据端到端调用尚未验收。Scheduler、Agent Run、Tool Gateway、审批、Patch、恢复和 evidence 继续由 OmniDesk 独占。
+- Agent Executor 契约防膨胀 v1 已落地：公开状态携带稳定 `omnidesk.agent-executor.v1` 版本；Runtime 准入只读取冻结的核心能力，执行器特有能力只能进入不透明 `extensions`。通用 Runtime 禁止读取扩展或根据 Hermes/Gemini 身份改变调度、审批、恢复、Patch、检查与证据规则，源码边界测试持续约束该规则。
+- Agent Event 标准化 v1 已落地：共享 ACP 层把生命周期、工具请求/结果、等待追问、等待审批和终态归一化为有序 `omnidesk.agent-event.v1`；每次执行只允许一个终态。Runtime Timeline 只消费标准事件，不再读取执行器 `trace/observations`；metadata-only 导出再次按白名单裁剪事件详情。事件只保存公开阶段摘要，不保存 Prompt、正文、工具输出或模型完整思维链。
 
 当前重点：
 
@@ -99,6 +108,7 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 - 后续改动继续守住多文件 Patch 授权、独立审批、恢复不重放、单终态、显式 usage/cost 和脱敏 trace 门槛，不扩展关键词执行路由或旁路工具 transport。
 - 下一阶段优先降低真实模型多文件 Patch 输出波动，并以既有 13-case 和隔离 worktree 门槛防止可靠性回退。
 - 受保护 Eval 继续保留失败 artifact；上游模型波动、依赖漂移或软 bundle 超限不能通过放宽门槛掩盖。
+- 第三个执行器接入应只增加 Adapter 与 Registry 项；若必须修改 Runtime 核心能力，需要发布新的契约版本，而不能向 v1 持续追加供应商字段。
 
 当前风险：
 

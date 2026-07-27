@@ -10,6 +10,7 @@ export function classifyConversationIntent(message, hasAttachments = false) {
     && !/(为什么|怎么|如何|是什么|要不要|可以吗|能不能)/.test(text)
     && (/(阶段目标|下一阶段|本阶段)/.test(text) || /^(?:接下来|下一步)(?:我们)?(?:要|想|准备|先)/.test(text))) return "stage-goal";
   if (isDialogueActionRequest(text, hasAttachments)) return "task";
+  if (/(建议|改进|优化方向)/.test(text)) return "question";
   if (/(状态|进度|下一步|总结|概况|现在)/.test(text)) return "project-status";
   if (/(风险|检查|验证|报告)/.test(text)) return "project-inspect";
   if (["hi", "hello", "hey", "你好", "您好", "哈喽", "嗨", "在吗", "在么"].includes(compact)) return "chat";

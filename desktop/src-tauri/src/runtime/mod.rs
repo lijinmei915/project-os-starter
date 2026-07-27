@@ -1,3 +1,6 @@
+pub mod acp_execution;
+pub mod acp_protocol;
+pub mod agent_executor;
 pub mod agent_runs;
 pub mod agent_scheduler;
 pub mod agent_tools;
@@ -8,8 +11,10 @@ pub mod chat_runtime;
 pub mod chat_stream;
 pub mod conversations;
 pub mod execution;
+pub mod gemini_executor;
 pub mod goals;
 pub mod hermes_execution;
+pub mod hermes_executor;
 pub mod hermes_protocol;
 pub mod isolated_workspace;
 pub mod mcp_runtime;

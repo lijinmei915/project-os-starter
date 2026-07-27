@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
-import { agentRunWorkflowState, workflowStates } from "../../lib/workflow-state";
+import { agentInteractionPresentation } from "../../lib/conversation-agent-events";
+import { agentRunWorkflowState, workflowStateIsFailure } from "../../lib/workflow-state";
 import { Button } from "../ui/button";
 import { Field } from "../ui/field";
 import { Input } from "../ui/input";
@@ -8,22 +9,14 @@ function initialAnswers(fields) {
   return Object.fromEntries((fields || []).map((field) => [field.id, field.type === "multi-choice" ? [] : field.type === "confirm" ? false : ""]));
 }
 
-function answerSummary(interaction, runStatus) {
-  const response = interaction?.response;
-  if (!response) return "";
-  if (response.action === "skip") return "已跳过";
-  const state = agentRunWorkflowState(runStatus);
-  if ([workflowStates.planned, workflowStates.working, workflowStates.verifying].includes(state)) return "AI 正在继续";
-  if ([workflowStates.failed, workflowStates.interrupted].includes(state)) return "继续失败";
-  return "已提交";
-}
-
-export function AgentUserFormCard({ interaction, onSubmit, runStatus = "" }) {
+export function AgentUserFormCard({ interaction, onRetry, onSubmit, run = {} }) {
   const fields = Array.isArray(interaction?.fields) ? interaction.fields : [];
   const [answers, setAnswers] = useState(() => initialAnswers(fields));
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const submitted = interaction?.status === "submitted";
+  const presentation = agentInteractionPresentation(interaction, { ...run, workflowFailed: workflowStateIsFailure(agentRunWorkflowState(run)) });
   const submit = async (action) => {
     if (submitted || saving) return;
     if (action === "submit") {
@@ -39,11 +32,26 @@ export function AgentUserFormCard({ interaction, onSubmit, runStatus = "" }) {
   };
   const renderedAnswers = useMemo(() => interaction?.response?.answers || {}, [interaction]);
 
+  if (presentation.collapsed) {
+    const retry = async () => {
+      if (retrying) return;
+      setRetrying(true);
+      try { await onRetry?.(); } finally { setRetrying(false); }
+    };
+    return (
+      <section className={`conversationUserForm conversationUserForm-collapsed conversationUserForm-${presentation.tone}`} aria-label={interaction?.title || "已处理的确认"}>
+        <header><strong>{interaction?.title || "需要确认"}</strong><span>{presentation.label}</span></header>
+        <p className="conversationUserFormSummary">{presentation.summary}</p>
+        {presentation.tone === "failed" ? <footer><Button disabled={retrying} onClick={retry} size="sm" type="button" variant="outline">{retrying ? "正在重新开始" : "重新开始"}</Button>{presentation.detail ? <details className="conversationUserFormDetails"><summary>查看详情</summary><code>{presentation.detail}</code></details> : null}</footer> : null}
+      </section>
+    );
+  }
+
   return (
     <section className="conversationUserForm" aria-label={interaction?.title || "需要确认"}>
       <header>
         <div><strong>{interaction?.title || "需要确认"}</strong>{interaction?.description ? <p>{interaction.description}</p> : null}</div>
-        <span>{saving ? "正在保存回答" : submitted ? answerSummary(interaction, runStatus) : "等待你的回答"}</span>
+        <span>{saving ? "正在保存回答" : presentation.label}</span>
       </header>
       <div className="conversationUserFormFields">
         {fields.map((field) => (

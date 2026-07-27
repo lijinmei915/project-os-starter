@@ -14,6 +14,7 @@ export function AgentWorkspaceConversationCanvas({
   isEmpty,
   loading,
   onTurnAction,
+  onRetryInteraction,
   onSubmitInteraction,
   onUseStarterPrompt,
   pendingTurn,
@@ -44,6 +45,7 @@ export function AgentWorkspaceConversationCanvas({
           error={error}
           loading={loading}
           onTurnAction={onTurnAction}
+          onRetryInteraction={onRetryInteraction}
           onSubmitInteraction={onSubmitInteraction}
           pendingTurn={pendingTurn}
           phase={phase}

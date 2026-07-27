@@ -1,17 +1,14 @@
 import { FileText } from "lucide-react";
 import { conversationTextForDisplay } from "../../conversation-runtime";
+import { conversationTranscriptItems, projectConversationAgentEvents } from "../../lib/conversation-agent-events";
 import { conversationTurnWorkflowState, workflowStatePresentation, workflowStates } from "../../lib/workflow-state";
 import { Badge } from "../ui/badge";
 import { PatchDraft, ReadonlyPlan } from "./plan-views";
 import { AgentProcessingStatus, Conversation, ConversationMessage } from "./conversation";
 import { AgentUserFormCard } from "./agent-user-form-card";
 
-function agentEventsForTurn(turn) {
-  return Array.isArray(turn?.events) ? turn.events : [];
-}
-
-function shouldShowAgentTimeline(turn) {
-  const events = agentEventsForTurn(turn);
+function shouldShowAgentTimeline(turn, interactions) {
+  const events = projectConversationAgentEvents(turn, interactions);
   return Boolean(
     events.length
     && (turn.intent === "task" || turn.workflow?.length || events.some((event) => ["current", "failed"].includes(event.status)))
@@ -20,7 +17,7 @@ function shouldShowAgentTimeline(turn) {
 
 function shouldShowReadonlyPlan(turn) {
   return turn?.pendingAction?.type === "confirm-active-task"
-    || agentEventsForTurn(turn).some((event) => event.id === "confirmation");
+    || projectConversationAgentEvents(turn).some((event) => event.id === "confirmation");
 }
 
 function referenceSignature(references = []) {
@@ -72,6 +69,7 @@ export function ConversationTranscript({
   error,
   loading,
   onTurnAction,
+  onRetryInteraction,
   onSubmitInteraction,
   pendingTurn,
   phase,
@@ -81,10 +79,16 @@ export function ConversationTranscript({
 }) {
   return (
     <Conversation data-conversation-id={conversationId} data-runtime-state={conversationState}>
-      {turns.map((turn, turnIndex) => (
-      <ConversationMessage key={turn.id} role={turn.role}>
-        {shouldShowAgentTimeline(turn) ? (
-          <AgentProcessingStatus conversationEvents={turn.conversationEvents} durationMs={turn.durationMs} events={agentEventsForTurn(turn)} />
+      {conversationTranscriptItems(turns, interactions).map((item) => item.type === "interaction" ? (
+        <ConversationMessage key={item.key} role="assistant">
+          <AgentUserFormCard interaction={item.interaction} onRetry={() => onRetryInteraction?.(item.run)} onSubmit={(response) => onSubmitInteraction?.(item.run, response)} run={item.run} />
+        </ConversationMessage>
+      ) : (() => {
+        const turn = item.turn;
+        const turnIndex = turns.indexOf(turn);
+        return <ConversationMessage key={item.key} role={turn.role}>
+        {shouldShowAgentTimeline(turn, interactions) ? (
+          <AgentProcessingStatus conversationEvents={turn.conversationEvents} durationMs={turn.durationMs} events={projectConversationAgentEvents(turn, interactions)} />
         ) : null}
           {shouldShowReadonlyPlan(turn) ? (() => {
             const taskId = turn.taskId || turn.pendingAction.taskId;
@@ -137,14 +141,8 @@ export function ConversationTranscript({
             </div>
           ) : null}
           <Attachments attachments={turn.attachments} />
-        </ConversationMessage>
-      ))}
-
-      {interactions.map(({ interaction, run }) => (
-        <ConversationMessage key={`interaction-${run.id}-${interaction.id}`} role="assistant">
-          <AgentUserFormCard interaction={interaction} onSubmit={(response) => onSubmitInteraction?.(run, response)} runStatus={run.status} />
-        </ConversationMessage>
-      ))}
+        </ConversationMessage>;
+      })())}
 
       {loading || error ? (
         <ConversationMessage meta={loading ? "连接中" : error ? "需要检查" : phase} role="assistant" title="OmniDesk">

@@ -13,4 +13,5 @@ test("keeps provider failure categories visible in the conversation health proje
   );
   assert.equal(modelHealthUpdate({ providerError: "本轮超时", providerStatus: "timed-out" }, "gpt-test"), null);
   assert.equal(modelHealthUpdate({ providerError: "流中断", providerStatus: "interrupted" }, "gpt-test"), null);
+  assert.equal(modelHealthUpdate({ providerError: "provider HTTP 503", providerStatus: "unavailable" }, "gpt-test"), null);
 });

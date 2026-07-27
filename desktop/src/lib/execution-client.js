@@ -24,9 +24,11 @@ export function mergeRunSummaryToHandoff(task) {
   return invokeRuntimeCommand("merge_run_summary_to_handoff", { input: { task } });
 }
 
-export function getHermesExecutorStatus() {
+export function getAgentExecutorStatus() {
   return invokeRuntimeCommand("get_hermes_executor_status", {});
 }
+
+export const getHermesExecutorStatus = getAgentExecutorStatus;
 
 export function executeAgentReadTool(name, arguments_ = {}) {
   return invokeRuntimeCommand("execute_agent_read_tool", { input: { name, arguments: arguments_ } });
@@ -60,19 +62,26 @@ export function requestMcpCall(serverId, remoteName, arguments_ = {}) {
   return invokeRuntimeCommand("request_mcp_call", { input: { serverId, remoteName, arguments: arguments_ } });
 }
 
-export function runHermesAgent(prompt, requestId = "", maxSteps = 20, approvalToken = "", context = {}) {
-  return invokeRuntimeCommand("run_hermes_agent", {
+export function runAgent(prompt, requestId = "", maxSteps = 20, approvalToken = "", context = {}) {
+  return invokeRuntimeCommand("run_agent", {
     input: {
       approvalToken,
       conversationId: String(context?.conversationId || ""),
       maxSteps,
       isolate: Boolean(context?.isolate),
+      executorId: String(context?.executorId || ""),
       prompt,
       requestId,
       taskId: String(context?.taskId || ""),
     },
   });
 }
+
+export function listAgentExecutorStatuses() {
+  return invokeRuntimeCommand("list_agent_executor_statuses", {});
+}
+
+export const runHermesAgent = runAgent;
 
 // Kept for older callers; the live approval flow now continues by run id so it
 // cannot replace the persisted evidence timeline.
@@ -113,7 +122,7 @@ export function projectScheduledAgentRuns(runs, scheduler) {
   }));
 }
 
-export async function resumeHermesAgent(run) {
+export async function resumeAgent(run) {
   if (!run?.id) throw new Error("缺少可恢复的 Agent Run。");
   if (run.status === "queued") return invokeRuntimeCommand("continue_agent_run", { input: { id: run.id } });
   const resumed = await invokeRuntimeCommand("resume_agent_run", { input: { id: run.id } });
@@ -121,7 +130,9 @@ export async function resumeHermesAgent(run) {
   return invokeRuntimeCommand("continue_agent_run", { input: { id: resumed.id } });
 }
 
-export async function approveHermesAgent(run) {
+export const resumeHermesAgent = resumeAgent;
+
+export async function approveAgent(run) {
   if (!run?.id) throw new Error("缺少待审批的 Agent Run。");
   const approved = await invokeRuntimeCommand("approve_agent_run", { input: { id: run.id } });
   await invokeRuntimeCommand("execute_approved_agent_tool", { input: { id: approved.id, token: approved.approvalToken } });
@@ -131,10 +142,14 @@ export async function approveHermesAgent(run) {
   return invokeRuntimeCommand("continue_agent_run", { input: { id: updated.id } });
 }
 
-export function continueHermesAgent(run) {
+export const approveHermesAgent = approveAgent;
+
+export function continueAgent(run) {
   if (!run?.id) throw new Error("缺少需要继续的 Agent Run。");
   return invokeRuntimeCommand("continue_agent_run", { input: { id: run.id } });
 }
+
+export const continueHermesAgent = continueAgent;
 
 export function acceptAgentInteraction(run, { action = "submit", answers = {} } = {}) {
   if (!run?.id || !run?.checkpoint?.interaction?.id) throw new Error("缺少待提交的追问表单。");
@@ -147,7 +162,7 @@ export async function submitAgentInteraction(run, response = {}) {
   const accepted = await acceptAgentInteraction(run, response);
   if (accepted.status !== "queued") return accepted;
   try {
-    return await continueHermesAgent(accepted);
+    return await continueAgent(accepted);
   } catch (error) {
     return { ...accepted, continuationError: error instanceof Error ? error.message : String(error) };
   }

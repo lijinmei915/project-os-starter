@@ -57,3 +57,26 @@ test("confirms a recommended plan through the injected controlled executor", asy
   assert.equal(await handlers["confirm-action"](), true);
   assert.deepEqual(received, pendingAction);
 });
+
+test("confirms an executable recommendation through the controlled Agent executor", async () => {
+  const handlers = {};
+  const pendingAction = { id: "recommend-agent-1", task: "推进当前任务摘要", type: "start-agent" };
+  let received = null;
+  addConversationConfirmationHandler({
+    clearSubmittedInput: () => {},
+    executePendingAgent: async (action) => { received = action; return true; },
+    executePendingPatchApply: async () => true,
+    executionReadyEvents: () => [],
+    handlers,
+    onChatTurnsChange: () => {},
+    onRunChatAction: async () => true,
+    pendingAction,
+    projectExecutionEvent: (turns) => turns,
+    requestBaseTurns: [],
+    requestId: "request-agent-1",
+    resolveStageGoalTurn: (turn) => turn,
+    userTurn: { id: "user-agent-1" },
+  });
+  assert.equal(await handlers["confirm-action"](), true);
+  assert.deepEqual(received, pendingAction);
+});

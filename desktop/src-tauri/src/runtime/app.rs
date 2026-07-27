@@ -1,7 +1,13 @@
+#[cfg(test)]
+use crate::runtime::acp_protocol::extract_structured_envelope as extract_structured_hermes_envelope;
+use crate::runtime::agent_executor::{
+    select_agent_executor, validate_governed_capabilities, AgentExecutionMode,
+    AgentExecutionRequest, AgentExecutionResult,
+};
 use crate::runtime::agent_runs::PersistedAgentRun;
 use crate::runtime::chat_content::{
     local_chat_result, project_evidence, references_for_message, ChatTurnInput,
-    ChatWithModelResult, DialogueContextInput,
+    ChatWithModelResult, DialogueContextInput, ProviderStreamTrace,
 };
 use crate::runtime::chat_runtime::{emit_conversation_event, RuntimeRequestState};
 use crate::runtime::chat_stream::{
@@ -10,12 +16,8 @@ use crate::runtime::chat_stream::{
 use crate::runtime::execution::build_run_summary_markdown;
 #[cfg(test)]
 use crate::runtime::execution::run_git_apply;
-use crate::runtime::hermes_execution::{run_structured_loop, HermesAgentLoopResult};
 #[cfg(test)]
 use crate::runtime::hermes_protocol::custom_provider_key_env as hermes_custom_provider_key_env;
-use crate::runtime::hermes_protocol::executor_status as hermes_executor_status;
-#[cfg(test)]
-use crate::runtime::hermes_protocol::extract_structured_envelope as extract_structured_hermes_envelope;
 use crate::runtime::patch::PatchDraft;
 use crate::runtime::planning::{
     sanitize_image_attachments, GeneratePlanInput as PlanningGeneratePlanInput, PlanAttachment,
@@ -51,7 +53,8 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, State};
 
 const STATE_PATH: &str = ".omnidesk/data/state.json";
@@ -100,6 +103,8 @@ struct GeneratePlanInput {
 #[serde(rename_all = "camelCase")]
 struct ChatWithModelInput {
     message: String,
+    #[serde(default)]
+    response_contract: String,
     #[serde(default)]
     attachments: Vec<PlanAttachment>,
     #[serde(default)]
@@ -254,7 +259,7 @@ struct ReadEngineeringFileInput {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct RunHermesAgentInput {
+struct RunAgentInput {
     #[serde(default)]
     request_id: String,
     prompt: String,
@@ -270,6 +275,8 @@ struct RunHermesAgentInput {
     task_id: String,
     #[serde(default)]
     isolate: bool,
+    #[serde(default)]
+    executor_id: String,
 }
 
 fn default_agent_max_steps() -> usize {
@@ -904,6 +911,17 @@ fn request_mcp_call(input: RequestMcpCallInput) -> Result<PersistedAgentRun, Str
     Ok(run)
 }
 
+fn transient_chat_failure_reply(failure_status: &str) -> Option<&'static str> {
+    if crate::runtime::provider::failure_changes_health(failure_status) {
+        return None;
+    }
+    Some(if failure_status == "network-unavailable" {
+        "本轮请求遇到网络异常，自动重试后仍未收到正文。你可以重新发送。"
+    } else {
+        "模型服务本轮暂时不可用，没有生成新回答。你可以稍后重试。"
+    })
+}
+
 #[tauri::command]
 async fn chat_with_model(
     input: ChatWithModelInput,
@@ -966,6 +984,9 @@ async fn chat_with_model(
             "running",
             json!({}),
         );
+        let stream_started = Instant::now();
+        let provider_stream_trace = Arc::new(Mutex::new(ProviderStreamTrace::default()));
+        let trace_for_request = Arc::clone(&provider_stream_trace);
         let provider_request = async {
             tokio::time::timeout(Duration::from_secs(300), async {
                 let mut attempt = 0;
@@ -979,10 +1000,18 @@ async fn chat_with_model(
                         &attachments,
                         &input.recent_turns,
                         &input.context_state,
+                        input.response_contract == "recommendation-required",
                         &input.summary,
                         &input.project_memory,
                         &project_evidence,
                         |text, chars| {
+                            if let Ok(mut trace) = trace_for_request.lock() {
+                                let elapsed_ms = stream_started.elapsed().as_millis() as u64;
+                                trace.delta_count = trace.delta_count.saturating_add(1);
+                                trace.char_count = trace.char_count.saturating_add(chars as u64);
+                                trace.first_delta_ms.get_or_insert(elapsed_ms);
+                                trace.last_delta_ms = Some(elapsed_ms);
+                            }
                             emit_conversation_event(
                                 &app,
                                 &request_id,
@@ -1030,6 +1059,10 @@ async fn chat_with_model(
         if !request_id.is_empty() {
             runtime_requests.finish(&request_id);
         }
+        let provider_stream_trace = provider_stream_trace
+            .lock()
+            .map(|trace| trace.clone())
+            .unwrap_or_default();
         match provider_result {
             Ok(mut result) => {
                 emit_conversation_event(
@@ -1043,6 +1076,7 @@ async fn chat_with_model(
                 result.provider_status = "available".to_string();
                 result.provider_model = provider.model.clone();
                 result.provider_error = String::new();
+                result.provider_stream_trace = provider_stream_trace;
                 if !provider_switch_note.is_empty() {
                     result.reply = format!("{}\n\n{}", provider_switch_note, result.reply);
                 }
@@ -1095,6 +1129,8 @@ async fn chat_with_model(
                         provider_error: err.message,
                         response_mode: "partial".to_string(),
                         references: evidence_references,
+                        recommended_action: None,
+                        provider_stream_trace,
                     });
                 }
                 if timed_out {
@@ -1107,12 +1143,13 @@ async fn chat_with_model(
                         provider_error: err.message,
                         response_mode: "text".to_string(),
                         references: evidence_references,
+                        recommended_action: None,
+                        provider_stream_trace,
                     });
                 }
-                if failure_status == "network-unavailable" {
+                if let Some(reply) = transient_chat_failure_reply(failure_status) {
                     return Ok(ChatWithModelResult {
-                        reply: "本轮请求遇到网络异常，自动重试后仍未收到正文。你可以重新发送。"
-                            .to_string(),
+                        reply: reply.to_string(),
                         should_create_plan: false,
                         intent: "chat".to_string(),
                         provider_status: "request-failed".to_string(),
@@ -1120,6 +1157,8 @@ async fn chat_with_model(
                         provider_error: err.message,
                         response_mode: "text".to_string(),
                         references: evidence_references,
+                        recommended_action: None,
+                        provider_stream_trace,
                     });
                 }
                 let mut fallback = local_chat_result(
@@ -1506,11 +1545,8 @@ fn resume_agent_run(input: ResumeAgentRunInput) -> Result<PersistedAgentRun, Str
             &existing.project_id,
             &timestamp,
         )?;
-        let (outcome, lease) = crate::runtime::agent_scheduler::try_claim(
-            &app_root,
-            &existing.id,
-            &timestamp,
-        )?;
+        let (outcome, lease) =
+            crate::runtime::agent_scheduler::try_claim(&app_root, &existing.id, &timestamp)?;
         if outcome != crate::runtime::agent_scheduler::ClaimOutcome::Claimed {
             return Err("Agent Run 已进入恢复队列，等待当前项目与并发槽位释放。".to_string());
         }
@@ -1604,7 +1640,7 @@ async fn continue_agent_run(
     input: ContinueAgentRunInput,
     app: AppHandle,
     runtime_requests: State<'_, RuntimeRequestState>,
-) -> Result<HermesAgentLoopResult, String> {
+) -> Result<AgentExecutionResult, String> {
     let app_root = find_workspace_root()?;
     let run = crate::runtime::agent_runs::load(&app_root, &input.id)?;
     if run.status != "queued"
@@ -1618,8 +1654,8 @@ async fn continue_agent_run(
             run.checkpoint.next_action
         ));
     }
-    run_hermes_agent(
-        RunHermesAgentInput {
+    run_agent(
+        RunAgentInput {
             request_id: run.request_id.clone(),
             prompt: run.prompt.clone(),
             max_steps: run.max_steps,
@@ -1628,6 +1664,7 @@ async fn continue_agent_run(
             conversation_id: run.conversation_id.clone(),
             task_id: run.task_id.clone(),
             isolate: false,
+            executor_id: String::new(),
         },
         app,
         runtime_requests,
@@ -1636,17 +1673,28 @@ async fn continue_agent_run(
 }
 
 #[tauri::command]
-async fn run_hermes_agent(
-    input: RunHermesAgentInput,
+async fn run_agent(
+    input: RunAgentInput,
     app: AppHandle,
     runtime_requests: State<'_, RuntimeRequestState>,
-) -> Result<HermesAgentLoopResult, String> {
+) -> Result<AgentExecutionResult, String> {
     let app_root = find_workspace_root()?;
     let mut registry = load_or_seed_registry(&app_root)?;
     let current_project = current_registry_project(&mut registry, &app_root)?;
     let source_root = PathBuf::from(&current_project.path);
     let provider = load_or_seed_provider_config(&app_root)?;
-    sync_hermes_runtime_config(&provider)?;
+    let persisted_executor_id = if input.run_id.trim().is_empty() {
+        None
+    } else {
+        let persisted_run = crate::runtime::agent_runs::load(&app_root, input.run_id.trim())?;
+        Some(persisted_run.executor_id)
+    };
+    let executor = select_agent_executor(
+        Some(input.executor_id.as_str()),
+        persisted_executor_id.as_deref(),
+    )?;
+    validate_governed_capabilities(executor)?;
+    executor.prepare(&provider)?;
     let api_key = read_secret_from_env_or_dotenv(&source_root, &provider.api_key_env)
         .ok_or_else(|| format!("环境变量或 .env.local 中未设置 {}", provider.api_key_env))?;
     let request_id = input.request_id.trim().to_string();
@@ -1668,10 +1716,11 @@ async fn run_hermes_agent(
     let scheduler_timestamp = current_timestamp_string();
     let is_new_run = input.run_id.trim().is_empty();
     if is_new_run {
-        let queued_run = crate::runtime::agent_runs::new_hermes_run_with_context(
+        let queued_run = crate::runtime::agent_runs::new_agent_run_with_context(
             run_id.clone(),
             request_id.clone(),
             current_project.id.clone(),
+            executor.id().to_string(),
             input.prompt.clone(),
             input.max_steps,
             input.approval_token.clone(),
@@ -1771,20 +1820,33 @@ async fn run_hermes_agent(
         .unwrap_or_else(|| source_root.clone());
     let token = request_lease.as_ref().map(|lease| lease.token());
     let cancellation = token.clone();
+    let execution_mode = if is_new_run {
+        AgentExecutionMode::Start
+    } else {
+        AgentExecutionMode::Resume
+    };
     let model_started_at = std::time::Instant::now();
+    if running_run.executor_id != executor.id() {
+        return Err(format!(
+            "Agent Run 绑定执行器 {}，当前解析为 {}。",
+            running_run.executor_id,
+            executor.id()
+        ));
+    }
     let mut result = tauri::async_runtime::spawn_blocking(move || {
-        run_structured_loop(
-            &execution_root,
-            &api_key,
-            &provider.api_base,
-            &provider.api_key_env,
-            &execution_prompt,
-            input.max_steps,
-            cancellation.as_ref(),
-        )
+        executor.execute(AgentExecutionRequest {
+            mode: execution_mode,
+            root: execution_root,
+            api_key,
+            api_base: provider.api_base,
+            api_key_env: provider.api_key_env,
+            prompt: execution_prompt,
+            max_steps: input.max_steps,
+            cancellation,
+        })
     })
     .await
-    .map_err(|err| format!("Hermes worker 中断: {err}"))?;
+    .map_err(|err| format!("Agent Executor worker 中断: {err}"))?;
     let model_duration_ms = model_started_at.elapsed().as_millis() as u64;
     let mut status = match result.as_ref() {
         Ok(value) if value.status == "awaiting-approval" => "awaiting-approval",
@@ -1813,8 +1875,7 @@ async fn run_hermes_agent(
         .map(|value| {
             json!({
                 "step": value.step,
-                "trace": value.trace,
-                "observations": value.observations,
+                "agentEvents": value.events,
                 "interaction": value.interaction,
                 "durationMs": model_duration_ms,
                 "usage": value.usage,
@@ -1886,6 +1947,15 @@ async fn run_hermes_agent(
     )?;
     scheduler_lease.settle(scheduler_status, &current_timestamp_string())?;
     result
+}
+
+#[tauri::command]
+async fn run_hermes_agent(
+    input: RunAgentInput,
+    app: AppHandle,
+    runtime_requests: State<'_, RuntimeRequestState>,
+) -> Result<AgentExecutionResult, String> {
+    run_agent(input, app, runtime_requests).await
 }
 
 #[tauri::command]
@@ -2074,8 +2144,16 @@ fn run_guarded_check(
 }
 
 #[tauri::command]
-fn get_hermes_executor_status() -> crate::runtime::hermes_protocol::ExecutorStatus {
-    hermes_executor_status()
+fn get_hermes_executor_status() -> crate::runtime::agent_executor::AgentExecutorStatus {
+    crate::runtime::agent_executor::default_agent_executor().status()
+}
+
+#[tauri::command]
+fn list_agent_executor_statuses() -> Vec<crate::runtime::agent_executor::AgentExecutorStatus> {
+    crate::runtime::agent_executor::registered_agent_executors()
+        .iter()
+        .map(|executor| executor.status())
+        .collect()
 }
 
 #[tauri::command]
@@ -2342,6 +2420,18 @@ mod task_storage_tests {
     }
 
     #[test]
+    fn transient_provider_failures_do_not_generate_local_conversation_replies() {
+        let service_status =
+            crate::runtime::provider::classify_failure("provider HTTP 503 Service Unavailable");
+        assert_eq!(service_status, "unavailable");
+        assert!(transient_chat_failure_reply(service_status)
+            .is_some_and(|reply| reply.contains("本轮暂时不可用")));
+        assert!(transient_chat_failure_reply("network-unavailable")
+            .is_some_and(|reply| reply.contains("本轮请求遇到网络异常")));
+        assert!(transient_chat_failure_reply("authentication-failed").is_none());
+    }
+
+    #[test]
     fn atomic_write_replaces_task_without_temp_residue() {
         let dir = test_directory("atomic-task");
         fs::create_dir_all(&dir).unwrap();
@@ -2531,7 +2621,7 @@ mod task_storage_tests {
 
     #[test]
     fn hermes_permission_rejection_uses_acp_cancelled_outcome() {
-        let rejection = crate::runtime::hermes_protocol::rejection_response(42);
+        let rejection = crate::runtime::acp_protocol::rejection_response(42);
         assert_eq!(rejection.get("id").and_then(Value::as_u64), Some(42));
         assert_eq!(
             rejection
@@ -2767,6 +2857,7 @@ pub fn run() {
             request_mcp_call,
             execute_agent_read_tool,
             run_hermes_agent,
+            run_agent,
             list_agent_runs,
             get_agent_scheduler,
             export_agent_run_timeline,
@@ -2778,6 +2869,7 @@ pub fn run() {
             execute_approved_agent_tool,
             run_guarded_check,
             get_hermes_executor_status,
+            list_agent_executor_statuses,
             start_terminal_session,
             save_terminal_image,
             write_terminal_session,

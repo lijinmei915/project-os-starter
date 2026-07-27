@@ -1,5 +1,6 @@
 use crate::runtime::chat_content::{
-    chat_reply_prompt, ChatTurnInput, ChatWithModelResult, DialogueContextInput,
+    chat_reply_prompt, ChatRecommendedAction, ChatTurnInput, ChatWithModelResult,
+    DialogueContextInput,
 };
 use crate::runtime::chat_routing::{is_question_like_message, should_create_plan_for_message};
 use crate::runtime::planning::PlanAttachment;
@@ -7,9 +8,10 @@ use crate::runtime::provider::{
     post_streaming_chat_completion, read_secret, require_success, ProviderConfig,
 };
 use crate::runtime::provider_tools::{
-    add_conversation_tools, engineering_task_from_calls, non_streaming_message,
-    record_provider_tool_capability, should_fallback_from_native_tools, tool_call_fragments,
-    ProviderToolCall, ProviderToolMode,
+    add_conversation_tools, conversation_response_from_calls, engineering_task_from_calls,
+    non_streaming_message, provider_tool_mode, recommendation_task_from_calls,
+    record_provider_tool_capability, should_fallback_from_native_tools,
+    streamed_conversation_reply, tool_call_fragments, ProviderToolCall, ProviderToolMode,
 };
 use futures_util::StreamExt;
 use serde_json::{json, Value};
@@ -63,6 +65,7 @@ pub async fn generate_provider_chat<F>(
     attachments: &[PlanAttachment],
     recent_turns: &[ChatTurnInput],
     context_state: &DialogueContextInput,
+    require_recommendation: bool,
     summary: &Value,
     project_memory: &[Value],
     project_evidence: &Value,
@@ -91,6 +94,7 @@ where
         summary,
         project_memory,
         project_evidence,
+        require_recommendation,
     );
     let user_content = provider_user_content(reply_prompt, attachments);
     let mut payload = json!({
@@ -98,7 +102,7 @@ where
         "messages": [
             {
                 "role": "system",
-                "content": "You are OmniDesk, a local AI project workbench assistant. Answer the user directly in natural Chinese text. Do not wrap the answer in JSON or include routing metadata."
+                "content": "You are OmniDesk, a local AI project workbench assistant. Answer the user directly in natural Chinese text. Do not wrap the answer in JSON or include routing metadata. When an available function exactly represents the next interaction, use that function instead of encoding the action in prose."
             },
             {
                 "role": "user",
@@ -109,7 +113,11 @@ where
         "stream": true
     });
     let compatibility_payload = payload.clone();
-    let mut provider_tool_mode = add_conversation_tools(root, provider, &mut payload);
+    let mut provider_tool_mode = if require_recommendation {
+        ProviderToolMode::CompatibilityKeyword
+    } else {
+        add_conversation_tools(root, provider, &mut payload, false)
+    };
     let response = tokio::time::timeout(
         FIRST_RESPONSE_TIMEOUT,
         post_streaming_chat_completion(provider, &api_key, &payload, FIRST_RESPONSE_TIMEOUT),
@@ -173,6 +181,7 @@ where
         let mut content = String::new();
         let mut pending = String::new();
         let mut tool_call_parts = BTreeMap::<usize, ProviderToolCall>::new();
+        let mut streamed_tool_reply = String::new();
         let mut stream_mode = StreamMode::Unknown;
         let mut stream = response.bytes_stream();
         loop {
@@ -190,6 +199,20 @@ where
                 let call = tool_call_parts.entry(fragment.index).or_default();
                 call.name.push_str(&fragment.name);
                 call.arguments.push_str(&fragment.arguments);
+                if matches!(
+                    call.name.as_str(),
+                    crate::runtime::provider_tools::RESPOND_TO_USER_TOOL
+                        | crate::runtime::provider_tools::RESPOND_WITH_RECOMMENDATION_TOOL
+                ) {
+                    let visible = streamed_conversation_reply(&call.arguments);
+                    if visible.starts_with(&streamed_tool_reply) {
+                        let delta = visible[streamed_tool_reply.len()..].to_string();
+                        if !delta.is_empty() {
+                            on_delta(delta.clone(), delta.chars().count());
+                            streamed_tool_reply = visible;
+                        }
+                    }
+                }
             }
             for delta in delta.content {
                 content.push_str(&delta);
@@ -221,6 +244,17 @@ where
         }
         (content, tool_calls)
     };
+    if require_recommendation {
+        if !tool_calls.is_empty() {
+            return Err(ChatStreamError::new(
+                "provider 在可见流式回答中返回了未请求的工具调用",
+            ));
+        }
+        let (reply, _) = visible_chat_content(&content)?;
+        let recommended_task =
+            request_recommendation_task(provider, root, &api_key, message, &reply).await;
+        return Ok(recommendation_chat_result(message, reply, recommended_task));
+    }
     Ok(build_chat_result(
         &content,
         message,
@@ -228,6 +262,103 @@ where
         provider_tool_mode,
         &tool_calls,
     )?)
+}
+
+async fn request_recommendation_task(
+    provider: &ProviderConfig,
+    root: &Path,
+    api_key: &str,
+    message: &str,
+    visible_reply: &str,
+) -> Option<String> {
+    if provider_tool_mode(root, provider) == ProviderToolMode::CompatibilityKeyword {
+        return None;
+    }
+    let mut payload = json!({
+        "model": provider.model,
+        "messages": [
+            {
+                "role": "system",
+                "content": "Select the one concrete engineering outcome recommended by the completed answer. Return only the required function call. The task must be self-contained, bounded, and must not claim that work is already complete."
+            },
+            {
+                "role": "user",
+                "content": serde_json::to_string(&json!({
+                    "userMessage": message,
+                    "visibleAnswer": visible_reply,
+                })).ok()?
+            }
+        ],
+        "temperature": 0.1,
+        "stream": false
+    });
+    if add_conversation_tools(root, provider, &mut payload, true)
+        != ProviderToolMode::NativeFunctionCalling
+    {
+        return None;
+    }
+    let response = tokio::time::timeout(
+        FIRST_RESPONSE_TIMEOUT,
+        post_streaming_chat_completion(provider, api_key, &payload, FIRST_RESPONSE_TIMEOUT),
+    )
+    .await
+    .ok()?
+    .ok()?;
+    let response = match require_success(response, "provider recommendation classifier").await {
+        Ok(response) => response,
+        Err(error) if should_fallback_from_native_tools(&error) => {
+            let _ = record_provider_tool_capability(
+                root,
+                provider,
+                ProviderToolMode::CompatibilityKeyword,
+                "explicit-tool-rejection",
+            );
+            return None;
+        }
+        Err(_) => return None,
+    };
+    let response: Value = tokio::time::timeout(STREAM_IDLE_TIMEOUT, response.json())
+        .await
+        .ok()?
+        .ok()?;
+    let (_, calls) = non_streaming_message(&response);
+    let task = recommendation_task_from_calls(&calls).ok().flatten()?;
+    let _ = record_provider_tool_capability(
+        root,
+        provider,
+        ProviderToolMode::NativeFunctionCalling,
+        "request-accepted-tools",
+    );
+    Some(task)
+}
+
+fn recommendation_chat_result(
+    message: &str,
+    reply: String,
+    recommended_task: Option<String>,
+) -> ChatWithModelResult {
+    ChatWithModelResult {
+        reply,
+        should_create_plan: false,
+        intent: if is_question_like_message(message) {
+            "question"
+        } else {
+            "chat"
+        }
+        .to_string(),
+        provider_status: String::new(),
+        provider_model: String::new(),
+        provider_error: String::new(),
+        response_mode: if recommended_task.is_some() {
+            "native-recommendation-call"
+        } else {
+            "native-text"
+        }
+        .to_string(),
+        references: Vec::new(),
+        recommended_action: recommended_task.map(|task| ChatRecommendedAction { task }),
+        provider_stream_trace: Default::default(),
+    }
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -274,23 +405,50 @@ fn build_chat_result(
     provider_tool_mode: ProviderToolMode,
     tool_calls: &[ProviderToolCall],
 ) -> Result<ChatWithModelResult, String> {
-    let native_task = engineering_task_from_calls(tool_calls)?.is_some();
-    let (reply, content_mode) = if content.trim().is_empty() && native_task {
+    let native_task = engineering_task_from_calls(tool_calls)?;
+    let conversation_response = conversation_response_from_calls(tool_calls)?;
+    if native_task.is_some() && conversation_response.is_some() {
+        return Err("provider 同时返回了工程任务和对话响应，无法确定唯一结果".to_string());
+    }
+    if provider_tool_mode == ProviderToolMode::NativeFunctionCalling
+        && native_task.is_none()
+        && conversation_response.is_none()
+    {
+        return Err("provider 未返回必需的结构化对话响应".to_string());
+    }
+    let recommended_task = conversation_response
+        .as_ref()
+        .and_then(|response| response.recommended_task.clone());
+    let (reply, content_mode) = if let Some(response) = &conversation_response {
+        (response.reply.clone(), "structured")
+    } else if content.trim().is_empty() && native_task.is_some() {
         ("已识别为工程任务，正在准备执行计划。".to_string(), "text")
     } else {
         visible_chat_content(content)?
     };
     let should_create_plan = match provider_tool_mode {
-        ProviderToolMode::NativeFunctionCalling => native_task,
+        ProviderToolMode::NativeFunctionCalling => native_task.is_some(),
         ProviderToolMode::CompatibilityKeyword => {
             should_create_plan_for_message(message, has_attachments)
         }
     };
-    let response_mode = match (provider_tool_mode, native_task, content_mode) {
-        (_, _, "legacy-json") => "legacy-json",
-        (ProviderToolMode::NativeFunctionCalling, true, _) => "native-function-call",
-        (ProviderToolMode::NativeFunctionCalling, false, _) => "native-text",
-        (ProviderToolMode::CompatibilityKeyword, _, _) => "compatibility-keyword",
+    let response_mode = match (
+        provider_tool_mode,
+        native_task.is_some(),
+        recommended_task.is_some(),
+        content_mode,
+    ) {
+        (_, _, _, "legacy-json") => "legacy-json",
+        (ProviderToolMode::NativeFunctionCalling, true, true, _) => {
+            unreachable!("conflicting native actions are rejected before response projection")
+        }
+        (ProviderToolMode::NativeFunctionCalling, true, false, _) => "native-function-call",
+        (ProviderToolMode::NativeFunctionCalling, false, true, _) => "native-recommendation-call",
+        (ProviderToolMode::NativeFunctionCalling, false, false, "structured") => {
+            "native-structured-text"
+        }
+        (ProviderToolMode::NativeFunctionCalling, false, false, _) => "native-text",
+        (ProviderToolMode::CompatibilityKeyword, _, _, _) => "compatibility-keyword",
     };
     Ok(ChatWithModelResult {
         reply,
@@ -308,6 +466,8 @@ fn build_chat_result(
         provider_error: String::new(),
         response_mode: response_mode.to_string(),
         references: Vec::new(),
+        recommended_action: recommended_task.map(|task| ChatRecommendedAction { task }),
+        provider_stream_trace: Default::default(),
     })
 }
 
@@ -456,15 +616,18 @@ mod tests {
         assert_eq!(result.response_mode, "native-function-call");
 
         let question = build_chat_result(
-            "这是解释。",
+            "",
             "帮我解释这个实现",
             false,
             ProviderToolMode::NativeFunctionCalling,
-            &[],
+            &[ProviderToolCall {
+                name: "respond_to_user".to_string(),
+                arguments: r#"{"reply":"这是解释。","action":"none","task":""}"#.to_string(),
+            }],
         )
         .unwrap();
         assert!(!question.should_create_plan);
-        assert_eq!(question.response_mode, "native-text");
+        assert_eq!(question.response_mode, "native-structured-text");
     }
 
     #[test]
@@ -480,6 +643,57 @@ mod tests {
             }],
         );
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn native_recommendation_call_carries_reply_and_action_without_text_parsing() {
+        let result = build_chat_result(
+            "",
+            "分析对话模块并给出建议",
+            false,
+            ProviderToolMode::NativeFunctionCalling,
+            &[ProviderToolCall {
+                name: "respond_to_user".to_string(),
+                arguments: r#"{"reply":"建议先统一任务状态。","action":"start-agent","task":"在会话消息旁加入统一任务状态标签"}"#.to_string(),
+            }],
+        )
+        .unwrap();
+        assert_eq!(result.reply, "建议先统一任务状态。");
+        assert!(!result.should_create_plan);
+        assert_eq!(result.response_mode, "native-recommendation-call");
+        assert_eq!(
+            result
+                .recommended_action
+                .map(|action| action.task)
+                .as_deref(),
+            Some("在会话消息旁加入统一任务状态标签")
+        );
+    }
+
+    #[test]
+    fn native_mode_rejects_unstructured_text_and_accepts_explicit_no_action() {
+        assert!(build_chat_result(
+            "plain text",
+            "explain this",
+            false,
+            ProviderToolMode::NativeFunctionCalling,
+            &[],
+        )
+        .is_err());
+        let result = build_chat_result(
+            "",
+            "explain this",
+            false,
+            ProviderToolMode::NativeFunctionCalling,
+            &[ProviderToolCall {
+                name: "respond_to_user".to_string(),
+                arguments: r#"{"reply":"这是普通回答。","action":"none","task":""}"#.to_string(),
+            }],
+        )
+        .unwrap();
+        assert_eq!(result.reply, "这是普通回答。");
+        assert_eq!(result.response_mode, "native-structured-text");
+        assert!(result.recommended_action.is_none());
     }
 
     #[test]
@@ -534,7 +748,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn streams_natural_text_from_the_provider_without_a_json_contract() {
+    async fn streams_required_structured_text_from_the_provider() {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
         let server = std::thread::spawn(move || {
@@ -566,8 +780,8 @@ mod tests {
             }
             let request = String::from_utf8_lossy(&request).to_string();
             let body = concat!(
-                "data: {\"choices\":[{\"delta\":{\"content\":\"自然\"}}]}\n\n",
-                "data: {\"choices\":[{\"delta\":{\"content\":\"文本\"}}]}\n\n",
+                "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"name\":\"respond_to_user\",\"arguments\":\"{\\\"reply\\\":\\\"自然\"}}]}}]}\n\n",
+                "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"文本\\\",\\\"action\\\":\\\"none\\\",\\\"task\\\":\\\"\\\"}\"}}]}}]}\n\n",
                 "data: [DONE]\n\n"
             );
             write!(
@@ -608,6 +822,7 @@ mod tests {
             &[],
             &[],
             &DialogueContextInput::default(),
+            false,
             &json!({}),
             &[],
             &json!({}),
@@ -617,12 +832,81 @@ mod tests {
         .unwrap();
         let request = server.join().unwrap();
         assert_eq!(result.reply, "自然文本");
-        assert_eq!(result.response_mode, "native-text");
-        assert_eq!(deltas.concat(), "自然文本");
+        assert_eq!(result.response_mode, "native-structured-text");
+        assert_eq!(deltas, ["自然".to_string(), "文本".to_string()]);
         assert!(request.contains("\"tools\""));
-        assert!(request.contains("natural Chinese text"));
+        assert!(request.contains("\"tool_choice\":\"required\""));
+        assert!(request.contains("respond_to_user"));
         assert!(!request.contains("Return only strict JSON"));
         assert!(!request.contains("shouldCreatePlan"));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[tokio::test]
+    async fn streams_visible_recommendation_before_classifying_the_agent_task() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = std::thread::spawn(move || {
+            let (mut visible_stream, _) = listener.accept().unwrap();
+            let visible_request = read_http_request(&mut visible_stream);
+            let visible_body = concat!(
+                "data: {\"choices\":[{\"delta\":{\"content\":\"建议先\"}}]}\n\n",
+                "data: {\"choices\":[{\"delta\":{\"content\":\"统一状态。回复可以后启动。\"}}]}\n\n",
+                "data: [DONE]\n\n"
+            );
+            write_sse_response(&mut visible_stream, visible_body);
+
+            let (mut classifier_stream, _) = listener.accept().unwrap();
+            let classifier_request = read_http_request(&mut classifier_stream);
+            let classifier_body = r#"{"choices":[{"message":{"content":null,"tool_calls":[{"function":{"name":"respond_with_recommendation","arguments":"{\"task\":\"实现统一对话状态机\"}"}}]}}]}"#;
+            write!(
+                classifier_stream,
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                classifier_body.len(),
+                classifier_body
+            )
+            .unwrap();
+            (visible_request, classifier_request)
+        });
+        let (root, provider) = native_test_provider(address);
+        let mut deltas = Vec::new();
+        let result = generate_provider_chat(
+            &provider,
+            &root,
+            "OmniDesk",
+            "stabilizing",
+            "给出三个改进建议",
+            &[],
+            &[],
+            &DialogueContextInput::default(),
+            true,
+            &json!({}),
+            &[],
+            &json!({}),
+            |text, _| deltas.push(text),
+        )
+        .await
+        .unwrap();
+        let (visible_request, classifier_request) = server.join().unwrap();
+        assert_eq!(
+            deltas,
+            [
+                "建议先".to_string(),
+                "统一状态。回复可以后启动。".to_string()
+            ]
+        );
+        assert_eq!(result.reply, "建议先统一状态。回复可以后启动。");
+        assert_eq!(result.response_mode, "native-recommendation-call");
+        assert_eq!(
+            result
+                .recommended_action
+                .as_ref()
+                .map(|action| action.task.as_str()),
+            Some("实现统一对话状态机")
+        );
+        assert!(!visible_request.contains("\"tools\""));
+        assert!(classifier_request.contains("respond_with_recommendation"));
+        assert!(classifier_request.contains("\"stream\":false"));
         std::fs::remove_dir_all(root).unwrap();
     }
 
@@ -651,6 +935,7 @@ mod tests {
             &[],
             &[],
             &DialogueContextInput::default(),
+            false,
             &json!({}),
             &[],
             &json!({}),
@@ -704,6 +989,7 @@ mod tests {
             &[],
             &[],
             &DialogueContextInput::default(),
+            false,
             &json!({}),
             &[],
             &json!({}),

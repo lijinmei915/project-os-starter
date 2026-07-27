@@ -58,7 +58,11 @@ pub fn builtin_registry() -> ToolRegistrySnapshot {
                 json!({
                     "type": "object",
                     "additionalProperties": false,
-                    "properties": { "path": { "type": "string", "minLength": 1 } },
+                    "properties": {
+                        "endLine": { "type": "integer", "minimum": 1 },
+                        "path": { "type": "string", "minLength": 1 },
+                        "startLine": { "type": "integer", "minimum": 1 }
+                    },
                     "required": ["path"]
                 }),
             ),
@@ -69,6 +73,7 @@ pub fn builtin_registry() -> ToolRegistrySnapshot {
                     "type": "object",
                     "additionalProperties": false,
                     "properties": {
+                        "maxResults": { "type": "integer", "minimum": 1, "maximum": 100 },
                         "path": { "type": "string" },
                         "query": { "type": "string", "minLength": 1 }
                     },
@@ -131,6 +136,18 @@ pub fn validate_arguments(tool: &ToolDescriptor, arguments: &Value) -> Result<()
                     return Err(format!("工具 {} 的参数 {key} 长度不足", tool.name));
                 }
             }
+            Some("integer") => {
+                let number = value
+                    .as_i64()
+                    .ok_or_else(|| format!("工具 {} 的参数 {key} 必须是整数", tool.name))?;
+                let minimum = property.get("minimum").and_then(Value::as_i64);
+                let maximum = property.get("maximum").and_then(Value::as_i64);
+                if minimum.is_some_and(|limit| number < limit)
+                    || maximum.is_some_and(|limit| number > limit)
+                {
+                    return Err(format!("工具 {} 的参数 {key} 超出允许范围", tool.name));
+                }
+            }
             Some(other) => {
                 return Err(format!(
                     "工具 {} 使用了不受支持的参数类型：{other}",
@@ -138,6 +155,16 @@ pub fn validate_arguments(tool: &ToolDescriptor, arguments: &Value) -> Result<()
                 ));
             }
             None => return Err(format!("工具 {} 的参数 {key} 缺少类型声明", tool.name)),
+        }
+    }
+    if tool.name == "read_file" {
+        let start = values.get("startLine").and_then(Value::as_u64).unwrap_or(1);
+        if values
+            .get("endLine")
+            .and_then(Value::as_u64)
+            .is_some_and(|end| end < start)
+        {
+            return Err("工具 read_file 的 endLine 不能小于 startLine".to_string());
         }
     }
     Ok(())
@@ -252,12 +279,24 @@ mod tests {
     fn validates_arguments_against_the_registered_closed_schema() {
         let read = find_builtin("read_file").unwrap();
         assert!(validate_arguments(&read, &json!({ "path": "README.md" })).is_ok());
+        assert!(validate_arguments(
+            &read,
+            &json!({ "path": "README.md", "startLine": 2, "endLine": 8 })
+        )
+        .is_ok());
+        assert!(validate_arguments(&read, &json!({ "path": "README.md", "endLine": 0 })).is_err());
         assert!(validate_arguments(&read, &json!({})).is_err());
         assert!(validate_arguments(&read, &json!({ "path": "README.md", "extra": true })).is_err());
         assert!(validate_arguments(&read, &json!({ "path": 42 })).is_err());
 
         let search = find_builtin("search_project").unwrap();
         assert!(validate_arguments(&search, &json!({ "query": "agent" })).is_ok());
+        assert!(
+            validate_arguments(&search, &json!({ "query": "agent", "maxResults": 25 })).is_ok()
+        );
+        assert!(
+            validate_arguments(&search, &json!({ "query": "agent", "maxResults": 101 })).is_err()
+        );
         assert!(validate_arguments(&search, &json!({ "query": "" })).is_err());
 
         let status = find_builtin("git_status").unwrap();

@@ -5,6 +5,8 @@ use serde_json::{json, Value};
 use std::path::Path;
 
 pub const START_ENGINEERING_TASK_TOOL: &str = "start_engineering_task";
+pub const RESPOND_TO_USER_TOOL: &str = "respond_to_user";
+pub const RESPOND_WITH_RECOMMENDATION_TOOL: &str = "respond_with_recommendation";
 const PROVIDER_TOOL_CAPABILITIES_PATH: &str = ".omnidesk/cache/provider-tool-capabilities.json";
 const PROVIDER_TOOL_CAPABILITIES_SCHEMA: &str = "omnidesk.provider-tool-capabilities.v0.1";
 
@@ -36,6 +38,12 @@ pub struct ProviderToolCallFragment {
     pub index: usize,
     pub name: String,
     pub arguments: String,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ProviderConversationResponse {
+    pub reply: String,
+    pub recommended_task: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -146,19 +154,102 @@ pub fn conversation_tool_definitions() -> Value {
                 "required": ["task"]
             }
         }
+    }, {
+        "type": "function",
+        "function": {
+            "name": RESPOND_TO_USER_TOOL,
+            "description": "Use for every conversational answer that is not an explicit engineering execution request. Put the complete user-visible answer in reply. You MUST set action to start-agent and provide a self-contained task whenever reply selects or recommends one implementation, priority, improvement, or smallest next step. Set action to none and task to an empty string only for pure explanation or multiple unranked alternatives with no selected engineering outcome. Never recommend a concrete next step while returning action=none.",
+            "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                    "reply": { "type": "string", "description": "The complete natural-language answer shown to the user." },
+                    "action": { "type": "string", "enum": ["none", "start-agent"], "description": "Whether the answer carries one executable next action." },
+                    "task": { "type": "string", "description": "A concise, self-contained engineering outcome when action is start-agent; otherwise an empty string." }
+                },
+                "required": ["reply", "action", "task"]
+            }
+        }
     }])
+}
+
+fn required_recommendation_tool_definition() -> Value {
+    json!({
+        "type": "function",
+        "function": {
+            "name": RESPOND_WITH_RECOMMENDATION_TOOL,
+            "description": "Select exactly one self-contained engineering outcome from the completed user-visible answer.",
+            "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                    "task": { "type": "string", "description": "The one concrete, self-contained engineering outcome selected as the next action." }
+                },
+                "required": ["task"]
+            }
+        }
+    })
+}
+
+pub fn recommendation_task_from_calls(
+    calls: &[ProviderToolCall],
+) -> Result<Option<String>, String> {
+    let mut task = None;
+    for call in calls {
+        let name = call.name.trim();
+        if name != RESPOND_WITH_RECOMMENDATION_TOOL {
+            return Err(format!("provider 返回了未登记的推荐工具调用：{name}"));
+        }
+        if task.is_some() {
+            return Err("provider 返回了重复的推荐工具调用".to_string());
+        }
+        let arguments: Value = serde_json::from_str(&call.arguments)
+            .map_err(|_| "provider 推荐工具参数不是有效 JSON".to_string())?;
+        let arguments = arguments
+            .as_object()
+            .ok_or_else(|| "provider 推荐工具参数必须是对象".to_string())?;
+        if arguments.len() != 1 || !arguments.contains_key("task") {
+            return Err("provider 推荐工具参数必须只包含 task".to_string());
+        }
+        let value = arguments
+            .get("task")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| "provider 推荐工具参数 task 必须是非空字符串".to_string())?;
+        if value.chars().count() > 1_200 {
+            return Err("provider 推荐工具参数 task 超出长度上限".to_string());
+        }
+        task = Some(value.to_string());
+    }
+    Ok(task)
 }
 
 pub fn add_conversation_tools(
     root: &Path,
     provider: &ProviderConfig,
     payload: &mut Value,
+    require_recommendation: bool,
 ) -> ProviderToolMode {
     let mode = provider_tool_mode(root, provider);
     if mode == ProviderToolMode::NativeFunctionCalling {
         if let Some(object) = payload.as_object_mut() {
-            object.insert("tools".to_string(), conversation_tool_definitions());
-            object.insert("tool_choice".to_string(), Value::String("auto".to_string()));
+            if require_recommendation {
+                object.insert(
+                    "tools".to_string(),
+                    Value::Array(vec![required_recommendation_tool_definition()]),
+                );
+                object.insert(
+                    "tool_choice".to_string(),
+                    json!({ "type": "function", "function": { "name": RESPOND_WITH_RECOMMENDATION_TOOL } }),
+                );
+            } else {
+                object.insert("tools".to_string(), conversation_tool_definitions());
+                object.insert(
+                    "tool_choice".to_string(),
+                    Value::String("required".to_string()),
+                );
+            }
         }
     }
     mode
@@ -224,6 +315,161 @@ pub fn tool_call_fragments(event: &Value) -> Vec<ProviderToolCallFragment> {
         .collect()
 }
 
+pub fn streamed_conversation_reply(arguments: &str) -> String {
+    let Some(value_start) = top_level_reply_value_start(arguments) else {
+        return String::new();
+    };
+    let chars = arguments[value_start..].chars().collect::<Vec<_>>();
+    let mut output = String::new();
+    let mut index = 0;
+    while index < chars.len() {
+        match chars[index] {
+            '"' => break,
+            '\\' => {
+                let Some(escape) = chars.get(index + 1).copied() else {
+                    break;
+                };
+                match escape {
+                    '"' | '\\' | '/' => {
+                        output.push(escape);
+                        index += 1;
+                    }
+                    'b' => {
+                        output.push('\u{0008}');
+                        index += 1;
+                    }
+                    'f' => {
+                        output.push('\u{000c}');
+                        index += 1;
+                    }
+                    'n' => {
+                        output.push('\n');
+                        index += 1;
+                    }
+                    'r' => {
+                        output.push('\r');
+                        index += 1;
+                    }
+                    't' => {
+                        output.push('\t');
+                        index += 1;
+                    }
+                    'u' => {
+                        let Some(first) = decode_hex_quad(&chars, index + 2) else {
+                            break;
+                        };
+                        index += 5;
+                        if (0xD800..=0xDBFF).contains(&first) {
+                            if chars.get(index + 1) != Some(&'\\')
+                                || chars.get(index + 2) != Some(&'u')
+                            {
+                                break;
+                            }
+                            let Some(second) = decode_hex_quad(&chars, index + 3) else {
+                                break;
+                            };
+                            if !(0xDC00..=0xDFFF).contains(&second) {
+                                break;
+                            }
+                            let scalar = 0x10000
+                                + (((first as u32) - 0xD800) << 10)
+                                + ((second as u32) - 0xDC00);
+                            if let Some(character) = char::from_u32(scalar) {
+                                output.push(character);
+                            }
+                            index += 6;
+                        } else if let Some(character) = char::from_u32(first as u32) {
+                            output.push(character);
+                        }
+                    }
+                    _ => break,
+                }
+            }
+            character if character.is_control() => break,
+            character => output.push(character),
+        }
+        index += 1;
+    }
+    output
+}
+
+fn top_level_reply_value_start(arguments: &str) -> Option<usize> {
+    let bytes = arguments.as_bytes();
+    let mut index = 0;
+    while bytes.get(index)?.is_ascii_whitespace() {
+        index += 1;
+    }
+    if bytes.get(index) != Some(&b'{') {
+        return None;
+    }
+    index += 1;
+    loop {
+        while bytes.get(index).is_some_and(u8::is_ascii_whitespace) {
+            index += 1;
+        }
+        if bytes.get(index) == Some(&b'}') {
+            return None;
+        }
+        let (key, next) = decode_complete_json_string(arguments, index)?;
+        index = next;
+        while bytes.get(index).is_some_and(u8::is_ascii_whitespace) {
+            index += 1;
+        }
+        if bytes.get(index) != Some(&b':') {
+            return None;
+        }
+        index += 1;
+        while bytes.get(index).is_some_and(u8::is_ascii_whitespace) {
+            index += 1;
+        }
+        if key == "reply" {
+            return (bytes.get(index) == Some(&b'"')).then_some(index + 1);
+        }
+        let (_, next) = decode_complete_json_string(arguments, index)?;
+        index = next;
+        while bytes.get(index).is_some_and(u8::is_ascii_whitespace) {
+            index += 1;
+        }
+        match bytes.get(index) {
+            Some(b',') => index += 1,
+            _ => return None,
+        }
+    }
+}
+
+fn decode_complete_json_string(input: &str, start: usize) -> Option<(String, usize)> {
+    if input.as_bytes().get(start) != Some(&b'"') {
+        return None;
+    }
+    let tail = &input[start..];
+    let mut escaped = false;
+    for (offset, character) in tail.char_indices().skip(1) {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        match character {
+            '\\' => escaped = true,
+            '"' => {
+                let end = start + offset + 1;
+                let value = serde_json::from_str::<String>(&input[start..end]).ok()?;
+                return Some((value, end));
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+fn decode_hex_quad(chars: &[char], start: usize) -> Option<u16> {
+    let digits = chars.get(start..start + 4)?;
+    let mut value = 0u16;
+    for digit in digits {
+        value = value.checked_mul(16)? + digit.to_digit(16)? as u16;
+    }
+    Some(value)
+}
+
 pub fn engineering_task_from_calls(calls: &[ProviderToolCall]) -> Result<Option<String>, String> {
     let mut task = None;
     for call in calls
@@ -250,6 +496,73 @@ pub fn engineering_task_from_calls(calls: &[ProviderToolCall]) -> Result<Option<
         task = Some(value.to_string());
     }
     Ok(task)
+}
+
+pub fn conversation_response_from_calls(
+    calls: &[ProviderToolCall],
+) -> Result<Option<ProviderConversationResponse>, String> {
+    let mut response = None;
+    for call in calls {
+        let name = call.name.trim();
+        if !matches!(name, START_ENGINEERING_TASK_TOOL | RESPOND_TO_USER_TOOL) {
+            return Err(format!("provider 返回了未登记的对话工具调用：{name}"));
+        }
+        if name != RESPOND_TO_USER_TOOL {
+            continue;
+        }
+        if response.is_some() {
+            return Err("provider 返回了重复的结构化对话响应".to_string());
+        }
+        let arguments: Value = serde_json::from_str(&call.arguments)
+            .map_err(|_| "provider 结构化对话参数不是有效 JSON".to_string())?;
+        let arguments = arguments
+            .as_object()
+            .ok_or_else(|| "provider 结构化对话参数必须是对象".to_string())?;
+        let valid_shape = arguments.len() == 3
+            && arguments.contains_key("reply")
+            && arguments.contains_key("action")
+            && arguments.contains_key("task");
+        if !valid_shape {
+            return Err("provider 结构化对话参数与工具 schema 不一致".to_string());
+        }
+        let required_text = |key: &str, max: usize| -> Result<String, String> {
+            let value = arguments
+                .get(key)
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| format!("provider 结构化对话参数 {key} 必须是非空字符串"))?;
+            if value.chars().count() > max {
+                return Err(format!("provider 结构化对话参数 {key} 超出长度上限"));
+            }
+            Ok(value.to_string())
+        };
+        let action = arguments
+            .get("action")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "provider 结构化对话参数 action 必须是字符串".to_string())?;
+        let raw_task = arguments
+            .get("task")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "provider 结构化对话参数 task 必须是字符串".to_string())?
+            .trim();
+        let recommended_task = match action {
+            "none" if raw_task.is_empty() => None,
+            "start-agent" if !raw_task.is_empty() && raw_task.chars().count() <= 1_200 => {
+                Some(raw_task.to_string())
+            }
+            "none" => return Err("provider action=none 时 task 必须为空".to_string()),
+            "start-agent" => {
+                return Err("provider action=start-agent 时 task 必须是有界非空字符串".to_string())
+            }
+            _ => return Err("provider 结构化对话 action 未登记".to_string()),
+        };
+        response = Some(ProviderConversationResponse {
+            reply: required_text("reply", 12_000)?,
+            recommended_task,
+        });
+    }
+    Ok(response)
 }
 
 #[cfg(test)]
@@ -307,7 +620,12 @@ mod tests {
         let root = temp_root();
         let mut native = json!({ "model": "test" });
         assert_eq!(
-            add_conversation_tools(&root, &provider("https://api.openai.com/v1"), &mut native),
+            add_conversation_tools(
+                &root,
+                &provider("https://api.openai.com/v1"),
+                &mut native,
+                false,
+            ),
             ProviderToolMode::NativeFunctionCalling
         );
         assert_eq!(
@@ -322,6 +640,43 @@ mod tests {
                 .and_then(Value::as_bool),
             Some(false)
         );
+        assert_eq!(
+            native.get("tool_choice").and_then(Value::as_str),
+            Some("required")
+        );
+        assert_eq!(
+            native
+                .pointer("/tools/1/function/name")
+                .and_then(Value::as_str),
+            Some(RESPOND_TO_USER_TOOL)
+        );
+
+        let mut recommendation = json!({ "model": "test" });
+        add_conversation_tools(
+            &root,
+            &provider("https://api.openai.com/v1"),
+            &mut recommendation,
+            true,
+        );
+        assert_eq!(
+            recommendation
+                .pointer("/tools/0/function/name")
+                .and_then(Value::as_str),
+            Some(RESPOND_WITH_RECOMMENDATION_TOOL)
+        );
+        assert_eq!(
+            recommendation
+                .pointer("/tools/0/function/parameters/properties")
+                .and_then(Value::as_object)
+                .map(|properties| properties.keys().cloned().collect::<Vec<_>>()),
+            Some(vec!["task".to_string()])
+        );
+        assert_eq!(
+            recommendation
+                .pointer("/tool_choice/function/name")
+                .and_then(Value::as_str),
+            Some(RESPOND_WITH_RECOMMENDATION_TOOL)
+        );
 
         let fallback_provider = provider("https://gateway.example/v1");
         record_provider_tool_capability(
@@ -333,7 +688,7 @@ mod tests {
         .unwrap();
         let mut fallback = json!({ "model": "test" });
         assert_eq!(
-            add_conversation_tools(&root, &fallback_provider, &mut fallback),
+            add_conversation_tools(&root, &fallback_provider, &mut fallback, false),
             ProviderToolMode::CompatibilityKeyword
         );
         assert!(fallback.get("tools").is_none());
@@ -368,6 +723,69 @@ mod tests {
             engineering_task_from_calls(&tools).unwrap().as_deref(),
             Some("fix")
         );
+    }
+
+    #[test]
+    fn streams_only_the_decoded_reply_field_from_partial_tool_arguments() {
+        assert_eq!(
+            streamed_conversation_reply(r#"{"reply":"第一行\n第二"#),
+            "第一行\n第二"
+        );
+        assert_eq!(
+            streamed_conversation_reply(
+                r#"{"reply":"建议 \"先修\" \u4e2d文 \ud83d\ude80","task":"later"}"#
+            ),
+            "建议 \"先修\" 中文 🚀"
+        );
+        assert_eq!(
+            streamed_conversation_reply(r#"{"task":"reply is not a field yet"}"#),
+            ""
+        );
+        assert_eq!(
+            streamed_conversation_reply(
+                r#"{"task":"hidden \"reply\": \"do not show\"","reply":"可见"}"#
+            ),
+            "可见"
+        );
+        assert_eq!(
+            streamed_conversation_reply(r#"{"reply":"未完成\u4e"#),
+            "未完成"
+        );
+    }
+
+    #[test]
+    fn parses_a_bounded_structured_response_without_reading_prose() {
+        let calls = [ProviderToolCall {
+            name: RESPOND_TO_USER_TOOL.to_string(),
+            arguments: r#"{"reply":"建议先统一任务状态。","action":"start-agent","task":"在会话消息旁加入统一任务状态标签"}"#.to_string(),
+        }];
+        assert_eq!(
+            conversation_response_from_calls(&calls).unwrap(),
+            Some(ProviderConversationResponse {
+                reply: "建议先统一任务状态。".to_string(),
+                recommended_task: Some("在会话消息旁加入统一任务状态标签".to_string()),
+            })
+        );
+        assert_eq!(
+            conversation_response_from_calls(&[ProviderToolCall {
+                name: RESPOND_TO_USER_TOOL.to_string(),
+                arguments: r#"{"reply":"只回答问题。","action":"none","task":""}"#.to_string(),
+            }])
+            .unwrap()
+            .unwrap()
+            .recommended_task,
+            None
+        );
+        assert!(conversation_response_from_calls(&[ProviderToolCall {
+            name: RESPOND_WITH_RECOMMENDATION_TOOL.to_string(),
+            arguments: r#"{"task":"实现任务语义去重"}"#.to_string(),
+        }])
+        .is_err());
+        assert!(conversation_response_from_calls(&[ProviderToolCall {
+            name: RESPOND_TO_USER_TOOL.to_string(),
+            arguments: r#"{"reply":"建议。","action":"none","task":"执行"}"#.to_string(),
+        }])
+        .is_err());
     }
 
     #[test]

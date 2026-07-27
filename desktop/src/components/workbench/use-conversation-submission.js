@@ -2,12 +2,14 @@ import { addConversationConfirmationHandler } from "../../lib/conversation-confi
 import { resolveConversationChatResult } from "../../lib/conversation-chat-result";
 import { createBasicConversationImmediateHandlers } from "../../lib/conversation-immediate-handlers";
 import { buildNonPlanConversationTurn } from "../../lib/conversation-result-projection";
+import { recommendedActionFromChatResult } from "../../lib/conversation-recommended-action";
 import { modelHealthUpdate, shouldGenerateConversationPlan } from "../../lib/conversation-result-decision";
 import { syncConversationProfilePatches } from "../../lib/conversation-profile-sync";
 import { getProjectMemory, saveProjectMemory } from "../../lib/project-memory-client";
 import { appendMemoryAudit, projectMemoryReferences, retrieveProjectMemory } from "../../lib/project-memory";
 import { modelConversationAttachments, releaseConversationAttachments, submittedConversationAttachments, withActiveTaskConversationContext } from "../../lib/conversation-submission-utils";
 import { applyConversationTakeover } from "../../lib/conversation-takeover-controller";
+import { composerResponseForPendingInteraction } from "../../lib/conversation-agent-events";
 import { beginRequest, isRequestRunning, settleRequest } from "../../lib/request-lifecycle";
 import {
   actionCancelledTurn,
@@ -29,12 +31,11 @@ export function useConversationSubmission({
   activeProjectGoalTitle,
   activeRequestRef,
   activeTask,
-  actionFromAssistantCommitment,
-  actionFromAssistantRecommendation,
   actionPromptsForMessage,
   agentEventsForMessageKind,
   attachments,
   buildChatRequestContext,
+  cancelRuntimeRequest,
   chatTurns,
   chatWithModel,
   conversationDiagnosticForResult,
@@ -43,6 +44,7 @@ export function useConversationSubmission({
   executePendingPatchApply,
   isActionRequestMessage,
   isTauri,
+  interactions,
   lastSubmissionRef,
   loadingEventsForMessageKind,
   loadingLabelForMessageKind,
@@ -50,6 +52,7 @@ export function useConversationSubmission({
   onChatTurnsChange,
   onGeneratePlan,
   onModelHealthChange,
+  onSubmitAgentInteraction,
   onProfileUpdated,
   onRunChatAction,
   onStopPlan,
@@ -101,7 +104,16 @@ export function useConversationSubmission({
       clearAttachments();
       releaseConversationAttachments(submittedAttachments);
     };
+    const interactionReply = composerResponseForPendingInteraction(interactions, nextInput, submittedAttachments.length);
+    if (interactionReply) {
+      lastSubmissionRef.current = prepared.submission;
+      onChatTurnsChange([...chatTurns, userTurn]);
+      clearSubmittedInput();
+      await onSubmitAgentInteraction?.(interactionReply.run, interactionReply.response);
+      return;
+    }
     const takeoverResult = applyConversationTakeover({
+      cancelRequest: cancelRuntimeRequest,
       chatTurns,
       clearInput: clearSubmittedInput,
       onChatTurnsChange,
@@ -120,6 +132,11 @@ export function useConversationSubmission({
     setTaskInput("");
     clearAttachments();
     onChatTurnsChange([...requestBaseTurns, userTurn]);
+    beginRequest(activeRequestRef, requestId, requestStartedAt);
+    setChatStartedAt(requestStartedAt);
+    setChatLoadingLabel(runningRequest ? "正在切换到新要求" : "正在准备请求");
+    setChatLoadingEvents(loadingEventsForMessageKind("chat"));
+    setChatLoading(true);
     const baseRequestContext = buildChatRequestContext([...requestBaseTurns, userTurn], 8, conversationSummary);
     let requestContext = withActiveTaskConversationContext(baseRequestContext, {
       activeConversationTaskId,
@@ -150,6 +167,10 @@ export function useConversationSubmission({
     } catch {
       requestContext = { ...requestContext, projectMemory: [] };
     }
+    if (!isRequestRunning(activeRequestRef, requestId)) {
+      releaseConversationAttachments(submittedAttachments);
+      return;
+    }
     userTurn.memoryReferences = requestContext.memoryReferences || [];
     const immediateHandlers = {
       ...createBasicConversationImmediateHandlers({
@@ -170,7 +191,6 @@ export function useConversationSubmission({
             ? { ...turn, actions: [], pendingAction: null, resolvedActionId: command.resolvePendingAction.id }
             : turn)
           : requestBaseTurns;
-        beginRequest(activeRequestRef, requestId, requestStartedAt);
         setTaskInput("");
         clearAttachments();
         onChatTurnsChange([...resolvedTurns, userTurn]);
@@ -213,6 +233,10 @@ export function useConversationSubmission({
       activeProjectGoalTitle,
       clearSubmittedInput,
       executePendingPatchApply,
+      executePendingAgent: async (action) => immediateHandlers["execute-action"]({
+        action: { id: "start-agent", task: action.task },
+        resolvePendingAction: action,
+      }),
       executePendingPlan: async (action) => immediateHandlers["execute-action"]({
         action: { id: "generate-plan", task: action.task },
         resolvePendingAction: action,
@@ -235,7 +259,6 @@ export function useConversationSubmission({
     const contextualTask = pendingAction?.type === "generate-plan" && followUp === "confirm"
       ? pendingAction.task
       : contextualizeUserMessage(nextInput, requestContext.contextState);
-    beginRequest(activeRequestRef, requestId, requestStartedAt);
     setTaskInput("");
     clearAttachments();
     onChatTurnsChange([...requestBaseTurns, userTurn]);
@@ -289,16 +312,10 @@ export function useConversationSubmission({
       return;
     }
     const revisingPendingAction = runtimeCommand.decision === "revise";
-    const commitmentAction = revisingPendingAction
+    const recommendedAction = revisingPendingAction
       ? null
-      : actionFromAssistantCommitment(chatResult?.reply, contextualTask, `generate-plan-${requestId}`);
-    const recommendedAction = commitmentAction ? null : actionFromAssistantRecommendation(
-      chatResult?.reply,
-      contextualTask,
-      `recommend-plan-${requestId}`,
-    );
+      : recommendedActionFromChatResult(chatResult, requestId);
     const shouldCreatePlan = !revisingPendingAction && shouldGenerateConversationPlan({
-      actionFromCommitment: commitmentAction,
       attachmentsCount: submittedAttachments.length,
       chatResult,
       isActionRequestMessage,

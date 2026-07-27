@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://omnidesk.local/schemas/agent-event.schema.json",
+  "title": "OmniDesk Agent Event",
+  "type": "object",
+  "required": ["schemaVersion", "sequence", "kind", "phase", "status", "summary", "details"],
+  "properties": {
+    "schemaVersion": { "const": "omnidesk.agent-event.v1" },
+    "sequence": { "type": "integer", "minimum": 1 },
+    "kind": { "enum": ["lifecycle", "tool-call", "tool-result", "terminal"] },
+    "phase": { "enum": ["model", "tool"] },
+    "status": {
+      "enum": ["running", "requested", "succeeded", "failed", "cancelled", "awaiting-user-input", "awaiting-approval", "budget-exceeded"]
+    },
+    "summary": { "type": "string", "minLength": 1, "maxLength": 240 },
+    "details": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 100 },
+        "step": { "type": "integer", "minimum": 1 },
+        "success": { "type": "boolean" },
+        "mode": { "enum": ["Start", "Resume"] }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

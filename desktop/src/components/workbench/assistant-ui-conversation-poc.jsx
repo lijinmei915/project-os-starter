@@ -70,9 +70,9 @@ function AssistantMessage({ toolRenderers }) {
   );
 }
 
-export function AssistantUiConversationPoc({ interactions = [], isRunning = false, onAction, onSubmitInteraction, turns = [] }) {
+export function AssistantUiConversationPoc({ interactions = [], isRunning = false, onAction, onRetryInteraction, onSubmitInteraction, turns = [] }) {
   const stageGoalRenderer = useMemo(() => (props) => <StageGoalPart {...props} onAction={onAction} />, [onAction]);
-  const askUserRenderer = useMemo(() => ({ args }) => <AgentUserFormCard interaction={args.interaction} onSubmit={(response) => onSubmitInteraction?.(args.run, response)} runStatus={args.run.status} />, [onSubmitInteraction]);
+  const askUserRenderer = useMemo(() => ({ args }) => <AgentUserFormCard interaction={args.interaction} onRetry={() => onRetryInteraction?.(args.run)} onSubmit={(response) => onSubmitInteraction?.(args.run, response)} run={args.run} />, [onRetryInteraction, onSubmitInteraction]);
   const toolRenderers = useMemo(() => ({ ask_user: askUserRenderer, stage_goal: stageGoalRenderer }), [askUserRenderer, stageGoalRenderer]);
   const messages = useMemo(() => [...normalizeAssistantUiTurns(turns), ...interactions.map(({ interaction, run }) => ({ agentInteraction: { interaction, run }, id: `interaction-${run.id}-${interaction.id}` }))], [interactions, turns]);
   const runtime = useExternalStoreRuntime({

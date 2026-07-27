@@ -46,6 +46,9 @@ Workbench UI
 - Desktop 通过 Tauri command 调用本地 Runtime，并通过事件接收流式进度。
 - Preview 只提供显式登记的读取操作；写入、终端、检查、Provider 密钥和工程 Patch 必须拒绝。
 - Hermes 是可选执行器，普通 Provider 是模型通道；二者都必须经过 OmniDesk 的授权文件、审批、Patch 校验和检查边界。
+- 开源或外部 Agent 通过 `AgentExecutor` 接口位于治理 Runtime 下方。唯一 Registry 当前登记默认 `HermesAcpExecutor` 与可选 `GeminiAcpExecutor`；`acp_protocol / acp_execution` 统一 JSON-RPC、结构化工具循环、取消和 usage，Adapter 只负责程序、参数与环境。新 Run 固化所选 ID，恢复只能使用原执行器，缺失或能力不足时明确失败。执行器不能拥有 Scheduler、持久化、Tool Gateway、审批、Patch Apply、检查、恢复或 evidence 的最终决定权。
+- `AgentExecutor` 公开契约版本为 `omnidesk.agent-executor.v1`。v1 核心能力是 Runtime 的受控执行准入条件；执行器独有特性只能写入不透明 `extensions`，供 Adapter 或展示层解释。Runtime 核心业务不得读取扩展，不得按具体执行器 ID 分支；新增核心语义必须升级契约版本，而不是继续扩充 v1。
+- 执行器公开过程事件使用 `omnidesk.agent-event.v1`：共享协议层负责把供应商消息归一化为单调 sequence、固定 kind/phase/status、公开摘要和白名单详情，并保证单一 terminal。Runtime 和前端不能读取供应商原始事件形状。内部思维链不属于产品事件；只允许记录用户可见阶段和 metadata-only 操作事实。
 - 旧 `project-os` CLI、Shell wrapper、CI adapter 不再定义产品语义；仅迁移器可读取外部历史状态，Desktop Runtime 不回退读写 legacy 状态。
 
 ## 仓库实现层次

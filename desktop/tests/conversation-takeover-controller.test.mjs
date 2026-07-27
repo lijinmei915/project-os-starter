@@ -4,10 +4,13 @@ import { applyConversationTakeover } from "../src/lib/conversation-takeover-cont
 
 test("cancels the old request and returns a redirected conversation projection", () => {
   const settled = [];
-  const result = applyConversationTakeover({ chatTurns: [{ id: "old" }], clearInput: () => {}, onChatTurnsChange: () => {}, onStopPlan: () => {}, projectExecutionEvent: (turns, event) => ({ turns, event }), requestRef: {}, runningRequest: { id: "request-1" }, setChatLoading: () => {}, setPendingTurn: () => {}, settleRequest: (...args) => settled.push(args), takeover: { decision: "redirect" }, userTurn: { id: "user" } });
+  const cancelled = [];
+  const turns = [{ id: "old" }];
+  const result = applyConversationTakeover({ cancelRequest: (id) => cancelled.push(id), chatTurns: turns, clearInput: () => {}, onChatTurnsChange: () => {}, onStopPlan: () => {}, projectExecutionEvent: () => { throw new Error("redirect must not add a cancellation message"); }, requestRef: {}, runningRequest: { id: "request-1" }, setChatLoading: () => {}, setPendingTurn: () => {}, settleRequest: (...args) => { settled.push(args); return true; }, takeover: { decision: "redirect" }, userTurn: { id: "user" } });
   assert.equal(result.handled, false);
   assert.deepEqual(settled, [[{}, "request-1", "cancelled"]]);
-  assert.equal(result.turns.event.outcome, "cancelled");
+  assert.deepEqual(cancelled, ["request-1"]);
+  assert.equal(result.turns, turns);
 });
 
 test("stops a running request and records the cancellation in the same conversation", () => {
@@ -36,13 +39,14 @@ test("stops a running request and records the cancellation in the same conversat
   assert.ok(events.includes("clear"));
 });
 
-test("preserves the new user turn when a running request is redirected", () => {
+test("keeps the transcript unchanged before the new user turn is appended", () => {
+  const turns = [{ id: "old" }];
   const result = applyConversationTakeover({
-    chatTurns: [{ id: "old" }],
+    chatTurns: turns,
     clearInput: () => {},
     onChatTurnsChange: () => {},
     onStopPlan: () => {},
-    projectExecutionEvent: (turns, event) => [...turns, event],
+    projectExecutionEvent: () => { throw new Error("redirect must not add an assistant turn"); },
     requestRef: {},
     runningRequest: { id: "request-1" },
     setChatLoading: () => {},
@@ -53,6 +57,5 @@ test("preserves the new user turn when a running request is redirected", () => {
   });
 
   assert.equal(result.handled, false);
-  assert.equal(result.turns.at(-1).outcome, "cancelled");
-  assert.equal(result.turns.at(-1).requestId, "request-1");
+  assert.equal(result.turns, turns);
 });

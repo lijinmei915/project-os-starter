@@ -546,6 +546,36 @@ fn redacted_timeline_event(event: &Value) -> Value {
             safe_details.insert(key.to_string(), value.clone());
         }
     }
+    if let Some(events) = details.get("agentEvents").and_then(Value::as_array) {
+        let safe_events = events
+            .iter()
+            .take(100)
+            .map(|event| {
+                let mut safe = serde_json::Map::new();
+                for key in [
+                    "schemaVersion",
+                    "sequence",
+                    "kind",
+                    "phase",
+                    "status",
+                    "summary",
+                ] {
+                    if let Some(value) = event.get(key) {
+                        safe.insert(key.to_string(), value.clone());
+                    }
+                }
+                let mut event_details = serde_json::Map::new();
+                for key in ["name", "step", "success", "mode"] {
+                    if let Some(value) = event.pointer(&format!("/details/{key}")) {
+                        event_details.insert(key.to_string(), value.clone());
+                    }
+                }
+                safe.insert("details".to_string(), Value::Object(event_details));
+                Value::Object(safe)
+            })
+            .collect();
+        safe_details.insert("agentEvents".to_string(), Value::Array(safe_events));
+    }
     if let Some(trace) = details.get("trace").and_then(Value::as_array) {
         safe_details.insert(
             "trace".to_string(),
@@ -904,7 +934,7 @@ pub fn prepare_model_run(
     run.status = "running".to_string();
     run.revision += 1;
     run.updated_at = timestamp.to_string();
-    run.summary = "Hermes 正在读取上下文并形成结果。".to_string();
+    run.summary = "Agent Executor 正在读取上下文并形成结果。".to_string();
     run.checkpoint.phase = "running".to_string();
     run.checkpoint.context_summary = run.summary.clone();
     run.checkpoint.last_confirmation = None;
@@ -912,7 +942,7 @@ pub fn prepare_model_run(
     append_evidence(
         &mut run,
         "draft",
-        "Hermes 开始生成受控草稿。",
+        "Agent Executor 开始生成受控草稿。",
         json!({ "maxSteps": input.max_steps, "resumed": input.resume_existing }),
         timestamp,
     );
@@ -1332,6 +1362,33 @@ pub fn new_hermes_run_with_context(
     task_id: String,
     timestamp: &str,
 ) -> PersistedAgentRun {
+    new_agent_run_with_context(
+        id,
+        request_id,
+        project_id,
+        "hermes-acp".to_string(),
+        prompt,
+        max_steps,
+        approval_token,
+        conversation_id,
+        task_id,
+        timestamp,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn new_agent_run_with_context(
+    id: String,
+    request_id: String,
+    project_id: String,
+    executor_id: String,
+    prompt: String,
+    max_steps: usize,
+    approval_token: String,
+    conversation_id: String,
+    task_id: String,
+    timestamp: &str,
+) -> PersistedAgentRun {
     let mut run = PersistedAgentRun {
         schema_version: AGENT_RUN_SCHEMA_VERSION.to_string(),
         id,
@@ -1339,7 +1396,7 @@ pub fn new_hermes_run_with_context(
         conversation_id,
         task_id,
         project_id,
-        executor_id: "hermes-acp".to_string(),
+        executor_id,
         status: "queued".to_string(),
         step: 0,
         max_steps: max_steps.max(1),
@@ -1347,7 +1404,7 @@ pub fn new_hermes_run_with_context(
         revision: 0,
         created_at: timestamp.to_string(),
         updated_at: timestamp.to_string(),
-        summary: "等待 Hermes 执行。".to_string(),
+        summary: "等待 Agent Executor 执行。".to_string(),
         prompt,
         approval: None,
         approval_token,
@@ -1369,11 +1426,12 @@ pub fn new_hermes_run_with_context(
         },
         evidence: Vec::new(),
     };
+    let executor_id = run.executor_id.clone();
     append_evidence(
         &mut run,
         "scheduling",
         "Agent Run 已创建并等待调度。",
-        json!({ "executor": "hermes-acp" }),
+        json!({ "executor": executor_id }),
         timestamp,
     );
     run
@@ -1496,6 +1554,24 @@ mod tests {
         run.checkpoint.phase = "running".to_string();
         persist(root, &run).unwrap();
         run
+    }
+
+    #[test]
+    fn new_run_persists_the_selected_executor_in_state_and_evidence() {
+        let run = new_agent_run_with_context(
+            "run-gemini".to_string(),
+            "request-gemini".to_string(),
+            "project".to_string(),
+            "gemini-acp".to_string(),
+            "inspect".to_string(),
+            2,
+            String::new(),
+            String::new(),
+            String::new(),
+            "2026-07-27T00:00:00Z",
+        );
+        assert_eq!(run.executor_id, "gemini-acp");
+        assert_eq!(run.evidence[0]["details"]["executor"], "gemini-acp");
     }
 
     #[test]

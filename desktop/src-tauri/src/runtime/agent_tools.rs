@@ -54,25 +54,62 @@ pub fn list_files(root: &Path, relative: &str) -> Result<Value, String> {
     )
 }
 
-pub fn read_file(root: &Path, relative: &str) -> Result<Value, String> {
+pub fn read_file(
+    root: &Path,
+    relative: &str,
+    start_line: usize,
+    end_line: Option<usize>,
+) -> Result<Value, String> {
     const MAX_BYTES: usize = 80 * 1024;
+    const MAX_LINES: usize = 2_000;
     let root = canonical_root(root)?;
     let path = resolve_path(&root, relative, false)?;
     let bytes = fs::read(&path).map_err(|err| err.to_string())?;
     if bytes.iter().take(512).any(|byte| *byte == 0) {
         return Err("不支持读取二进制文件".to_string());
     }
-    let truncated = bytes.len() > MAX_BYTES;
-    let content = String::from_utf8_lossy(&bytes[..bytes.len().min(MAX_BYTES)]).to_string();
+    let text = String::from_utf8_lossy(&bytes);
+    let total_lines = text.lines().count();
+    let start = start_line.max(1);
+    let requested_end = end_line.unwrap_or_else(|| start.saturating_add(MAX_LINES - 1));
+    if requested_end < start {
+        return Err("read_file 的 endLine 不能小于 startLine".to_string());
+    }
+    let end = requested_end.min(start.saturating_add(MAX_LINES - 1));
+    let mut content = text
+        .lines()
+        .skip(start - 1)
+        .take(end - start + 1)
+        .collect::<Vec<_>>()
+        .join("\n");
+    if !content.is_empty() && text.ends_with('\n') {
+        content.push('\n');
+    }
+    let byte_truncated = content.len() > MAX_BYTES;
+    if byte_truncated {
+        let boundary = content
+            .char_indices()
+            .map(|(index, _)| index)
+            .take_while(|index| *index <= MAX_BYTES)
+            .last()
+            .unwrap_or(0);
+        content.truncate(boundary);
+    }
+    let truncated = byte_truncated || end < total_lines || requested_end > end;
     Ok(
-        json!({ "summary": format!("读取 {}", relative_path(&root, &path)), "path": relative_path(&root, &path), "content": content, "size": bytes.len(), "truncated": truncated }),
+        json!({ "summary": format!("读取 {} 第 {}-{} 行", relative_path(&root, &path), start, end.min(total_lines.max(start))), "path": relative_path(&root, &path), "content": content, "size": bytes.len(), "startLine": start, "endLine": end.min(total_lines.max(start)), "totalLines": total_lines, "truncated": truncated }),
     )
 }
 
-pub fn search_project(root: &Path, relative: &str, query: &str) -> Result<Value, String> {
+pub fn search_project(
+    root: &Path,
+    relative: &str,
+    query: &str,
+    max_results: usize,
+) -> Result<Value, String> {
     const MAX_FILES: usize = 1000;
-    const MAX_HITS: usize = 100;
     const MAX_FILE_BYTES: u64 = 256 * 1024;
+    let max_hits = max_results.clamp(1, 100);
     let root = canonical_root(root)?;
     let start = resolve_path(&root, relative, true)?;
     let needle = query.trim().to_lowercase();
@@ -121,21 +158,21 @@ pub fn search_project(root: &Path, relative: &str, query: &str) -> Result<Value,
             for (index, line) in content.lines().enumerate() {
                 if line.to_lowercase().contains(&needle) {
                     hits.push(json!({ "path": relative_path(&root, &canonical), "line": index + 1, "text": line.chars().take(500).collect::<String>() }));
-                    if hits.len() >= MAX_HITS {
+                    if hits.len() >= max_hits {
                         break;
                     }
                 }
             }
-            if hits.len() >= MAX_HITS || files_scanned > MAX_FILES {
+            if hits.len() >= max_hits || files_scanned > MAX_FILES {
                 break;
             }
         }
-        if hits.len() >= MAX_HITS || files_scanned > MAX_FILES {
+        if hits.len() >= max_hits || files_scanned > MAX_FILES {
             break;
         }
     }
     Ok(
-        json!({ "summary": format!("找到 {} 处匹配", hits.len()), "hits": hits, "filesScanned": files_scanned.min(MAX_FILES), "truncated": hits.len() >= MAX_HITS || files_scanned > MAX_FILES }),
+        json!({ "summary": format!("找到 {} 处匹配", hits.len()), "hits": hits, "filesScanned": files_scanned.min(MAX_FILES), "truncated": hits.len() >= max_hits || files_scanned > MAX_FILES }),
     )
 }
 
@@ -308,27 +345,30 @@ pub fn execute_read_tool(root: &Path, name: &str, arguments: &Value) -> Result<V
     let path = arguments.get("path").and_then(Value::as_str).unwrap_or(".");
     match name.trim() {
         "list_files" => list_files(root, path),
-        "read_file" => read_file(root, path),
+        "read_file" => read_file(
+            root,
+            path,
+            arguments
+                .get("startLine")
+                .and_then(Value::as_u64)
+                .unwrap_or(1) as usize,
+            arguments
+                .get("endLine")
+                .and_then(Value::as_u64)
+                .map(|value| value as usize),
+        ),
         "search_project" => search_project(
             root,
             path,
             arguments.get("query").and_then(Value::as_str).unwrap_or(""),
+            arguments
+                .get("maxResults")
+                .and_then(Value::as_u64)
+                .unwrap_or(100) as usize,
         ),
         "git_status" => git_status(root),
         _ => Err("已登记工具缺少 Native Core 执行器".to_string()),
     }
-}
-
-/// Hermes ACP uses the same registered read-only tools as the native command.
-/// Keep its protocol-specific error boundary here so ACP cannot duplicate path
-/// or query argument handling.
-pub fn execute_hermes_read_tool(
-    root: &Path,
-    name: &str,
-    arguments: &Value,
-) -> Result<Value, String> {
-    execute_read_tool(root, name, arguments)
-        .map_err(|error| format!("Hermes 读取工具失败：{error}"))
 }
 
 fn is_ignored(path: &Path) -> bool {
@@ -442,8 +482,8 @@ mod tests {
         assert!(paths.contains(&"src"), "listed paths: {paths:?}");
         assert!(!paths.iter().any(|path| path.starts_with(".project-os")));
         assert!(!paths.iter().any(|path| path.starts_with(".omnidesk")));
-        assert!(read_file(&root, ".project-os/state.json").is_err());
-        assert!(read_file(&root, ".omnidesk/data/state.json").is_err());
+        assert!(read_file(&root, ".project-os/state.json", 1, None).is_err());
+        assert!(read_file(&root, ".omnidesk/data/state.json", 1, None).is_err());
         fs::remove_dir_all(root).unwrap();
     }
 
@@ -460,14 +500,40 @@ mod tests {
     }
 
     #[test]
-    fn hermes_dispatch_shares_the_registered_read_only_boundary() {
-        let root = test_root("hermes-dispatch");
+    fn acp_dispatch_shares_the_registered_read_only_boundary() {
+        let root = test_root("acp-dispatch");
         fs::create_dir_all(&root).unwrap();
         fs::write(root.join("README.md"), "hello\n").unwrap();
-        assert!(
-            execute_hermes_read_tool(&root, "read_file", &json!({ "path": "README.md" })).is_ok()
-        );
-        assert!(execute_hermes_read_tool(&root, "shell", &json!({})).is_err());
+        assert!(execute_read_tool(
+            &root,
+            "read_file",
+            &json!({ "path": "README.md", "startLine": 1, "endLine": 1 })
+        )
+        .is_ok());
+        assert!(execute_read_tool(&root, "shell", &json!({})).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn read_file_honors_bounded_line_ranges() {
+        let root = test_root("read-range");
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("README.md"), "one\ntwo\nthree\nfour\n").unwrap();
+        let result = execute_read_tool(
+            &root,
+            "read_file",
+            &json!({ "path": "README.md", "startLine": 2, "endLine": 3 }),
+        )
+        .unwrap();
+        assert_eq!(result["content"], "two\nthree\n");
+        assert_eq!(result["startLine"], 2);
+        assert_eq!(result["endLine"], 3);
+        assert!(execute_read_tool(
+            &root,
+            "read_file",
+            &json!({ "path": "README.md", "startLine": 4, "endLine": 2 }),
+        )
+        .is_err());
         fs::remove_dir_all(root).unwrap();
     }
 

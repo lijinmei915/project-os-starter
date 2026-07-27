@@ -460,6 +460,13 @@
 .conversationUserForm > footer { justify-content: flex-start; align-items: center; margin-top: var(--desktop-space-md); }
 .conversationUserFormError { margin: var(--desktop-space-sm) 0 0; color: var(--desktop-danger); font-size: var(--desktop-text-small); }
 .conversationUserFormAnswer { color: var(--desktop-text-soft); font-size: var(--desktop-text-small); }
+.conversationUserForm-collapsed { padding: 10px 12px; }
+.conversationUserForm-collapsed > header { align-items: center; }
+.conversationUserFormSummary { margin: 5px 0 0; color: var(--desktop-text-soft); font-size: var(--desktop-text-small); }
+.conversationUserForm-collapsed > footer { margin-top: 8px; }
+.conversationUserFormDetails { align-self: center; color: var(--desktop-text-muted); font-size: var(--desktop-text-meta); }
+.conversationUserFormDetails summary { cursor: pointer; }
+.conversationUserFormDetails code { display: block; max-width: 520px; margin-top: 6px; color: var(--desktop-text-soft); white-space: normal; line-height: 1.45; }
 
 .conversationReferences {
   width: fit-content;
