@@ -1,6 +1,6 @@
 {
   "schemaVersion": "omnidesk.repository-file-inventory.v1",
-  "generatedAt": "2026-07-27T16:32:45.517Z",
+  "generatedAt": "2026-07-27T17:28:31.722Z",
   "sourceOfTruth": "git ls-files --cached --others --exclude-standard",
   "scope": "受版本控制文件及准备纳入版本控制的非忽略工作树文件；忽略的本地运行数据和构建输出不在本账本内。",
   "reviewContract": {
@@ -98,7 +98,7 @@
       "path": ".gitignore",
       "kind": "repository",
       "owner": "Repository Governance",
-      "bytes": 949,
+      "bytes": 1206,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -8641,7 +8641,7 @@
       "path": "desktop/tests/repository-ledger.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 1006,
+      "bytes": 1411,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -9496,7 +9496,7 @@
       "path": "docs/LESSONS.md",
       "kind": "documentation",
       "owner": "Documentation Governance",
-      "bytes": 119726,
+      "bytes": 120495,
       "pathMentions": [
         "desktop/src/components/workbench/project-memory-panel.jsx",
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",

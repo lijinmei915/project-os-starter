@@ -15,6 +15,11 @@ bin/project-os
 .cache/
 *.log
 
+# Tauri generates host-specific schemas during native builds. The checked-in
+# macOS schema remains tracked; other host outputs must not enter file audits.
+/desktop/src-tauri/gen/schemas/linux-schema.json
+/desktop/src-tauri/gen/schemas/windows-schema.json
+
 # OmniDesk 本地生成物，不入库
 .cursor/
 .claude/cache/

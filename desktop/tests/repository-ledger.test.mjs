@@ -7,6 +7,19 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
+test("ignores host-specific Tauri schemas that make the repository ledger platform-dependent", () => {
+  for (const file of [
+    "desktop/src-tauri/gen/schemas/linux-schema.json",
+    "desktop/src-tauri/gen/schemas/windows-schema.json",
+  ]) {
+    assert.doesNotThrow(() => execFileSync(
+      "git",
+      ["check-ignore", "--no-index", "--quiet", "--", file],
+      { cwd: repoRoot },
+    ));
+  }
+});
+
 test("covers tracked and nonignored worktree files before commit", () => {
   const expected = execFileSync(
     "git",
