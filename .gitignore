@@ -56,3 +56,6 @@ GLOBAL_USER_PROFILE.md
 GLOBAL_USER_PREFERENCES.md
 LOCAL_NOTES.md
 PRIVATE_HANDOFF.md
+
+# AI 会话记忆与本地分析笔记，不入库
+.workbuddy/
