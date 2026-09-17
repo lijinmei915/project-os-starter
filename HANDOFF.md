@@ -1,7 +1,7 @@
 ---
 layer: knowledge
 type: status
-last_verified: 2026-07-28
+last_verified: 2026-07-30
 teaches: "当前接手上下文、运行边界、验证证据和下一步"
 use_when: "新的 AI 或工程师需要继续 OmniDesk 工作时"
 depends_on: [PROJECT.md, AGENTS.md, docs/ARCHITECTURE.md, docs/TESTING.md]
@@ -16,11 +16,32 @@ depends_on: [PROJECT.md, AGENTS.md, docs/ARCHITECTURE.md, docs/TESTING.md]
 
 - 产品核心：`desktop/` 中的 Tauri + React + Local Agent Runtime。它在用户授权范围内处理项目、对话、Patch、审批、检查、恢复与证据。
 - 状态根：`.omnidesk/` 是唯一活动状态根，分为 `data`、`runtime`、`cache`、`evidence`。历史 `.project-os/` 只能通过显式、非破坏性迁移导入，不能作为运行时回退。
-- 当前分支：`main`，Hermes 多文件 Patch 稳定性 v1 已在 `de9c9f1` 完成并通过本地、原生、普通 CI 与受保护真实 Eval。
+- 当前分支：`main`。当前目标为“外部 Agent 归档治理 v1”：成熟 Agent 在各自应用中负责开发，OmniDesk 自动归档同一项目的变动并在治理区展示；外部归档不强制审批，只有从 OmniDesk 内发起的高风险操作继续审批。工作树包含用户既有与本目标改动，尚未提交。
 - 受控边界不可放松：Patch 写入与检查各自独立审批；恢复不能自动重放；Provider 成功不等于任务成功；Preview 只读，不执行写入、终端、检查或恢复。
 
 ## 最近完成
 
+- 外部工作自动归档已接入“执行结果”治理区：Runtime 将不同的 Git 变动集合追加为最多 50 条归档历史，每条保存时间、文件数量、最多 30 个安全相对路径与可选任务关联，明确 `approvalRequired=false`、`verificationStatus=unverified`。治理区默认显示摘要，可选展开文件或打开关联任务；不会因归档自动创建审批、运行检查或改成任务完成。旧单条 `external-changes.v0.1` 会先做非破坏只读投影，在下一次新改动时并入历史。
+
+- 外部应用改动发现 v1 已接入：Workspace watcher 在安全文件变化后读取 Git 的变动路径，再由 `external_changes` 用 Repository 事务保存最多 30 个相对路径、发现时间、项目与最近未完成任务关联。`.omnidesk`、`.env`、构建目录、依赖目录和越界路径不会进入记录；重复 watcher 事件不重复写入。发现只刷新工作台并提示“检测到工程文件改动”，不会读取源码、保存外部 Agent 对话、自动检查、提交、改任务状态或标为完成。Rust `2/2` 新回归与 Cargo check 已通过，仍需完成完整仓库回归和原生窗口验收。
+
+- Codex CLI 只读规划 Adapter 已接入：`codex-cli` 通过 `codex exec --json --sandbox read-only` 运行，把公开的生命周期、只读工具和完成事件归一化为 `omnidesk.agent-event.v1`。只有没有图片附件的计划自动选它；图片计划仍用 Hermes 的受控视觉桥接。Adapter 不声明 `AgentExecutor v1` 的写入治理能力，因此不能被 `start_agent_run` 选中，不能绕过独立 Patch/Check 审批，也不把中断冒充续传。Codex CLI 未安装/不可用时计划回到 Hermes。适配器 Rust 单测与 Cargo check 已通过；仍需跑完整回归和原生窗口验收。
+
+- Agent 风险检查实时化与预算收敛 v1 已完成：`RiskReview` 是独立的只读执行用途，初始上下文限制为最多 3 个源码片段/3000 字、工具步骤最多 8 个；`apply_patch`、检查、终端和追问在 Runtime 拒绝。Scheduler 成功领取后立即发送 `request.started`，Agent 生命周期和工具请求/结果会以脱敏、有界的事件实时保存并推送给界面。对话展示会把实时事件和最终事件包投影为同一条时间线，未领取前才显示“排队”，领取后显示真实读取状态。完整 Rust `249/249`、`conversation-agent-events` `12/12` 与 Web build 通过；尚未重新取得可引用的原生 WebDriver 最终诊断。
+
+- 常驻 Agent Worker v1 已完成：Hermes ACP 最多保留两个内存 Worker，每个受控任务都创建新的 ACP session，不会继承前一任务的上下文。Worker 按项目路径、程序参数、连接和模型区分；只读规划保持一次性隔离进程。取消、错误、协议失败或空闲进程退出时销毁，下一任务受控重建；池满时临时启动而不阻塞其他项目。预热仅在桌面启动后后台进行，缺少本地 Provider 或密钥时静默跳过。状态只显示空闲/处理中数量，不持久化进程、密钥、上下文或会话。Rust `247/247`、Patch `9/9`、完整仓库回归、Web build、文档与账本通过；本轮原生 smoke 命令只返回启动行，需在可观察桌面环境补一次最终诊断。
+- 工程任务入口已移除普通 Provider 前置规划：纯文字项目检查、审查、分析、实现和修改请求会先持久化最小 Task，再直接启动当前 AgentExecutor。Task 只保存用户目标和治理边界，不伪造模型计划；写入和检查仍独立审批。普通解释性风险问题不会被误送进 Agent。带图片请求保留受控视觉上下文桥接，因为冻结的 `AgentExecutor v1` 只接收文字，不能静默丢图。完整回归通过 Node `645/645`、Rust `245/245`、Patch Normalizer `9/9`、Web build 和仓库门槛；原生 WebDriver 证明前置 Provider 规划调用为 0、Agent 正常启动且工程零写入。
+- Hermes 原生只读规划遇到安全范围内的错误文件名时，现会把“路径不存在”作为可纠正的工具结果保留，并允许模型改读真实文件；连续失败预算仍为两次。敏感状态、密钥文件、越界路径、写入和执行工具继续立即拒绝。截图中的 `.js -> .mjs` 后缀错误已加入回归。
+- 用户可见计划失败不再附带 Hermes stderr、临时目录、`.env` 探测或 `acp_adapter` 启动日志；新失败在持久化前清洗，旧失败在展示时同样投影为有界中文原因。WebDriver 的追问恢复夹具也改为一次事务写入最终等待态，避免测试自身制造迟到结果竞态。
+- 本轮验证通过 Desktop Node `639/639`、Runtime Rust `245/245`、Patch Normalizer `9/9`、Web build、仓库治理与原生 WebDriver。首次沙箱运行有 3 个 Provider 测试因本机端口权限 `EPERM` 被阻断；在允许绑定 `127.0.0.1` 的环境复跑后全部通过。当前真实模型随后在临时非敏感项目完成原生读文件、实时事件、持久化、单终态与零写入验收，未走本地兜底。
+- 项目感知的只读计划已切换为 Hermes ACP 原生工具循环。Runtime 通过独立 `ReadonlyPlan` 用途、无密钥临时配置、路径复核和事件允许列表共同限制为只读；拒绝追问、Patch、检查和终端，失败不再生成宽泛 Provider 兜底计划。真实桌面验收证明 Hermes 读取了非敏感 `status-bar.jsx` 并准确理解 `runtimeStatus`，工具过程实时有序展示且随计划持久化，刷新后仍可查看；只有一个终态且工程零写入。
+- 图片规划已接入受控视觉摘要桥接：当前外部模型先从用户附件提取任务相关界面、文字和布局，Hermes 再读取源码核对。图片格式会同时校验 MIME 与真实文件头，只接受 PNG/JPEG/WebP/GIF；视觉摘要最多 4,000 字，不进入 Agent 事件正文。真实桌面验收同时识别黑底白色星形和源码 `runtimeStatus`，源码未变化。
+- 对话计划不再用一张大卡包住所有内容：摘要和具体步骤按普通正文连续呈现，文件范围和验收方式按需展开，只有真实下一步使用决策卡。确认按钮已收入该卡，标题与说明会跟随“生成草稿 / 运行检查 / 查看详情”的真实动作。运行中顺序已固定为用户消息、行内过程、流式正文，不再出现回答跑到用户消息上方。
+- 本轮完整验收通过 Desktop Node `634/634`、Runtime Rust `237/237`、Patch Normalizer `9/9`、Web build 和原生 WebDriver。原生测试验证了连续内容无卡片嵌套、决策按钮位于唯一决策卡内、终态清理、发送恢复和零工程写入。
+- Agent 执行现明确分为只读计划、改动草稿、文件写入和运行检查四步，每一步单独确认；用户可见文案优先说明是否改文件，技术词只放在细节中。
+- 计划完成后残留“正在处理/停止生成”的根因已修复：同一请求终态会一起关闭 `chatLoading`、`pendingTurn` 和流式预览，迟到旧请求不能清理新请求。原生 WebDriver 已真实发送只读计划并验证用户消息即时出现、四步卡片出现、终态后发送恢复。
+- 右栏已移除写死的对话任务 ID 投影，改为通用优先级选出唯一当前任务；用户主动打开的任务优先，其余未完成记录折叠为“其他待办”，数据不删除。完整回归通过 Node `633/633`、Rust `238/238`、Patch Normalizer `9/9`、Web build 和原生 WebDriver。
+- 旧真实 Provider 桌面验收只证明出现过一次 `plan.delta`，用户截图证明这不足以验收可见流式；该结论已撤回。新实现先真实 SSE 流式生成自然语言摘要，再在后台生成结构化计划，不使用前端假打字动画。规划上下文只增加最多 240 条相对文件路径，不发送文件正文；提示词要求引用真实路径并禁止内部验收话术。
 - 模糊修改请求已从源头改走 Hermes：`修改项目概览里的核心能力`、`帮我修改按钮` 等缺少目标值的输入不再直接生成 Patch，而是启动 Agent 并通过标准 `ask_user` 收集必要内容；`请把按钮文案改成保存` 等信息完整的请求仍可直接生成只读草稿。
 - 前端固定 15 秒计划超时及静默本地 fallback 已移除，计划期限与取消继续由 Rust Runtime 单点负责。任何带 `LOCAL_FALLBACK`、`PROVIDER_FALLBACK` 或 `PROVIDER_PRECHECK_FAILED` 的计划都不能自动进入 Patch。
 - Patch 语义闸门返回 `notApplicable` 时现按失败处理并显示真实 `failureReason`；失败时间线在实际失败阶段结束，不再伪造“草稿已生成”或“等待确认应用”。同一 Task 存在待回答 Run 时，对话状态投影为“等待你的回答”。
@@ -77,5 +98,6 @@ depends_on: [PROJECT.md, AGENTS.md, docs/ARCHITECTURE.md, docs/TESTING.md]
 
 ## 下一步建议
 
-1. Gemini 产品接入继续暂停，成熟后再作为独立目标评估。
-2. 开始新目标前先读取 `PROJECT.md` 与 active `.omnidesk/data/state.json`；不要继续扩展已完成的多文件 Patch v1 契约。
+1. Provider 复用能力已有两层：`runtime/provider_core.rs` 承担无产品状态的端点、SSE、错误和重试；`components/provider/provider-connection-settings.jsx` 承担可注入存储/密钥/测试/模型发现接口的多连接设置 UI。OmniDesk 专属 Tauri client、Preview 规则、`.env.local` 提示和 `OMNIDESK_API_KEY_*` 命名均留在 `workbench/provider-panel.jsx`。下一步用仓库外最小消费者验证后再独立发包。
+2. 在真实日常任务中继续观察工程任务识别边界；新增表达应优先补语义契约测试，不扩张为无限关键词表。
+3. Gemini 产品接入继续暂停，成熟后再作为独立目标评估。

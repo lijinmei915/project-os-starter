@@ -1,7 +1,7 @@
 ---
 layer: knowledge
 type: status
-last_verified: 2026-07-28
+last_verified: 2026-07-30
 teaches: "OmniDesk 当前产品内核、阶段、可靠性基线和唯一下一步"
 use_when: "AI 需要判断 OmniDesk 当前状态、架构边界或下一步工作时"
 depends_on: [AGENTS.md, docs/ARCHITECTURE.md, docs/PRODUCT_PLAN.md]
@@ -18,7 +18,7 @@ depends_on: [AGENTS.md, docs/ARCHITECTURE.md, docs/PRODUCT_PLAN.md]
 - 项目名：`OmniDesk`
 - 产品形态：基于 `Tauri + React + Local Agent Runtime` 的本地 AI 工程工作台
 - 唯一产品核心：`desktop/` 内的 OmniDesk Desktop Runtime
-- 当前阶段：`Hermes 多文件 Patch 稳定性 v1 / 已完成`
+- 当前阶段：`外部 Agent 归档治理 v1 / 自动归档与治理区展示已接入`
 
 OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生成计划和 Patch 草稿、执行独立审批、运行检查、有限修复并保存可审计证据。它不是 Project OS 安装器、AI 工程评分工具或跨工具模板分发产品。
 
@@ -28,7 +28,10 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 
 - 桌面应用：`desktop/src/`，负责 Workbench、对话、任务、目标、审批、终端和证据呈现。
 - 本地运行时：`desktop/src-tauri/src/runtime/`，负责 Workspace、Conversation、Task、Goal、Agent Run、Provider、Patch、Execution 与 Repository。
-- 模型执行：普通 Provider 与 Hermes 都经过同一授权文件、Patch 校验、审批和检查边界。
+- 可复用 Provider Core：`runtime/provider_core.rs` 只负责 OpenAI-compatible 端点、SSE 文本/工具片段、失败分类和有限重试契约，不读取密钥、不依赖 `.omnidesk`，也不认识 Task、审批、Patch 或项目状态。当前是仓库内能力模块；独立发布前仍需第二消费者验证。
+- 可复用模型连接设置：`components/provider/provider-connection-settings.jsx` 通过注入的保存、密钥、测试、模型发现和删除接口管理多连接表单；组件本身不导入 Tauri、Provider client、`.omnidesk` 或 OmniDesk Key 命名。`workbench/provider-panel.jsx` 仅负责把它接到当前桌面 Runtime。
+- 模型执行：普通 Provider、Hermes 与外部 Codex CLI 均由 Runtime 编排。Codex CLI 当前只用于只读规划；文件改动、检查和最终完成仍由 OmniDesk 的审批、Patch 校验和证据闭环决定。
+- 外部归档治理：用户在 Codex Desktop、Claude Desktop、Cursor 等其他应用编辑同一项目时，Workspace watcher 将安全的 Git 改动路径、时间和可关联任务自动归档到“执行结果”治理区。归档不要求审批；查看文件和后续验证均为可选操作。它不保存源码、外部对话和密钥，也不会自动检查、提交、应用或完成任务。
 - 状态事务：Runtime Repository 使用 schema、锁和原子事务维护跨实体一致性。
 - 浏览器 Preview：仅用于只读预览和 UI 验证，不执行文件写入、终端或受控检查。
 - 当前状态根：`.omnidesk/` 是唯一物理状态根；旧 `.project-os/` 已迁移、归档并删除。Runtime 与 Preview 仅接受 native `.omnidesk/data|runtime|cache|evidence` 路径；历史导入由迁移器单独处理。
@@ -39,6 +42,10 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 ## 当前进度
 
 已完成：
+
+- 外部 Agent 接入 v1：本机已登录的 Codex CLI 已作为 `codex-cli` 执行器登记。没有图片附件的只读规划会优先使用其 JSONL（逐条事件）流并实时投影公开阶段；它以 `read-only` 沙箱运行，不能进入 Agent Run 的写入、检查、审批或伪续传入口。CLI 不可用时仍使用现有 Hermes 只读规划。Codex 的账户凭据、Prompt、源码正文、原始工具输出和思维链不保存到 Timeline。
+
+- 外部工作自动归档 v1：Workspace watcher 在安全文件变化后以 Git 状态复核，追加最多 50 条归档历史；每条最多展示 30 个安全相对路径，并尽量关联一个未完成任务。归档在“执行结果”治理区显示为“已归档，尚未验证”，可展开查看文件或打开关联任务。外部归档不进入审批状态机；只有从 OmniDesk 内发起的写入、命令、合并与发布继续要求对应审批。
 
 - 对话 SSE 流式输出、请求级取消、新请求接管和迟到结果拒绝。
 - Agent Run 持久化、独立审批、Patch 应用、检查、最多两轮修复，以及工具边界的阶段 checkpoint 恢复。
@@ -103,11 +110,18 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 - Agent Event 标准化 v1 已落地：共享 ACP 层把生命周期、工具请求/结果、等待追问、等待审批和终态归一化为有序 `omnidesk.agent-event.v1`；每次执行只允许一个终态。Runtime Timeline 只消费标准事件，不再读取执行器 `trace/observations`；metadata-only 导出再次按白名单裁剪事件详情。事件只保存公开阶段摘要，不保存 Prompt、正文、工具输出或模型完整思维链。
 - `Hermes 单执行器生产可靠性 v1` 已完成受保护真实验收：[`30280519155`](https://github.com/lijinmei915/project-os-starter/actions/runs/30280519155) 的 suite 通过 13/13 场景与隔离 worktree，覆盖 `ask_user` 恢复、独立审批、Patch、检查和中断恢复；严格 P3 [`30281795504`](https://github.com/lijinmei915/project-os-starter/actions/runs/30281795504) 在 `f008f1e` 证明真实 `hermes-acp` 事件 sequence `1 -> 2`、唯一 `succeeded` terminal、显式 `11121 / 109 / 11230` token、Scheduler 零残留及无 `content/reasoning` 的 metadata-only Timeline。首次 P3 虽通过 usage 与调度门槛但 artifact 漏收事件，现已改为缺失标准事件即失败。
 - `Hermes 多文件 Patch 稳定性 v1` 已完成：计划契约以向后兼容的 `requiredFiles` 区分“允许读取”和“必须修改”；Hermes 与普通 Provider 的草稿都必须覆盖每个必改文件且包含真实内容变化，漏改、无效路径或越权必改文件会在审批前被拒绝。Runtime 只在原授权范围内完整重生成一次，旧计划未声明 `requiredFiles` 时保持兼容。完整本地回归通过 Desktop Node `621/621`、Runtime Rust `232/232`、Patch Normalizer `9/9`、Web build、仓库治理和原生 WebDriver smoke；普通 CI [`30322329795`](https://github.com/lijinmei915/project-os-starter/actions/runs/30322329795) 全绿。受保护 suite [`30322609952`](https://github.com/lijinmei915/project-os-starter/actions/runs/30322609952) 在 `de9c9f1` 通过 13/13 与隔离 worktree；`goal-rebind` 一次生成即真实修改四个授权必改文件，`missingRequiredFiles=[]`、无越权文件、独立 Patch 审批和检查成功，逐次原始输出与 usage 均进入 artifact。下载后复算统一索引中的 63 个文件 SHA-256 无差异。
+- `Hermes 只读规划与实时过程流 v1` 已完成真实桌面验收：项目规划由 Hermes 通过 ACP（Agent 通信协议）原生 `read_file` 工具读取真实源码，OmniDesk 把原生工具事件映射为有序、实时并可持久化的标准事件。Runtime 使用无密钥临时配置隔离 Hermes，重新校验每次读取路径，并只接受只读事件；追问、Patch、检查、终端和其他工具均被拒绝。真实模型验收确认计划准确理解 `status-bar.jsx` 的 `runtimeStatus`、刷新后记录仍在、只有一个终态且工程零写入；模型失败不再静默生成宽泛 `PROVIDER_FALLBACK`。
+- `Hermes 图片视觉上下文桥接 v1` 已完成真实桌面验收：用户明确附带图片时，当前外部模型先生成最多 4,000 字的任务相关视觉摘要，Hermes 再结合只读源码工具形成计划。Runtime 只接受文件头与 MIME 一致的 PNG、JPEG、WebP、GIF，一次最多 4 张、单张 4 MB、合计 12 MB；图片文字始终作为不可信资料，不能成为执行指令。过程只持久化图片数量和阶段，不保存视觉摘要正文；用户附件仍按既有对话记录保存。真实原生测试准确识别黑底白色星形图片和 `status-bar.jsx` 的 `runtimeStatus`，事件连续有序、唯一终态且源码逐字节未变。
+- 对话展示已收口为“连续内容 + 轻量过程 + 关键决策卡”：用户消息先于过程和流式正文；计划摘要与步骤不再放入大卡片，文件和验收细节按需展开；只有生成草稿、运行检查或其他真实下一步保留决策卡和操作按钮。完整回归通过 Node `634/634`、Rust `237/237`、Patch Normalizer `9/9`、Web build 和原生 WebDriver；验收确认顺序、单决策卡、动态下一步文案与零工程写入。
+- `Hermes 只读路径自修复 v1` 已完成：原生 `read_file` 猜错安全相对路径时不再立即中断整轮，而是记录失败工具结果并允许最多两次纠正；连续失败才以单一失败原因结束。`.env`、`.omnidesk`、目录穿越、非读取工具和执行请求仍立即拒绝。ACP stderr 只进入开发日志，计划失败记录和历史展示统一使用有界中文原因，不再暴露临时目录或 Hermes 启动日志。完整回归通过 Node `639/639`、Rust `245/245`、Patch Normalizer `9/9`、Web build、治理检查和原生 WebDriver；当前真实模型也已在临时项目完成原生读文件、事件持久化、单终态和零写入验收，未走本地兜底。
+- `可替换 Agent 的主执行链路 v1` 已完成：明确的纯文字项目检查、审查、分析、实现和修改请求由本地规则直接建立最小 Task 并启动当前 `AgentExecutor`，不再先请求普通 Provider 生成计划。普通解释性问答仍保留自然文本流；带图片请求继续使用受控视觉上下文桥接，避免 `AgentExecutor v1` 静默丢图。文件写入、检查、恢复和证据继续由 OmniDesk 独占。完整回归通过 Desktop Node `645/645`、Rust Runtime `245/245`、Patch Normalizer `9/9`、Web build、文档与仓库账本；原生 WebDriver 证明 Task 先保存、Provider 前置规划调用为 0、随后进入 Agent 运行态且工程零写入。
+- `常驻 Agent Worker v1` 已完成：Hermes ACP 进程最多常驻两个，并按项目路径、连接和模型隔离；每个任务仍新建独立 ACP 会话。只读规划继续使用一次性隔离进程；取消、协议错误或空闲进程退出时会销毁并在下一任务中受控重建，容量已满时退化为一次性进程，不阻塞其他项目。Worker 状态仅保存在内存中，不保存密钥、任务上下文或会话内容。完整 Rust 回归 `247/247`、Patch `9/9`、仓库总回归、Web build、文档和账本检查已通过。
+- `Agent 风险检查实时化与预算收敛 v1` 已完成：风险检查使用单独的只读执行用途，初始源码上下文最多 3 个片段、3000 字，最多 8 个工具步骤；读取、搜索和终态会实时写入受控进度并投影到对话。Scheduler 领取后立即从“排队”切换为“正在读取项目”，不再把模型处理时间误报为排队。过程只公开工具名称、步骤和有界摘要，不保存 Prompt、源码正文、工具输出或思维链；文件写入与检查仍不可在风险检查中调用。Rust `249/249`、前端过程投影测试和 Web build 已通过。
 
 当前重点：
 
-- Hermes 继续作为唯一默认生产执行器；其真实追问、审批、Patch、检查、恢复、取消和标准事件证据已达到当前稳定门槛。Gemini 接入和执行器选择界面仍暂停，Registry 中的 Adapter 仅作为已验证架构边界保留，不宣称产品可用。
-- `OmniDesk Agent 平台稳定化 v1` 已完成本地、原生与受保护真实验收；P0-P4、首屏预算、Eval 矩阵、artifact 索引和真实桌面组合证据均已闭环。
+- 风险检查会先以小而有界的只读上下文开始，并实时展示真实读取过程；仍需在真实桌面任务中观察不同模型的实际耗时与结果质量。
+- 规划过程只展示真实公开动作与安全摘要，不展示模型完整思维链，也不使用前端假工具步骤。
 - 后续改动继续守住多文件 Patch 授权、独立审批、恢复不重放、单终态、显式 usage/cost 和脱敏 trace 门槛，不扩展关键词执行路由或旁路工具 transport。
 - 多文件 Patch 的显式必改文件覆盖、审批前拒绝与单次有界重生成已经由受保护 `goal-rebind` / suite artifact 证明真实模型闭环；后续不得通过放宽授权、审批、Normalizer、检查、恢复或 trace 门槛换取表面成功率。
 - 受保护 Eval 继续保留失败 artifact；上游模型波动、依赖漂移或软 bundle 超限不能通过放宽门槛掩盖。
@@ -121,5 +135,6 @@ OmniDesk 负责在用户授权范围内理解本地项目、持续对话、生�
 
 ## 下一步重点
 
-1. 保持 P1/P3/P4/suite 可独立重跑，并在 Provider、依赖或 bundle 变化时复核统一 artifact 索引与 800 KiB 预算。
-2. Gemini 产品接入继续暂停；等待用户选择下一个独立目标，不把可选 Adapter 边界误报为已上线能力。
+1. 用一个仓库外最小消费者同时验证 Provider Core 与模型连接设置组件：宿主注入配置存储和安全密钥存储，组件完成新增、切换、测试与模型发现；验证后再决定独立包结构。
+2. 在真实桌面任务中观察风险检查的首个工具事件、读取次数、总耗时和结果质量。
+3. Gemini 产品接入继续暂停；等待成熟后再作为独立目标评估。

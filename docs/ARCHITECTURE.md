@@ -45,8 +45,11 @@ Workbench UI
 
 - Desktop 通过 Tauri command 调用本地 Runtime，并通过事件接收流式进度。
 - Preview 只提供显式登记的读取操作；写入、终端、检查、Provider 密钥和工程 Patch 必须拒绝。
+- Workspace watcher 只负责发现当前项目的安全文件变化。它必须先用 Git 状态复核，再将有界相对路径、时间和可选未完成任务关联追加到 `external-change-archive`，由“执行结果”治理区展示。外部归档默认 `approvalRequired=false`、`verificationStatus=unverified`，查看详情和运行检查都是用户可选动作；它不能保存源码、diff、外部聊天、工具输出或凭据，也不能触发检查、提交、Patch、任务完成或验证通过。
+- 审批边界按动作来源划分：外部工具已经造成的工作区变化只自动归档，不重复审批；从 OmniDesk 内发起的工程写入、命令、合并与发布仍必须经过各自的受控审批。归档记录不能冒充 OmniDesk Agent Run 或检查证据。
 - Hermes 是可选执行器，普通 Provider 是模型通道；二者都必须经过 OmniDesk 的授权文件、审批、Patch 校验和检查边界。
-- 开源或外部 Agent 通过 `AgentExecutor` 接口位于治理 Runtime 下方。唯一 Registry 当前登记默认 `HermesAcpExecutor` 与可选 `GeminiAcpExecutor`；`acp_protocol / acp_execution` 统一 JSON-RPC、结构化工具循环、取消和 usage，Adapter 只负责程序、参数与环境。新 Run 固化所选 ID，恢复只能使用原执行器，缺失或能力不足时明确失败。执行器不能拥有 Scheduler、持久化、Tool Gateway、审批、Patch Apply、检查、恢复或 evidence 的最终决定权。
+- 开源或外部 Agent 通过 `AgentExecutor` 接口位于治理 Runtime 下方。唯一 Registry 当前登记默认 `HermesAcpExecutor`、可选 `GeminiAcpExecutor` 与 `CodexCliExecutor`；`acp_protocol / acp_execution` 统一 ACP JSON-RPC、结构化工具循环、取消和 usage，Adapter 只负责程序、参数与环境。`codex-cli` 当前是独立 JSONL 只读规划 Adapter：无图片附件时以 `codex exec --json --sandbox read-only` 运行，公开事件会转换为标准 Timeline；它不满足 v1 的受控写入能力，不能被 Agent Run 写入/检查入口选择，也不能伪称 checkpoint 续传。新 Run 固化所选 ID，恢复只能使用原执行器，缺失或能力不足时明确失败。执行器不能拥有 Scheduler、持久化、Tool Gateway、审批、Patch Apply、检查、恢复或 evidence 的最终决定权。
+- Hermes 的受控工程任务可复用最多两个内存 ACP Worker（常驻 Agent 进程），以减少每次进程启动的等待。Worker 按项目路径、程序参数、连接和模型隔离；每个 Run 仍必须发送新的 `session/new`，不得复用前一任务会话或上下文。只读规划和图片规划继续使用一次性隔离进程；取消、错误或协议失败时销毁 Worker，池满时使用一次性进程。Worker 状态、密钥、会话和项目内容都不得持久化到 `.omnidesk/`。
 - `AgentExecutor` 公开契约版本为 `omnidesk.agent-executor.v1`。v1 核心能力是 Runtime 的受控执行准入条件；执行器独有特性只能写入不透明 `extensions`，供 Adapter 或展示层解释。Runtime 核心业务不得读取扩展，不得按具体执行器 ID 分支；新增核心语义必须升级契约版本，而不是继续扩充 v1。
 - 执行器公开过程事件使用 `omnidesk.agent-event.v1`：共享协议层负责把供应商消息归一化为单调 sequence、固定 kind/phase/status、公开摘要和白名单详情，并保证单一 terminal。Runtime 和前端不能读取供应商原始事件形状。内部思维链不属于产品事件；只允许记录用户可见阶段和 metadata-only 操作事实。
 - 旧 `project-os` CLI、Shell wrapper、CI adapter 不再定义产品语义；仅迁移器可读取外部历史状态，Desktop Runtime 不回退读写 legacy 状态。
@@ -56,6 +59,7 @@ Workbench UI
 | 路径 | 所有权 |
 |---|---|
 | `desktop/src/` | Workbench UI、领域 controller、客户端契约和只读投影 |
+| `desktop/src/components/provider/` | 可复用模型连接设置 UI；只消费注入的配置、密钥、测试和模型发现接口，不直接调用 Tauri 或 OmniDesk 状态 |
 | `desktop/src-tauri/src/runtime/` | Local Agent Runtime 领域服务和 Repository |
 | `desktop/evals/` | Agent 能力数据集、基线报告和发布门槛 |
 | `desktop/tests/` | 前端契约、工作流、状态机和边界回归 |
@@ -79,10 +83,28 @@ Workbench UI
 
 取消只影响当前 `requestId`；新请求接管后，旧请求的迟到结果不得写回。网络或应用中断后可以重新执行当前阶段，但当前尚不能从流式 token 位置续传。
 
+### 工程任务入口
+
+```txt
+明确的项目检查、审查、分析、实现或修改请求
+  -> 本地确定性识别
+  -> 持久化最小 Task（不请求 Provider 生成前置计划）
+  -> 选择并启动 AgentExecutor
+  -> 标准 Agent Event 实时展示
+  -> OmniDesk Tool Gateway / 审批 / 恢复 / 证据
+```
+
+普通 Provider 不是工程任务的必经路由器。明确的纯文字项目工作直接进入当前选择的 `AgentExecutor`；替换 Agent 只增加 Adapter 与 Registry 项，不改对话入口、审批或展示。普通解释、概念问答和不要求实际读取项目的问题仍走 Provider 自然文本流。显式要求生成独立计划时可以使用只读规划入口，但该入口不能成为所有 Agent Run 的前置条件。
+
+`AgentExecutor v1` 是纯文字执行契约。带图片的工程请求必须先经过现有受控视觉上下文桥接，再将有界视觉摘要与源码观察交给 Agent；不得为了表面直达而静默丢弃图片，也不得向冻结的 v1 契约追加供应商专用多模态字段。未来若执行器统一支持原生图片输入，应发布新的核心契约版本。
+
+本地 Task 只保存用户目标、项目/对话归属和治理边界，不伪造模型计划。Agent 可以先读项目、追问必要信息；任何文件写入和受控检查仍分别等待批准。Task 已保存但执行器启动失败时必须保留失败事实，不能回退成普通 Provider 成功回答。
+
 ### 复杂开发任务
 
 ```txt
-任务与授权文件
+本地持久化 Task -> 选定 AgentExecutor
+  -> 任务与授权文件
   -> 有界只读 Context Pack（项目摘要、候选源码、显式读取）
   -> 计划
   -> Patch 草稿和本地校验
@@ -128,7 +150,8 @@ Agent Run 已持久化 attempt、审批、观察、request checkpoint、当前�
 | `agent_tools` | 受控项目读取、上下文包和只读工具参数边界 |
 | `tool_registry` | 版本化工具描述符、能力发现、输入 schema、来源、风险与审批声明校验 |
 | `mcp_runtime` | MCP stdio Server 配置、环境变量引用、有界发现/调用 transport 与项目绑定发现证据；仅由消费独立 Agent Run 审批后的 Tool Gateway 调用 |
-| `provider` | Provider 配置、密钥隔离、预检和失败分类 |
+| `provider_core` | 不含产品状态的 OpenAI-compatible 能力核心：端点规范化、SSE 文本/工具片段、失败分类和有限重试；不读取密钥，不依赖 Task、审批、Patch、Repository 或 `.omnidesk` |
+| `provider` | OmniDesk Provider 配置、密钥隔离、预检、健康证据和对 `provider_core` 的产品适配 |
 | `provider_tools` | 原生 Function Calling 能力、按 API Base + 模型持久化的能力证据、标准工具 schema、SSE/非流式完整 tool call 累计与参数校验、明确拒绝后的兼容降级 |
 | `patch` | unified diff 归一化、授权路径、hunk 和上下文校验 |
 | `execution` | 受控写入、检查、审计和执行结果 |
@@ -136,6 +159,10 @@ Agent Run 已持久化 attempt、审批、观察、request checkpoint、当前�
 | `state_namespace` | 四分区路径映射、非破坏性迁移、冲突回退和激活 manifest |
 
 跨模块写入必须由 Runtime 领域服务在一个 Repository 事务内完成。React 只消费投影和调用明确 operation，不承担跨实体补偿逻辑。
+
+`provider_core` 当前是仓库内可复用边界，不是已经发布的 SDK。其他项目若要复用，只能向它注入 API Base、模型请求、凭据和取消策略；OmniDesk 的 Provider profile、健康缓存、Function Calling 能力证据和对话/任务投影不能下沉到核心。拆为独立 crate 前必须由第二个最小消费者证明无需引用 OmniDesk Runtime。
+
+模型连接设置采用同样的宿主注入边界。`ProviderConnectionSettings` 只管理表单状态、连接列表、模型发现和测试反馈；保存位置、安全密钥存储、删除确认、Key 引用命名和只读策略由宿主提供。OmniDesk 通过薄 `ProviderPanel` 适配当前 Tauri Runtime，其他项目不得复制该适配器作为通用组件。
 
 Agent Scheduler 保存于 `.omnidesk/runtime/agent-scheduler.json`。完整 Agent Run 必须先于 scheduler 入队持久化，因此重启后的 queued 项仍有任务、对话和恢复上下文。只读 snapshot 向工作台提供全局上限、活动数、调度状态和稳定队列位置。`queued` 不占项目；`running`、等待审批、等待追问和等待工具续接均保留项目。模型阶段异常退出由作用域租约落为 `interrupted`；启动恢复只中断旧保留，不领取 queued 项或重放 Patch/检查。显式取消同时封口 Agent Run 与 scheduler，释放项目；revision 与 scheduler 终态守卫拒绝迟到结果覆盖。
 
