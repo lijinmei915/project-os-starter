@@ -137,3 +137,17 @@ test("returns a failed terminal outcome for a non-compatible provider error", as
   assert.equal(result.status, "failed");
   assert.equal(result.error, "provider disconnected");
 });
+
+test("does not persist native path mistakes or Hermes startup logs in a planning failure", async () => {
+  const harness = createHarness({
+    generateRemotePlan: async () => {
+      throw new Error("没有找到项目路径：desktop/tests/conversation-agent-events.test.js；Hermes: 2026-07-29 [INFO] acp_adapter.entry: No .env found at /var/folders/private/.env");
+    },
+    remote: true,
+  });
+  const result = await executeReadonlyPlanWorkflow(harness.input);
+
+  assert.equal(result.status, "failed");
+  assert.equal(result.error, "读取的文件路径不存在，Agent 未能自动找到正确文件。可以重试。");
+  assert.doesNotMatch(JSON.stringify(result), /\[INFO\]|acp_adapter|\/var\/folders\/|\.env/);
+});

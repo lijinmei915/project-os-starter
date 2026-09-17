@@ -13,11 +13,14 @@ export function useConversationPersistence({
 }) {
   const persistRef = useRef(Promise.resolve());
   return (nextTurns) => {
+    // Commit the visible transcript first; durable work runs after the browser can paint.
+    setChatTurns(nextTurns);
+    const queuedTurns = nextTurns;
+    setTimeout(() => {
     const finishMeasure = measureDesktopPerformance("conversation-update");
-    const normalizedTurns = normalizeConversationTurns(nextTurns, normalizeConversationReferences);
+    const normalizedTurns = normalizeConversationTurns(queuedTurns, normalizeConversationReferences);
     const retention = retainConversationTurns(normalizedTurns, { previousSummary: conversationSummary });
     const turns = retention.turns;
-    setChatTurns(turns);
     finishMeasure({ evictedTurnCount: retention.evictedTurnCount, retainedTurnCount: turns.length });
     const durableTurns = turns.filter((turn) => !isEphemeralConversationTurn(turn));
     if (!durableTurns.length) return;
@@ -49,5 +52,6 @@ export function useConversationPersistence({
       void setAndPersistTask({ ...task, conversationId: activeConversationId, conversationSummary: record.summary, conversationUpdatedAt: new Date().toISOString(), latestResult: latest.text, updatedAt: new Date().toISOString() }, { durable: true })
         .catch((error) => setRunnerError(error instanceof Error ? error.message : String(error)));
     }
+    }, 0);
   };
 }

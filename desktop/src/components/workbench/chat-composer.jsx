@@ -251,9 +251,8 @@ export function ChatComposer({
                   onClick={() => setPreviewAttachment(attachment)}
                   type="button"
                 >
-                  <img src={attachment.url} alt={attachment.name} />
+                  <img src={attachment.dataUrl || attachment.url} alt={attachment.name || "待发送图片"} />
                 </button>
-                <span title={attachment.name}>{attachment.name}</span>
                 <button
                   aria-label={`移除 ${attachment.name}`}
                   className="chatAttachmentRemove"
@@ -280,7 +279,7 @@ export function ChatComposer({
         />
         <div className="chatComposerToolbar" aria-label="对话工具">
           <input
-            accept="image/*"
+            accept="image/png,image/jpeg,image/webp,image/gif,.png,.jpg,.jpeg,.webp,.gif"
             className="chatComposerFileInput"
             multiple
             onChange={(event) => {
@@ -458,7 +457,7 @@ export function ChatComposer({
                 <X aria-hidden="true" strokeWidth={2.25} />
               </button>
             </div>
-            <img src={previewAttachment.url} alt={previewAttachment.name} />
+            <img src={previewAttachment.dataUrl || previewAttachment.url} alt={previewAttachment.name || "图片预览"} />
           </div>
         </div>
       ) : null}

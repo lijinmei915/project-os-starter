@@ -3,6 +3,7 @@ use serde::Serialize;
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 
 pub const AGENT_EXECUTOR_CONTRACT_VERSION: &str = "omnidesk.agent-executor.v1";
@@ -73,18 +74,40 @@ pub enum AgentExecutionMode {
     Resume,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AgentExecutionPurpose {
+    GovernedTask,
+    /// A bounded, read-only inspection used for requests such as "check the
+    /// current project risks". It cannot turn an inspection into a write.
+    RiskReview,
+    ReadonlyPlan,
+}
+
+pub type AgentEventSink = Arc<dyn Fn(&AgentEvent) + Send + Sync>;
+
 pub struct AgentExecutionRequest {
     pub mode: AgentExecutionMode,
+    pub purpose: AgentExecutionPurpose,
     pub root: PathBuf,
     pub api_key: String,
     pub api_base: String,
     pub api_key_env: String,
+    pub model: String,
     pub prompt: String,
     pub max_steps: usize,
     pub cancellation: Option<CancellationToken>,
+    pub event_sink: Option<AgentEventSink>,
 }
 
-#[derive(Debug, Serialize)]
+pub struct AgentExecutorWarmupRequest {
+    pub root: PathBuf,
+    pub api_key: String,
+    pub api_base: String,
+    pub api_key_env: String,
+    pub model: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentEvent {
     pub schema_version: &'static str,
@@ -147,14 +170,18 @@ pub trait AgentExecutor: Send + Sync {
     fn capabilities(&self) -> AgentExecutorCapabilities;
     fn status(&self) -> AgentExecutorStatus;
     fn prepare(&self, provider: &ProviderConfig) -> Result<(), String>;
+    fn prewarm(&self, _request: AgentExecutorWarmupRequest) -> Result<(), String> {
+        Ok(())
+    }
     fn execute(&self, request: AgentExecutionRequest) -> Result<AgentExecutionResult, String>;
 }
 
 const DEFAULT_AGENT_EXECUTOR_ID: &str = "hermes-acp";
 
-static AGENT_EXECUTORS: [&'static dyn AgentExecutor; 2] = [
+static AGENT_EXECUTORS: [&'static dyn AgentExecutor; 3] = [
     &crate::runtime::hermes_executor::HERMES_ACP_EXECUTOR,
     &crate::runtime::gemini_executor::GEMINI_ACP_EXECUTOR,
+    &crate::runtime::codex_executor::CODEX_CLI_EXECUTOR,
 ];
 
 pub fn registered_agent_executors() -> &'static [&'static dyn AgentExecutor] {
@@ -271,6 +298,10 @@ mod tests {
         assert_eq!(
             agent_executor_by_id("gemini-acp").unwrap().id(),
             "gemini-acp"
+        );
+        assert_eq!(
+            agent_executor_by_id("codex-cli").unwrap().id(),
+            "codex-cli"
         );
         assert!(agent_executor_by_id("missing").is_err());
     }

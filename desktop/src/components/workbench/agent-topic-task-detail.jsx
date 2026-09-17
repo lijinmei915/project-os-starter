@@ -5,6 +5,7 @@ import { Button } from "../ui/button";
 import { Notice } from "../ui/notice";
 import { taskExecutionFlow, taskNextAction } from "../../lib/task-next-action";
 import { agentRunWorkflowState, workflowStatePresentation } from "../../lib/workflow-state";
+import { ExternalChangeArchive } from "./external-change-archive";
 
 function previewItems(items = [], limit = 3) {
   return items.filter(Boolean).slice(0, limit);
@@ -73,8 +74,9 @@ export function AgentTopicCurrentTaskDetail({ currentTask, currentChecks, curren
   </div>;
 }
 
-export function AgentTopicExecutionResults({ agentRuns = [], failedRunsForTask, failureSummaryForTask, onApproveAgentRun, onCancelAgentRun, onCreateRepairTask, onExportAgentRun, onOpenTask, onResumeAgentRun, onRerunFailedChecks, recentResultTasks, runnerLoadingId, taskStatuses, taskStatusLabel }) {
+export function AgentTopicExecutionResults({ agentRuns = [], externalChanges, failedRunsForTask, failureSummaryForTask, onApproveAgentRun, onCancelAgentRun, onCreateRepairTask, onExportAgentRun, onOpenTask, onResumeAgentRun, onRerunFailedChecks, recentResultTasks, runnerLoadingId, taskStatuses, taskStatusLabel }) {
   return <div className="agentTopicList">
+    <ExternalChangeArchive archive={externalChanges} onOpenTask={onOpenTask} />
     {agentRuns.length ? <section className="agentPatchItem agentRunHistory"><div className="agentPatchItemHeader"><div><strong>Agent 运行记录</strong><span>Hermes / 本地执行器</span></div><Badge>只读</Badge></div>{agentRuns.slice(0, 8).map((run) => <div className="agentTopicStatusLine" key={run.id}><span>{run.executorId || "Agent"} · {workflowStatePresentation(agentRunWorkflowState(run)).label}</span><span>第 {run.step || 0}/{run.maxSteps || 20} 步 · {run.summary || "暂无摘要"}</span>{run.scheduler?.queuePosition ? <span>调度队列：第 {run.scheduler.queuePosition} 位</span> : null}{schedulerStatusLabel(run.scheduler?.status) ? <span>调度状态：{schedulerStatusLabel(run.scheduler.status)}</span> : null}{run.checkpoint?.phase ? <span>恢复点：{run.checkpoint.phase} · {run.checkpoint.nextAction || "resume-stage"}</span> : null}{["queued", "interrupted"].includes(run.status) ? <Button size="sm" type="button" variant="outline" onClick={() => onResumeAgentRun?.(run)}>{run.status === "queued" ? "继续任务" : "恢复执行"}</Button> : null}{run.status === "awaiting-approval" ? <Button size="sm" type="button" variant="primary" onClick={() => onApproveAgentRun?.(run)}>批准并继续</Button> : null}{["queued", "running", "awaiting-approval", "awaiting-user-input", "interrupted"].includes(run.status) ? <Button size="sm" type="button" variant="ghost" onClick={() => onCancelAgentRun?.(run)}>取消任务</Button> : null}<Button size="sm" type="button" variant="ghost" onClick={() => onExportAgentRun?.(run)}>导出证据</Button><RunTimeline events={run.evidence} /></div>)}</section> : null}
     {recentResultTasks.length ? recentResultTasks.map((task) => <div className="agentPatchItem" key={task.id}>
       <div className="agentPatchItemHeader"><div><strong>{task.title}</strong><span>{task.runSummary?.path || task.createdAt || "暂无 run summary"}</span></div><Badge status={taskStatusLabel(task)}>{taskStatusLabel(task)}</Badge></div>

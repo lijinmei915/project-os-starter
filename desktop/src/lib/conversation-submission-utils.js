@@ -4,7 +4,6 @@ export function submittedConversationAttachments(attachments = []) {
     id: attachment.id,
     mimeType: attachment.type,
     name: attachment.name,
-    url: attachment.url,
   }));
 }
 
@@ -13,7 +12,9 @@ export function modelConversationAttachments(attachments = []) {
 }
 
 export function releaseConversationAttachments(attachments = []) {
-  attachments.forEach((attachment) => URL.revokeObjectURL(attachment.url));
+  attachments.forEach((attachment) => {
+    if (attachment.url) URL.revokeObjectURL(attachment.url);
+  });
 }
 
 export function withActiveTaskConversationContext(baseRequestContext, { activeConversationTaskId, activeTask, taskGoalName, taskNextAction }) {

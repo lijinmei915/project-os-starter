@@ -7,6 +7,26 @@ use tokio_util::sync::CancellationToken;
 
 pub const ACP_MAX_LINE_BYTES: usize = 1024 * 1024;
 
+/// Timeout policy for one ACP JSON-RPC request. A prompt owns a fresh policy;
+/// it must never inherit time already spent by an earlier prompt or ask_user
+/// checkpoint.
+#[derive(Debug, Clone, Copy)]
+pub struct AcpResponseTimeouts {
+    pub first_response: Duration,
+    pub stream_idle: Duration,
+    pub overall: Duration,
+}
+
+impl AcpResponseTimeouts {
+    pub const fn new(first_response: Duration, stream_idle: Duration, overall: Duration) -> Self {
+        Self {
+            first_response,
+            stream_idle,
+            overall,
+        }
+    }
+}
+
 #[derive(Debug, Default, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ProviderUsage {
@@ -107,22 +127,64 @@ pub fn wait_for_response(
     receiver: &mpsc::Receiver<Result<String, String>>,
     stdin: &mut impl Write,
     expected_id: u64,
-    deadline: Instant,
+    timeouts: AcpResponseTimeouts,
     agent_text: &mut String,
     cancellation: Option<&CancellationToken>,
 ) -> Result<Value, String> {
+    wait_for_response_with_updates(
+        receiver,
+        stdin,
+        expected_id,
+        timeouts,
+        agent_text,
+        cancellation,
+        |_| Ok(()),
+    )
+}
+
+pub fn wait_for_response_with_updates<F>(
+    receiver: &mpsc::Receiver<Result<String, String>>,
+    stdin: &mut impl Write,
+    expected_id: u64,
+    timeouts: AcpResponseTimeouts,
+    agent_text: &mut String,
+    cancellation: Option<&CancellationToken>,
+    mut on_update: F,
+) -> Result<Value, String>
+where
+    F: FnMut(&Value) -> Result<(), String>,
+{
+    let started_at = Instant::now();
+    let overall_deadline = started_at + timeouts.overall;
+    let mut activity_deadline = started_at + timeouts.first_response;
+    let mut received_response = false;
     loop {
         if cancellation.is_some_and(CancellationToken::is_cancelled) {
             return Err("请求已取消".to_string());
         }
-        let remaining = deadline
-            .checked_duration_since(Instant::now())
-            .ok_or_else(|| "ACP 请求超时".to_string())?;
+        let now = Instant::now();
+        if now >= overall_deadline {
+            return Err("Agent 本轮运行时间过长".to_string());
+        }
+        if now >= activity_deadline {
+            return Err(if received_response {
+                "Agent 响应中断".to_string()
+            } else {
+                "Agent 未在规定时间开始响应".to_string()
+            });
+        }
+        let remaining = overall_deadline
+            .saturating_duration_since(now)
+            .min(activity_deadline.saturating_duration_since(now));
         let line = match receiver.recv_timeout(remaining.min(Duration::from_millis(200))) {
             Ok(line) => line?,
             Err(mpsc::RecvTimeoutError::Timeout) => continue,
             Err(mpsc::RecvTimeoutError::Disconnected) => {
-                return Err("ACP 请求超时或连接已关闭".to_string())
+                return Err(if received_response {
+                    "Agent 响应中断".to_string()
+                } else {
+                    "Agent 未在规定时间开始响应（连接已关闭）".to_string()
+                })
             }
         };
         if line.len() > ACP_MAX_LINE_BYTES {
@@ -146,12 +208,16 @@ pub fn wait_for_response(
             }
         }
         if message.get("method").and_then(Value::as_str) == Some("session/update") {
+            received_response = true;
+            activity_deadline = Instant::now() + timeouts.stream_idle;
+            on_update(&message)?;
             if let Some(text) = message
                 .pointer("/params/update/content/text")
                 .and_then(Value::as_str)
             {
                 agent_text.push_str(text);
             }
+            continue;
         }
     }
 }
@@ -230,5 +296,85 @@ mod tests {
         reversed.merge(with_cost);
         assert_eq!(reversed.total_tokens, 15);
         assert_eq!(reversed.cost_usd, None);
+    }
+
+    #[test]
+    fn streamed_updates_refresh_the_idle_timeout() {
+        let (sender, receiver) = mpsc::channel();
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(20));
+            sender
+                .send(Ok(
+                    r#"{"jsonrpc":"2.0","method":"session/update","params":{"update":{"content":{"text":"hello"}}}}"#
+                        .to_string(),
+                ))
+                .unwrap();
+            std::thread::sleep(Duration::from_millis(20));
+            sender
+                .send(Ok(r#"{"jsonrpc":"2.0","id":7,"result":{}}"#.to_string()))
+                .unwrap();
+        });
+        let mut stdin = Vec::new();
+        let mut text = String::new();
+        let response = wait_for_response(
+            &receiver,
+            &mut stdin,
+            7,
+            AcpResponseTimeouts::new(
+                Duration::from_millis(30),
+                Duration::from_millis(30),
+                Duration::from_millis(100),
+            ),
+            &mut text,
+            None,
+        )
+        .unwrap();
+        assert_eq!(response["id"], 7);
+        assert_eq!(text, "hello");
+    }
+
+    #[test]
+    fn classifies_missing_first_response() {
+        let (_sender, receiver) = mpsc::channel::<Result<String, String>>();
+        let mut stdin = Vec::new();
+        let mut text = String::new();
+        let error = wait_for_response(
+            &receiver,
+            &mut stdin,
+            7,
+            AcpResponseTimeouts::new(Duration::ZERO, Duration::ZERO, Duration::from_secs(1)),
+            &mut text,
+            None,
+        )
+        .unwrap_err();
+        assert_eq!(error, "Agent 未在规定时间开始响应");
+    }
+
+    #[test]
+    fn classifies_stream_that_becomes_idle() {
+        let (sender, receiver) = mpsc::channel();
+        sender
+            .send(Ok(
+                r#"{"jsonrpc":"2.0","method":"session/update","params":{"update":{"content":{"text":"hello"}}}}"#
+                    .to_string(),
+            ))
+            .unwrap();
+        let mut stdin = Vec::new();
+        let mut text = String::new();
+        let error = wait_for_response(
+            &receiver,
+            &mut stdin,
+            7,
+            AcpResponseTimeouts::new(
+                Duration::from_secs(1),
+                Duration::ZERO,
+                Duration::from_secs(1),
+            ),
+            &mut text,
+            None,
+        )
+        .unwrap_err();
+        assert_eq!(error, "Agent 响应中断");
+        assert_eq!(text, "hello");
     }
 }

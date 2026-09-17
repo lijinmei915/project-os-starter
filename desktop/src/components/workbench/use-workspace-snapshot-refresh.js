@@ -17,8 +17,12 @@ export function useWorkspaceSnapshotRefresh({ isTauri, refreshSnapshot, showToas
           try {
             await refreshSnapshot();
             if (cancelled) return;
+            const changeCount = event.payload?.externalChange?.changedFileCount;
             const path = event.payload?.path ? `：${event.payload.path}` : "";
-            showToast(`治理骨架已变化，页面已同步${path}`, "success");
+            const message = changeCount
+              ? `已自动归档工程文件改动（${changeCount} 个）${path}`
+              : `工程文件已变化，页面已同步${path}`;
+            showToast(message, "success");
           } catch (err) {
             if (!cancelled) showToast(`治理状态自动同步失败：${err instanceof Error ? err.message : String(err)}`, "danger");
           }

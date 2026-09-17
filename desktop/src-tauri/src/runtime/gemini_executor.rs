@@ -102,12 +102,17 @@ impl AgentExecutor for GeminiAcpExecutor {
                     "plan".to_string(),
                 ],
                 forward_provider_env: false,
+                supports_warm_workers: false,
                 mode: request.mode,
+                purpose: request.purpose,
+                native_tool_events: false,
+                event_sink: request.event_sink,
             },
             &request.root,
             &request.api_key,
             &request.api_base,
             &request.api_key_env,
+            &request.model,
             &request.prompt,
             request.max_steps,
             request.cancellation.as_ref(),
@@ -140,13 +145,16 @@ mod tests {
         let error = GEMINI_ACP_EXECUTOR
             .execute(AgentExecutionRequest {
                 mode: AgentExecutionMode::Start,
+                purpose: crate::runtime::agent_executor::AgentExecutionPurpose::GovernedTask,
                 root: std::env::current_dir().unwrap(),
                 api_key: String::new(),
                 api_base: String::new(),
                 api_key_env: String::new(),
+                model: String::new(),
                 prompt: "cancel before model access".to_string(),
                 max_steps: 1,
                 cancellation: Some(cancellation),
+                event_sink: None,
             })
             .unwrap_err();
         assert!(error.contains("请求已取消"));

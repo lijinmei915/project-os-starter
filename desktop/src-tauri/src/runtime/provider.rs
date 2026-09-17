@@ -111,23 +111,11 @@ pub async fn probe_catalog_with_credential(
 }
 
 pub fn chat_completions_endpoint(api_base: &str) -> String {
-    let base = api_base.trim_end_matches('/');
-    if base.ends_with("/chat/completions") {
-        base.to_string()
-    } else {
-        format!("{base}/chat/completions")
-    }
+    crate::runtime::provider_core::chat_completions_endpoint(api_base)
 }
 
 pub fn models_endpoint(api_base: &str) -> String {
-    let base = api_base.trim_end_matches('/');
-    if base.ends_with("/models") {
-        base.to_string()
-    } else if base.ends_with("/chat/completions") {
-        format!("{}/models", base.trim_end_matches("/chat/completions"))
-    } else {
-        format!("{base}/models")
-    }
+    crate::runtime::provider_core::models_endpoint(api_base)
 }
 
 #[derive(Deserialize)]
@@ -437,41 +425,7 @@ pub struct ModelHealthEntry {
 /// Keeps execution failures explainable without persisting credentials or raw
 /// provider payloads. These values are shared with the desktop presentation.
 pub fn classify_failure(message: &str) -> &'static str {
-    let text = message.to_lowercase();
-    if text.contains("insufficient_user_quota")
-        || text.contains("quota insufficient")
-        || text.contains("subscription quota")
-        || text.contains("额度不足")
-        || text.contains("订阅额度")
-    {
-        "quota-exhausted"
-    } else if text.contains("http 401")
-        || text.contains("http 403")
-        || text.contains("invalid api key")
-        || text.contains("invalid token")
-        || text.contains("unauthorized")
-        || text.contains("认证失败")
-    {
-        "authentication-failed"
-    } else if text.contains("model_not_found")
-        || text.contains("model not found")
-        || text.contains("unknown model")
-        || text.contains("模型不存在")
-        || text.contains("模型不可用")
-    {
-        "model-unavailable"
-    } else if text.contains("timed out")
-        || text.contains("timeout")
-        || text.contains("超时")
-        || text.contains("connection")
-        || text.contains("dns")
-        || text.contains("网络")
-        || text.contains("连接")
-    {
-        "network-unavailable"
-    } else {
-        "unavailable"
-    }
+    crate::runtime::provider_core::classify_failure(message)
 }
 
 pub fn failure_changes_health(status: &str) -> bool {

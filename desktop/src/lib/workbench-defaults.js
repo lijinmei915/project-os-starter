@@ -40,6 +40,7 @@ export const fallbackSnapshot = {
     missingFields: ["项目简介", "长期目标", "目标用户", "使用场景", "用户偏好"],
   },
   workspaceFacts: null,
+  externalChanges: { schemaVersion: "omnidesk.external-change-archive.v0.1", status: "none", entryCount: 0, latest: null, entries: [] },
   trace: ["BOOT: browser preview fallback.", "INDEX: waiting for Tauri Local Agent Core.", "GUARD: write actions require diff review."],
   goalValidation: { criteria: [] },
   goalValidationReport: { status: "missing", checks: [] },

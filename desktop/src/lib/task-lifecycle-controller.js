@@ -87,8 +87,8 @@ export function createTaskLifecycleController({
       showToast("已在当前任务中准备修复草稿。", "success");
       return true;
     },
-    markTaskWaiting: async (id) => {
-      const task = findTask(id);
+    markTaskWaiting: async (id, persistedTask = null) => {
+      const task = findTask(id) || (persistedTask?.id === id ? persistedTask : null);
       if (!task) return false;
       await persistTask({ ...task, status: taskStatuses.waitingApproval }, { durable: true });
       return true;

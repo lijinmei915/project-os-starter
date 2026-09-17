@@ -10,7 +10,8 @@ import { appendMemoryAudit, projectMemoryReferences, retrieveProjectMemory } fro
 import { modelConversationAttachments, releaseConversationAttachments, submittedConversationAttachments, withActiveTaskConversationContext } from "../../lib/conversation-submission-utils";
 import { applyConversationTakeover } from "../../lib/conversation-takeover-controller";
 import { composerResponseForPendingInteraction } from "../../lib/conversation-agent-events";
-import { beginRequest, isRequestRunning, settleRequest } from "../../lib/request-lifecycle";
+import { beginRequest, isRequestRunning, settleRequest, settleRequestAndCleanup } from "../../lib/request-lifecycle";
+import { initialPlanActivityEvents, mergePlanWorkflowProgress } from "../../lib/conversation-plan-activity";
 import {
   actionCancelledTurn,
   classifyConversationIntent,
@@ -18,7 +19,6 @@ import {
   dispatchConversationCommand,
   executeConversationActionRequest,
   executionReadyAgentEvents,
-  planProgressEvents,
   prepareConversationSubmission,
   projectExecutionEvent,
   resolveRequestTakeover,
@@ -51,10 +51,12 @@ export function useConversationSubmission({
   localStatusReply,
   onChatTurnsChange,
   onGeneratePlan,
+  onPrepareAgentTask,
   onModelHealthChange,
   onSubmitAgentInteraction,
   onProfileUpdated,
   onRunChatAction,
+  onStartAgent,
   onStopPlan,
   pendingTurn,
   previewChatResult,
@@ -104,6 +106,11 @@ export function useConversationSubmission({
       clearAttachments();
       releaseConversationAttachments(submittedAttachments);
     };
+    const clearTransientRequestUi = () => {
+      setChatLoading(false);
+      setPendingTurn(null);
+      setStreamingReply("");
+    };
     const interactionReply = composerResponseForPendingInteraction(interactions, nextInput, submittedAttachments.length);
     if (interactionReply) {
       lastSubmissionRef.current = prepared.submission;
@@ -132,6 +139,8 @@ export function useConversationSubmission({
     setTaskInput("");
     clearAttachments();
     onChatTurnsChange([...requestBaseTurns, userTurn]);
+    // Let the optimistic user turn and cleared composer render before request preparation.
+    await new Promise((resolve) => setTimeout(resolve, 0));
     beginRequest(activeRequestRef, requestId, requestStartedAt);
     setChatStartedAt(requestStartedAt);
     setChatLoadingLabel(runningRequest ? "正在切换到新要求" : "正在准备请求");
@@ -199,7 +208,9 @@ export function useConversationSubmission({
           adapters: createConversationActionAdapters({
             generatePlan: onGeneratePlan,
             isRequestActive: (nextRequestId) => isRequestRunning(activeRequestRef, nextRequestId),
+            prepareAgentTask: onPrepareAgentTask,
             runAction: onRunChatAction,
+            startAgent: onStartAgent,
           }),
           context: {
             attachments: modelConversationAttachments(submittedAttachments),
@@ -213,7 +224,7 @@ export function useConversationSubmission({
             if (!isRequestRunning(activeRequestRef, requestId)) return;
             setPendingTurn((current) => ({
               ...(current || { attachments: submittedAttachments, showUser: false, startedAt: requestStartedAt, text: nextInput }),
-              events,
+              events: mergePlanWorkflowProgress(current?.events || initialPlanActivityEvents(), events),
               label,
             }));
           },
@@ -222,9 +233,9 @@ export function useConversationSubmission({
           releaseConversationAttachments(submittedAttachments);
           return true;
         }
-        if (!settleRequest(activeRequestRef, requestId, result.requestStatus)) return true;
+        const settled = settleRequestAndCleanup(activeRequestRef, requestId, result.requestStatus, clearTransientRequestUi);
+        if (!settled) return true;
         if (result.turn) onChatTurnsChange([...resolvedTurns, userTurn, result.turn]);
-        setPendingTurn(null);
         clearSubmittedInput();
         return result.handled;
       },
@@ -347,12 +358,14 @@ export function useConversationSubmission({
     }
     setPendingTurn({
       attachments: submittedAttachments,
-      events: planProgressEvents("context"),
-      label: "读取项目上下文",
+      events: initialPlanActivityEvents(),
+      label: "正在查看项目（只读）",
+      requestId,
       showUser: false,
       startedAt: requestStartedAt,
       text: nextInput || "请根据截图帮我分析并修改。",
     });
+    setStreamingReply("");
     const actionResult = await executeConversationActionRequest({
       action: { id: "generate-plan", task: contextualTask || "请根据截图帮我分析并修改。" },
       adapters: createConversationActionAdapters({ generatePlan: onGeneratePlan }),
@@ -366,17 +379,16 @@ export function useConversationSubmission({
       },
       onProgress: ({ events, label }) => {
         if (!isRequestRunning(activeRequestRef, requestId)) return;
-        setPendingTurn((current) => current ? { ...current, events, label } : current);
+        setPendingTurn((current) => current ? { ...current, events: mergePlanWorkflowProgress(current.events, events), label } : current);
       },
     });
     if (!isRequestRunning(activeRequestRef, requestId)) {
       releaseConversationAttachments(submittedAttachments);
       return;
     }
-    if (!settleRequest(activeRequestRef, requestId, actionResult.requestStatus)) return;
+    const settled = settleRequestAndCleanup(activeRequestRef, requestId, actionResult.requestStatus, clearTransientRequestUi);
+    if (!settled) return;
     if (actionResult.turn) onChatTurnsChange([...requestBaseTurns, userTurn, actionResult.turn]);
-    setPendingTurn(null);
-    setStreamingReply("");
     releaseConversationAttachments(submittedAttachments);
   };
 }

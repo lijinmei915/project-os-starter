@@ -1,7 +1,7 @@
 import { Plus, X } from "lucide-react";
 import { Notice } from "../ui/notice";
 
-export function ProviderConnections({ activeProfileId, onCreate, onDelete, onEdit, profiles, providerError, profileLabel }) {
+export function ProviderConnections({ activeProfileId, disabled = false, onCreate, onDelete, onEdit, profiles, providerError, profileLabel }) {
   return (
     <div className="providerSavedConnections" aria-label="已保存连接">
       <div className="providerSectionTitle">
@@ -13,7 +13,7 @@ export function ProviderConnections({ activeProfileId, onCreate, onDelete, onEdi
             const active = profile.id === activeProfileId;
             return (
               <div className={`providerConnectionItem${active ? " active" : ""}`} key={profile.id}>
-                <button className="providerConnectionMain" type="button" onClick={() => onEdit(profile)}>
+                <button className="providerConnectionMain" disabled={disabled} type="button" onClick={() => onEdit(profile)}>
                   <strong>{profileLabel(profile)}</strong>
                 </button>
                 <button
@@ -21,18 +21,19 @@ export function ProviderConnections({ activeProfileId, onCreate, onDelete, onEdi
                   type="button"
                   onClick={() => onDelete(profile)}
                   aria-label={`删除连接 ${profileLabel(profile)}`}
+                  disabled={disabled}
                 >
                   <X strokeWidth={2.2} aria-hidden="true" />
                 </button>
               </div>
             );
           })}
-          <button className="providerConnectionItem providerConnectionAdd" type="button" onClick={onCreate} aria-label="新建连接">
+          <button className="providerConnectionItem providerConnectionAdd" disabled={disabled} type="button" onClick={onCreate} aria-label="新建连接">
             <Plus strokeWidth={2.25} aria-hidden="true" />
           </button>
         </div>
       ) : (
-        <button className="providerConnectionItem providerConnectionAdd providerConnectionAdd-empty" type="button" onClick={onCreate}>
+        <button className="providerConnectionItem providerConnectionAdd providerConnectionAdd-empty" disabled={disabled} type="button" onClick={onCreate}>
           <Plus strokeWidth={2.25} aria-hidden="true" />
           <span>新建连接</span>
         </button>

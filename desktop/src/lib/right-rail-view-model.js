@@ -12,13 +12,22 @@ import {
   taskSubtasks,
 } from "./goal-presentation.js";
 
-const dialogueTaskIds = new Set([
-  "dialogue-context-state",
-  "dialogue-context-assembler",
-  "dialogue-grounded-answer-contract",
-  "dialogue-reference-action-loop",
-  "dialogue-multiturn-evaluation",
-]);
+function focusPriority(todo, activeTaskId, stateFor) {
+  if (todo.id === activeTaskId) return -1;
+  return {
+    [workflowStates.waitingUser]: 0,
+    [workflowStates.waitingApproval]: 1,
+    [workflowStates.working]: 2,
+    [workflowStates.verifying]: 2,
+    [workflowStates.failed]: 3,
+    [workflowStates.interrupted]: 3,
+    [workflowStates.planned]: 4,
+    [workflowStates.idle]: 5,
+    [workflowStates.cancelled]: 6,
+    [workflowStates.completed]: 7,
+    [workflowStates.verified]: 7,
+  }[stateFor(todo)] ?? 8;
+}
 
 export function buildRightRailViewModel({
   activeConversationId,
@@ -75,7 +84,12 @@ export function buildRightRailViewModel({
     : taskFilter === "done"
       ? goalTodos.filter((todo) => workflowStateIsFinished(stateFor(todo)))
       : goalTodos.filter((todo) => !workflowStateIsFinished(stateFor(todo)));
-  const currentPhaseTodos = visibleGoalTodos.filter((todo) => dialogueTaskIds.has(todo.id));
+  const focusOrderedTodos = visibleGoalTodos
+    .map((todo, index) => ({ index, priority: focusPriority(todo, activeTaskId, stateFor), todo }))
+    .sort((left, right) => left.priority - right.priority || left.index - right.index)
+    .map((item) => item.todo);
+  const currentPhaseTodos = taskFilter === "todo" ? focusOrderedTodos.slice(0, 1) : visibleGoalTodos;
+  const currentTaskId = currentPhaseTodos[0]?.id || "";
 
   return {
     activeGoal,
@@ -83,7 +97,7 @@ export function buildRightRailViewModel({
     conversationGroups: groupConversations(conversations),
     currentPhaseTodos,
     doneCount,
-    futurePhaseTodos: visibleGoalTodos.filter((todo) => !dialogueTaskIds.has(todo.id)),
+    futurePhaseTodos: taskFilter === "todo" ? visibleGoalTodos.filter((todo) => todo.id !== currentTaskId) : [],
     goalIsDraft: activeGoal?.status === "draft",
     goalIsPlanned: activeGoal?.status === "planned" && !goalTodos.length,
     hasGoalProgress: goalTodos.length > 0,
@@ -103,7 +117,7 @@ export function buildRightRailViewModel({
     progressValue: progressFromTodos(goalTodos, taskStatuses),
     snapshotTodos,
     todoMeta: visibleTasks.length || snapshotTodos.length,
-    useDialoguePhaseGroups: currentPhaseTodos.length > 1,
+    useDialoguePhaseGroups: taskFilter === "todo" && visibleGoalTodos.length > 0,
     validationCriteria: Array.isArray(snapshot.goalValidation?.criteria) ? snapshot.goalValidation.criteria : [],
     validationStatus,
     visibleGoalTodos,

@@ -37,7 +37,7 @@ export function useConversationTurnActions({
       onChatTurnsChange(nextTurns);
       return true;
     }
-    const nextAction = action.nextAction || { id: "generate-patch", label: "生成文件改动", taskId: action.taskId };
+    const nextAction = action.nextAction || { id: "generate-patch", label: "生成改动草稿", taskId: action.taskId };
     const projectedTurns = projectExecutionEvent(nextTurns, {
       events: executionReadyAgentEvents(),
       outcome: "awaiting-confirmation",

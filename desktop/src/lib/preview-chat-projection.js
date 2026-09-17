@@ -87,11 +87,14 @@ export function previewChatResult({
 
 export function buildPreviewPlan(input, snapshot = {}) {
   const task = displayText(input?.task, "未命名任务").trim() || "未命名任务";
+  const recommendedNextSteps = nextStepRecommendations(task, snapshot);
   return {
     task,
     projectName: snapshot.projectName,
     mode: "plan",
-    summary: `我会先围绕「${task}」理清范围，再给出最小下一步。`,
+    summary: recommendedNextSteps.length
+      ? `我根据当前项目的任务和进度，整理了 ${recommendedNextSteps.length} 项可以优先推进的工作。先选择一项，我再为它生成具体计划。`
+      : `我会先围绕「${task}」理清范围，再给出最小下一步。`,
     steps: [
       "确认用户真正想解决的问题。",
       "读取当前项目状态和交接记录。",
@@ -102,8 +105,31 @@ export function buildPreviewPlan(input, snapshot = {}) {
     candidateChanges: ["先不写文件，只形成下一步建议。"],
     checks: ["npm --prefix desktop test"],
     guardrails: ["不自动写文件。", "不自动运行命令。"],
+    recommendedNextSteps,
     trace: ["PREVIEW: browser-only local plan."],
   };
+}
+
+function nextStepRecommendations(task, snapshot) {
+  const compact = task.replace(/[\s。！？!?，,]/g, "");
+  const isDiscovery = (compact.includes("下一步") || compact.includes("待办"))
+    && (compact.includes("整理") || compact.includes("生成计划") || compact.includes("任务"));
+  if (!isDiscovery) return [];
+  const finished = new Set(["done", "completed", "verified", "succeeded", "cancelled", "failed"]);
+  const seen = new Set();
+  return (Array.isArray(snapshot?.queue) ? snapshot.queue : [])
+    .filter((item) => item?.title && !finished.has(String(item.status || "").toLowerCase()))
+    .filter((item) => {
+      if (seen.has(item.title) || seen.size >= 3) return false;
+      seen.add(item.title);
+      return true;
+    })
+    .map((item) => ({
+      id: String(item.id || item.title),
+      title: String(item.title),
+      reason: String(item.body || "这是当前项目中尚未完成的工作。"),
+      expectedOutcome: "完成后会推进当前项目目标，并留下可追溯的结果。",
+    }));
 }
 
 function displayText(value, fallback = "") {

@@ -19,6 +19,21 @@ test("keeps archived conversations out of the history list", () => {
   assert.deepEqual(groupConversations(conversations).flatMap((group) => group.items).map((item) => item.id), ["active"]);
 });
 
+test("groups conversations by local calendar day instead of a rolling 24-hour window", () => {
+  const now = new Date(2026, 6, 28, 0, 30).getTime();
+  const groups = groupConversations([
+    { id: "today", title: "今天", updatedAt: new Date(2026, 6, 28, 0, 10).toISOString() },
+    { id: "yesterday-recent", title: "昨天但不足 24 小时", updatedAt: new Date(2026, 6, 27, 23, 50).toISOString() },
+    { id: "earlier", title: "更早", updatedAt: new Date(2026, 6, 26, 23, 50).toISOString() },
+  ], { now });
+
+  assert.deepEqual(groups.map((group) => [group.label, group.items.map((item) => item.id)]), [
+    ["今天", ["today"]],
+    ["昨天", ["yesterday-recent"]],
+    ["更早", ["earlier"]],
+  ]);
+});
+
 test("hides low-signal previews and compacts meaningful conversation text", () => {
   assert.equal(isLowSignalConversationText("你好"), true);
   assert.equal(isLowSignalConversationText("已创建执行计划"), true);

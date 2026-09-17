@@ -953,6 +953,43 @@ pub fn prepare_model_run(
     })
 }
 
+/// Records a compact live progress event while a model stage is running. The
+/// final model completion still owns the durable full event bundle; this is
+/// only the user-visible heartbeat and never stores prompts or tool output.
+pub fn record_live_agent_event(
+    root: &Path,
+    run_id: &str,
+    event: &crate::runtime::agent_executor::AgentEvent,
+    timestamp: &str,
+) -> Result<(), String> {
+    let safe_event = json!({
+        "schemaVersion": event.schema_version,
+        "sequence": event.sequence,
+        "kind": event.kind,
+        "phase": event.phase,
+        "status": event.status,
+        "summary": event.summary.chars().take(240).collect::<String>(),
+        "details": {
+            "name": event.details.get("name"),
+            "step": event.details.get("step"),
+            "success": event.details.get("success"),
+            "mode": event.details.get("mode"),
+        },
+    });
+    Repository::new(root).transaction_with("record-live-agent-event", |repository| {
+        let mut run = load_from_repository(repository, run_id)?;
+        if run.status != "running" {
+            return Ok(((), Vec::new()));
+        }
+        run.updated_at = timestamp.to_string();
+        run.summary = safe_event["summary"].as_str().unwrap_or("Agent 正在处理。").to_string();
+        run.checkpoint.context_summary = run.summary.clone();
+        let summary = run.summary.clone();
+        append_evidence(&mut run, "live-agent-event", summary, json!({ "agentEvent": safe_event }), timestamp);
+        Ok(((), vec![mutation(&run)?]))
+    })
+}
+
 /// Persists the terminal or approval boundary reached by a model transport.
 /// Transport-specific result parsing stays outside this domain; the durable
 /// state, checkpoint and user-facing evidence do not.
@@ -1520,10 +1557,7 @@ pub fn seed_native_interaction_run(
         "native-interaction-task".to_string(),
         timestamp,
     );
-    run.status = "running".to_string();
-    run.checkpoint.phase = "running".to_string();
-    persist(root, &run)?;
-    let interaction = validate_ask_user_interaction(
+    let mut interaction = validate_ask_user_interaction(
         &json!({
             "title": "确认数据范围",
             "description": "继续任务前需要确认一个关键选择。",
@@ -1540,19 +1574,28 @@ pub fn seed_native_interaction_run(
         }),
         1,
     )?;
-    settle_model_run(
-        root,
-        run,
-        ModelRunCompletion {
-            status: "awaiting-user-input".to_string(),
-            summary: "原生追问夹具等待用户回答。".to_string(),
-            step: Some(1),
-            approval: None,
-            interaction: Some(interaction),
-            evidence_details: json!({ "fixture": true, "approvalCreated": false }),
-        },
+    run.status = "awaiting-user-input".to_string();
+    run.step = 1;
+    run.revision = 1;
+    run.updated_at = timestamp.to_string();
+    run.summary = "原生追问夹具等待用户回答。".to_string();
+    interaction["id"] = json!("ask-user-native-interaction-run-2-1");
+    interaction["requestedAt"] = json!(timestamp);
+    run.interactions.push(interaction.clone());
+    run.checkpoint.phase = run.status.clone();
+    run.checkpoint.context_summary = run.summary.clone();
+    run.checkpoint.interaction = Some(interaction);
+    run.checkpoint.next_action = "await-user-input".to_string();
+    let summary = run.summary.clone();
+    append_evidence(
+        &mut run,
+        "interaction",
+        summary,
+        json!({ "fixture": true, "approvalCreated": false }),
         timestamp,
-    )
+    );
+    persist(root, &run)?;
+    Ok(run)
 }
 
 #[cfg(test)]

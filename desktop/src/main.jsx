@@ -223,6 +223,10 @@ function phaseLabel(phase) {
   }[phase] || phase || "进行中";
 }
 
+function isBackgroundAgentRun(run = {}) {
+  return ["queued", "running", "applying", "running-tool", "verifying"].includes(run.status);
+}
+
 function activeGoalFromSnapshot(snapshot) {
   return resolveWorkspaceGoal(snapshot);
 }
@@ -275,10 +279,12 @@ function AgentWorkspace({
   conversationResetKey,
   onChatTurnsChange,
   onGeneratePlan,
+  onPrepareAgentTask,
   onGeneratePatchDraft,
   onApplyPatchDraft,
   onMergeHandoff,
   onRunChatAction,
+  onStartAgent,
   onRunGuardedCheck,
   onRunTerminalCheck,
   onWriteTerminalData,
@@ -450,10 +456,12 @@ function AgentWorkspace({
     localStatusReply,
     onChatTurnsChange,
     onGeneratePlan,
+    onPrepareAgentTask,
     onModelHealthChange,
     onSubmitAgentInteraction,
     onProfileUpdated,
     onRunChatAction,
+    onStartAgent,
     onStopPlan,
     pendingTurn,
     previewChatResult,
@@ -499,6 +507,7 @@ function AgentWorkspace({
 
       <AgentWorkspaceConversationCanvas
         assistantUi={useAssistantUiPoc ? <React.Suspense fallback={<AgentProcessingStatus label="载入对话 POC" running />}><AssistantUiConversationPoc interactions={interactions} isRunning={chatLoading || Boolean(pendingTurn)} onAction={handleAssistantUiAction} onRetryInteraction={onRetryAgentInteraction} onSubmitInteraction={onSubmitAgentInteraction} turns={chatTurns} /></React.Suspense> : null}
+        agentRuns={agentRunsForConversation(agentRuns, activeConversationId, activeTask?.id || activeConversationTaskId)}
         chatLoading={chatLoading}
         chatLoadingEvents={chatLoadingEvents}
         chatLoadingLabel={chatLoadingLabel}
@@ -691,14 +700,36 @@ function App() {
 
   useEffect(() => {
     let active = true;
-    const refresh = () => executionClient.listScheduledAgentRuns().then((runs) => {
-      if (!active) return;
-      const records = Array.isArray(runs) ? runs : [];
-      setAgentRuns(records.filter((run) => !snapshot?.currentProjectId || run.projectId === snapshot.currentProjectId));
-    }).catch(() => { if (active) setAgentRuns([]); });
+    let refreshing = false;
+    let refreshTimer = 0;
+    const refresh = async () => {
+      if (refreshing || !active) return;
+      window.clearTimeout(refreshTimer);
+      refreshTimer = 0;
+      refreshing = true;
+      try {
+        const runs = await executionClient.listScheduledAgentRuns();
+        if (!active) return;
+        const records = (Array.isArray(runs) ? runs : [])
+          .filter((run) => !snapshot?.currentProjectId || run.projectId === snapshot.currentProjectId);
+        setAgentRuns(records);
+        if (records.some(isBackgroundAgentRun)) {
+          refreshTimer = window.setTimeout(refresh, 2000);
+        }
+      } catch {
+        // Keep the last known activity visible. A transient refresh failure must
+        // not make a background task appear to disappear from the conversation.
+      } finally {
+        refreshing = false;
+      }
+    };
     refresh();
     window.addEventListener("omnidesk:agent-runs-changed", refresh);
-    return () => { active = false; window.removeEventListener("omnidesk:agent-runs-changed", refresh); };
+    return () => {
+      active = false;
+      window.clearTimeout(refreshTimer);
+      window.removeEventListener("omnidesk:agent-runs-changed", refresh);
+    };
   }, [snapshot?.currentProjectId, snapshot?.currentProjectPath, source]);
 
   const resumeAgentRun = async (run) => {
@@ -897,7 +928,7 @@ function App() {
     snapshot,
   });
 
-  const { generatePlan, stopPlanGeneration } = usePlanAction({
+  const { generatePlan, prepareAgentTask, stopPlanGeneration } = usePlanAction({
     activeConversationId,
     beginActionFeedback,
     buildLocalPlan: (input) => buildPreviewPlan(input, snapshot),
@@ -911,7 +942,7 @@ function App() {
     setPlanLoading,
   });
 
-  const startTaskAgent = async (task) => {
+  const startTaskAgent = async (task, { previousRun = null } = {}) => {
     const rawRequestId = `task-${task.id}-${Date.now()}`;
     const requestId = rawRequestId.replace(/[^a-zA-Z0-9_-]/g, "-");
     const plan = task.plan || {};
@@ -919,6 +950,9 @@ function App() {
       `继续执行任务：${task.title || plan.task || "未命名任务"}`,
       plan.summary ? `任务摘要：${plan.summary}` : "",
       Array.isArray(plan.steps) && plan.steps.length ? `计划步骤：${plan.steps.join("；")}` : "",
+      previousRun?.checkpoint?.toolResult?.type === "ask_user_result"
+        ? `这是一次重新开始。上一轮已保存用户对追问的回答：${JSON.stringify(previousRun.checkpoint.toolResult.answers)}。请直接使用这些回答继续，不要重复询问同一件事；只有确实出现新的必要信息缺口时，才能再次调用 ask_user。上一轮未完成的原因是请求中断，不代表任务完成。`
+        : "",
       "先读取完成任务所需的最小工程上下文。若缺少会实质影响实现结果的必要参数，调用 ask_user；不要用普通文本猜测。用户回答不代表允许写文件或运行检查。需要写入或检查时分别请求独立审批。",
     ].filter(Boolean).join("\n");
     try {
@@ -928,13 +962,13 @@ function App() {
         showToast(existingRun.status === "awaiting-user-input" ? "等待回答。" : "任务运行中。");
         return true;
       }
-      const result = await executionClient.runAgent(prompt, requestId, 20, "", {
+      const result = await executionClient.startAgent(prompt, requestId, 20, "", {
         conversationId: agentRunConversationId(activeConversationId, task),
         isolate: task?.executionMode === "isolated",
         taskId: task.id,
       });
       await refreshAgentRuns();
-      return ["awaiting-user-input", "awaiting-approval", "succeeded"].includes(result?.status);
+      return ["queued", "running", "awaiting-user-input", "awaiting-approval", "applying", "running-tool", "verifying", "succeeded"].includes(result?.status);
     } catch (error_) {
       const message = error_ instanceof Error ? error_.message : String(error_);
       setError(message);
@@ -949,7 +983,7 @@ function App() {
       showToast("原任务记录不存在，无法重新开始。");
       return false;
     }
-    return startTaskAgent(task);
+    return startTaskAgent(task, { previousRun: run });
   };
 
   const runChatAction = createConversationActionController({
@@ -1022,6 +1056,10 @@ function App() {
     taskStatuses,
     tasks,
   });
+  const startPreparedAgentTask = async (task) => {
+    if (!await startTaskAgent(task)) return false;
+    return await markTaskWaiting(task.id, task) !== false;
+  };
 
   const { executeGuardedCheck, runGuardedCheck } = createExecutionActionController({
     appendTerminalLog,
@@ -1240,10 +1278,12 @@ function App() {
           conversationResetKey={conversationResetKey}
           onChatTurnsChange={updateChatTurns}
           onGeneratePlan={generatePlan}
+          onPrepareAgentTask={prepareAgentTask}
           onGeneratePatchDraft={generatePatchDraft}
           onApplyPatchDraft={applyPatchDraft}
           onMergeHandoff={mergeHandoff}
           onRunChatAction={runChatAction}
+          onStartAgent={startPreparedAgentTask}
           onRunGuardedCheck={runGuardedCheck}
           onRunTerminalCheck={runTerminalCheck}
           onWriteTerminalData={writeTerminalData}

@@ -16,11 +16,11 @@ test("prefers current conversation runs and uses only the latest task fallback",
   assert.deepEqual(agentRunsForConversation([oldRun], "conversation-missing", "task-2"), []);
 });
 
-test("shows only the latest run per task and prevents concurrent Agent starts", () => {
+test("keeps each conversation run visible and prevents concurrent Agent starts", () => {
   const failed = { conversationId: "conversation-1", status: "failed", taskId: "task-1", updatedAt: "2026-07-24T07:33:03Z" };
   const running = { conversationId: "conversation-1", status: "running", taskId: "task-1", updatedAt: "2026-07-24T07:31:47Z" };
   const waiting = { conversationId: "conversation-1", status: "awaiting-user-input", taskId: "task-1", updatedAt: "2026-07-24T07:32:37Z" };
-  assert.deepEqual(agentRunsForConversation([failed, running, waiting], "conversation-1", "task-1"), [waiting]);
+  assert.deepEqual(agentRunsForConversation([failed, running, waiting], "conversation-1", "task-1"), [running, waiting, failed]);
   assert.equal(activeAgentRunForTask([failed, running, waiting], "task-1"), waiting);
   assert.equal(activeAgentRunForTask([failed], "task-1"), null);
 });

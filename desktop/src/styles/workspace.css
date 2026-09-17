@@ -387,6 +387,7 @@ body.isResizingSidebar {
 
 .rightScroll {
   overflow: auto;
+  padding-bottom: calc(var(--desktop-space-panel) + 42px);
 }
 
 .leftRailSection {

@@ -122,7 +122,7 @@ export function AgentTopicPanel({
     cards={cards}
     compact={compact}
     currentTaskDetailProps={{ currentChecks, currentPlan, currentTask, goalTitleForTask, onApplyPatchDraft, onGeneratePatchDraft, onMergeHandoff, onOpenTask: selectTaskInWorkspace, onRunChecks: runChecksForTask, taskStatusLabel }}
-    executionResultsProps={{ agentRuns, failedRunsForTask, failureSummaryForTask, onApproveAgentRun, onCancelAgentRun, onCreateRepairTask, onExportAgentRun, onOpenTask: selectTaskInWorkspace, onResumeAgentRun, onRerunFailedChecks: rerunFailedChecks, recentResultTasks, runnerLoadingId, taskStatuses, taskStatusLabel }}
+    executionResultsProps={{ agentRuns, externalChanges: snapshot?.externalChanges, failedRunsForTask, failureSummaryForTask, onApproveAgentRun, onCancelAgentRun, onCreateRepairTask, onExportAgentRun, onOpenTask: selectTaskInWorkspace, onResumeAgentRun, onRerunFailedChecks: rerunFailedChecks, recentResultTasks, runnerLoadingId, taskStatuses, taskStatusLabel }}
     id={id}
     onOpenCapabilityFile={onOpenCapabilityFile}
     taskBoardProps={{

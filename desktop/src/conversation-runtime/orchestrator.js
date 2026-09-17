@@ -13,7 +13,8 @@ export function resolveConversationCommand({ activeTask, hasAttachments = false,
   }
   if (!pendingAction && decision === "confirm" && activeTask) return { command: conversationCommands.resumeTask, decision, taskId: activeTask.id };
   const actionDecision = conversationActionDecision(message);
-  if (actionDecision?.confirmation === "none") {
+  const needsVisualContextBridge = hasAttachments && actionDecision?.action?.id === "start-agent";
+  if (actionDecision?.confirmation === "none" && !needsVisualContextBridge) {
     return { ...actionDecision, command: conversationCommands.executeAction, decision: "execute" };
   }
   const intent = classifyConversationIntent(message, hasAttachments);

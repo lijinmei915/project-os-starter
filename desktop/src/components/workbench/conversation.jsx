@@ -1,4 +1,5 @@
 import React from "react";
+import { publicErrorMessage } from "../../lib/public-error-message";
 import { cn } from "../../lib/cn";
 import { presentConversationActivity } from "../../conversation-runtime/presentation";
 
@@ -66,7 +67,7 @@ function formatDuration(durationMs) {
   return `${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒`;
 }
 
-export function AgentProcessingStatus({ conversationEvents = [], durationMs = 0, events = [], label = "正在处理", running = false, startedAt }) {
+export function AgentProcessingStatus({ background = false, conversationEvents = [], durationMs = 0, events = [], label = "正在处理", running = false, startedAt, summary = "" }) {
   const [elapsed, setElapsed] = React.useState(durationMs);
   React.useEffect(() => {
     if (!running) {
@@ -78,18 +79,23 @@ export function AgentProcessingStatus({ conversationEvents = [], durationMs = 0,
     const timer = window.setInterval(update, 1000);
     return () => window.clearInterval(timer);
   }, [durationMs, running, startedAt]);
-  const activity = presentConversationActivity({ conversationEvents, events, label, running });
+  const activity = presentConversationActivity({ conversationEvents, events, label, running, summary });
   const failedEvent = events.find((event) => event.status === "failed")
     || conversationEvents.find((event) => event.status === "failed");
   const currentEvent = events.find((event) => event.status === "current")
     || conversationEvents.find((event) => event.status === "running");
   const showDuration = running || (!currentEvent && durationMs > 0);
   return (
-    <details className={`agentProcessingStatus${running ? " running" : ""}${currentEvent ? " current" : ""}${failedEvent ? " failed" : ""}`}>
+    <details className={`agentProcessingStatus${running ? " running" : ""}${currentEvent ? " current" : ""}${failedEvent ? " failed" : ""}`} defaultOpen={running}>
       <summary>
         <span className="agentProcessingIndicator" aria-hidden="true" />
         <strong>{activity.summary}</strong>
         {showDuration ? <time>{formatDuration(elapsed)}</time> : null}
+        {running && background ? <span className="agentProcessingBackgroundLabel">后台运行</span> : null}
+        {(activity.timeline.length || activity.tools.length) ? <>
+          <span className="agentProcessingDetailsLabel agentProcessingDetailsLabel-open">收起详情</span>
+          <span className="agentProcessingDetailsLabel agentProcessingDetailsLabel-closed">查看详情</span>
+        </> : null}
         <span className="agentProcessingChevron" aria-hidden="true" />
       </summary>
       {activity.timeline.length ? (
@@ -103,17 +109,17 @@ export function AgentProcessingStatus({ conversationEvents = [], durationMs = 0,
               <span aria-hidden="true" />
               <div>
                 <strong>{event.label || event.title}</strong>
-                {event.detail ? <p>{event.detail}</p> : null}
+                {event.detail ? <p>{event.status === "failed" ? publicErrorMessage(event.detail) : event.detail}</p> : null}
               </div>
             </div>
           ))}
         </div>
       ) : null}
-      {activity.tools.length ? (
-        <details className="agentToolActivity">
-          <summary>已使用工具 {activity.tools.length}</summary>
-          <ul>{activity.tools.map((tool) => <li key={tool}>{tool}</li>)}</ul>
-        </details>
+      {activity.toolEvents.length ? (
+        <div className="agentToolActivity" aria-label="工具调用">
+          <strong>工具调用</strong>
+          <ul>{activity.toolEvents.map((tool) => <li className={tool.status} key={tool.id}><span aria-hidden="true" /><div><b>{tool.label}</b>{tool.detail ? <p>{tool.detail}</p> : null}</div></li>)}</ul>
+        </div>
       ) : null}
     </details>
   );

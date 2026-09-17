@@ -3,6 +3,7 @@ import { TabsContent } from "../ui/tabs";
 
 export function AgentWorkspaceConversationCanvas({
   assistantUi,
+  agentRuns,
   chatLoading,
   chatLoadingEvents,
   chatLoadingLabel,
@@ -40,6 +41,7 @@ export function AgentWorkspaceConversationCanvas({
           chatLoadingLabel={chatLoadingLabel}
           chatStartedAt={chatStartedAt}
           interactions={interactions}
+          agentRuns={agentRuns}
           conversationId={conversationId}
           conversationState={conversationState}
           error={error}

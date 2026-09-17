@@ -4,7 +4,7 @@ import { modelConversationAttachments, submittedConversationAttachments, withAct
 
 test("normalizes composer attachments for persisted and model request contracts", () => {
   const attachments = submittedConversationAttachments([{ dataUrl: "data:image/png;base64,AA", id: "image-1", name: "shot.png", type: "image/png", url: "blob:1" }]);
-  assert.deepEqual(attachments, [{ dataUrl: "data:image/png;base64,AA", id: "image-1", mimeType: "image/png", name: "shot.png", url: "blob:1" }]);
+  assert.deepEqual(attachments, [{ dataUrl: "data:image/png;base64,AA", id: "image-1", mimeType: "image/png", name: "shot.png" }]);
   assert.deepEqual(modelConversationAttachments(attachments), [{ dataUrl: "data:image/png;base64,AA", mimeType: "image/png", name: "shot.png" }]);
 });
 

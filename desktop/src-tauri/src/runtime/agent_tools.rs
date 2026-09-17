@@ -180,11 +180,24 @@ pub fn search_project(
 /// starts reasoning. It is deliberately not an authorization mechanism: a
 /// model must still call `read_file` before it can request a patch for a file.
 pub fn build_task_context(root: &Path, task_text: &str) -> Result<Value, String> {
-    const MAX_FILES_SCANNED: usize = 300;
-    const MAX_CANDIDATES: usize = 6;
-    const MAX_FILE_BYTES: u64 = 128 * 1024;
-    const MAX_EXCERPT_CHARS: usize = 3_500;
-    const MAX_TOTAL_CHARS: usize = 14_000;
+    build_task_context_with_limits(root, task_text, 300, 6, 128 * 1024, 3_500, 14_000)
+}
+
+/// Risk reviews should start with enough evidence to form a useful answer,
+/// not a broad source dump that makes a simple inspection take minutes.
+pub fn build_risk_review_context(root: &Path, task_text: &str) -> Result<Value, String> {
+    build_task_context_with_limits(root, task_text, 80, 3, 128 * 1024, 1_000, 3_000)
+}
+
+fn build_task_context_with_limits(
+    root: &Path,
+    task_text: &str,
+    max_files_scanned: usize,
+    max_candidates: usize,
+    max_file_bytes: u64,
+    max_excerpt_chars: usize,
+    max_total_chars: usize,
+) -> Result<Value, String> {
 
     let root = canonical_root(root)?;
     let keywords = context_keywords(task_text);
@@ -216,13 +229,13 @@ pub fn build_task_context(root: &Path, task_text: &str) -> Result<Value, String>
             if !canonical.is_file()
                 || canonical
                     .metadata()
-                    .map(|metadata| metadata.len() > MAX_FILE_BYTES)
+                .map(|metadata| metadata.len() > max_file_bytes)
                     .unwrap_or(true)
             {
                 continue;
             }
             scanned += 1;
-            if scanned > MAX_FILES_SCANNED {
+            if scanned > max_files_scanned {
                 break;
             }
             let Ok(content) = fs::read_to_string(&canonical) else {
@@ -232,7 +245,7 @@ pub fn build_task_context(root: &Path, task_text: &str) -> Result<Value, String>
             let score = context_score(&relative, &content, &keywords);
             files.push((canonical, content, score));
         }
-        if scanned > MAX_FILES_SCANNED {
+        if scanned > max_files_scanned {
             break;
         }
     }
@@ -244,29 +257,29 @@ pub fn build_task_context(root: &Path, task_text: &str) -> Result<Value, String>
             .then_with(|| relative_path(&root, &left.0).cmp(&relative_path(&root, &right.0)))
     });
 
-    let mut remaining = MAX_TOTAL_CHARS;
+    let mut remaining = max_total_chars;
     let mut excerpts = Vec::new();
-    for (path, content, score) in files.into_iter().take(MAX_CANDIDATES) {
+    for (path, content, score) in files.into_iter().take(max_candidates) {
         if remaining == 0 {
             break;
         }
         let excerpt = content
             .chars()
-            .take(MAX_EXCERPT_CHARS.min(remaining))
+            .take(max_excerpt_chars.min(remaining))
             .collect::<String>();
         remaining = remaining.saturating_sub(excerpt.chars().count());
         excerpts.push(json!({
             "path": relative_path(&root, &path),
             "score": score,
             "content": excerpt,
-            "truncated": content.chars().count() > MAX_EXCERPT_CHARS,
+            "truncated": content.chars().count() > max_excerpt_chars,
         }));
     }
     Ok(json!({
         "summary": format!("已准备 {} 个候选源码片段", excerpts.len()),
         "keywords": keywords,
-        "filesScanned": scanned.min(MAX_FILES_SCANNED),
-        "truncated": scanned > MAX_FILES_SCANNED,
+        "filesScanned": scanned.min(max_files_scanned),
+        "truncated": scanned > max_files_scanned,
         "excerpts": excerpts,
         "guardrail": "这些只读片段不构成文件写入授权；修改前仍须调用 read_file 并请求独立审批。",
     }))
@@ -408,23 +421,33 @@ fn canonical_root(root: &Path) -> Result<PathBuf, String> {
         .map_err(|err| format!("项目目录不可访问: {}", err))
 }
 
+pub(crate) fn validate_project_relative_path(relative: &str) -> Result<(), String> {
+    let relative = relative.trim();
+    let path = Path::new(relative);
+    if path.is_absolute()
+        || path.components().any(|part| {
+            matches!(
+                part,
+                Component::ParentDir | Component::RootDir | Component::Prefix(_)
+            )
+        })
+    {
+        return Err("工具路径必须位于当前项目内".to_string());
+    }
+    if is_ignored(path) {
+        return Err("工具路径不允许访问".to_string());
+    }
+    Ok(())
+}
+
 fn resolve_path(root: &Path, relative: &str, directory: bool) -> Result<PathBuf, String> {
     let root = canonical_root(root)?;
     let relative = relative.trim();
+    validate_project_relative_path(relative)?;
     let candidate = if relative.is_empty() || relative == "." {
         root.to_path_buf()
     } else {
         let path = Path::new(relative);
-        if path.is_absolute()
-            || path.components().any(|part| {
-                matches!(
-                    part,
-                    Component::ParentDir | Component::RootDir | Component::Prefix(_)
-                )
-            })
-        {
-            return Err("工具路径必须位于当前项目内".to_string());
-        }
         root.join(path)
     };
     let canonical = candidate
@@ -463,7 +486,7 @@ mod tests {
     }
 
     #[test]
-    fn read_tools_hide_both_runtime_state_namespaces() {
+    fn read_tools_hide_runtime_state_and_secret_files() {
         let root = test_root("state-boundary");
         fs::create_dir_all(root.join("src")).unwrap();
         fs::create_dir_all(root.join(".project-os")).unwrap();
@@ -471,6 +494,8 @@ mod tests {
         fs::write(root.join("src/main.rs"), "fn main() {}\n").unwrap();
         fs::write(root.join(".project-os/state.json"), "{}\n").unwrap();
         fs::write(root.join(".omnidesk/data/state.json"), "{}\n").unwrap();
+        fs::write(root.join(".env.local"), "API_KEY=secret\n").unwrap();
+        fs::write(root.join("desktop-provider.json"), "{}\n").unwrap();
 
         let listing = list_files(&root, ".").unwrap();
         let paths = listing["items"]
@@ -482,8 +507,40 @@ mod tests {
         assert!(paths.contains(&"src"), "listed paths: {paths:?}");
         assert!(!paths.iter().any(|path| path.starts_with(".project-os")));
         assert!(!paths.iter().any(|path| path.starts_with(".omnidesk")));
+        assert!(!paths.contains(&".env.local"));
+        assert!(!paths.contains(&"desktop-provider.json"));
         assert!(read_file(&root, ".project-os/state.json", 1, None).is_err());
         assert!(read_file(&root, ".omnidesk/data/state.json", 1, None).is_err());
+        assert!(read_file(&root, ".env.local", 1, None).is_err());
+        assert!(read_file(&root, "desktop-provider.json", 1, None).is_err());
+        assert!(validate_project_relative_path(".env.missing").is_err());
+        assert!(validate_project_relative_path(".omnidesk/missing.json").is_err());
+        assert!(validate_project_relative_path("../outside.rs").is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn risk_review_context_has_a_small_fixed_source_budget() {
+        let root = test_root("risk-review-context");
+        fs::create_dir_all(&root).unwrap();
+        for index in 0..6 {
+            fs::write(
+                root.join(format!("module-{index}.rs")),
+                format!("// risk module {index}\n{}", "x".repeat(2_000)),
+            )
+            .unwrap();
+        }
+        let context = build_risk_review_context(&root, "检查当前项目风险").unwrap();
+        assert!(context["excerpts"].as_array().unwrap().len() <= 3);
+        let chars = context["excerpts"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|excerpt| excerpt["content"].as_str())
+            .map(str::chars)
+            .map(Iterator::count)
+            .sum::<usize>();
+        assert!(chars <= 3_000);
         fs::remove_dir_all(root).unwrap();
     }
 

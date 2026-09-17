@@ -53,6 +53,13 @@ export async function loadPreviewWorkspaceSnapshot(fetchImpl = fetch) {
   const projectProfileFile = await loadPreviewJson("/.omnidesk/data/project-profile.json", null, fetchImpl);
   const projectProfile = previewProjectProfile(projectProfileFile, fallbackSnapshot.projectProfile);
   const workspaceFacts = await loadPreviewJson("/.omnidesk/cache/workspace-facts.json", null, fetchImpl);
+  const externalChanges = await loadPreviewJson("/.omnidesk/data/external-changes.json", {
+    schemaVersion: "omnidesk.external-change-archive.v0.1",
+    status: "none",
+    entryCount: 0,
+    latest: null,
+    entries: [],
+  }, fetchImpl);
   const projectCapabilities = await loadPreviewJson(
     "/.omnidesk/data/project-capabilities.json",
     { capabilities: [] },
@@ -91,6 +98,7 @@ export async function loadPreviewWorkspaceSnapshot(fetchImpl = fetch) {
     goals,
     projectProfile,
     workspaceFacts,
+    externalChanges,
     projectCapabilities,
   };
 }

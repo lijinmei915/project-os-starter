@@ -18,6 +18,8 @@ pub struct WorkspaceWatcherState {
 struct WorkspaceFilesChangedEvent {
     path: String,
     root: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    external_change: Option<crate::runtime::external_changes::ExternalChangeSummary>,
 }
 
 pub fn should_ignore_path(path: &Path) -> bool {
@@ -99,6 +101,7 @@ pub fn start(
     app: AppHandle,
     state: State<WorkspaceWatcherState>,
     root: PathBuf,
+    project_id: String,
 ) -> Result<String, String> {
     let root = root
         .canonicalize()
@@ -139,11 +142,18 @@ pub fn start(
                 .and_then(|path| path.strip_prefix(&emit_root).ok())
                 .map(|path| path.to_string_lossy().replace('\\', "/"))
                 .unwrap_or_else(|| "project".to_string());
+            let external_change = crate::runtime::external_changes::record_workspace_change(
+                &emit_root,
+                &project_id,
+            )
+            .ok()
+            .flatten();
             let _ = emit_app.emit(
                 "workspace://files-changed",
                 WorkspaceFilesChangedEvent {
                     path: relative,
                     root: emit_root_text.clone(),
+                    external_change,
                 },
             );
         },

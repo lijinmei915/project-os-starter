@@ -1,4 +1,5 @@
 import { requestOutcome } from "./request-lifecycle.js";
+import { publicErrorMessage } from "./public-error-message.js";
 
 function isLegacyPlanArgumentsError(error) {
   const message = error instanceof Error ? error.message : String(error);
@@ -27,9 +28,9 @@ export async function executeReadonlyPlanWorkflow({
   requestId,
 } = {}) {
   try {
-    onProgress?.({ label: "读取项目上下文", stage: "context" });
+    onProgress?.({ label: "正在查看项目（只读）", stage: "context" });
     let plan = buildLocalPlan(commandInput);
-    onProgress?.({ label: "生成执行计划", stage: "generate" });
+    onProgress?.({ label: "正在整理只读计划", stage: "generate" });
     if (remote) {
       try {
         plan = await generateRemotePlan({ input: commandInput });
@@ -42,7 +43,7 @@ export async function executeReadonlyPlanWorkflow({
       }
     }
     if (isActive && !isActive()) return requestOutcome("cancelled", "", { requestId });
-    onProgress?.({ label: "保存任务", stage: "persist" });
+    onProgress?.({ label: "正在保存只读计划", stage: "persist" });
     const nextTask = createTask(plan);
     const persistedTask = await persistTask(nextTask, { durable: true });
     const task = persistedTask || nextTask;
@@ -55,7 +56,8 @@ export async function executeReadonlyPlanWorkflow({
     });
   } catch (error) {
     if (isActive && !isActive()) return requestOutcome("cancelled", "", { requestId });
-    const message = error instanceof Error ? error.message : String(error);
+    const rawMessage = error instanceof Error ? error.message : String(error);
+    const message = publicErrorMessage(rawMessage, "计划生成未完成，可以重试。");
     const status = error?.code === "REQUEST_TIMEOUT" ? "timed-out" : "failed";
     return requestOutcome(status, message, {
       error: message,

@@ -33,7 +33,7 @@ export function addConversationConfirmationHandler({
   } else if (pendingAction?.type === "confirm-active-task") {
     handlers["confirm-action"] = async () => {
       if (!await onRunChatAction?.({ id: "confirm-active-task", taskId: pendingAction.taskId })) return false;
-      const nextAction = pendingAction.nextAction || { id: "generate-patch", label: "生成文件改动", taskId: pendingAction.taskId };
+      const nextAction = pendingAction.nextAction || { id: "generate-patch", label: "生成改动草稿", taskId: pendingAction.taskId };
       const targetRequestId = pendingAction.requestId || requestBaseTurns.find((turn) => turn.pendingAction?.id === pendingAction.id)?.requestId;
       const resolvedTurns = requestBaseTurns.map((turn) => turn.pendingAction?.id === pendingAction.id
         ? { ...turn, actions: [], pendingAction: null, resolvedActionId: pendingAction.id }

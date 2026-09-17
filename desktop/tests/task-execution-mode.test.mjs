@@ -1,6 +1,19 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { taskExecutionNextAction } from "../src/lib/task-execution-mode.js";
+import { taskExecutionBoundaries, taskExecutionNextAction } from "../src/lib/task-execution-mode.js";
+
+test("explains the four independently confirmed execution boundaries", () => {
+  assert.deepEqual(taskExecutionBoundaries.map(({ id, label }) => ({ id, label })), [
+    { id: "plan", label: "只读计划" },
+    { id: "draft", label: "改动草稿" },
+    { id: "write", label: "写入文件" },
+    { id: "check", label: "运行检查" },
+  ]);
+  assert.match(taskExecutionBoundaries[0].detail, /不修改文件/);
+  assert.match(taskExecutionBoundaries[1].detail, /仍不修改文件/);
+  assert.match(taskExecutionBoundaries[2].detail, /再次确认/);
+  assert.match(taskExecutionBoundaries[3].detail, /单独确认/);
+});
 
 test("runs checks before drafting a patch for validation-only tasks", () => {
   assert.deepEqual(taskExecutionNextAction({
@@ -30,7 +43,7 @@ test("drafts a patch only when the plan has an engineering change", () => {
   assert.deepEqual(taskExecutionNextAction({
     id: "task-patch",
     plan: { candidateChanges: ["调整 desktop/src/main.jsx 的状态提示"], checks: ["cd desktop && npm run web:build"] },
-  }), { id: "generate-patch", label: "生成文件改动", taskId: "task-patch" });
+  }), { id: "generate-patch", label: "生成改动草稿", taskId: "task-patch" });
 });
 
 test("keeps planning-only tasks out of the patch workflow", () => {

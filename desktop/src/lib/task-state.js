@@ -22,27 +22,15 @@ export function agentRunConversationId(activeConversationId, task = {}) {
 export function agentRunsForConversation(runs = [], activeConversationId, activeTaskId) {
   const conversationId = String(activeConversationId || "");
   const direct = conversationId ? runs.filter((run) => run.conversationId === conversationId) : [];
-  if (direct.length) return latestRunsByTask(direct);
+  // Conversation history is an audit trail. Do not collapse an earlier failed
+  // run once the user starts a new attempt for the same task.
+  if (direct.length) return direct.sort((left, right) => String(left.createdAt || left.updatedAt || "").localeCompare(String(right.createdAt || right.updatedAt || "")));
   const taskId = String(activeTaskId || "");
   if (!taskId) return [];
   const fallback = runs
     .filter((run) => run.taskId === taskId)
     .sort((left, right) => String(right.updatedAt || right.createdAt || "").localeCompare(String(left.updatedAt || left.createdAt || "")));
   return fallback.length ? [fallback[0]] : [];
-}
-
-function latestRunsByTask(runs) {
-  const latest = new Map();
-  for (const run of runs) {
-    const key = String(run.taskId || run.id || "");
-    const current = latest.get(key);
-    const timestamp = String(run.updatedAt || run.createdAt || "");
-    const currentTimestamp = String(current?.updatedAt || current?.createdAt || "");
-    const active = isActiveAgentRun(run.status);
-    const currentActive = isActiveAgentRun(current?.status);
-    if (!current || (active && !currentActive) || (active === currentActive && timestamp.localeCompare(currentTimestamp) > 0)) latest.set(key, run);
-  }
-  return [...latest.values()];
 }
 
 const isActiveAgentRun = (status) => /^(awaiting-approval|awaiting-user-input|interrupted|queued|running)$/.test(status);

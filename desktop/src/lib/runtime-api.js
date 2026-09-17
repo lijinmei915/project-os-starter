@@ -32,7 +32,7 @@ export async function invokePreviewCommand(command, payload) {
   if (command === "open_native_terminal") {
     throw new Error("浏览器预览不能打开系统终端，请在桌面 App 窗口里使用。");
   }
-  if (["run_agent", "run_hermes_agent"].includes(command)) {
+  if (["run_agent", "run_hermes_agent", "start_agent_run"].includes(command)) {
     throw new Error("浏览器预览不能运行 Agent，请在桌面 App 窗口里使用。");
   }
   if (command === "resume_agent_run") {

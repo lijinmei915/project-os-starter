@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import { executeReadonlyPlanWorkflow } from "../../lib/plan-executor";
+import { buildDirectAgentTaskPlan, prepareDirectAgentTask } from "../../lib/direct-agent-task";
 import { taskTitleForPlan } from "../../lib/task-record-factory";
 
 /** React lifecycle wrapper for the shared read-only plan workflow. */
@@ -55,6 +56,35 @@ export function usePlanAction({
       }
     }
   };
+  const prepareAgentTask = async (request) => {
+    const input = typeof request === "string" ? { task: request, attachments: [] } : request;
+    const requestId = input.requestId || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    activeRequestRef.current = requestId;
+    setPlanError("");
+    setPlanLoading(true);
+    try {
+      return await prepareDirectAgentTask({
+        commandInput: input,
+        createTask: (commandInput) => {
+          const plan = buildDirectAgentTaskPlan(commandInput);
+          return createTaskFromPlan(plan, taskTitleForPlan(commandInput.displayTask, commandInput.task, plan), {
+            conversationId: commandInput.conversationId || activeConversationId,
+            origin: "agent-direct",
+            requestId,
+            startedAt: commandInput.startedAt,
+          });
+        },
+        isActive: () => activeRequestRef.current === requestId,
+        persistTask,
+        requestId,
+      });
+    } finally {
+      if (activeRequestRef.current === requestId) {
+        activeRequestRef.current = null;
+        setPlanLoading(false);
+      }
+    }
+  };
   const stopPlanGeneration = () => {
     const requestId = activeRequestRef.current;
     if (requestId) finishActionFeedback(`generate-plan-${requestId}`, "success", "已停止当前处理。");
@@ -62,5 +92,5 @@ export function usePlanAction({
     setPlanLoading(false);
     void cancelRuntimeRequest?.(requestId);
   };
-  return { generatePlan, stopPlanGeneration };
+  return { generatePlan, prepareAgentTask, stopPlanGeneration };
 }

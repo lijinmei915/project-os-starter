@@ -1,19 +1,12 @@
 import { FileText } from "lucide-react";
 import { conversationTextForDisplay } from "../../conversation-runtime";
-import { conversationReadonlyPlanTaskId, conversationTranscriptItems, projectConversationAgentEvents } from "../../lib/conversation-agent-events";
+import { agentRunActivityPresentation, agentRunForTurn, conversationReadonlyPlanTaskId, conversationTranscriptItems, hasActiveAgentRun, projectConversationAgentEvents, shouldShowConversationAgentTimeline } from "../../lib/conversation-agent-events";
+import { publicErrorMessage } from "../../lib/public-error-message";
 import { conversationTurnWorkflowState, workflowStatePresentation, workflowStates } from "../../lib/workflow-state";
 import { Badge } from "../ui/badge";
 import { PatchDraft, ReadonlyPlan } from "./plan-views";
 import { AgentProcessingStatus, Conversation, ConversationMessage } from "./conversation";
 import { AgentUserFormCard } from "./agent-user-form-card";
-
-function shouldShowAgentTimeline(turn, interactions) {
-  const events = projectConversationAgentEvents(turn, interactions);
-  return Boolean(
-    events.length
-    && (turn.intent === "task" || turn.workflow?.length || events.some((event) => ["current", "failed"].includes(event.status)))
-  );
-}
 
 function referenceSignature(references = []) {
   return references.map((reference) => `${reference.kind}:${reference.target}`).sort().join("|");
@@ -45,8 +38,7 @@ function Attachments({ attachments }) {
     <div className="conversationAttachmentGrid">
       {attachments.map((attachment) => (
         <figure className="conversationAttachment" key={attachment.id}>
-          <img src={attachment.url} alt={attachment.name} />
-          <figcaption>{attachment.name}</figcaption>
+          <img src={attachment.dataUrl || attachment.url} alt={attachment.name || "对话图片"} />
         </figure>
       ))}
     </div>
@@ -59,6 +51,7 @@ export function ConversationTranscript({
   chatLoadingLabel,
   chatStartedAt,
   interactions = [],
+  agentRuns = [],
   conversationId,
   conversationState,
   error,
@@ -82,13 +75,36 @@ export function ConversationTranscript({
         const turn = item.turn;
         const turnIndex = turns.indexOf(turn);
         const readonlyPlanTaskId = conversationReadonlyPlanTaskId(turn);
+        const activeAgentRun = hasActiveAgentRun(turn, interactions);
+        const run = agentRunForTurn(turn, agentRuns);
+        const hasRunInteraction = run && interactions.some(({ run: interactionRun }) => interactionRun?.id === run.id);
+        const activity = run ? agentRunActivityPresentation(run) : null;
         return <ConversationMessage key={item.key} role={turn.role}>
-        {shouldShowAgentTimeline(turn, interactions) ? (
+        {run && !hasRunInteraction ? (
+          <AgentProcessingStatus
+            background
+            conversationEvents={activity.conversationEvents}
+            durationMs={activity.durationMs}
+            events={activity.events}
+            label={activity.label}
+            running={!['failed', 'interrupted', 'succeeded', 'cancelled'].includes(run.status)}
+            startedAt={run.createdAt ? Date.parse(run.createdAt) : undefined}
+            summary={activity.summary}
+          />
+        ) : shouldShowConversationAgentTimeline(turn, interactions) ? (
           <AgentProcessingStatus conversationEvents={turn.conversationEvents} durationMs={turn.durationMs} events={projectConversationAgentEvents(turn, interactions)} />
         ) : null}
           {readonlyPlanTaskId ? (() => {
             const task = tasks.find((item) => item.id === readonlyPlanTaskId);
-            return task?.plan ? <ReadonlyPlan className="conversationReadonlyPlan" plan={task.plan} statusLabel={turn.pendingAction ? "计划待确认" : "已确认"} /> : null;
+            return task?.plan ? <ReadonlyPlan
+              className="conversationReadonlyPlan"
+              decisionActions={turn.actions}
+              onDecisionAction={(action) => onTurnAction?.(action, turn)}
+              onSelectRecommendation={(recommendation) => onTurnAction?.({ id: "generate-plan", task: recommendation.title }, turn)}
+              plan={task.plan}
+              statusLabel={turn.pendingAction ? "计划待确认" : "已确认"}
+              variant="conversation"
+            /> : null;
           })() : null}
           {turn.stageGoal ? (
             <section className="conversationGoal" aria-label={turn.intent === "stage-goal-created" ? "已登记阶段目标" : "阶段目标候选"}>
@@ -103,16 +119,16 @@ export function ConversationTranscript({
               </dl>
               {turn.intent === "stage-goal-candidate" ? <p>确认前不会写入目标，也不会创建任务或开始执行。</p> : null}
             </section>
-          ) : <div>{conversationTextForDisplay(displayText(turn.text))}</div>}
-          <TaskOutcome task={tasks.find((task) => task.id === turn.taskId)} turn={turn} />
+          ) : readonlyPlanTaskId ? null : <div>{conversationTextForDisplay(displayText(turn.text))}</div>}
+          {!activeAgentRun ? <TaskOutcome task={tasks.find((task) => task.id === turn.taskId)} turn={turn} /> : null}
           {turn.pendingAction?.type === "apply-patch" ? (
             <PatchDraft className="conversationPatchDraft" draft={tasks.find((task) => task.id === turn.pendingAction.taskId)?.patchDraft} />
           ) : null}
-          {turn.diagnostic ? (
+          {turn.diagnostic && !activeAgentRun ? (
             <div className="conversationDiagnostic">
               <span>{turn.diagnostic.label}</span>
               <p>{turn.diagnostic.message}</p>
-              {turn.diagnostic.detail ? <details><summary>Details</summary><code>{turn.diagnostic.detail}</code></details> : null}
+              {turn.diagnostic.detail ? <details><summary>失败原因</summary><code>{publicErrorMessage(turn.diagnostic.detail)}</code></details> : null}
             </div>
           ) : null}
           {turn.references?.length && referenceSignature(turn.references) !== previousAssistantReferenceSignature(turns, turnIndex) ? (
@@ -128,7 +144,7 @@ export function ConversationTranscript({
               </div>
             </details>
           ) : null}
-          {turn.actions?.length ? (
+          {turn.actions?.length && !readonlyPlanTaskId ? (
             <div className="conversationActions">
               {turn.actions.map((action) => (
                 <button key={action.id} type="button" onClick={() => onTurnAction?.(action, turn)}>{action.label}</button>
@@ -145,12 +161,6 @@ export function ConversationTranscript({
         </ConversationMessage>
       ) : null}
 
-      {streamingReply ? (
-        <ConversationMessage className="conversationMessage-streaming" role="assistant">
-          <div>{conversationTextForDisplay(streamingReply)}<span className="conversationStreamCursor" aria-label="正在生成" /></div>
-        </ConversationMessage>
-      ) : null}
-
       {pendingTurn || chatLoading ? (
         <>
           {pendingTurn && pendingTurn.showUser !== false ? (
@@ -159,15 +169,19 @@ export function ConversationTranscript({
               <Attachments attachments={pendingTurn.attachments} />
             </ConversationMessage>
           ) : null}
-          {!streamingReply ? (
-            <AgentProcessingStatus
-              events={pendingTurn?.events || chatLoadingEvents}
-              label={pendingTurn?.label || chatLoadingLabel}
-              running
-              startedAt={pendingTurn?.startedAt || chatStartedAt}
-            />
-          ) : null}
+          <AgentProcessingStatus
+            events={pendingTurn?.events || chatLoadingEvents}
+            label={pendingTurn?.label || chatLoadingLabel}
+            running
+            startedAt={pendingTurn?.startedAt || chatStartedAt}
+          />
         </>
+      ) : null}
+
+      {streamingReply ? (
+        <ConversationMessage className="conversationMessage-streaming" role="assistant">
+          <div>{conversationTextForDisplay(streamingReply)}<span className="conversationStreamCursor" aria-label="正在生成" /></div>
+        </ConversationMessage>
       ) : null}
     </Conversation>
   );

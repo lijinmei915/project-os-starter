@@ -1,5 +1,5 @@
 use crate::runtime::agent_executor::{
-    default_agent_executor, AgentExecutionMode, AgentExecutionRequest,
+    default_agent_executor, AgentExecutionMode, AgentExecutionPurpose, AgentExecutionRequest,
 };
 use crate::runtime::patch::{
     files_from_unified_diff, files_with_substantive_changes, normalize_hermes_unified_diff,
@@ -298,17 +298,21 @@ pub async fn generate_hermes_draft(
     let root = root.to_path_buf();
     let api_base = provider.api_base.clone();
     let api_key_env = provider.api_key_env.clone();
+    let model = provider.model.clone();
     let executor = default_agent_executor();
     let result = tauri::async_runtime::spawn_blocking(move || {
         executor.execute(AgentExecutionRequest {
             mode: AgentExecutionMode::Start,
+            purpose: AgentExecutionPurpose::GovernedTask,
             root,
             api_key,
             api_base,
             api_key_env,
+            model,
             prompt,
             max_steps: 20,
             cancellation,
+            event_sink: None,
         })
     })
     .await

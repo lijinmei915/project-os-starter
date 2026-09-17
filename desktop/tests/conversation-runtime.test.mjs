@@ -22,12 +22,12 @@ test("decides a safe check action before the generic task route", () => {
   assert.equal(guardedCheckCapability("runtime").command, "npm --prefix desktop test");
 });
 
-test("routes explicit modifications to a read-only patch draft", () => {
+test("routes explicit project modifications directly to the selected Agent", () => {
   assert.deepEqual(conversationActionDecision("请把按钮文案改成保存"), {
-    action: { id: "generate-patch", task: "请把按钮文案改成保存" },
+    action: { id: "start-agent", task: "请把按钮文案改成保存" },
     confirmation: "none",
     mode: "execute",
-    risk: "read-only-draft",
+    risk: "read-only-agent",
   });
   assert.deepEqual(conversationActionDecision("帮我制定修改方案"), {
     action: { id: "generate-plan", task: "帮我制定修改方案" },
@@ -36,6 +36,44 @@ test("routes explicit modifications to a read-only patch draft", () => {
     risk: "read-only",
   });
   assert.equal(conversationActionDecision("当前有什么检查问题"), null);
+});
+
+test("routes explicit project inspection to the Agent while keeping explanatory risk questions in chat", () => {
+  assert.deepEqual(conversationActionDecision("检查当前项目还有哪些风险"), {
+    action: { id: "start-agent", task: "检查当前项目还有哪些风险" },
+    confirmation: "none",
+    mode: "execute",
+    risk: "read-only-agent",
+  });
+  assert.deepEqual(conversationActionDecision("审查当前改动"), {
+    action: { id: "start-agent", task: "审查当前改动" },
+    confirmation: "none",
+    mode: "execute",
+    risk: "read-only-agent",
+  });
+  assert.deepEqual(conversationActionDecision("分析这个模块并给出方案"), {
+    action: { id: "start-agent", task: "分析这个模块并给出方案" },
+    confirmation: "none",
+    mode: "execute",
+    risk: "read-only-agent",
+  });
+  assert.equal(conversationActionDecision("这个方案有什么风险"), null);
+});
+
+test("routes explicit no-write analysis directly to readonly planning", () => {
+  assert.deepEqual(conversationActionDecision("帮我检查当前项目的对话发送为什么慢，只做分析，不要改文件。"), {
+    action: { id: "generate-plan", task: "帮我检查当前项目的对话发送为什么慢，只做分析，不要改文件。" },
+    confirmation: "none",
+    mode: "execute",
+    risk: "read-only",
+  });
+});
+
+test("keeps image engineering requests on the governed visual-context bridge", () => {
+  const command = resolveConversationCommand({ hasAttachments: true, message: "根据截图修复这个页面" });
+  assert.equal(command.command, conversationCommands.startPlan);
+  assert.equal(command.intent, "task");
+  assert.equal(command.action, undefined);
 });
 
 test("does not execute an incomplete modification intent", () => {
@@ -244,7 +282,7 @@ test("projects conversation action fields for the next governed step", () => {
 
 test("keeps one stable timeline and advances the prior current step", () => {
   const events = mergeExecutionEvents([
-    { id: "understand", label: "理解请求", status: "done" },
+    { id: "understand", label: "了解你的要求", status: "done" },
     { id: "confirmation", label: "等待确认", status: "current" },
   ], [
     { id: "execution-ready", label: "等待生成改动", status: "current" },
@@ -400,7 +438,7 @@ test("projects a generated plan through the runtime executor", async () => {
     adapters: {
       generatePlan: async (input) => {
         planInput = input;
-        input.onProgress({ label: "保存任务", stage: "persist" });
+        input.onProgress({ label: "正在保存只读计划", stage: "persist" });
         return { status: "succeeded", task: { id: "task-1" }, taskId: "task-1" };
       },
     },
@@ -419,7 +457,7 @@ test("projects a generated plan through the runtime executor", async () => {
   assert.equal(result.turn.pendingAction.type, "confirm-active-task");
   assert.equal(result.turn.actions[0].taskId, "task-1");
   assert.equal(result.turn.taskId, "task-1");
-  assert.equal(progress.at(-1).label, "保存任务");
+  assert.equal(progress.at(-1).label, "正在保存只读计划");
   assert.equal(planInput.conversationId, "conversation-1");
   assert.equal(planInput.displayTask, "当前主题");
   assert.equal(planInput.attachments[0].name, "screen.png");
@@ -489,7 +527,8 @@ test("starts Hermes directly when an engineering request needs a user decision",
   const result = await executeConversationActionRequest({
     action: { id: "start-agent", task: "先用表单询问我" },
     adapters: {
-      generatePlan: async () => ({ status: "succeeded", task, taskId: task.id }),
+      generatePlan: async () => { throw new Error("direct Agent entry must not call the Provider planner"); },
+      prepareAgentTask: async () => ({ status: "succeeded", task, taskId: task.id }),
       startAgent: async ({ task: nextTask }) => {
         startedTask = nextTask;
         return true;
@@ -501,9 +540,10 @@ test("starts Hermes directly when an engineering request needs a user decision",
   assert.equal(startedTask, task);
   assert.equal(result.requestStatus, "succeeded");
   assert.equal(result.turn.taskId, task.id);
+  assert.equal(result.turn.outcome, "running");
   assert.match(result.turn.text, /Agent 已开始处理/);
   assert.match(result.turn.text, /当前不会自动写入文件/);
-  assert.equal(result.turn.events.at(-1).label, "Agent 已启动");
+  assert.equal(result.turn.events.at(-1).label, "Agent 正在处理");
 });
 
 test("requires confirmation for an applicable patch in the runtime executor", async () => {

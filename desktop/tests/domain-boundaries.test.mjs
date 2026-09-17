@@ -477,6 +477,7 @@ test("keeps the app status bar as a stateless workbench surface", () => {
 test("keeps the Provider form surface outside App while preserving the Provider client boundary", () => {
   const workbench = source("src/main.jsx");
   const providerPanel = source("src/components/workbench/provider-panel.jsx");
+  const settings = source("src/components/provider/provider-connection-settings.jsx");
   assert.equal(workbench.includes("function ProviderPanel"), false);
   assert.match(
     workbench,
@@ -486,6 +487,18 @@ test("keeps the Provider form surface outside App while preserving the Provider 
   assert.match(providerPanel, /providerClient\.probeProviderModels/);
   assert.match(providerPanel, /providerClient\.testProviderModel/);
   assert.equal(providerPanel.includes("runtime-api"), false);
+  assert.match(providerPanel, /<ProviderConnectionSettings/);
+  assert.match(settings, /export function ProviderConnectionSettings/);
+  assert.equal(settings.includes("provider-client"), false);
+  assert.equal(settings.includes("runtime-api"), false);
+  assert.equal(settings.includes("OMNIDESK"), false);
+  assert.equal(settings.includes("\.omnidesk"), false);
+  assert.equal(settings.includes("tauri"), false);
+  assert.match(settings, /onSaveProfile/);
+  assert.match(settings, /onSaveSecret/);
+  assert.match(settings, /onProbeModels/);
+  assert.match(settings, /onTestModel/);
+  assert.match(settings, /secretReferenceForProfile/);
 });
 
 test("keeps Provider persistence feedback outside App", () => {
@@ -1300,6 +1313,23 @@ test("keeps request progress in the conversation surface instead of duplicate gl
   assert.equal(chatDock.includes("输入“停止”可取消"), false);
 });
 
+test("keeps plan content in the transcript and reserves the card for the decision", () => {
+  const planViews = source("src/components/workbench/plan-views.jsx");
+  const transcript = source("src/components/workbench/conversation-transcript.jsx");
+  const pendingSection = transcript.slice(transcript.indexOf("{pendingTurn || chatLoading ?"));
+  const userMessage = pendingSection.indexOf('<ConversationMessage role="user">');
+  const progress = pendingSection.indexOf("<AgentProcessingStatus");
+  const stream = pendingSection.indexOf('className="conversationMessage-streaming"');
+
+  assert.match(planViews, /variant === "conversation"/);
+  assert.match(planViews, /className="conversationPlanNarrative"/);
+  assert.match(planViews, /className="conversationPlanDecision"/);
+  assert.match(planViews, /decisionActions\.map/);
+  assert.match(transcript, /decisionActions=\{turn\.actions\}/);
+  assert.match(transcript, /turn\.actions\?\.length && !readonlyPlanTaskId/);
+  assert.ok(userMessage >= 0 && progress > userMessage && stream > progress);
+});
+
 test("shows a submitted message before loading optional project memory", () => {
   const submission = source(
     "src/components/workbench/use-conversation-submission.js",
@@ -1539,13 +1569,28 @@ test("keeps pure chat routing outside the Tauri command assembly", () => {
 test("keeps Provider chat transport and SSE result normalization outside Tauri commands", () => {
   const app = source("src-tauri/src/runtime/app.rs");
   const stream = source("src-tauri/src/runtime/chat_stream.rs");
+  const core = source("src-tauri/src/runtime/provider_core.rs");
   assert.doesNotMatch(app, /async fn generate_provider_chat\(/);
   assert.doesNotMatch(app, /consume_openai_sse_deltas/);
   assert.doesNotMatch(app, /streaming_reply_prefix/);
   assert.match(app, /generate_provider_chat, should_retry_provider_chat, ChatStreamError/);
   assert.match(stream, /pub async fn generate_provider_chat/);
   assert.match(stream, /post_streaming_chat_completion/);
+  assert.match(stream, /use crate::runtime::provider_core/);
+  assert.match(core, /pub fn consume_openai_sse/);
   assert.match(stream, /FnMut\(String, usize\)/);
+});
+
+test("keeps reusable Provider Core independent from OmniDesk governance and persistence", () => {
+  const core = source("src-tauri/src/runtime/provider_core.rs");
+  assert.match(core, /pub fn chat_completions_endpoint/);
+  assert.match(core, /pub fn models_endpoint/);
+  assert.match(core, /pub fn classify_failure/);
+  assert.match(core, /pub fn should_retry/);
+  assert.match(core, /pub fn consume_openai_sse/);
+  assert.doesNotMatch(core, /runtime::(tasks|agent_runs|execution|patch|repository|state_namespace)/);
+  assert.doesNotMatch(core, /\.omnidesk|approval|task_id|project_name|Tauri|tauri/);
+  assert.doesNotMatch(core, /read_secret|api_key_env|Repository/);
 });
 
 test("keeps native Provider Function Calling behind one capability owner", () => {
@@ -1664,8 +1709,20 @@ test("keeps read-only planning outside the Tauri command assembly", () => {
   assert.match(planning, /pub async fn generate_plan/);
   assert.match(planning, /pub async fn generate_provider_plan/);
   assert.match(planning, /prepare_for_request\(/);
-  assert.match(planning, /PROVIDER_FALLBACK/);
+  assert.match(planning, /purpose: AgentExecutionPurpose::ReadonlyPlan/);
+  assert.match(planning, /event_sink: Some\(event_sink\)/);
+  assert.doesNotMatch(planning, /PROVIDER_FALLBACK/);
   assert.match(planning, /#\[cfg\(test\)\]/);
+});
+
+test("persists and renders real read-only planning events", () => {
+  const planning = source("src-tauri/src/runtime/planning.rs");
+  const planView = source("src/components/workbench/plan-views.jsx");
+  const requestState = source("src/components/workbench/use-conversation-request-state.js");
+  assert.match(planning, /pub agent_events: Vec<Value>/);
+  assert.match(planView, /实际查看记录/);
+  assert.match(requestState, /plan\.tool-requested/);
+  assert.match(requestState, /plan\.tool-completed/);
 });
 
 test("keeps image attachment input limits in the planning domain", () => {
@@ -1676,7 +1733,9 @@ test("keeps image attachment input limits in the planning domain", () => {
   assert.equal(app.includes("4_000_000"), false);
   assert.match(planning, /pub fn sanitize_image_attachments/);
   assert.match(planning, /const MAX_IMAGE_ATTACHMENTS: usize = 4/);
-  assert.match(planning, /const MAX_IMAGE_DATA_URL_BYTES: usize = 4_000_000/);
+  assert.match(planning, /const MAX_IMAGE_DATA_URL_BYTES: usize = 5_700_000/);
+  assert.match(planning, /image_bytes_match_mime/);
+  assert.match(app, /attachments\.len\(\) != submitted_attachment_count/);
 });
 
 test("keeps the complete governed Patch Draft lifecycle in the Patch domain", () => {
@@ -1836,11 +1895,25 @@ test("keeps Workspace file watching outside the Tauri command assembly", () => {
   assert.doesNotMatch(app, /struct WorkspaceWatcherState/);
   assert.doesNotMatch(app, /fn should_ignore_watch_path\(/);
   assert.doesNotMatch(app, /fn watch_event_should_refresh\(/);
-  assert.match(app, /workspace_watcher::start\(app, state, PathBuf::from\(&current_project.path\)\)/);
+  assert.match(app, /workspace_watcher::start\(\s*app,\s*state,\s*PathBuf::from\(&current_project.path\),\s*current_project.id,\s*\)/);
   assert.match(watcher, /pub struct WorkspaceWatcherState/);
   assert.match(watcher, /pub fn should_ignore_path/);
   assert.match(watcher, /pub fn event_should_refresh/);
   assert.match(watcher, /workspace:\/\/files-changed/);
+});
+
+test("archives external workspace changes without putting them in the approval state machine", () => {
+  const archive = source("src-tauri/src/runtime/external_changes.rs");
+  const panel = source("src/components/workbench/external-change-archive.jsx");
+  const topic = source("src/components/workbench/agent-topic-panel.jsx");
+  assert.match(archive, /archived-unverified/);
+  assert.match(archive, /approval_required: false/);
+  assert.match(archive, /verification_status: "unverified"/);
+  assert.doesNotMatch(archive, /create_approval|approve_agent_run|run_guarded_check/);
+  assert.match(panel, /外部工作归档/);
+  assert.match(panel, /不需要审批/);
+  assert.match(panel, /已归档，尚未验证/);
+  assert.match(topic, /externalChanges: snapshot\?\.externalChanges/);
 });
 
 test("keeps Agent read-tool argument validation and dispatch in the Agent Tools domain", () => {

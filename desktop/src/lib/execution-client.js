@@ -77,6 +77,21 @@ export function runAgent(prompt, requestId = "", maxSteps = 20, approvalToken = 
   });
 }
 
+export function startAgent(prompt, requestId = "", maxSteps = 20, approvalToken = "", context = {}) {
+  return invokeRuntimeCommand("start_agent_run", {
+    input: {
+      approvalToken,
+      conversationId: String(context?.conversationId || ""),
+      maxSteps,
+      isolate: Boolean(context?.isolate),
+      executorId: String(context?.executorId || ""),
+      prompt,
+      requestId,
+      taskId: String(context?.taskId || ""),
+    },
+  });
+}
+
 export function listAgentExecutorStatuses() {
   return invokeRuntimeCommand("list_agent_executor_statuses", {});
 }

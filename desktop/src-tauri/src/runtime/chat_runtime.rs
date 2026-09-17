@@ -1,15 +1,15 @@
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter};
 use tokio_util::sync::CancellationToken;
 
 /// Tracks only active network requests. Durable conversation and task state belongs to
 /// their own Runtime services, so cancelling a request never discards user history.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct RuntimeRequestState {
-    requests: Mutex<HashMap<String, CancellationToken>>,
+    requests: Arc<Mutex<HashMap<String, CancellationToken>>>,
 }
 
 pub struct RuntimeRequestLease<'a> {

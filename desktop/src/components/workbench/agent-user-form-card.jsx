@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
-import { agentInteractionPresentation } from "../../lib/conversation-agent-events";
+import { agentInteractionPresentation, agentRunActivityPresentation } from "../../lib/conversation-agent-events";
 import { agentRunWorkflowState, workflowStateIsFailure } from "../../lib/workflow-state";
+import { AgentProcessingStatus } from "./conversation";
 import { Button } from "../ui/button";
 import { Field } from "../ui/field";
 import { Input } from "../ui/input";
@@ -17,6 +18,7 @@ export function AgentUserFormCard({ interaction, onRetry, onSubmit, run = {} }) 
   const [retrying, setRetrying] = useState(false);
   const submitted = interaction?.status === "submitted";
   const presentation = agentInteractionPresentation(interaction, { ...run, workflowFailed: workflowStateIsFailure(agentRunWorkflowState(run)) });
+  const activity = agentRunActivityPresentation(run);
   const submit = async (action) => {
     if (submitted || saving) return;
     if (action === "submit") {
@@ -42,7 +44,8 @@ export function AgentUserFormCard({ interaction, onRetry, onSubmit, run = {} }) 
       <section className={`conversationUserForm conversationUserForm-collapsed conversationUserForm-${presentation.tone}`} aria-label={interaction?.title || "已处理的确认"}>
         <header><strong>{interaction?.title || "需要确认"}</strong><span>{presentation.label}</span></header>
         <p className="conversationUserFormSummary">{presentation.summary}</p>
-        {presentation.tone === "failed" ? <footer><Button disabled={retrying} onClick={retry} size="sm" type="button" variant="outline">{retrying ? "正在重新开始" : "重新开始"}</Button>{presentation.detail ? <details className="conversationUserFormDetails"><summary>查看详情</summary><code>{presentation.detail}</code></details> : null}</footer> : null}
+        {submitted ? <AgentProcessingStatus conversationEvents={activity.conversationEvents} durationMs={activity.durationMs} events={activity.events} label={activity.label} summary={activity.summary} /> : null}
+        {presentation.tone === "failed" ? <footer><Button disabled={retrying} onClick={retry} size="sm" type="button" variant="outline">{retrying ? "正在重新开始" : "重新开始并保留选择"}</Button>{presentation.detail && !activity.events.length ? <details className="conversationUserFormDetails"><summary>查看失败原因</summary><span>{presentation.detail}</span></details> : null}</footer> : null}
       </section>
     );
   }

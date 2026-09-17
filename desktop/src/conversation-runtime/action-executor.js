@@ -6,19 +6,19 @@ import { patchDraftResultState } from "../lib/patch-draft-state.js";
 const terminalStatuses = new Set(["cancelled", "failed", "succeeded", "timed-out"]);
 
 const planProgressStages = [
-  { currentDetail: "正在识别当前请求和需要完成的动作。", doneDetail: "已识别为需要进入受控开发流程的任务。", id: "understand", label: "理解请求" },
-  { currentDetail: "正在读取项目状态、目标和任务记录。", doneDetail: "已使用项目状态、目标和任务记录。", id: "context", label: "读取项目上下文" },
-  { currentDetail: "正在把请求整理为可执行步骤和检查项。", doneDetail: "已生成执行步骤、影响范围和验证方式。", id: "generate", label: "生成执行计划" },
-  { currentDetail: "正在持久化任务和请求追踪信息。", doneDetail: "计划已保存为本地任务。", id: "persist", label: "保存任务" },
-  { currentDetail: "确认后进入改动和验证链路。", doneDetail: "已确认执行计划。", id: "confirmation", label: "计划待确认" },
+  { currentDetail: "正在确认你希望完成什么。", doneDetail: "已经了解你的要求。", id: "understand", label: "了解你的要求" },
+  { currentDetail: "正在只读查看项目状态和相关文件。", doneDetail: "已查看完成计划所需的项目信息，没有修改文件。", id: "context", label: "查看项目（只读）" },
+  { currentDetail: "正在整理步骤、影响范围和验收方式。", doneDetail: "只读计划已经生成，没有修改文件。", id: "generate", label: "整理只读计划" },
+  { currentDetail: "正在保存计划，方便确认后继续。", doneDetail: "只读计划已保存。", id: "persist", label: "保存只读计划" },
+  { currentDetail: "等你决定是否生成改动草稿。", doneDetail: "你已确认生成改动草稿；写入文件仍需再次确认。", id: "confirmation", label: "等你确认下一步" },
 ];
 
 const changeDraftStages = [
-  { id: "context", label: "读取项目上下文" },
-  { id: "generate", label: "生成执行计划" },
-  { id: "persist", label: "保存任务" },
-  { id: "patch", label: "生成改动草稿" },
-  { id: "review", label: "等待确认应用" },
+  { id: "context", label: "查看项目（只读）" },
+  { id: "generate", label: "整理只读计划" },
+  { id: "persist", label: "保存只读计划" },
+  { id: "patch", label: "生成改动草稿（未写入）" },
+  { id: "review", label: "等你确认写入文件" },
 ];
 
 export function planProgressEvents(currentStage, detail = "", currentStatus = "current") {
@@ -45,7 +45,14 @@ export function completedPlanAgentEvents() {
 export function executionReadyAgentEvents() {
   return [
     { detail: "已确认把这个目标交给 Agent 处理。", id: "confirmation", label: "任务已确认", status: "done" },
-    { detail: "Agent 正在读取项目并判断下一步；当前尚未改动文件。", id: "execution-ready", label: "Agent 已启动", status: "current" },
+    { detail: "Agent 正在只读查看项目并判断下一步；当前没有修改文件。", id: "execution-ready", label: "Agent 正在处理", status: "current" },
+  ];
+}
+
+function directAgentExecutionEvents() {
+  return [
+    { detail: "任务目标和授权边界已保存。", id: "register-task", label: "任务已登记", status: "done" },
+    { detail: "Agent 正在读取项目并处理目标；当前没有修改文件。", id: "execution-ready", label: "Agent 正在处理", status: "current" },
   ];
 }
 
@@ -120,7 +127,7 @@ function turnBase(context, suffix, now) {
 }
 
 async function executePlanAction(action, adapters, context, emitProgress, now) {
-  emitProgress({ events: planProgressEvents("context"), label: "读取项目上下文" });
+  emitProgress({ events: planProgressEvents("context"), label: "正在查看项目（只读）" });
   const outcome = await adapters.generatePlan(planInput(action, context, ({ detail = "", label, stage }) => {
     emitProgress({ events: planProgressEvents(stage, detail), label });
   }));
@@ -152,7 +159,7 @@ async function executePlanAction(action, adapters, context, emitProgress, now) {
       pendingAction,
       taskId: outcome?.taskId || "",
       text: succeeded
-        ? `执行计划已生成并保存。确认后将${nextAction.label}。`
+        ? `只读计划已生成并保存。确认后只会${nextAction.label}，不会直接修改文件。`
         : status === "cancelled"
           ? "计划生成已取消，没有继续执行。"
           : "这次计划没有生成成功，已停止后续操作。",
@@ -161,7 +168,7 @@ async function executePlanAction(action, adapters, context, emitProgress, now) {
 }
 
 async function executePatchAction(action, adapters, context, emitProgress, now) {
-  emitProgress({ events: changeDraftProgressEvents("context"), label: "读取项目上下文" });
+  emitProgress({ events: changeDraftProgressEvents("context"), label: "正在查看项目（只读）" });
   const planOutcome = await adapters.generatePlan(planInput(action, context, ({ detail = "", label, stage }) => {
     emitProgress({ events: changeDraftProgressEvents(stage, "current", detail), label });
   }, true));
@@ -254,10 +261,18 @@ async function executePatchAction(action, adapters, context, emitProgress, now) 
 }
 
 async function executeAgentAction(action, adapters, context, emitProgress, now) {
-  emitProgress({ events: planProgressEvents("context"), label: "读取项目上下文" });
-  const outcome = await adapters.generatePlan(planInput(action, context, ({ detail = "", label, stage }) => {
-    emitProgress({ events: planProgressEvents(stage, detail), label });
-  }));
+  emitProgress({
+    events: [{ detail: "正在保存任务目标和授权边界。", id: "register-task", label: "登记任务", status: "current" }],
+    label: "正在登记任务",
+  });
+  const outcome = await adapters.prepareAgentTask?.({
+    attachments: context.attachments || [],
+    conversationId: context.conversationId,
+    displayTask: context.displayTask || context.input,
+    requestId: context.requestId,
+    startedAt: new Date(context.startedAt).toISOString(),
+    task: action.task || context.input,
+  });
   const status = requestStatus(outcome?.status);
   if (status !== "succeeded" || !outcome?.task) {
     return {
@@ -265,13 +280,13 @@ async function executeAgentAction(action, adapters, context, emitProgress, now) 
       requestStatus: status,
       turn: {
         ...turnBase(context, "agent-plan-failed", now),
-        events: planningAgentEvents("failed", outcome?.message || "计划生成失败。"),
+        events: [{ detail: outcome?.message || "任务登记失败。", id: "register-task", label: "登记任务", status: "failed" }],
         outcome: status,
-        text: "这次没有生成可执行任务，Agent 未启动。",
+        text: "这次没有保存好任务，Agent 未启动。",
       },
     };
   }
-  emitProgress({ events: executionReadyAgentEvents(), label: "启动 Agent" });
+  emitProgress({ events: directAgentExecutionEvents(), label: "启动 Agent" });
   const started = await adapters.startAgent?.({ task: outcome.task });
   return {
     handled: true,
@@ -279,14 +294,14 @@ async function executeAgentAction(action, adapters, context, emitProgress, now) 
     turn: {
       ...turnBase(context, started ? "agent-started" : "agent-start-failed", now),
       diagnostic: started ? null : {
-        detail: "任务已保存，但 Hermes Agent 没有成功启动。",
+        detail: "任务已保存，但当前 Agent 没有成功启动。",
         label: "Agent 启动失败",
         message: "请检查模型连接后重试。",
       },
-      events: executionReadyAgentEvents(),
-      outcome: started ? "awaiting-confirmation" : "failed",
+      events: directAgentExecutionEvents(),
+      outcome: started ? "running" : "failed",
       taskId: outcome.taskId || outcome.task.id,
-      text: started ? "Agent 已开始处理这个目标。它会先读取项目并判断下一步；需要你补充信息，或批准改动、检查时，会在这里明确询问。当前不会自动写入文件。" : "任务已保存，但 Agent 没有成功启动。",
+      text: started ? "Agent 已开始处理这个目标。它会先读取项目并判断下一步；需要你补充信息，或批准改动、检查时，会在这里明确询问。当前不会自动写入文件。" : "任务已保存，但当前 Agent 没有成功启动。",
     },
   };
 }

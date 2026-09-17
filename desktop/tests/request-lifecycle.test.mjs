@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { beginRequest, isRequestRunning, requestOutcome, settleRequest, taskIdForRequest } from "../src/lib/request-lifecycle.js";
+import { beginRequest, isRequestRunning, requestOutcome, settleRequest, settleRequestAndCleanup, taskIdForRequest } from "../src/lib/request-lifecycle.js";
 
 test("allows exactly one terminal outcome for a request", () => {
   const ref = { current: null };
@@ -17,6 +17,25 @@ test("ignores late outcomes from an older request", () => {
   beginRequest(ref, "old");
   beginRequest(ref, "new");
   assert.equal(settleRequest(ref, "old", "failed"), false);
+  assert.equal(isRequestRunning(ref, "new"), true);
+});
+
+test("clears transient UI even when the same request already reached a terminal state", () => {
+  const ref = { current: null };
+  let cleanupCount = 0;
+  beginRequest(ref, "request-1");
+  assert.equal(settleRequestAndCleanup(ref, "request-1", "failed", () => { cleanupCount += 1; }), true);
+  assert.equal(settleRequestAndCleanup(ref, "request-1", "failed", () => { cleanupCount += 1; }), false);
+  assert.equal(cleanupCount, 2);
+});
+
+test("does not clear a newer request when an old result arrives late", () => {
+  const ref = { current: null };
+  let cleaned = false;
+  beginRequest(ref, "old");
+  beginRequest(ref, "new");
+  assert.equal(settleRequestAndCleanup(ref, "old", "failed", () => { cleaned = true; }), false);
+  assert.equal(cleaned, false);
   assert.equal(isRequestRunning(ref, "new"), true);
 });
 

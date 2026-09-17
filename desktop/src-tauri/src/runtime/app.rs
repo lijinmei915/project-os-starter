@@ -1,8 +1,8 @@
 #[cfg(test)]
 use crate::runtime::acp_protocol::extract_structured_envelope as extract_structured_hermes_envelope;
 use crate::runtime::agent_executor::{
-    select_agent_executor, validate_governed_capabilities, AgentExecutionMode,
-    AgentExecutionRequest, AgentExecutionResult,
+    select_agent_executor, validate_governed_capabilities, AgentExecutionMode, AgentExecutionPurpose,
+    AgentExecutionRequest, AgentExecutionResult, AgentExecutorWarmupRequest,
 };
 use crate::runtime::agent_runs::PersistedAgentRun;
 use crate::runtime::chat_content::{
@@ -20,8 +20,8 @@ use crate::runtime::execution::run_git_apply;
 use crate::runtime::hermes_protocol::custom_provider_key_env as hermes_custom_provider_key_env;
 use crate::runtime::patch::PatchDraft;
 use crate::runtime::planning::{
-    sanitize_image_attachments, GeneratePlanInput as PlanningGeneratePlanInput, PlanAttachment,
-    PlanContext, ReadonlyPlan,
+    sanitize_image_attachments, GeneratePlanInput as PlanningGeneratePlanInput,
+    NextStepRecommendation, PlanAttachment, PlanContext, ReadonlyPlan,
 };
 #[cfg(test)]
 use crate::runtime::provider::ProviderProfile;
@@ -532,7 +532,12 @@ fn start_workspace_file_watcher(
     let app_root = find_workspace_root()?;
     let mut registry = load_or_seed_registry(&app_root)?;
     let current_project = current_registry_project(&mut registry, &app_root)?;
-    crate::runtime::workspace_watcher::start(app, state, PathBuf::from(&current_project.path))
+    crate::runtime::workspace_watcher::start(
+        app,
+        state,
+        PathBuf::from(&current_project.path),
+        current_project.id,
+    )
 }
 
 #[cfg(test)]
@@ -933,7 +938,11 @@ async fn chat_with_model(
         return Err("请输入内容".to_string());
     }
 
+    let submitted_attachment_count = input.attachments.len();
     let attachments = sanitize_image_attachments(input.attachments);
+    if attachments.len() != submitted_attachment_count {
+        return Err("图片未发送：仅支持 PNG、JPEG、WebP、GIF；一次最多 4 张，单张不超过 4 MB，合计不超过 12 MB。".to_string());
+    }
 
     let app_root = find_workspace_root()?;
     let mut registry = load_or_seed_registry(&app_root)?;
@@ -1195,10 +1204,88 @@ fn cancel_runtime_request(
     runtime_requests.cancel(request_id.trim())
 }
 
+fn next_step_recommendations(root: &Path) -> Vec<NextStepRecommendation> {
+    let mut recommendations = Vec::new();
+    let mut seen_titles = HashSet::new();
+    let is_finished = |status: &str| {
+        matches!(
+            status.trim().to_ascii_lowercase().as_str(),
+            "done" | "completed" | "verified" | "succeeded" | "cancelled" | "failed"
+        )
+    };
+    let add = |recommendations: &mut Vec<NextStepRecommendation>,
+               seen_titles: &mut HashSet<String>,
+               id: String,
+               title: String,
+               reason: String,
+               expected_outcome: String| {
+        let title = title.trim().to_string();
+        if title.is_empty() || recommendations.len() >= 3 || !seen_titles.insert(title.clone()) {
+            return;
+        }
+        recommendations.push(NextStepRecommendation {
+            id,
+            title,
+            reason: reason.trim().to_string(),
+            expected_outcome: expected_outcome.trim().to_string(),
+        });
+    };
+
+    for task in crate::runtime::tasks::list(root).unwrap_or_default() {
+        let status = task.get("status").and_then(Value::as_str).unwrap_or("");
+        if is_finished(status) {
+            continue;
+        }
+        let title = task
+            .get("title")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+        let reason = task
+            .pointer("/plan/summary")
+            .and_then(Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or("这项工作已经在当前项目中登记，但还没有完成。")
+            .to_string();
+        add(
+            &mut recommendations,
+            &mut seen_titles,
+            task.get("id")
+                .and_then(Value::as_str)
+                .unwrap_or("task")
+                .to_string(),
+            title,
+            reason,
+            "完成后会留下可查看的执行结果和验收状态。".to_string(),
+        );
+    }
+
+    let projection = crate::runtime::workspace::load_projection_state(root);
+    for item in crate::runtime::workspace::workspace_queue(
+        &projection.task_backlog,
+        &projection.recommendations,
+    ) {
+        if is_finished(&item.status) {
+            continue;
+        }
+        add(
+            &mut recommendations,
+            &mut seen_titles,
+            item.id,
+            item.title,
+            item.body,
+            "完成后会推进当前项目目标，并留下可追溯的结果。".to_string(),
+        );
+    }
+
+    recommendations
+}
+
 #[tauri::command]
 async fn generate_readonly_plan(
     input: GeneratePlanInput,
     runtime_requests: State<'_, RuntimeRequestState>,
+    app: AppHandle,
 ) -> Result<ReadonlyPlan, String> {
     let task = input.task.trim().to_string();
     if task.is_empty() {
@@ -1223,6 +1310,8 @@ async fn generate_readonly_plan(
         stage: stage.clone(),
         root: root.clone(),
         provider: configured_provider.clone(),
+        next_step_candidates: next_step_recommendations(&root),
+        file_index: crate::runtime::planning::bounded_plan_file_index(&root),
     };
     let request_id = input.request_id.trim().to_string();
     let token = if request_id.is_empty() {
@@ -1230,15 +1319,78 @@ async fn generate_readonly_plan(
     } else {
         Some(runtime_requests.start(&request_id))
     };
-    let result = crate::runtime::planning::generate_plan(PlanningGeneratePlanInput {
-        app_root: &app_root,
-        context,
-        cancellation: token,
-    })
+    emit_conversation_event(
+        &app,
+        &request_id,
+        "plan.started",
+        "planning",
+        "running",
+        json!({ "label": "正在生成只读计划" }),
+    );
+    let app_for_events = app.clone();
+    let request_for_events = request_id.clone();
+    let result = crate::runtime::planning::generate_plan(
+        PlanningGeneratePlanInput {
+            app_root: &app_root,
+            context,
+            cancellation: token,
+        },
+        move |update| {
+            if let Some(event) = update.agent_event {
+                let event_type = match event.kind.as_str() {
+                    "tool-call" => "plan.tool-requested",
+                    "tool-result" => "plan.tool-completed",
+                    "terminal" => "plan.agent-terminal",
+                    _ => "plan.phase",
+                };
+                emit_conversation_event(
+                    &app_for_events,
+                    &request_for_events,
+                    event_type,
+                    &event.phase,
+                    &event.status,
+                    json!({
+                        "sequence": event.sequence,
+                        "kind": event.kind,
+                        "summary": event.summary,
+                        "details": event.details,
+                    }),
+                );
+            } else if !update.preview.is_empty() {
+                emit_conversation_event(
+                    &app_for_events,
+                    &request_for_events,
+                    "plan.delta",
+                    "planning",
+                    "running",
+                    json!({
+                        "chars": update.received_chars,
+                        "preview": update.preview,
+                    }),
+                );
+            }
+        },
+    )
     .await;
     if !request_id.is_empty() {
         runtime_requests.finish(&request_id);
     }
+    emit_conversation_event(
+        &app,
+        &request_id,
+        if result.is_ok() {
+            "plan.completed"
+        } else {
+            "plan.failed"
+        },
+        "planning",
+        if result.is_ok() {
+            "completed"
+        } else {
+            "failed"
+        },
+        json!({}),
+    );
     result
 }
 
@@ -1635,12 +1787,62 @@ fn execute_approved_agent_tool(input: ExecuteApprovedAgentToolInput) -> Result<V
     Ok(result)
 }
 
+fn record_background_agent_failure(root: &Path, run_id: &str, error: &str) {
+    let Ok(run) = crate::runtime::agent_runs::load(root, run_id) else {
+        return;
+    };
+    if !matches!(run.status.as_str(), "queued" | "running") {
+        return;
+    }
+
+    let timestamp = current_timestamp_string();
+    let summary = format!("Agent 后台启动失败：{error}");
+    let settled = if run.status == "running" {
+        crate::runtime::agent_runs::settle_model_run(
+            root,
+            run,
+            crate::runtime::agent_runs::ModelRunCompletion {
+                status: "failed".to_string(),
+                summary,
+                step: None,
+                approval: None,
+                interaction: None,
+                evidence_details: serde_json::json!({ "error": error }),
+            },
+            &timestamp,
+        )
+        .is_ok()
+    } else {
+        let mut queued = run;
+        queued.status = "failed".to_string();
+        queued.revision += 1;
+        queued.updated_at = timestamp.clone();
+        queued.summary = summary.clone();
+        queued.checkpoint.phase = "failed".to_string();
+        queued.checkpoint.context_summary = summary.clone();
+        queued.checkpoint.next_action = "none".to_string();
+        crate::runtime::agent_runs::append_evidence(
+            &mut queued,
+            "result",
+            summary,
+            serde_json::json!({ "error": error }),
+            &timestamp,
+        );
+        crate::runtime::agent_runs::persist(root, &queued).is_ok()
+    };
+
+    if settled {
+        let _ =
+            crate::runtime::agent_scheduler::settle_if_present(root, run_id, "failed", &timestamp);
+    }
+}
+
 #[tauri::command]
 async fn continue_agent_run(
     input: ContinueAgentRunInput,
     app: AppHandle,
     runtime_requests: State<'_, RuntimeRequestState>,
-) -> Result<AgentExecutionResult, String> {
+) -> Result<crate::runtime::agent_runs::PersistedAgentRun, String> {
     let app_root = find_workspace_root()?;
     let run = crate::runtime::agent_runs::load(&app_root, &input.id)?;
     if run.status != "queued"
@@ -1654,22 +1856,30 @@ async fn continue_agent_run(
             run.checkpoint.next_action
         ));
     }
-    run_agent(
-        RunAgentInput {
-            request_id: run.request_id.clone(),
-            prompt: run.prompt.clone(),
-            max_steps: run.max_steps,
-            approval_token: String::new(),
-            run_id: run.id.clone(),
-            conversation_id: run.conversation_id.clone(),
-            task_id: run.task_id.clone(),
-            isolate: false,
-            executor_id: String::new(),
-        },
-        app,
-        runtime_requests,
-    )
-    .await
+    let queued = run.clone();
+    let queued_id = queued.id.clone();
+    let state = runtime_requests.inner().clone();
+    let run_input = RunAgentInput {
+        request_id: run.request_id.clone(),
+        prompt: run.prompt.clone(),
+        max_steps: run.max_steps,
+        approval_token: String::new(),
+        run_id: run.id.clone(),
+        conversation_id: run.conversation_id.clone(),
+        task_id: run.task_id.clone(),
+        isolate: false,
+        executor_id: String::new(),
+    };
+    tauri::async_runtime::spawn(async move {
+        let root = find_workspace_root().ok();
+        let result = run_agent_impl(run_input, app, &state, false).await;
+        if let Err(error) = result {
+            if let Some(root) = root {
+                record_background_agent_failure(&root, &queued_id, &error);
+            }
+        }
+    });
+    Ok(queued)
 }
 
 #[tauri::command]
@@ -1677,6 +1887,76 @@ async fn run_agent(
     input: RunAgentInput,
     app: AppHandle,
     runtime_requests: State<'_, RuntimeRequestState>,
+) -> Result<AgentExecutionResult, String> {
+    run_agent_impl(input, app, runtime_requests.inner(), false).await
+}
+
+#[tauri::command]
+async fn start_agent_run(
+    input: RunAgentInput,
+    app: AppHandle,
+    runtime_requests: State<'_, RuntimeRequestState>,
+) -> Result<crate::runtime::agent_runs::PersistedAgentRun, String> {
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let current_project = current_registry_project(&mut registry, &app_root)?;
+    if !input.run_id.trim().is_empty() {
+        return Err("后台启动只接受新的 Agent Run。".to_string());
+    }
+    let provider = load_or_seed_provider_config(&app_root)?;
+    let persisted_executor = select_agent_executor(Some(input.executor_id.as_str()), None)?;
+    validate_governed_capabilities(persisted_executor)?;
+    persisted_executor.prepare(&provider)?;
+    let source_root = PathBuf::from(&current_project.path);
+    read_secret_from_env_or_dotenv(&source_root, &provider.api_key_env)
+        .ok_or_else(|| format!("环境变量或 .env.local 中未设置 {}", provider.api_key_env))?;
+    let request_id = input.request_id.trim().to_string();
+    let run_id = if request_id.is_empty() {
+        format!(
+            "agent-{}",
+            crate::runtime::provider::current_unix_timestamp()
+        )
+    } else {
+        format!("agent-{request_id}")
+    };
+    let timestamp = current_timestamp_string();
+    let queued_run = crate::runtime::agent_runs::new_agent_run_with_context(
+        run_id.clone(),
+        request_id,
+        current_project.id.clone(),
+        persisted_executor.id().to_string(),
+        input.prompt.clone(),
+        input.max_steps,
+        input.approval_token.clone(),
+        input.conversation_id.clone(),
+        input.task_id.clone(),
+        &timestamp,
+    );
+    crate::runtime::agent_runs::persist_new_queued(&app_root, &queued_run)?;
+    crate::runtime::agent_scheduler::enqueue(&app_root, &run_id, &current_project.id, &timestamp)?;
+    let state = runtime_requests.inner().clone();
+    let background_input = RunAgentInput {
+        run_id: run_id.clone(),
+        ..input
+    };
+    let background_run = queued_run.clone();
+    tauri::async_runtime::spawn(async move {
+        let root = find_workspace_root().ok();
+        let result = run_agent_impl(background_input, app, &state, true).await;
+        if let Err(error) = result {
+            if let Some(root) = root {
+                record_background_agent_failure(&root, &background_run.id, &error);
+            }
+        }
+    });
+    Ok(queued_run)
+}
+
+async fn run_agent_impl(
+    input: RunAgentInput,
+    app: AppHandle,
+    runtime_requests: &RuntimeRequestState,
+    force_start: bool,
 ) -> Result<AgentExecutionResult, String> {
     let app_root = find_workspace_root()?;
     let mut registry = load_or_seed_registry(&app_root)?;
@@ -1698,6 +1978,12 @@ async fn run_agent(
     let api_key = read_secret_from_env_or_dotenv(&source_root, &provider.api_key_env)
         .ok_or_else(|| format!("环境变量或 .env.local 中未设置 {}", provider.api_key_env))?;
     let request_id = input.request_id.trim().to_string();
+    let purpose = agent_execution_purpose(&input.prompt);
+    let max_steps = if purpose == AgentExecutionPurpose::RiskReview {
+        input.max_steps.min(8).max(1)
+    } else {
+        input.max_steps
+    };
     let run_id = if !input.run_id.trim().is_empty() {
         input.run_id.trim().to_string()
     } else if request_id.is_empty() {
@@ -1714,15 +2000,15 @@ async fn run_agent(
         Some(runtime_requests.try_lease(&request_id)?)
     };
     let scheduler_timestamp = current_timestamp_string();
-    let is_new_run = input.run_id.trim().is_empty();
-    if is_new_run {
+    let is_new_run = force_start || input.run_id.trim().is_empty();
+    if is_new_run && input.run_id.trim().is_empty() {
         let queued_run = crate::runtime::agent_runs::new_agent_run_with_context(
             run_id.clone(),
             request_id.clone(),
             current_project.id.clone(),
             executor.id().to_string(),
             input.prompt.clone(),
-            input.max_steps,
+            max_steps,
             input.approval_token.clone(),
             input.conversation_id.clone(),
             input.task_id.clone(),
@@ -1799,7 +2085,7 @@ async fn run_agent(
             request_id: request_id.clone(),
             project_id: current_project.id.clone(),
             prompt: input.prompt.clone(),
-            max_steps: input.max_steps,
+            max_steps,
             approval_token: input.approval_token.clone(),
             conversation_id: input.conversation_id.clone(),
             task_id: input.task_id.clone(),
@@ -1833,16 +2119,64 @@ async fn run_agent(
             executor.id()
         ));
     }
+    emit_conversation_event(
+        &app,
+        &request_id,
+        "request.started",
+        "thinking",
+        "running",
+        json!({ "runId": running_run.id, "label": "Agent 已开始读取项目" }),
+    );
+    let app_for_events = app.clone();
+    let request_for_events = request_id.clone();
+    let app_root_for_events = app_root.clone();
+    let run_id_for_events = running_run.id.clone();
+    let event_sink = Arc::new(move |event: &crate::runtime::agent_executor::AgentEvent| {
+        let timestamp = current_timestamp_string();
+        let _ = crate::runtime::agent_runs::record_live_agent_event(
+            &app_root_for_events,
+            &run_id_for_events,
+            event,
+            &timestamp,
+        );
+        let event_type = match event.kind.as_str() {
+            "tool-call" => "agent.tool-requested",
+            "tool-result" => "agent.tool-completed",
+            "terminal" => "agent.terminal",
+            _ => "agent.lifecycle",
+        };
+        emit_conversation_event(
+            &app_for_events,
+            &request_for_events,
+            event_type,
+            &event.phase,
+            &event.status,
+            json!({
+                "sequence": event.sequence,
+                "kind": event.kind,
+                "summary": event.summary,
+                "details": {
+                    "name": event.details.get("name"),
+                    "step": event.details.get("step"),
+                    "success": event.details.get("success"),
+                    "mode": event.details.get("mode"),
+                },
+            }),
+        );
+    });
     let mut result = tauri::async_runtime::spawn_blocking(move || {
         executor.execute(AgentExecutionRequest {
             mode: execution_mode,
+            purpose,
             root: execution_root,
             api_key,
             api_base: provider.api_base,
             api_key_env: provider.api_key_env,
+            model: provider.model,
             prompt: execution_prompt,
-            max_steps: input.max_steps,
+            max_steps,
             cancellation,
+            event_sink: Some(event_sink),
         })
     })
     .await
@@ -1949,13 +2283,28 @@ async fn run_agent(
     result
 }
 
+fn agent_execution_purpose(prompt: &str) -> AgentExecutionPurpose {
+    let normalized = prompt.to_lowercase();
+    let inspection = ["风险", "risk", "审查", "review", "检查当前项目"]
+        .iter()
+        .any(|needle| normalized.contains(needle));
+    let change_request = ["修复", "修改", "实现", "改动", "fix", "implement", "patch"]
+        .iter()
+        .any(|needle| normalized.contains(needle));
+    if inspection && !change_request {
+        AgentExecutionPurpose::RiskReview
+    } else {
+        AgentExecutionPurpose::GovernedTask
+    }
+}
+
 #[tauri::command]
 async fn run_hermes_agent(
     input: RunAgentInput,
     app: AppHandle,
     runtime_requests: State<'_, RuntimeRequestState>,
 ) -> Result<AgentExecutionResult, String> {
-    run_agent(input, app, runtime_requests).await
+    run_agent_impl(input, app, runtime_requests.inner(), false).await
 }
 
 #[tauri::command]
@@ -2432,6 +2781,40 @@ mod task_storage_tests {
     }
 
     #[test]
+    fn next_step_recommendations_use_unfinished_project_work_only() {
+        let root = test_directory("next-step-recommendations");
+        fs::create_dir_all(root.join(".omnidesk/data/tasks")).unwrap();
+        fs::write(
+            root.join(".omnidesk/data/tasks/active.json"),
+            r#"{"id":"active","title":"让计划更容易理解","status":"running","updatedAt":"2","plan":{"summary":"当前计划仍然宽泛。"}}"#,
+        )
+        .unwrap();
+        fs::write(
+            root.join(".omnidesk/data/tasks/done.json"),
+            r#"{"id":"done","title":"不应推荐的已完成任务","status":"completed","updatedAt":"3"}"#,
+        )
+        .unwrap();
+        fs::write(
+            root.join(".omnidesk/data/task-backlog.json"),
+            r#"{"items":[{"id":"attachment","title":"扩展附件能力","status":"planned","body":"当前仅支持图片。"},{"id":"old","title":"旧待办","status":"done","body":"已经完成。"}]}"#,
+        )
+        .unwrap();
+
+        let recommendations = next_step_recommendations(&root);
+        assert_eq!(
+            recommendations
+                .iter()
+                .map(|item| item.title.as_str())
+                .collect::<Vec<_>>(),
+            vec!["让计划更容易理解", "扩展附件能力"]
+        );
+        assert!(recommendations
+            .iter()
+            .all(|item| !item.title.contains("已完成")));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn atomic_write_replaces_task_without_temp_residue() {
         let dir = test_directory("atomic-task");
         fs::create_dir_all(&dir).unwrap();
@@ -2787,6 +3170,14 @@ pub fn run() {
         .manage(TerminalState::default())
         .manage(RuntimeRequestState::default())
         .manage(WorkspaceWatcherState::default())
+        .setup(|_| {
+            std::thread::spawn(|| {
+                if let Err(error) = prewarm_default_agent_worker() {
+                    eprintln!("OmniDesk 常驻 Agent 预热未完成：{error}");
+                }
+            });
+            Ok(())
+        })
         .plugin(tauri_plugin_dialog::init());
     // The embedded WebDriver is opt-in for dedicated test builds only.
     // Release and ordinary development builds never expose this HTTP endpoint.
@@ -2864,6 +3255,7 @@ pub fn run() {
             resume_agent_run,
             cancel_agent_run,
             continue_agent_run,
+            start_agent_run,
             approve_agent_run,
             submit_agent_interaction,
             execute_approved_agent_tool,
@@ -2893,6 +3285,30 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("failed to run OmniDesk");
+}
+
+fn prewarm_default_agent_worker() -> Result<(), String> {
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let project = current_registry_project(&mut registry, &app_root)?;
+    let provider = load_or_seed_provider_config(&app_root)?;
+    if !provider.enabled {
+        return Ok(());
+    }
+    let executor = select_agent_executor(None, None)?;
+    validate_governed_capabilities(executor)?;
+    executor.prepare(&provider)?;
+    let source_root = PathBuf::from(project.path);
+    let Some(api_key) = read_secret_from_env_or_dotenv(&source_root, &provider.api_key_env) else {
+        return Ok(());
+    };
+    executor.prewarm(AgentExecutorWarmupRequest {
+        root: source_root,
+        api_key,
+        api_base: provider.api_base,
+        api_key_env: provider.api_key_env,
+        model: provider.model,
+    })
 }
 
 /// Recovery belongs to process startup, not the next state mutation. A crash

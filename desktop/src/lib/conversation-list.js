@@ -55,17 +55,27 @@ export function conversationMatchesQuery(conversation, query = "") {
 }
 
 export function groupConversations(conversations = [], { now = Date.now() } = {}) {
-  const day = 24 * 60 * 60 * 1000;
+  const current = new Date(now);
+  const todayStart = new Date(
+    current.getFullYear(),
+    current.getMonth(),
+    current.getDate(),
+  ).getTime();
+  const yesterdayStart = new Date(
+    current.getFullYear(),
+    current.getMonth(),
+    current.getDate() - 1,
+  ).getTime();
   const visible = conversations
     .filter((conversation) => !conversation?.archivedAt && !conversation?.taskId)
     .sort((left, right) => conversationTimestamp(right) - conversationTimestamp(left));
   const groups = [];
-  const today = visible.filter((conversation) => now - conversationTimestamp(conversation) < day);
+  const today = visible.filter((conversation) => conversationTimestamp(conversation) >= todayStart);
   const yesterday = visible.filter((conversation) => {
-    const age = now - conversationTimestamp(conversation);
-    return age >= day && age < day * 2;
+    const timestamp = conversationTimestamp(conversation);
+    return timestamp >= yesterdayStart && timestamp < todayStart;
   });
-  const earlier = visible.filter((conversation) => now - conversationTimestamp(conversation) >= day * 2 || !conversationTimestamp(conversation));
+  const earlier = visible.filter((conversation) => conversationTimestamp(conversation) < yesterdayStart);
   if (today.length) groups.push({ items: today, kind: "general", label: "今天" });
   if (yesterday.length) groups.push({ items: yesterday, kind: "general", label: "昨天" });
   if (earlier.length) groups.push({ items: earlier, kind: "general", label: "更早" });

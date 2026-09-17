@@ -16,6 +16,13 @@ export function settleRequest(ref, id, status) {
   return true;
 }
 
+export function settleRequestAndCleanup(ref, id, status, cleanup = () => {}) {
+  const ownsTransientState = ref.current?.id === id;
+  const settled = settleRequest(ref, id, status);
+  if (ownsTransientState) cleanup();
+  return settled;
+}
+
 export function requestOutcome(status, message = "", metadata = {}) {
   if (![...terminalStatuses].includes(status)) {
     throw new Error(`invalid request outcome status: ${status}`);

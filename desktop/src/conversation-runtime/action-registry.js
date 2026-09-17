@@ -28,12 +28,19 @@ export function conversationActionDecision(message) {
   const text = String(message || "").trim();
   const compact = text.replace(/[。！？!?,，\s]/g, "").toLowerCase();
   const requestsExecution = /^(运行|执行|跑|开始)(一轮|一下|一次)?/.test(compact);
-  const requestsStructuredQuestion = /(尚未决定|还没决定|没有决定|需要我确认|缺少.*决定|先.*(表单|选项).*(问|询问|确认)|ask_user)/i.test(compact);
+  const projectTarget = /(当前)?(项目|工程|代码|源码|仓库|改动|模块|文件|页面|组件|功能|链路|流程)/.test(compact);
+  const requestsAgentInspection = projectTarget
+    && (/(检查|审查|排查|分析|评估|定位).*(风险|问题|改动|项目|工程|代码|源码|仓库|模块|文件|链路|流程)?/.test(compact)
+      || /(风险|问题).*(检查|审查|排查|分析|评估|定位)/.test(compact));
+  // An explicit no-write request is a planning request, not a background
+  // Agent Run. Keeping it out of Scheduler makes the visible route match the
+  // user's requested boundary and lets the read-only executor stream at once.
+  const requestsReadonlyPlan = projectTarget
+    && requestsAgentInspection
+    && /(只做分析|只分析|仅分析|只查看|只读|不要改文件|不改文件|不修改文件|不要修改|不做修改)/.test(compact);
   const requestsBaseCheck = /(基础检查|runtime检查|运行时检查|检查runtime)/i.test(compact)
     || (requestsExecution && /^(运行|执行|跑)(一轮|一下|一次)?检查$/.test(compact));
   const incompleteModification = /^(我)?(还)?(想|要)?(改|修改|调整|优化|修)(一下)?$/.test(compact);
-  const ambiguousModification = /(改|修改|调整|优化)/.test(compact)
-    && !/(改成|改为|调整为|优化为|变成|替换成|替换为|新增|添加|删除|移除|隐藏|显示|支持|修复|解决|避免|对齐|从.+到|把.+(改|换|调整)成)/.test(compact);
   const requestsPatchDraft = !incompleteModification
     && !/(计划|方案|待办|分析|审查|检查|报告)/.test(compact)
     && /(帮我|请|直接|继续)?(改|修|优化|实现|新增|添加|删除|移除|接入|配置|调整|重构|做成)/.test(compact);
@@ -41,15 +48,15 @@ export function conversationActionDecision(message) {
     && (/(生成|制定|整理|创建).{0,16}(计划|方案|待办)/.test(compact)
       || /(帮我|请)?(给|出)(我)?(一份|一个|个)?(执行)?(计划|方案|待办)/.test(compact)
       || /(帮我|请)?(规划|拆解)(一下)?(这个|这项)?(任务|需求|工作)?/.test(compact));
-  const action = (requestsStructuredQuestion || ambiguousModification) && requestsPatchDraft
-    ? { id: "start-agent", task: text }
-    : requestsExecution && requestsBaseCheck
+  const action = requestsExecution && requestsBaseCheck
     ? { checkId: "runtime", id: "run-check" }
-    : requestsPatchDraft
-      ? { id: "generate-patch", task: text }
-      : requestsPlan
-        ? { id: "generate-plan", task: text }
-        : null;
+    : requestsReadonlyPlan
+      ? { id: "generate-plan", task: text }
+    : requestsAgentInspection || requestsPatchDraft
+      ? { id: "start-agent", task: text }
+    : requestsPlan
+      ? { id: "generate-plan", task: text }
+      : null;
   if (!action) return null;
   const definition = conversationActionDefinition(action);
   return definition ? {

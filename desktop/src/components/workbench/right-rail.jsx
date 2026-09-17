@@ -71,7 +71,7 @@ export function RightRail({
   }[taskFilter];
   const viewingCompletedGoal = false;
   const showGoalDetail = hasActiveWorkGoal;
-  const visibleTaskFilterLabel = useDialoguePhaseGroups ? "当前阶段" : viewingCompletedGoal ? "记录" : taskFilterLabel;
+  const visibleTaskFilterLabel = useDialoguePhaseGroups ? "当前任务" : viewingCompletedGoal ? "记录" : taskFilterLabel;
   const visibleTaskFilterCount = useDialoguePhaseGroups ? currentPhaseTodos.length : visibleGoalTodos.length;
   const recordedProfileCount = profileItems.filter((item) => !item.missing).length;
   const submitNewGoal = (event) => {
@@ -259,7 +259,7 @@ export function RightRail({
             {showGoalDetail ? (
               <>
                 <div className="goalTaskHeader">
-                  {useDialoguePhaseGroups ? <span>当前阶段</span> : <DropdownMenu>
+                  {useDialoguePhaseGroups ? <span>当前任务</span> : <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button className="goalTaskFilter" type="button">
                         <span>任务拆解 · {compactGoalTitle(goalTitle)} · {visibleTaskFilterLabel}</span>
@@ -301,7 +301,7 @@ export function RightRail({
                   </ol>
                   {useDialoguePhaseGroups && futurePhaseTodos.length ? (
                     <details className="goalFutureTasks">
-                      <summary><span>后续任务</span><em>{futurePhaseTodos.length}</em></summary>
+                      <summary><span>其他待办</span><em>{futurePhaseTodos.length}</em></summary>
                       <ol className="goalTodoList">
                         {futurePhaseTodos.map((todo, index) => (
                           <GoalTaskItem

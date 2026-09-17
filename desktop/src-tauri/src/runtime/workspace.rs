@@ -48,6 +48,7 @@ pub struct WorkspaceProjectionState {
     pub workspace_facts: Value,
     pub goals: Option<Value>,
     pub project_goals: Value,
+    pub external_changes: Value,
 }
 
 #[derive(Serialize)]
@@ -129,6 +130,7 @@ pub struct WorkspaceSnapshot {
     pub memory: Vec<MemoryItem>,
     pub project_profile: ProjectProfile,
     pub workspace_facts: Value,
+    pub external_changes: Value,
     pub runbook_commands: Value,
     pub project_capabilities: Value,
     pub fact_freshness: Value,
@@ -1848,6 +1850,7 @@ pub fn load_projection_state(root: &Path) -> WorkspaceProjectionState {
         project_goals: repository
             .read_json(".omnidesk/data/project-goals.json")
             .unwrap_or_else(|| json!({ "activeProjectGoalId": "", "projectGoals": [] })),
+        external_changes: crate::runtime::external_changes::summary(root),
     }
 }
 
@@ -1957,6 +1960,7 @@ pub fn build_workspace_snapshot(
         ],
         project_profile: build_project_profile(root, &project_name),
         workspace_facts: projection.workspace_facts,
+        external_changes: projection.external_changes,
         runbook_commands: runbook_commands(root),
         project_capabilities: detected_capabilities(root),
         fact_freshness: fact_freshness(root),

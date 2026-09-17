@@ -39,3 +39,13 @@ test("does not create a repair task for a missing failed task", async () => {
   assert.equal(await controller.createRepairTask("missing"), false);
   assert.deepEqual(persisted, []);
 });
+
+test("updates a newly persisted task before the React task list refreshes", async () => {
+  const { controller, persisted } = createController({
+    taskStatuses: { done: "done", planned: "planned", running: "running", waitingApproval: "waiting approval" },
+    tasks: [],
+  });
+  const task = { id: "task-new", status: "planned", title: "检查项目风险" };
+  assert.equal(await controller.markTaskWaiting(task.id, task), true);
+  assert.deepEqual(persisted, [{ ...task, status: "waiting approval" }]);
+});

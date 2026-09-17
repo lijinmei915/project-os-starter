@@ -9,17 +9,47 @@ const webdriverPort = Number(process.env.OMNIDESK_WEBDRIVER_PORT || 4447);
 const webdriverUrl = `http://127.0.0.1:${webdriverPort}`;
 const webdriverRequestTimeoutMs = 15_000;
 const diagnoseTerminal = process.env.OMNIDESK_NATIVE_TEST_TRACE_TERMINAL === "1";
+const verifyRealPlanStream = process.env.OMNIDESK_NATIVE_TEST_REAL_PLAN === "1";
+const verifyRealPlanVision = process.env.OMNIDESK_NATIVE_TEST_REAL_VISION === "1";
+const sourceWorkspaceRoot = path.resolve(desktopRoot, "..");
 const diagnosticReportPath = diagnoseTerminal
   ? path.join(os.tmpdir(), `omnidesk-native-terminal-diagnostic-${process.pid}.json`)
   : "";
 const fixture = fs.mkdtempSync(path.join(os.tmpdir(), "omnidesk-native-webdriver-"));
 let app;
+let realPlanEnvironment = {};
 let sessionId;
+
+function readDotenvValue(filePath, key) {
+  const line = fs.readFileSync(filePath, "utf8")
+    .split(/\r?\n/)
+    .find((entry) => {
+      const trimmed = entry.trimStart();
+      if (!trimmed || trimmed.startsWith("#")) return false;
+      const separator = trimmed.indexOf("=");
+      return separator > 0 && trimmed.slice(0, separator).trim() === key;
+    });
+  if (!line) return "";
+  const value = line.slice(line.indexOf("=") + 1).trim();
+  if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+    return value.slice(1, -1);
+  }
+  return value;
+}
 
 function writeFixture() {
   fs.mkdirSync(path.join(fixture, ".omnidesk", "data"), { recursive: true });
   fs.writeFileSync(path.join(fixture, "AGENTS.md"), "# Native WebDriver fixture\n", "utf8");
   fs.writeFileSync(path.join(fixture, "PROJECT.md"), "# Native WebDriver fixture\n", "utf8");
+  fs.mkdirSync(path.join(fixture, "desktop", "src", "components", "workbench"), { recursive: true });
+  fs.writeFileSync(
+    path.join(fixture, "desktop", "src", "components", "workbench", "status-bar.jsx"),
+    `export function StatusBar({ runtimeStatus }) {
+  return <footer data-testid="native-fixture-status">{runtimeStatus === "busy" ? "处理中" : "就绪"}</footer>;
+}
+`,
+    "utf8",
+  );
   fs.writeFileSync(path.join(fixture, ".omnidesk", "namespace.json"), JSON.stringify({
     schemaVersion: "omnidesk.state-namespace.v1",
     activeNamespace: "omnidesk",
@@ -30,6 +60,19 @@ function writeFixture() {
     phase: "stabilizing",
     status: "testing"
   }), "utf8");
+  if (verifyRealPlanStream || verifyRealPlanVision) {
+    const providerConfigPath = path.join(sourceWorkspaceRoot, ".omnidesk", "data", "desktop-provider.json");
+    const providerConfig = JSON.parse(fs.readFileSync(providerConfigPath, "utf8"));
+    const activeProfile = (providerConfig.profiles || []).find((profile) => profile.id === providerConfig.activeProfileId);
+    const apiKeyEnv = String(activeProfile?.apiKeyEnv || providerConfig.apiKeyEnv || "").trim();
+    const apiKey = readDotenvValue(path.join(sourceWorkspaceRoot, ".env.local"), apiKeyEnv);
+    if (!apiKeyEnv || !apiKey) throw new Error("真实计划验收找不到当前连接所需的本机密钥。");
+    realPlanEnvironment = { [apiKeyEnv]: apiKey };
+    fs.copyFileSync(
+      providerConfigPath,
+      path.join(fixture, ".omnidesk", "data", "desktop-provider.json"),
+    );
+  }
 }
 
 async function request(route, options = {}) {
@@ -180,6 +223,7 @@ function startApp() {
     detached: true,
     env: {
       ...process.env,
+      ...realPlanEnvironment,
       TAURI_WEBDRIVER_PORT: String(webdriverPort),
       OMNIDESK_WEBDRIVER_WORKSPACE_ROOT: fixture
     },
@@ -236,6 +280,127 @@ try {
   if (currentValue !== prompt) throw new Error("原生输入事件没有更新 React 状态。");
   const enabledAfterInput = await request(`/session/${sessionId}/element/${send}/enabled`);
   if (enabledAfterInput !== true) throw new Error("填写输入后发送按钮应可用。");
+  currentStage = "验证只读计划结束后的界面状态";
+  await request(`/session/${sessionId}/element/${input}/clear`, { method: "POST" });
+  const planPrompt = verifyRealPlanVision
+    ? "请结合我上传的图片和 status-bar.jsx 整理只读计划：说明图片的主要颜色与中心图形，并明确源码当前使用的属性名"
+    : "请读取 status-bar.jsx，为桌面状态栏整理一个只读计划，并在计划中明确写出它当前使用的属性名";
+  await request(`/session/${sessionId}/element/${input}/value`, {
+    method: "POST",
+    body: JSON.stringify({ text: planPrompt, value: [...planPrompt] })
+  });
+  if (verifyRealPlanVision) {
+    currentStage = "上传真实图片附件";
+    const imagePath = path.join(sourceWorkspaceRoot, "desktop", "src-tauri", "icons", "128x128.png");
+    const imageBase64 = fs.readFileSync(imagePath).toString("base64");
+    await script(`const input = document.querySelector('input.chatComposerFileInput[type="file"]');
+      if (!input) return { attached: false, reason: 'missing-input' };
+      const bytes = Uint8Array.from(atob(${JSON.stringify(imageBase64)}), (character) => character.charCodeAt(0));
+      const transfer = new DataTransfer();
+      transfer.items.add(new File([bytes], 'native-vision-fixture.png', { type: 'image/png' }));
+      input.files = transfer.files;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      return { attached: true };`);
+    let attachmentReady = false;
+    const attachmentDeadline = Date.now() + 5_000;
+    while (Date.now() < attachmentDeadline && !attachmentReady) {
+      attachmentReady = await script("return Boolean(document.querySelector('.chatAttachment img'))");
+      if (!attachmentReady) await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    if (!attachmentReady) throw new Error("真实图片附件没有进入发送区。");
+  }
+  const statusBarSourceBeforePlan = fs.readFileSync(path.join(fixture, "desktop", "src", "components", "workbench", "status-bar.jsx"), "utf8");
+  await request(`/session/${sessionId}/element/${send}/click`, { method: "POST" });
+  let planUiState = null;
+  const planProcessSamples = [];
+  const planUiDeadline = Date.now() + ((verifyRealPlanStream || verifyRealPlanVision) ? 300_000 : 30_000);
+  while (Date.now() < planUiDeadline) {
+    planUiState = await script(`return {
+      decisionActionInsideCard: Boolean(document.querySelector('.conversationPlanDecision .uiButton')),
+      decisionCardText: document.querySelector('.conversationPlanDecision')?.textContent || '',
+      failureText: document.querySelector('.appToast-danger')?.textContent || '',
+      hasDecisionCard: Boolean(document.querySelector('.conversationPlanDecision.uiPanel')),
+      hasPendingTurn: Boolean(document.querySelector('.pendingTurn')),
+      hasPlanNarrative: Boolean(document.querySelector('.conversationPlanNarrative')),
+      hasReadonlyPlan: Boolean(document.querySelector('.conversationReadonlyPlan')),
+      hasRunningStatus: Boolean(document.querySelector('.agentProcessingStatus.running')),
+      narrativeIsUnframed: !document.querySelector('.conversationPlanNarrative .uiPanel'),
+      planCardText: document.querySelector('.conversationReadonlyPlan')?.textContent || '',
+      sendLabel: document.querySelector('.chatComposerSend')?.getAttribute('aria-label') || document.querySelector('button[aria-label="发送"], button[aria-label="停止生成"]')?.getAttribute('aria-label') || '',
+      userMessageVisible: [...document.querySelectorAll('.conversationMessage-user')].some((node) => node.textContent.includes(${JSON.stringify(planPrompt)})),
+      userMessageBeforePlan: (() => {
+        const user = [...document.querySelectorAll('.conversationMessage-user')].filter((node) => node.textContent.includes(${JSON.stringify(planPrompt)})).at(-1);
+        const plan = document.querySelector('.conversationReadonlyPlan');
+        return Boolean(user && plan && (user.compareDocumentPosition(plan) & Node.DOCUMENT_POSITION_FOLLOWING));
+      })(),
+    }`);
+    const processText = await script("return document.querySelector('.agentProcessingStatus.running')?.textContent || ''");
+    if (processText && planProcessSamples.at(-1)?.text !== processText) {
+      planProcessSamples.push({ at: Date.now(), text: processText });
+    }
+    if (planUiState?.failureText) break;
+    if (planUiState?.hasReadonlyPlan && planUiState?.hasDecisionCard && planUiState?.sendLabel === "发送") break;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  if (planUiState?.failureText) {
+    throw new Error(`只读计划运行失败：${planUiState.failureText}`);
+  }
+  if (!planUiState?.userMessageVisible || !planUiState?.userMessageBeforePlan || !planUiState?.hasReadonlyPlan
+    || !planUiState?.hasPlanNarrative || !planUiState?.narrativeIsUnframed || !planUiState?.hasDecisionCard
+    || !planUiState?.decisionActionInsideCard || !planUiState?.decisionCardText.includes("是否生成改动草稿")
+    || planUiState?.hasPendingTurn || planUiState?.hasRunningStatus || planUiState?.sendLabel !== "发送") {
+    throw new Error(`只读计划未按“连续内容 + 关键决策卡”完成收口：${JSON.stringify(planUiState)}`);
+  }
+  if (verifyRealPlanStream || verifyRealPlanVision) {
+    const generatedTasks = await invokeNative("list_desktop_tasks");
+    const generatedPlanTask = generatedTasks.find((task) => task?.plan?.task === planPrompt);
+    const trace = (generatedPlanTask?.plan?.trace || []).map(String);
+    const usedFallback = trace.some((entry) => /^(?:LOCAL_FALLBACK|PROVIDER_FALLBACK|PROVIDER_PRECHECK_FAILED):/.test(entry));
+    const plan = generatedPlanTask?.plan || {};
+    const agentEvents = Array.isArray(plan.agentEvents) ? plan.agentEvents : [];
+    const eventSequences = agentEvents.map((event) => Number(event?.sequence || 0));
+    const eventsAreOrdered = eventSequences.every((sequence, index) => sequence === index + 1);
+    const toolCalls = agentEvents.filter((event) => event?.kind === "tool-call");
+    const toolResults = agentEvents.filter((event) => event?.kind === "tool-result");
+    const terminalEvents = agentEvents.filter((event) => event?.kind === "terminal");
+    const usedRealReadTools = toolCalls.some((event) => ["read_file", "search_project", "list_files", "git_status"].includes(event?.details?.name));
+    const usesConcreteStatusBarPath = (plan.filesToRead || []).some((file) => String(file).includes("status-bar.jsx"));
+    const userFacingPlan = JSON.stringify({
+      candidateChanges: plan.candidateChanges,
+      guardrails: plan.guardrails,
+      steps: plan.steps,
+      summary: plan.summary,
+    });
+    const understoodFixtureSource = userFacingPlan.includes("runtimeStatus");
+    const visionEvents = agentEvents.filter((event) => event?.kind === "model" && event?.phase === "vision-context");
+    const understoodFixtureImage = /黑|深色/.test(userFacingPlan) && /白|浅色/.test(userFacingPlan) && /星/.test(userFacingPlan);
+    const statusBarSourceAfterPlan = fs.readFileSync(path.join(fixture, "desktop", "src", "components", "workbench", "status-bar.jsx"), "utf8");
+    const sourceStayedUnchanged = statusBarSourceAfterPlan === statusBarSourceBeforePlan;
+    const leaksInternalAcceptanceLanguage = /Provider|模型路由|内部验收|验收环境|提示词/i.test(userFacingPlan);
+    if (planProcessSamples.length < 2 || !generatedPlanTask || usedFallback
+      || !usesConcreteStatusBarPath || !understoodFixtureSource || leaksInternalAcceptanceLanguage
+      || !eventsAreOrdered || !usedRealReadTools || toolResults.length < 1 || terminalEvents.length !== 1
+      || (verifyRealPlanVision && (!understoodFixtureImage || visionEvents.length !== 2 || !sourceStayedUnchanged))
+      || !planUiState.planCardText.includes("实际查看记录")
+      || !planUiState.decisionCardText.includes("是否生成改动草稿")) {
+      throw new Error(`真实计划没有形成有序工具过程、缺少具体文件范围、泄露内部话术或错误走入兜底：${JSON.stringify({
+        agentEvents,
+        eventsAreOrdered,
+        leaksInternalAcceptanceLanguage,
+        planCardText: planUiState.planCardText,
+        planProcessSamples,
+        taskFound: Boolean(generatedPlanTask),
+        terminalEvents: terminalEvents.length,
+        trace,
+        understoodFixtureSource,
+        understoodFixtureImage,
+        usedRealReadTools,
+        usesConcreteStatusBarPath,
+        sourceStayedUnchanged,
+        visionEvents,
+      })}`);
+    }
+  }
   currentStage = "验证建议到执行确认契约";
   const recommendationContractSource = `Promise.all([
     import('/src/lib/conversation-recommended-action.js'),
@@ -259,6 +424,52 @@ try {
     || recommendationContract?.action?.type !== "start-agent"
     || recommendationContract?.command !== "confirm-action") {
     throw new Error(`建议到执行确认契约未在原生 WebView 生效：${JSON.stringify(recommendationContract)}`);
+  }
+  currentStage = "验证工程任务直接进入 Agent";
+  const directAgentContractSource = `Promise.all([
+    import('/src/conversation-runtime/orchestrator.js'),
+    import('/src/conversation-runtime/action-executor.js')
+  ]).then(async ([orchestrator, executor]) => {
+    const command = orchestrator.resolveConversationCommand({ message: '检查当前项目还有哪些风险' });
+    let providerPlanningCalls = 0;
+    let persistedBeforeStart = false;
+    let startedTaskId = '';
+    const result = await executor.executeConversationActionRequest({
+      action: command.action,
+      adapters: {
+        generatePlan: async () => { providerPlanningCalls += 1; throw new Error('unexpected Provider planning'); },
+        prepareAgentTask: async () => ({ status: 'succeeded', taskId: 'native-direct-task', task: { id: 'native-direct-task' } }),
+        startAgent: async ({ task }) => { persistedBeforeStart = task?.id === 'native-direct-task'; startedTaskId = task?.id || ''; return true; }
+      },
+      context: { conversationId: 'native-direct-conversation', input: '检查当前项目还有哪些风险', requestId: 'native-direct-request', startedAt: 100 },
+      now: () => 200
+    });
+    window.__omnideskDirectAgentContract = {
+      actionId: command.action?.id,
+      command: command.command,
+      outcome: result.turn?.outcome,
+      persistedBeforeStart,
+      providerPlanningCalls,
+      startedTaskId,
+      taskId: result.turn?.taskId
+    };
+  }, (error) => { window.__omnideskDirectAgentContract = { error: String(error) }; });`;
+  await script(`window.__omnideskDirectAgentContract = null; const module = document.createElement('script'); module.type = 'module'; module.textContent = ${JSON.stringify(directAgentContractSource)}; document.head.appendChild(module); return true;`);
+  let directAgentContract = null;
+  const directAgentDeadline = Date.now() + 5_000;
+  while (!directAgentContract && Date.now() < directAgentDeadline) {
+    directAgentContract = await script("return window.__omnideskDirectAgentContract");
+    if (!directAgentContract) await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  if (directAgentContract?.error
+    || directAgentContract?.command !== "execute-action"
+    || directAgentContract?.actionId !== "start-agent"
+    || directAgentContract?.providerPlanningCalls !== 0
+    || !directAgentContract?.persistedBeforeStart
+    || directAgentContract?.startedTaskId !== "native-direct-task"
+    || directAgentContract?.taskId !== "native-direct-task"
+    || directAgentContract?.outcome !== "running") {
+    throw new Error(`工程任务没有直接进入 Agent：${JSON.stringify(directAgentContract)}`);
   }
   const startupTrace = await waitForPersistedTerminalStage("terminal-session.effect-start");
   const startupLocalTrace = await readTerminalTrace();
@@ -407,7 +618,10 @@ esac
   const sameReply = await invokeNative("submit_agent_interaction", { input: {
     action: "submit", answers: { scope: "team" }, formId: persistedForm.id, id: submittedInteraction.id,
   } });
-  if (sameReply?.revision !== submittedInteraction.revision) throw new Error("相同表单回答没有保持幂等。");
+  const matchingForms = sameReply?.interactions?.filter((item) => item?.id === persistedForm.id) || [];
+  if (matchingForms.length !== 1 || matchingForms[0]?.response?.answers?.scope !== "team") {
+    throw new Error("相同表单回答没有保持幂等。");
+  }
   let conflictingReplyRejected = false;
   try {
     await invokeNative("submit_agent_interaction", { input: {
@@ -593,7 +807,7 @@ esac
     }
   }
 
-  console.log(`原生 WebDriver smoke 通过：原生 structured recommendation 映射为 start-agent，并由“那开始吧”确认；可发现版本化内置工具及其风险/schema，MCP 配置零自动执行；Hermes 标准事件经待审批与桌面重启后保持顺序和单终态；同一 MCP Run 经过调度、待审批、桌面重启、不重放、显式恢复、原审批、工具成功与 metadata-only Timeline 导出；提交持久化 ask_user 表单并验证幂等，验证跨项目并发与稳定队列位置${diagnoseTerminal ? "，并完成终端诊断" : ""}；未写入工程文件。`);
+  console.log(`原生 WebDriver smoke 通过：只读计划按用户消息、行内过程、连续内容和关键决策卡的顺序呈现，结束后清理临时运行状态并恢复发送${verifyRealPlanStream ? "，Hermes 真实读取工具产生有序实时事件、完成后持久化且未走本地兜底" : ""}；明确工程任务本地建 Task 后直接进入 Agent，Provider 前置规划调用为零；原生 structured recommendation 映射为 start-agent，并由“那开始吧”确认；可发现版本化内置工具及其风险/schema，MCP 配置零自动执行；Hermes 标准事件经待审批与桌面重启后保持顺序和单终态；同一 MCP Run 经过调度、待审批、桌面重启、不重放、显式恢复、原审批、工具成功与 metadata-only Timeline 导出；提交持久化 ask_user 表单并验证幂等，验证跨项目并发与稳定队列位置${diagnoseTerminal ? "，并完成终端诊断" : ""}；未写入工程文件。`);
 } catch (error) {
   failure = error instanceof Error ? error : new Error(String(error));
   console.error(`原生 WebDriver smoke 失败（${currentStage}）：${failure.message}`);

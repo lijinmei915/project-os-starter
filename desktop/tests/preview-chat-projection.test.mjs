@@ -41,6 +41,19 @@ test("Preview plan stays read-only and preserves the requested project scope", (
   assert.deepEqual(plan.guardrails, ["不自动写文件。", "不自动运行命令。"]);
 });
 
+test("next-step planning uses current unfinished work instead of repeating the request", () => {
+  const plan = buildPreviewPlan({ task: "整理下一步任务并生成计划" }, {
+    projectName: "OmniDesk",
+    queue: [
+      { id: "done", title: "旧任务", status: "done", body: "已经完成。" },
+      { id: "copy", title: "让计划更容易理解", status: "running", body: "当前计划仍然宽泛。" },
+      { id: "attachments", title: "扩展附件能力", status: "planned", body: "当前仅支持图片。" },
+    ],
+  });
+  assert.deepEqual(plan.recommendedNextSteps.map((item) => item.title), ["让计划更容易理解", "扩展附件能力"]);
+  assert.match(plan.summary, /2 项可以优先推进/);
+});
+
 test("preview projection excludes noisy tasks from status summaries", () => {
   const result = previewChatResult({
     ...previewInput,

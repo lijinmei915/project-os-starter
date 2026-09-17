@@ -4,6 +4,7 @@ use crate::runtime::chat_content::{
 };
 use crate::runtime::chat_routing::{is_question_like_message, should_create_plan_for_message};
 use crate::runtime::planning::PlanAttachment;
+use crate::runtime::provider_core::{consume_openai_sse, ProviderCoreError};
 use crate::runtime::provider::{
     post_streaming_chat_completion, read_secret, require_success, ProviderConfig,
 };
@@ -11,7 +12,7 @@ use crate::runtime::provider_tools::{
     add_conversation_tools, conversation_response_from_calls, engineering_task_from_calls,
     non_streaming_message, provider_tool_mode, recommendation_task_from_calls,
     record_provider_tool_capability, should_fallback_from_native_tools,
-    streamed_conversation_reply, tool_call_fragments, ProviderToolCall, ProviderToolMode,
+    streamed_conversation_reply, ProviderToolCall, ProviderToolMode,
 };
 use futures_util::StreamExt;
 use serde_json::{json, Value};
@@ -22,38 +23,10 @@ use std::time::Duration;
 const FIRST_RESPONSE_TIMEOUT: Duration = Duration::from_secs(30);
 const STREAM_IDLE_TIMEOUT: Duration = Duration::from_secs(45);
 
-#[derive(Debug)]
-pub struct ChatStreamError {
-    pub message: String,
-    pub partial_reply: String,
-}
-
-impl ChatStreamError {
-    fn new(message: impl Into<String>) -> Self {
-        Self {
-            message: message.into(),
-            partial_reply: String::new(),
-        }
-    }
-
-    fn with_partial(message: impl Into<String>, partial_reply: &str) -> Self {
-        Self {
-            message: message.into(),
-            partial_reply: partial_reply.trim().to_string(),
-        }
-    }
-}
-
-impl From<String> for ChatStreamError {
-    fn from(message: String) -> Self {
-        Self::new(message)
-    }
-}
+pub type ChatStreamError = ProviderCoreError;
 
 pub fn should_retry_provider_chat(error: &ChatStreamError, retry_count: usize) -> bool {
-    retry_count == 0
-        && error.partial_reply.is_empty()
-        && crate::runtime::provider::classify_failure(&error.message) == "network-unavailable"
+    crate::runtime::provider_core::should_retry(error, retry_count)
 }
 
 pub async fn generate_provider_chat<F>(
@@ -194,7 +167,7 @@ where
             let chunk =
                 chunk.map_err(|err| ChatStreamError::with_partial(err.to_string(), &content))?;
             let chunk = String::from_utf8_lossy(&chunk);
-            let delta = consume_openai_sse_parts(&mut pending, &chunk);
+            let delta = consume_openai_sse(&mut pending, &chunk);
             for fragment in delta.tool_call_fragments {
                 let call = tool_call_parts.entry(fragment.index).or_default();
                 call.name.push_str(&fragment.name);
@@ -474,45 +447,7 @@ fn build_chat_result(
 /// Consumes complete SSE lines only, preserving unfinished transport chunks
 /// for the next read so a split Provider JSON envelope cannot be corrupted.
 pub fn consume_openai_sse_deltas(pending: &mut String, chunk: &str) -> Vec<String> {
-    consume_openai_sse_parts(pending, chunk).content
-}
-
-struct ProviderStreamDelta {
-    content: Vec<String>,
-    tool_call_fragments: Vec<crate::runtime::provider_tools::ProviderToolCallFragment>,
-}
-
-fn consume_openai_sse_parts(pending: &mut String, chunk: &str) -> ProviderStreamDelta {
-    pending.push_str(chunk);
-    let mut content = Vec::new();
-    let mut tools = Vec::new();
-    while let Some(index) = pending.find('\n') {
-        let line = pending[..index].trim().to_string();
-        pending.drain(..=index);
-        let Some(data) = line.strip_prefix("data:") else {
-            continue;
-        };
-        let data = data.trim();
-        if data == "[DONE]" {
-            continue;
-        }
-        let event: Value = match serde_json::from_str(data) {
-            Ok(event) => event,
-            Err(_) => continue,
-        };
-        let delta = event
-            .pointer("/choices/0/delta/content")
-            .and_then(Value::as_str)
-            .unwrap_or("");
-        if !delta.is_empty() {
-            content.push(delta.to_string());
-        }
-        tools.extend(tool_call_fragments(&event));
-    }
-    ProviderStreamDelta {
-        content,
-        tool_call_fragments: tools,
-    }
+    consume_openai_sse(pending, chunk).content
 }
 
 #[cfg(test)]
@@ -520,7 +455,22 @@ mod tests {
     use super::*;
     use std::io::{Read as _, Write as _};
     use std::net::TcpListener;
+    use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    static TEST_TEMP_DIR_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+
+    fn test_temp_dir(prefix: &str) -> std::path::PathBuf {
+        std::env::temp_dir().join(format!(
+            "{prefix}-{}-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos(),
+            TEST_TEMP_DIR_SEQUENCE.fetch_add(1, Ordering::Relaxed),
+        ))
+    }
 
     #[test]
     fn handles_transport_splits_and_completion_markers() {
@@ -699,17 +649,17 @@ mod tests {
     #[test]
     fn accumulates_streamed_native_tool_call_fragments_by_index() {
         let mut pending = String::new();
-        let first = consume_openai_sse_parts(
+        let first = consume_openai_sse(
             &mut pending,
             "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"name\":\"start_\"}}]}}]}\n\n",
         );
-        let second = consume_openai_sse_parts(
+        let second = consume_openai_sse(
             &mut pending,
             "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"name\":\"engineering_task\"}}]}}]}\n\n",
         );
         assert_eq!(
             first.tool_call_fragments,
-            vec![crate::runtime::provider_tools::ProviderToolCallFragment {
+            vec![crate::runtime::provider_core::ToolCallFragment {
                 index: 0,
                 name: "start_".to_string(),
                 arguments: String::new(),
@@ -717,7 +667,7 @@ mod tests {
         );
         assert_eq!(
             second.tool_call_fragments,
-            vec![crate::runtime::provider_tools::ProviderToolCallFragment {
+            vec![crate::runtime::provider_core::ToolCallFragment {
                 index: 0,
                 name: "engineering_task".to_string(),
                 arguments: String::new(),
@@ -793,13 +743,7 @@ mod tests {
             .unwrap();
             request
         });
-        let root = std::env::temp_dir().join(format!(
-            "omnidesk-chat-stream-{}",
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let root = test_temp_dir("omnidesk-chat-stream");
         std::fs::create_dir_all(&root).unwrap();
         std::fs::write(root.join(".env.local"), "OMNIDESK_CHAT_TEST_KEY=test-key\n").unwrap();
         let provider = ProviderConfig {
@@ -1009,13 +953,7 @@ mod tests {
     }
 
     fn native_test_provider(address: std::net::SocketAddr) -> (std::path::PathBuf, ProviderConfig) {
-        let root = std::env::temp_dir().join(format!(
-            "omnidesk-native-tool-chat-{}",
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let root = test_temp_dir("omnidesk-native-tool-chat");
         std::fs::create_dir_all(&root).unwrap();
         std::fs::write(root.join(".env.local"), "OMNIDESK_CHAT_TEST_KEY=test-key\n").unwrap();
         let provider = ProviderConfig {

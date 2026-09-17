@@ -58,8 +58,10 @@ fn run(request: EvalRequest) -> Result<Value, String> {
         .map_err(|_| "Provider Timeline Eval key is unavailable".to_string())?;
     let api_base = std::env::var("OMNIDESK_AGENT_EVAL_API_BASE")
         .map_err(|_| "Provider Timeline Eval API base is unavailable".to_string())?;
-    if api_key.trim().is_empty() || api_base.trim().is_empty() {
-        return Err("Provider Timeline Eval requires non-empty Provider credentials".to_string());
+    let model = std::env::var("OMNIDESK_AGENT_EVAL_MODEL")
+        .map_err(|_| "Provider Timeline Eval model is unavailable".to_string())?;
+    if api_key.trim().is_empty() || api_base.trim().is_empty() || model.trim().is_empty() {
+        return Err("Provider Timeline Eval requires non-empty Provider credentials and model".to_string());
     }
     let app_root = existing_directory(&request.app_root, "app root")?;
     let project_root = existing_directory(&request.project_root, "project root")?;
@@ -102,6 +104,7 @@ fn run(request: EvalRequest) -> Result<Value, String> {
         &api_key,
         &api_base,
         "OMNIDESK_AGENT_EVAL_KEY",
+        &model,
         &prepared.execution_prompt,
         request.max_steps,
         None,

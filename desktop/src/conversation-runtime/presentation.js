@@ -35,7 +35,7 @@ export function conversationTextForDisplay(text = "") {
   return "正在处理项目上下文。";
 }
 
-export function presentConversationActivity({ conversationEvents = [], events = [], label = "正在处理", running = false } = {}) {
+export function presentConversationActivity({ conversationEvents = [], events = [], label = "正在处理", running = false, summary = "" } = {}) {
   const normalizedEvents = Array.isArray(events) ? events : [];
   const normalizedConversationEvents = Array.isArray(conversationEvents) ? conversationEvents : [];
   const toolEvents = normalizedConversationEvents.filter((event) => event?.actor === "tool" || String(event?.type || "").startsWith("tool."));
@@ -44,11 +44,19 @@ export function presentConversationActivity({ conversationEvents = [], events = 
   const current = normalizedEvents.find((event) => event?.status === "current")
     || toolEvents.find((event) => event?.status === "running");
   const completed = !running && normalizedEvents.length > 0 && !failed && !current;
+  const toolTimeline = toolEvents.map((event, index) => ({
+    detail: String(event?.detail || ""),
+    id: event?.id || `tool-${index}`,
+    label: toolLabel(event),
+    status: event?.status || "done",
+  }));
   return {
-    summary: failed
+    summary: summary || (failed
       ? "处理失败"
-      : current?.label || current?.payload?.label || (completed ? "本轮处理完成" : label),
-    timeline: normalizedEvents.filter((event) => event?.type !== "tool"),
-    tools: [...new Set(toolEvents.map(toolLabel))],
+      : current?.label || current?.payload?.label || (completed ? "本轮处理完成" : label)
+    ),
+    timeline: normalizedEvents.filter((event) => event?.type !== "tool" && event?.status !== "pending"),
+    toolEvents: toolTimeline,
+    tools: [...new Set(toolTimeline.map((event) => event.label))],
   };
 }
