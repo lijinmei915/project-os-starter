@@ -1,6 +1,6 @@
 {
   "schemaVersion": "omnidesk.repository-file-inventory.v1",
-  "generatedAt": "2026-08-12T10:00:01.397Z",
+  "generatedAt": "2026-10-19T17:43:16.765Z",
   "sourceOfTruth": "git ls-files --cached --others --exclude-standard",
   "scope": "受版本控制文件及准备纳入版本控制的非忽略工作树文件；忽略的本地运行数据和构建输出不在本账本内。",
   "reviewContract": {
@@ -66,7 +66,7 @@
       "path": ".github/workflows/agent-eval.yml",
       "kind": "ci",
       "owner": "Release Engineering",
-      "bytes": 9952,
+      "bytes": 10094,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -98,7 +98,7 @@
       "path": ".gitignore",
       "kind": "repository",
       "owner": "Repository Governance",
-      "bytes": 1206,
+      "bytes": 1270,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -212,10 +212,11 @@
       "path": "README.md",
       "kind": "root-document",
       "owner": "Documentation Governance",
-      "bytes": 2282,
+      "bytes": 3839,
       "pathMentions": [
         "desktop/src-tauri/src/runtime/app.rs",
         "desktop/src-tauri/src/runtime/execution.rs",
+        "desktop/src-tauri/src/runtime/external_changes.rs",
         "desktop/src-tauri/src/runtime/isolated_workspace.rs"
       ],
       "moduleConsumers": [],
@@ -529,7 +530,7 @@
       "path": "desktop/scripts/run-provider-fallback-eval.mjs",
       "kind": "desktop-support",
       "owner": "Desktop Platform",
-      "bytes": 9214,
+      "bytes": 9772,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -1548,7 +1549,7 @@
       "path": "desktop/src-tauri/src/bin/provider_fallback_eval.rs",
       "kind": "native",
       "owner": "Desktop Shell",
-      "bytes": 5256,
+      "bytes": 7830,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -2562,7 +2563,7 @@
       "path": "desktop/src/agent-runtime/provider-evaluation.js",
       "kind": "eval-support",
       "owner": "Agent Reliability",
-      "bytes": 5677,
+      "bytes": 7507,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/scripts/run-provider-fallback-eval.mjs",
@@ -7317,6 +7318,7 @@
       "owner": "Desktop Frontend",
       "bytes": 58922,
       "pathMentions": [
+        "desktop/src-tauri/src/runtime/external_changes.rs",
         "desktop/src-tauri/src/runtime/workspace.rs",
         "desktop/src/lib/agent-topic-cards.js"
       ],
@@ -8807,7 +8809,7 @@
       "path": "desktop/tests/provider-function-eval.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 9708,
+      "bytes": 11280,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -9707,7 +9709,7 @@
       "path": "docs/LESSONS.md",
       "kind": "documentation",
       "owner": "Documentation Governance",
-      "bytes": 138965,
+      "bytes": 139786,
       "pathMentions": [
         "desktop/src/components/workbench/project-memory-panel.jsx",
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
@@ -9809,7 +9811,7 @@
       "path": "docs/TESTING.md",
       "kind": "documentation",
       "owner": "Documentation Governance",
-      "bytes": 15740,
+      "bytes": 16418,
       "pathMentions": [
         "desktop/scripts/run-native-webdriver-smoke.mjs",
         "desktop/src-tauri/src/runtime/workspace.rs",

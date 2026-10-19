@@ -76,3 +76,24 @@ export function validateProviderFallbackRuntimeResult(result) {
   if (!(Number.isSafeInteger(interruption.deltaEvents) && interruption.deltaEvents > 0) || interruption.errorPresent !== true) throw new Error("Interrupted stream lacks terminal failure evidence");
   return result;
 }
+
+export function validateProviderDirectStreamRuntimeResult(result) {
+  if (result?.schemaVersion !== "omnidesk.provider-direct-stream-runtime-result.v0.1") throw new Error("Direct stream result schema invalid");
+  if (result.status !== "completed" || result.error != null) throw new Error("Direct upstream stream did not complete");
+  if (result.fixtureSourceUnchanged !== true) throw new Error("Direct chat changed fixture source");
+  if (result.shouldCreatePlan !== false) throw new Error("Direct chat unexpectedly requested an engineering task");
+  if (!Number.isSafeInteger(result.replyChars) || result.replyChars < 100 || result.contentMatches !== true) throw new Error("Visible stream did not preserve the complete answer");
+  if (!Number.isSafeInteger(result.deltaEvents) || result.deltaEvents < 2) throw new Error("Direct upstream returned only one visible delivery");
+  const { firstDeltaMs, lastDeltaMs, durationMs } = result;
+  if (![firstDeltaMs, lastDeltaMs, durationMs].every((v) => Number.isSafeInteger(v) && v >= 0)
+    || lastDeltaMs > durationMs || lastDeltaMs - firstDeltaMs < 25) throw new Error("Visible deltas arrived together; incremental delivery is unproven");
+  const samples = result.samples;
+  if (!Array.isArray(samples) || samples.length < 2 || samples.length !== Math.min(256, result.deltaEvents)
+    || samples.some((sample, index) => !Number.isSafeInteger(sample.elapsedMs)
+      || sample.elapsedMs < firstDeltaMs || sample.elapsedMs > lastDeltaMs
+      || (index > 0 && sample.elapsedMs < samples[index - 1].elapsedMs)
+      || !Number.isSafeInteger(sample.chars) || sample.chars <= 0)
+    || samples[0].elapsedMs !== firstDeltaMs
+    || (result.deltaEvents <= 256 && samples.at(-1).elapsedMs !== lastDeltaMs)) throw new Error("Visible stream timing evidence is incomplete");
+  return result;
+}

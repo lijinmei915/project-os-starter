@@ -93,6 +93,7 @@ jobs:
           export eval_root=".omnidesk/evidence/agent-eval/${{ github.run_id }}/p1"
           npm --prefix desktop run eval:provider:function -- --trace "../$eval_root/traces/provider-function-calling.trace.json"
           npm --prefix desktop run eval:provider:fallback -- --trace "../$eval_root/traces/provider-fallback-slow-stream.trace.json"
+          npm --prefix desktop run eval:provider:fallback -- --direct-stream --trace "../$eval_root/traces/provider-direct-stream.trace.json"
       - name: Run P3 Runtime Timeline evaluation
         if: matrix.target == 'p3'
         env:

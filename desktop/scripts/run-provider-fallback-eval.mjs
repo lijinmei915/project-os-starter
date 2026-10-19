@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import {
   normalizeProviderUsage,
   validateProviderFallbackRuntimeResult,
+  validateProviderDirectStreamRuntimeResult,
 } from "../src/agent-runtime/provider-evaluation.js";
 
 const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -28,13 +29,15 @@ const tracePath = argument("--trace") ? path.resolve(argument("--trace")) : "";
 const apiBase = String(process.env.OMNIDESK_AGENT_EVAL_API_BASE || "").trim();
 const apiKey = String(process.env.OMNIDESK_AGENT_EVAL_KEY || "").trim();
 const model = String(process.env.OMNIDESK_AGENT_EVAL_MODEL || "").trim();
+const directStream = process.argv.includes("--direct-stream");
 if (!tracePath) throw new Error("Provider Fallback Eval requires --trace");
 if (!apiBase || !apiKey || !model) throw new Error("Provider Fallback Eval requires API base, key, and model environment values");
 
 const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), "omnidesk-provider-fallback-"));
 const projectRoot = path.join(fixtureRoot, "project");
 fs.mkdirSync(projectRoot, { recursive: true });
-fs.writeFileSync(path.join(projectRoot, "README.md"), "# Provider Fallback Eval\n\nRead-only fixture.\n");
+const fixtureSource = "# Provider Fallback Eval\n\nRead-only fixture.\n";
+fs.writeFileSync(path.join(projectRoot, "README.md"), fixtureSource);
 const relayEvidence = { requests: [], upstream: null };
 const relay = http.createServer((request, response) => {
   void handleRelayRequest(request, response).catch((error) => {
@@ -42,8 +45,8 @@ const relay = http.createServer((request, response) => {
     response.end(JSON.stringify({ error: { message: String(error instanceof Error ? error.message : error).slice(0, 500) } }));
   });
 });
-await new Promise((resolve) => relay.listen(0, "127.0.0.1", resolve));
-const relayBase = `http://127.0.0.1:${relay.address().port}/v1`;
+if (!directStream) await new Promise((resolve) => relay.listen(0, "127.0.0.1", resolve));
+const relayBase = directStream ? apiBase : `http://127.0.0.1:${relay.address().port}/v1`;
 const startedAt = new Date().toISOString();
 const started = Date.now();
 
@@ -58,25 +61,32 @@ try {
     projectId: "provider-fallback-eval",
     proxyApiBase: relayBase,
     model,
+    directStream,
   });
   if (execution.code !== 0) throw new Error(execution.stderr || `Provider Fallback Runtime exited ${execution.code}`);
-  runtimeResult = JSON.parse(execution.stdout.trim());
-  validateProviderFallbackRuntimeResult(runtimeResult);
-  validateRelayEvidence(relayEvidence);
+  runtimeResult = JSON.parse(redact(execution.stdout.trim(), fixtureRoot));
+  if (directStream) {
+    runtimeResult.fixtureSourceUnchanged = fs.readFileSync(path.join(projectRoot, "README.md"), "utf8") === fixtureSource;
+    validateProviderDirectStreamRuntimeResult(runtimeResult);
+  }
+  else {
+    validateProviderFallbackRuntimeResult(runtimeResult);
+    validateRelayEvidence(relayEvidence);
+  }
 } catch (error) {
   failure = redact(String(error instanceof Error ? error.message : error), fixtureRoot);
 }
 
-await new Promise((resolve) => relay.close(resolve));
+if (!directStream) await new Promise((resolve) => relay.close(resolve));
 const trace = {
-  schemaVersion: "omnidesk.provider-fallback-eval.v0.1",
+  schemaVersion: directStream ? "omnidesk.provider-direct-stream-eval.v0.1" : "omnidesk.provider-fallback-eval.v0.1",
   startedAt,
   completedAt: new Date().toISOString(),
   durationMs: Date.now() - started,
   status: failure ? "failed" : "passed",
   endpointHost: new URL(chatCompletionsEndpoint(apiBase)).host,
   model,
-  relay: relayEvidence,
+  relay: directStream ? null : relayEvidence,
   runtime: runtimeResult,
   error: failure,
 };

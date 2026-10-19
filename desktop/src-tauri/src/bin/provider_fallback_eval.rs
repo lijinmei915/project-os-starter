@@ -24,6 +24,8 @@ struct EvalRequest {
     project_id: String,
     proxy_api_base: String,
     model: String,
+    #[serde(default)]
+    direct_stream: bool,
 }
 
 #[tokio::main]
@@ -71,6 +73,10 @@ async fn run(request: EvalRequest) -> Result<Value, String> {
         active_profile_id: "provider-fallback-eval".to_string(),
         profiles: Vec::new(),
     };
+
+    if request.direct_stream {
+        return run_direct_stream(&provider, &project_root, &request.project_id).await;
+    }
 
     let fallback_started = Instant::now();
     let mut fallback_delta_events = 0_usize;
@@ -143,6 +149,74 @@ async fn run(request: EvalRequest) -> Result<Value, String> {
             "deltaEvents": interruption_delta_events,
             "errorPresent": !interruption.message.trim().is_empty(),
         },
+    }))
+}
+
+async fn run_direct_stream(
+    provider: &ProviderConfig,
+    project_root: &std::path::Path,
+    project_id: &str,
+) -> Result<Value, String> {
+    let started = Instant::now();
+    let mut samples = Vec::new();
+    let mut delta_events = 0_usize;
+    let mut first_delta_ms = None;
+    let mut last_delta_ms = None;
+    let mut streamed = String::new();
+    let result = runtime::chat_stream::generate_provider_chat(
+        provider,
+        project_root,
+        "Provider Direct Stream Eval",
+        "stabilizing",
+        "请用中文写十二条关于如何整理书桌的小建议，每条约二十字。直接回答，不要创建任务或提出修改工程的建议。",
+        &[],
+        &[],
+        &DialogueContextInput::default(),
+        false,
+        &json!({}),
+        &[],
+        &json!({}),
+        |delta, chars| {
+            if delta.is_empty() {
+                return;
+            }
+            let elapsed_ms = started.elapsed().as_millis() as u64;
+            delta_events += 1;
+            first_delta_ms.get_or_insert(elapsed_ms);
+            last_delta_ms = Some(elapsed_ms);
+            streamed.push_str(&delta);
+            if samples.len() < 256 {
+                samples.push(json!({ "elapsedMs": elapsed_ms, "chars": chars }));
+            }
+        },
+    )
+    .await;
+    let duration_ms = started.elapsed().as_millis() as u64;
+    let (reply_chars, content_matches, response_mode, should_create_plan, error) = match result {
+        Ok(reply) => (
+            reply.reply.chars().count(),
+            streamed.trim() == reply.reply.trim(),
+            reply.response_mode,
+            reply.should_create_plan,
+            None,
+        ),
+        Err(error) => (0, false, String::new(), false, Some(error.message)),
+    };
+    Ok(json!({
+        "schemaVersion": "omnidesk.provider-direct-stream-runtime-result.v0.1",
+        "projectId": project_id,
+        "status": if error.is_none() { "completed" } else { "failed" },
+        "responseMode": response_mode,
+        "shouldCreatePlan": should_create_plan,
+        "durationMs": duration_ms,
+        "firstDeltaMs": first_delta_ms,
+        "lastDeltaMs": last_delta_ms,
+        "deltaEvents": delta_events,
+        "samples": samples,
+        "streamedChars": streamed.chars().count(),
+        "replyChars": reply_chars,
+        "contentMatches": content_matches,
+        "error": error,
     }))
 }
 

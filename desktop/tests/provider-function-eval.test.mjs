@@ -10,9 +10,28 @@ import {
   normalizeProviderUsage,
   validateProviderFallbackRuntimeResult,
   validateProviderTimelineRuntimeResult,
+  validateProviderDirectStreamRuntimeResult,
 } from "../src/agent-runtime/provider-evaluation.js";
 
 const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+test("direct upstream streaming requires separated visible deliveries with complete matching content", () => {
+  const result = {
+    schemaVersion: "omnidesk.provider-direct-stream-runtime-result.v0.1",
+    status: "completed", error: null, shouldCreatePlan: false, fixtureSourceUnchanged: true,
+    replyChars: 140, contentMatches: true, deltaEvents: 2,
+    firstDeltaMs: 200, lastDeltaMs: 400, durationMs: 450,
+    samples: [{ elapsedMs: 200, chars: 70 }, { elapsedMs: 400, chars: 70 }],
+  };
+  assert.equal(validateProviderDirectStreamRuntimeResult(result), result);
+  assert.throws(() => validateProviderDirectStreamRuntimeResult({ ...result, deltaEvents: 1 }), /one visible delivery/);
+  assert.throws(() => validateProviderDirectStreamRuntimeResult({ ...result, lastDeltaMs: 200 }), /arrived together/);
+  assert.throws(() => validateProviderDirectStreamRuntimeResult({ ...result, contentMatches: false }), /complete answer/);
+  assert.throws(() => validateProviderDirectStreamRuntimeResult({ ...result, fixtureSourceUnchanged: false }), /changed fixture/);
+  assert.throws(() => validateProviderDirectStreamRuntimeResult({ ...result, status: "failed", error: "disconnected" }), /did not complete/);
+  assert.throws(() => validateProviderDirectStreamRuntimeResult({ ...result, samples: [{ elapsedMs: 200, chars: 70 }] }), /timing evidence/);
+  assert.throws(() => validateProviderDirectStreamRuntimeResult({ ...result, samples: [{ elapsedMs: 400, chars: 70 }, { elapsedMs: 200, chars: 70 }] }), /timing evidence/);
+});
 const runner = path.join(desktopRoot, "scripts", "run-provider-function-eval.mjs");
 const fallbackRunnerSource = fs.readFileSync(
   path.join(desktopRoot, "scripts", "run-provider-fallback-eval.mjs"),
