@@ -1223,7 +1223,13 @@ done
 
     #[test]
     fn readonly_plan_requires_successful_source_evidence_before_final() {
-        let root = std::env::temp_dir();
+        let root = std::env::temp_dir().join(format!(
+            "omnidesk-readonly-evidence-{}-{}",
+            std::process::id(),
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos()
+        ));
+        std::fs::create_dir(&root).unwrap();
+        std::fs::write(root.join("README.md"), "source evidence fixture\n").unwrap();
         let initial = initial_context_for_purpose(
             AgentExecutionPurpose::ReadonlyPlan,
             &root,
@@ -1251,6 +1257,7 @@ done
             AgentExecutionPurpose::GovernedTask,
             &[],
         ));
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
