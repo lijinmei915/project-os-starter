@@ -57,7 +57,7 @@ try {
   if (readonlyFiles) {
     runtimeResult.readonlyFileEvidence = {
       fixturePath: "README.md",
-      markerMatched: String(runtimeResult.summary || "").includes(marker),
+      markerMatched: String(runtimeResult.modelAnswerSummary || "").includes(marker),
       fixtureSourceUnchanged: fs.readFileSync(path.join(projectRoot, "README.md"), "utf8") === fixtureSource,
       projectEntriesUnchanged: JSON.stringify(fs.readdirSync(projectRoot).sort()) === JSON.stringify(["README.md"]),
     };

@@ -144,6 +144,15 @@ fn run(request: EvalRequest) -> Result<Value, String> {
     let model_deadline_exceeded = deadline_exceeded.load(Ordering::SeqCst);
     let captured_events = live_events.lock().map(|events| events.clone()).unwrap_or_default();
     let duration_ms = model_started.elapsed().as_millis() as u64;
+    // Executor summary describes transport state; the file-only answer lives
+    // in the model's structured result and must be checked independently.
+    let model_answer_summary = if request.readonly_files {
+        model_result.as_ref().ok()
+            .and_then(|result| result.result.as_ref())
+            .and_then(|result| result.get("summary"))
+            .and_then(Value::as_str)
+            .map(str::to_string)
+    } else { None };
     // The general timeline intentionally omits paths. Preserve only the fixed
     // non-sensitive fixture path for this explicit file-read acceptance slice.
     let readonly_tool_events = if request.readonly_files {
@@ -234,6 +243,7 @@ fn run(request: EvalRequest) -> Result<Value, String> {
         "modelDeadlineExceeded": model_deadline_exceeded,
         "usage": usage,
         "readonlyToolEvents": readonly_tool_events,
+        "modelAnswerSummary": model_answer_summary,
         "scheduler": {
             "statusDuringExecution": scheduler_during,
             "activeCountAfter": scheduler_after.active_count,
