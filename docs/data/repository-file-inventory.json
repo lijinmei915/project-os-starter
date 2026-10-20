@@ -1,6 +1,6 @@
 {
   "schemaVersion": "omnidesk.repository-file-inventory.v1",
-  "generatedAt": "2026-10-20T02:48:09.364Z",
+  "generatedAt": "2026-10-20T02:57:06.689Z",
   "sourceOfTruth": "git ls-files --cached --others --exclude-standard",
   "scope": "受版本控制文件及准备纳入版本控制的非忽略工作树文件；忽略的本地运行数据和构建输出不在本账本内。",
   "reviewContract": {
@@ -1520,7 +1520,7 @@
       "path": "desktop/src-tauri/src/bin/mcp_eval.rs",
       "kind": "native",
       "owner": "Desktop Shell",
-      "bytes": 10897,
+      "bytes": 10979,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -1550,7 +1550,7 @@
       "path": "desktop/src-tauri/src/bin/provider_fallback_eval.rs",
       "kind": "native",
       "owner": "Desktop Shell",
-      "bytes": 7856,
+      "bytes": 10837,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -2157,6 +2157,7 @@
       "bytes": 9540,
       "pathMentions": [],
       "moduleConsumers": [
+        "desktop/src-tauri/src/bin/provider_fallback_eval.rs",
         "desktop/src-tauri/src/runtime/chat_stream.rs",
         "desktop/src-tauri/src/runtime/mod.rs",
         "desktop/src-tauri/src/runtime/provider.rs"
@@ -9841,7 +9842,7 @@
       "path": "docs/TESTING.md",
       "kind": "documentation",
       "owner": "Documentation Governance",
-      "bytes": 28644,
+      "bytes": 29041,
       "pathMentions": [
         "desktop/scripts/run-native-webdriver-smoke.mjs",
         "desktop/src-tauri/src/runtime/workspace.rs",

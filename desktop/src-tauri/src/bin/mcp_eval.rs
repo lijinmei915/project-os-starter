@@ -103,7 +103,7 @@ fn run(request: EvalRequest) -> Result<Value, String> {
         &request.server_id,
     )?;
     let discovery_approved =
-        runtime::agent_runs::approve(&app_root, &discovery_run_id, &timestamp())?;
+        runtime::agent_runs::approve(&app_root, &discovery_run_id, discovery_pending.revision, &discovery_token, &timestamp())?;
     let discovery_result = runtime::execution::execute_approved_agent_tool(
         &app_root,
         &project_root,
@@ -168,7 +168,7 @@ fn run(request: EvalRequest) -> Result<Value, String> {
     )?;
     call_lease.settle("waiting-approval", &timestamp())?;
     let call_scheduler_before = scheduler_status(&app_root, &call_run_id)?;
-    let call_approved = runtime::agent_runs::approve(&app_root, &call_run_id, &timestamp())?;
+    let call_approved = runtime::agent_runs::approve(&app_root, &call_run_id, call_pending.revision, &call_token, &timestamp())?;
     let call_result = runtime::execution::execute_approved_agent_tool(
         &app_root,
         &project_root,

@@ -7,10 +7,11 @@ use runtime::chat_content::DialogueContextInput;
 use runtime::provider::{ProviderConfig, PROVIDER_SCHEMA_VERSION};
 use serde::Deserialize;
 use serde_json::{json, Value};
+use futures_util::StreamExt;
 use std::fs;
 use std::io::{self, Read};
 use std::path::PathBuf;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 const REQUEST_SCHEMA: &str = "omnidesk.provider-fallback-eval-request.v0.1";
 const RESULT_SCHEMA: &str = "omnidesk.provider-fallback-runtime-result.v0.1";
@@ -193,6 +194,9 @@ async fn run_direct_stream(
     )
     .await;
     let duration_ms = started.elapsed().as_millis() as u64;
+    let transport_probe = if result.is_err() {
+        Some(probe_minimal_stream(provider).await)
+    } else { None };
     let (reply_chars, content_matches, response_mode, should_create_plan, error) = match result {
         Ok(reply) => (
             reply.reply.chars().count(),
@@ -205,6 +209,7 @@ async fn run_direct_stream(
     };
     Ok(json!({
         "schemaVersion": "omnidesk.provider-direct-stream-runtime-result.v0.1",
+        "transportProbe": transport_probe,
         "projectId": project_id,
         "status": if error.is_none() { "completed" } else { "failed" },
         "responseMode": response_mode,
@@ -219,6 +224,43 @@ async fn run_direct_stream(
         "contentMatches": content_matches,
         "error": error,
     }))
+}
+
+async fn probe_minimal_stream(provider: &ProviderConfig) -> Value {
+    let started = Instant::now();
+    let mut metadata = json!({ "separateDiagnosticRequest": true, "client": "runtime-reqwest", "httpStatus": null, "eventStreamContentType": false, "chunks": 0, "bytes": 0, "firstChunkMs": null, "contentRecords": 0, "contentChars": 0, "done": false, "completed": false, "errorType": null });
+    let outcome = tokio::time::timeout(Duration::from_secs(45), async {
+        let key = std::env::var("OMNIDESK_AGENT_EVAL_KEY").map_err(|_| "credential-unavailable")?;
+        let payload = json!({ "model": provider.model, "messages": [{ "role": "user", "content": "请用中文写十二条关于如何整理书桌的小建议，每条约二十字。直接回答。" }], "stream": true });
+        let response = runtime::provider::post_streaming_chat_completion(provider, &key, &payload, Duration::from_secs(30)).await.map_err(|_| "request-failed")?;
+        metadata["httpStatus"] = json!(response.status().as_u16());
+        metadata["eventStreamContentType"] = json!(response.headers().get("content-type").and_then(|value| value.to_str().ok()).is_some_and(|value| value.contains("text/event-stream")));
+        let mut stream = response.bytes_stream();
+        let mut pending = String::new();
+        let mut decoder = runtime::provider_core::Utf8StreamDecoder::default();
+        let mut bytes = 0usize;
+        let mut chunks = 0usize;
+        let mut records = 0usize;
+        let mut chars = 0usize;
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk.map_err(|_| "body-failed")?;
+            bytes += chunk.len(); chunks += 1;
+            metadata["chunks"] = json!(chunks); metadata["bytes"] = json!(bytes);
+            if metadata["firstChunkMs"].is_null() { metadata["firstChunkMs"] = json!(started.elapsed().as_millis() as u64); }
+            if bytes > 512_000 { return Err("response-limit"); }
+            let decoded = decoder.push(&chunk).map_err(|_| "invalid-utf8")?;
+            let delta = runtime::provider_core::consume_openai_sse(&mut pending, &decoded);
+            records += delta.content.len(); chars += delta.content.iter().map(|text| text.chars().count()).sum::<usize>();
+            metadata["contentRecords"] = json!(records); metadata["contentChars"] = json!(chars);
+            if delta.done { metadata["done"] = json!(true); }
+        }
+        decoder.finish().map_err(|_| "incomplete-utf8")?;
+        metadata["completed"] = json!(true);
+        Ok::<(), &str>(())
+    }).await;
+    metadata["errorType"] = match outcome { Ok(Ok(())) => Value::Null, Ok(Err(error)) => json!(error), Err(_) => json!("deadline-exceeded") };
+    metadata["durationMs"] = json!(started.elapsed().as_millis() as u64);
+    metadata
 }
 
 fn existing_directory(value: &str) -> Result<PathBuf, String> {
