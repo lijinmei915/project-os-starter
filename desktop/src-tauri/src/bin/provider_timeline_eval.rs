@@ -116,9 +116,21 @@ fn run(request: EvalRequest) -> Result<Value, String> {
         }
     });
     let live_events = Arc::new(Mutex::new(Vec::new()));
+    let activity_timing = Arc::new(Mutex::new(Vec::new()));
+    let captured_timing = activity_timing.clone();
     let captured_events = live_events.clone();
     let event_sink: runtime::agent_executor::AgentEventSink = Arc::new(move |event| {
         if let Ok(mut events) = captured_events.lock() {
+            if let Ok(mut timing) = captured_timing.lock() {
+                if timing.len() < 256 {
+                    timing.push(json!({
+                        "sequence": event.sequence,
+                        "kind": event.kind,
+                        "status": event.status,
+                        "elapsedMs": model_started.elapsed().as_millis() as u64,
+                    }));
+                }
+            }
             events.push(event.clone());
         }
     });
@@ -144,6 +156,8 @@ fn run(request: EvalRequest) -> Result<Value, String> {
     let model_deadline_exceeded = deadline_exceeded.load(Ordering::SeqCst);
     let captured_events = live_events.lock().map(|events| events.clone()).unwrap_or_default();
     let duration_ms = model_started.elapsed().as_millis() as u64;
+    let activity_timing = activity_timing.lock().map(|timing| timing.clone()).unwrap_or_default();
+    let captured_event_count = captured_events.len();
     // Executor summary describes transport state; the file-only answer lives
     // in the model's structured result and must be checked independently.
     let model_answer_summary = if request.readonly_files {
@@ -241,6 +255,11 @@ fn run(request: EvalRequest) -> Result<Value, String> {
         "summary": summary,
         "durationMs": duration_ms,
         "modelDeadlineExceeded": model_deadline_exceeded,
+        "activityTiming": {
+            "clock": "model-start-monotonic",
+            "eventCount": captured_event_count,
+            "samples": activity_timing,
+        },
         "usage": usage,
         "readonlyToolEvents": readonly_tool_events,
         "modelAnswerSummary": model_answer_summary,

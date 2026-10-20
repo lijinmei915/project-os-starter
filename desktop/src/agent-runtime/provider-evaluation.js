@@ -62,6 +62,31 @@ export function validateProviderTimelineRuntimeResult(result) {
   return result;
 }
 
+// Timing is a separate diagnostic contract; old evidence retains its original
+// acceptance result without acquiring timing evidence retrospectively.
+export function validateProviderActivityTiming(result) {
+  const timing = result?.activityTiming;
+  const samples = timing?.samples;
+  const events = (result?.timeline?.events || []).flatMap((event) => event?.details?.agentEvents || []);
+  if (timing?.clock !== "model-start-monotonic"
+    || !Number.isSafeInteger(result?.durationMs) || result.durationMs < 0
+    || !Number.isSafeInteger(timing?.eventCount) || timing.eventCount < 1
+    || timing.eventCount !== events.length
+    || !Array.isArray(samples) || samples.length !== Math.min(256, timing.eventCount)) {
+    throw new Error("Agent timing evidence is incomplete");
+  }
+  for (const [index, sample] of samples.entries()) {
+    if (Object.keys(sample).sort().join(",") !== "elapsedMs,kind,sequence,status"
+      || sample.sequence !== index + 1 || sample.sequence !== events[index]?.sequence
+      || sample.kind !== events[index]?.kind || sample.status !== events[index]?.status
+      || !Number.isSafeInteger(sample.elapsedMs) || sample.elapsedMs < 0 || sample.elapsedMs > result.durationMs
+      || (index > 0 && sample.elapsedMs < samples[index - 1].elapsedMs)) {
+      throw new Error("Agent timing order or metadata is invalid");
+    }
+  }
+  return result;
+}
+
 export function validateProviderReadonlyFileEvidence(result) {
   const evidence = result?.readonlyFileEvidence;
   if (evidence?.fixturePath !== "README.md" || evidence.markerMatched !== true) throw new Error("Readonly Agent did not recover the file-only marker");

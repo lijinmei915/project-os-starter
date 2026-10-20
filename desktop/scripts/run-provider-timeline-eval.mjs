@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { validateProviderTimelineRuntimeResult, validateProviderReadonlyFileEvidence } from "../src/agent-runtime/provider-evaluation.js";
+import { validateProviderTimelineRuntimeResult, validateProviderReadonlyFileEvidence, validateProviderActivityTiming } from "../src/agent-runtime/provider-evaluation.js";
 
 const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = path.resolve(desktopRoot, "..");
@@ -63,6 +63,7 @@ try {
     };
   }
   validateProviderTimelineRuntimeResult(runtimeResult);
+  validateProviderActivityTiming(runtimeResult);
   if (readonlyFiles) validateProviderReadonlyFileEvidence(runtimeResult);
 } catch (error) {
   failure = redact(String(error instanceof Error ? error.message : error), fixtureRoot);

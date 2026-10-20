@@ -1,6 +1,6 @@
 {
   "schemaVersion": "omnidesk.repository-file-inventory.v1",
-  "generatedAt": "2026-10-20T03:04:12.902Z",
+  "generatedAt": "2026-10-20T10:21:57.478Z",
   "sourceOfTruth": "git ls-files --cached --others --exclude-standard",
   "scope": "受版本控制文件及准备纳入版本控制的非忽略工作树文件；忽略的本地运行数据和构建输出不在本账本内。",
   "reviewContract": {
@@ -561,7 +561,7 @@
       "path": "desktop/scripts/run-provider-timeline-eval.mjs",
       "kind": "desktop-support",
       "owner": "Desktop Platform",
-      "bytes": 6650,
+      "bytes": 6731,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -1565,7 +1565,7 @@
       "path": "desktop/src-tauri/src/bin/provider_timeline_eval.rs",
       "kind": "native",
       "owner": "Desktop Shell",
-      "bytes": 11299,
+      "bytes": 12159,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -2594,7 +2594,7 @@
       "path": "desktop/src/agent-runtime/provider-evaluation.js",
       "kind": "eval-support",
       "owner": "Agent Reliability",
-      "bytes": 9943,
+      "bytes": 11319,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/scripts/run-provider-fallback-eval.mjs",
@@ -8840,7 +8840,7 @@
       "path": "desktop/tests/provider-function-eval.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 13957,
+      "bytes": 15114,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -9740,7 +9740,7 @@
       "path": "docs/LESSONS.md",
       "kind": "documentation",
       "owner": "Documentation Governance",
-      "bytes": 171241,
+      "bytes": 171772,
       "pathMentions": [
         "desktop/src/components/workbench/project-memory-panel.jsx",
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
@@ -9842,7 +9842,7 @@
       "path": "docs/TESTING.md",
       "kind": "documentation",
       "owner": "Documentation Governance",
-      "bytes": 29041,
+      "bytes": 29609,
       "pathMentions": [
         "desktop/scripts/run-native-webdriver-smoke.mjs",
         "desktop/src-tauri/src/runtime/workspace.rs",

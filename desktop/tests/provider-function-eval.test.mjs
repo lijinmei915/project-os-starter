@@ -8,6 +8,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
   normalizeProviderUsage,
+  validateProviderActivityTiming,
   validateProviderFallbackRuntimeResult,
   validateProviderTimelineRuntimeResult,
   validateProviderDirectStreamRuntimeResult,
@@ -16,6 +17,33 @@ import {
 } from "../src/agent-runtime/provider-evaluation.js";
 
 const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+test("Agent timing rejects reordered, incomplete and private metadata", () => {
+  const events = [
+    { sequence: 1, kind: "lifecycle", status: "running" },
+    { sequence: 2, kind: "terminal", status: "succeeded" },
+  ];
+  const result = {
+    durationMs: 100,
+    timeline: { events: [{ details: { agentEvents: events } }] },
+    activityTiming: { clock: "model-start-monotonic", eventCount: 2,
+      samples: events.map((event, index) => ({ ...event, elapsedMs: 10 + index * 50 })) },
+  };
+  assert.equal(validateProviderActivityTiming(result), result);
+  for (const mutate of [
+    (r) => r.activityTiming.samples.reverse(),
+    (r) => r.activityTiming.samples.pop(),
+    (r) => { r.activityTiming.samples[1].elapsedMs = 101; },
+    (r) => { r.activityTiming.samples[1].elapsedMs = 9; },
+    (r) => { r.activityTiming.samples[1].sequence = 1; },
+    (r) => { r.activityTiming.samples[1].content = "private"; },
+    (r) => { r.activityTiming.eventCount = 3; },
+  ]) {
+    const invalid = structuredClone(result);
+    mutate(invalid);
+    assert.throws(() => validateProviderActivityTiming(invalid), /timing/);
+  }
+});
 
 test("stream probe distinguishes protocol failure without exporting private response content", () => {
   const secret = "private-body-key-value";
