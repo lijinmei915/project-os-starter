@@ -33,6 +33,26 @@ pub struct GenerateDraftInput<'a> {
 /// context, then a normal Provider fallback. Placeholder drafts remain
 /// explicitly non-applicable to the Apply path.
 pub async fn generate_draft(input: GenerateDraftInput<'_>) -> Result<PatchDraft, String> {
+    let token = input.cancellation.as_ref().map(CancellationToken::child_token).unwrap_or_default();
+    let input = GenerateDraftInput { cancellation: Some(token.clone()), ..input };
+    bounded_draft_execution(token, Duration::from_secs(300), generate_draft_inner(input)).await
+}
+
+async fn bounded_draft_execution<T>(
+    token: CancellationToken,
+    timeout: Duration,
+    work: impl std::future::Future<Output = Result<T, String>>,
+) -> Result<T, String> {
+    let _cancel_on_exit = token.clone().drop_guard();
+    tokio::select! {
+        biased;
+        _ = token.cancelled() => Err("请求已取消".to_string()),
+        result = tokio::time::timeout(timeout, work) =>
+            result.map_err(|_| "改动草稿生成超过整体时间上限".to_string())?,
+    }
+}
+
+async fn generate_draft_inner(input: GenerateDraftInput<'_>) -> Result<PatchDraft, String> {
     let title = input
         .task
         .get("title")
@@ -129,7 +149,7 @@ pub async fn generate_draft(input: GenerateDraftInput<'_>) -> Result<PatchDraft,
             &contexts,
             &required_files,
             Some(&error),
-            None,
+            input.cancellation.clone(),
         )
         .await
         {
@@ -311,6 +331,9 @@ pub async fn generate_hermes_draft(
             model,
             prompt,
             max_steps: 20,
+            previous_tool_name: String::new(),
+            previous_tool_result: None,
+            completed_check_ids: Vec::new(),
             cancellation,
             event_sink: None,
         })
@@ -363,11 +386,69 @@ pub async fn generate_hermes_draft(
 
 #[cfg(test)]
 mod tests {
-    use super::{generate_draft, GenerateDraftInput};
+    use super::{bounded_draft_execution, generate_draft, GenerateDraftInput};
     use crate::runtime::provider::default_config;
     use serde_json::json;
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
+    use std::time::Duration;
+    use tokio_util::sync::CancellationToken;
+
+    #[tokio::test]
+    async fn canceling_draft_preflight_closes_http_without_a_placeholder() {
+        use tokio::io::AsyncReadExt;
+        let root = std::env::temp_dir().join(format!("omnidesk-draft-preflight-{}-{}", std::process::id(),
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));
+        fs::create_dir_all(root.join("src")).unwrap();
+        fs::write(root.join("src/lib.rs"), "pub fn value() -> u8 { 1 }\n").unwrap();
+        crate::runtime::provider::write_secret(&root, "DRAFT_PREFLIGHT_CANCEL_KEY", "fixture-key").unwrap();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let parent = CancellationToken::new();
+        let cancel = parent.clone();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut bytes = [0; 4096];
+            assert!(socket.read(&mut bytes).await.unwrap() > 0);
+            cancel.cancel();
+            tokio::time::timeout(Duration::from_secs(1), async {
+                while socket.read(&mut bytes).await.unwrap() > 0 {}
+            }).await.expect("cancel must close draft preflight HTTP");
+        });
+        let mut provider = default_config();
+        provider.enabled = true;
+        provider.api_base = format!("http://{address}/v1");
+        provider.api_key_env = "DRAFT_PREFLIGHT_CANCEL_KEY".into();
+        provider.active_profile_id = "draft-cancel".into();
+        provider.profiles.clear();
+        let task = json!({"title":"更新实现","plan":{"candidateChanges":["调整返回值"],"filesToRead":["src/lib.rs"],"requiredFiles":["src/lib.rs"]}});
+        let result = tokio::time::timeout(Duration::from_secs(2), generate_draft(GenerateDraftInput {
+            app_root: &root, project_root: &root, configured_provider: &provider, task: &task, cancellation: Some(parent),
+        })).await.expect("cancel must not wait for network timeout");
+        assert_eq!(result.err().unwrap(), "请求已取消");
+        server.await.unwrap();
+        assert_eq!(fs::read_to_string(root.join("src/lib.rs")).unwrap(), "pub fn value() -> u8 { 1 }\n");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[tokio::test]
+    async fn draft_total_timeout_cancels_workers_and_keeps_parent_scope() {
+        let parent = CancellationToken::new();
+        let child = parent.child_token();
+        let worker_token = child.clone();
+        let worker = tauri::async_runtime::spawn_blocking(move || {
+            while !worker_token.is_cancelled() { std::thread::sleep(Duration::from_millis(1)); }
+            true
+        });
+        let result: Result<(), String> = bounded_draft_execution(child, Duration::from_millis(10), std::future::pending()).await;
+        assert!(result.unwrap_err().contains("整体时间上限"));
+        assert!(!parent.is_cancelled());
+        assert!(tokio::time::timeout(Duration::from_secs(1), worker).await.unwrap().unwrap());
+        let token = parent.child_token();
+        assert_eq!(bounded_draft_execution(token.clone(), Duration::from_secs(1), async { Ok(7) }).await.unwrap(), 7);
+        assert!(token.is_cancelled());
+        assert!(!parent.is_cancelled());
+    }
 
     #[test]
     fn disabled_provider_returns_a_non_applicable_placeholder_with_fixed_context() {

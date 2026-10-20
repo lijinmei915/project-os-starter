@@ -3,7 +3,11 @@ use std::fs;
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 use std::process;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+#[cfg(test)]
+thread_local! { static RECOVERY_JOURNAL_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) }; }
 
 /// The sole persistence boundary for project-local OmniDesk state.
 /// Domain services must provide paths relative to the workspace root.
@@ -114,8 +118,8 @@ impl Repository {
         operation: &str,
         mutations: &[JsonMutation],
     ) -> Result<Value, String> {
-        self.recover_incomplete_transactions()?;
         let _lock = RepositoryLock::acquire(&self.root)?;
+        self.recover_incomplete_transactions_locked()?;
         self.commit_transaction(operation, mutations)
     }
 
@@ -126,8 +130,8 @@ impl Repository {
     where
         F: FnOnce(&Repository) -> Result<(T, Vec<JsonMutation>), String>,
     {
-        self.recover_incomplete_transactions()?;
         let _lock = RepositoryLock::acquire(&self.root)?;
+        self.recover_incomplete_transactions_locked()?;
         let (result, mutations) = prepare(self)?;
         if mutations.is_empty() {
             return Ok(result);
@@ -143,8 +147,8 @@ impl Repository {
     where
         F: FnOnce(&Repository) -> Result<(T, Vec<TextMutation>), String>,
     {
-        self.recover_incomplete_transactions()?;
         let _lock = RepositoryLock::acquire(&self.root)?;
+        self.recover_incomplete_transactions_locked()?;
         let (result, mutations) = prepare(self)?;
         if mutations.is_empty() {
             return Ok(result);
@@ -165,7 +169,7 @@ impl Repository {
             return Err("事务至少需要一个状态变更".to_string());
         }
 
-        let transaction_id = format!("{}-{}", operation, timestamp_millis());
+        let transaction_id = format!("{}-{}", operation, unique_file_suffix());
         let staged = mutations
             .iter()
             .map(|mutation| {
@@ -227,6 +231,8 @@ impl Repository {
             .concat(),
         )?;
 
+        self.archive_pending_journal(&journal_path)?;
+
         let event = json!({
             "schemaVersion": "omnidesk.repository-event.v0.1",
             "id": transaction_id,
@@ -262,7 +268,7 @@ impl Repository {
             return Err("事务至少需要一个状态变更".to_string());
         }
 
-        let transaction_id = format!("{}-{}", operation, timestamp_millis());
+        let transaction_id = format!("{}-{}", operation, unique_file_suffix());
         let staged = mutations
             .iter()
             .map(|mutation| {
@@ -320,6 +326,7 @@ impl Repository {
             ]
             .concat(),
         )?;
+        self.archive_pending_journal(&journal_path)?;
         let event = json!({
             "schemaVersion": "omnidesk.repository-event.v0.1",
             "id": transaction_id,
@@ -344,22 +351,63 @@ impl Repository {
     }
 
     pub fn recover_incomplete_transactions(&self) -> Result<(), String> {
+        let _lock = RepositoryLock::acquire(&self.root)?;
+        self.recover_incomplete_transactions_locked()
+    }
+
+    fn recover_incomplete_transactions_locked(&self) -> Result<(), String> {
+        self.recover_journals_locked(false)
+    }
+
+    pub(crate) fn recover_imported_transactions(&self) -> Result<(), String> {
+        let _lock = RepositoryLock::acquire(&self.root)?;
+        self.recover_journals_locked(true)
+    }
+
+    fn recover_journals_locked(&self, imported: bool) -> Result<(), String> {
         let directory = crate::runtime::state_namespace::state_path_for_read(
             &self.root,
             ".omnidesk/runtime/transactions",
         )?;
-        let Ok(entries) = fs::read_dir(&directory) else {
+        if !directory.exists() {
             return Ok(());
-        };
-        for entry in entries.flatten() {
+        }
+        let pending = directory.join("pending");
+        if fs::symlink_metadata(&pending).is_ok_and(|metadata|metadata.file_type().is_symlink()) {
+            return Err("未结事务目录不能是符号链接。".to_string());
+        }
+        if !pending.exists() || imported {
+            // One upgrade/import scan. The directory is the durable cutover:
+            // all new writers put unfinished journals in pending from now on.
+            self.recover_journal_directory(&directory, false)?;
+            fs::create_dir_all(&pending).map_err(|error|error.to_string())?;
+        }
+        self.recover_journal_directory(&pending, true)
+    }
+
+    fn recover_journal_directory(&self, directory: &Path, pending: bool) -> Result<(), String> {
+        for entry in fs::read_dir(directory).map_err(|error|error.to_string())? {
+            let entry = entry.map_err(|error|error.to_string())?;
             let path = entry.path();
+            if path.extension().and_then(|value|value.to_str()) != Some("json") { continue; }
+            if !entry.file_type().map_err(|error|error.to_string())?.is_file() {
+                if pending {return Err("未结事务目录包含非常规文件，不能安全恢复。".to_string());}
+                continue;
+            }
+            #[cfg(test)] RECOVERY_JOURNAL_READS.with(|reads|reads.set(reads.get()+1));
             let Some(mut journal) = fs::read_to_string(&path)
                 .ok()
                 .and_then(|content| serde_json::from_str::<Value>(&content).ok())
             else {
+                if pending {return Err("未结事务记录损坏，已保留现场，请先核对状态。".to_string());}
                 continue;
             };
-            if journal.get("state").and_then(Value::as_str) != Some("prepared") {
+            let state = journal.get("state").and_then(Value::as_str);
+            if state != Some("prepared") {
+                if pending {
+                    if !matches!(state,Some("committed"|"rolled-back")) {return Err("未结事务状态未知，不能安全恢复。".to_string());}
+                    self.archive_pending_journal(&path)?;
+                }
                 continue;
             }
             self.restore_journal(&journal)?;
@@ -373,6 +421,7 @@ impl Repository {
                 ]
                 .concat(),
             )?;
+            if pending {self.archive_pending_journal(&path)?;}
         }
         Ok(())
     }
@@ -383,7 +432,20 @@ impl Repository {
             ".omnidesk/runtime/transactions",
         )
         .unwrap_or_else(|_| self.root.join(".omnidesk/runtime/transactions"))
+        .join("pending")
         .join(format!("{transaction_id}.json"))
+    }
+
+    fn archive_pending_journal(&self, path: &Path) -> Result<(), String> {
+        let directory = crate::runtime::state_namespace::state_path_for_write(&self.root,".omnidesk/runtime/transactions")?;
+        let destination = directory.join(path.file_name().ok_or_else(||"事务文件缺少名称".to_string())?);
+        if destination.exists() {
+            if fs::read(path).map_err(|error|error.to_string())? != fs::read(&destination).map_err(|error|error.to_string())? {
+                return Err("事务归档编号冲突，已保留两份记录。".to_string());
+            }
+            return fs::remove_file(path).map_err(|error|error.to_string());
+        }
+        fs::rename(path,destination).map_err(|error|error.to_string())
     }
 
     fn restore_journal(&self, journal: &Value) -> Result<(), String> {
@@ -476,9 +538,8 @@ pub fn write_atomic(path: &Path, content: &[u8]) -> Result<(), String> {
         .and_then(|value| value.to_str())
         .unwrap_or("state.json");
     let temp_path = parent.join(format!(
-        ".{file_name}.{}.{}.tmp",
-        process::id(),
-        timestamp_millis()
+        ".{file_name}.{}.tmp",
+        unique_file_suffix()
     ));
     let result = (|| -> Result<(), String> {
         let mut file = fs::File::create(&temp_path).map_err(|err| err.to_string())?;
@@ -493,50 +554,50 @@ pub fn write_atomic(path: &Path, content: &[u8]) -> Result<(), String> {
     result
 }
 
-struct RepositoryLock {
-    path: PathBuf,
+pub(crate) struct RepositoryLock {
+    // Keep the handle (and stable lock file) alive. The kernel releases the
+    // lock on close or process death; unlinking would create a second lock inode.
+    _file: fs::File,
 }
 
 impl RepositoryLock {
     fn acquire(root: &Path) -> Result<Self, String> {
+        Self::acquire_named(root, "omnidesk-repository.lock")
+    }
+
+    /// A separate lease for a whole source operation. Never hold the short
+    /// Repository transaction lock across Git/audit execution.
+    pub(crate) fn acquire_named(root: &Path, name: &str) -> Result<Self, String> {
+        if name.is_empty() || !name.bytes().all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, b'-' | b'.')) {
+            return Err("操作锁名称无效".to_string());
+        }
         let path =
             crate::runtime::state_namespace::state_path_for_write(root, ".omnidesk/runtime/locks")?
-                .join("omnidesk-repository.lock");
+                .join(name);
         let parent = path.parent().ok_or_else(|| "锁目录无效".to_string())?;
         fs::create_dir_all(parent).map_err(|err| err.to_string())?;
+        let mut options = fs::OpenOptions::new();
+        options.read(true).write(true).create(true).truncate(false);
+        #[cfg(unix)] {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.custom_flags(libc::O_NOFOLLOW);
+        }
+        let mut file = options.open(&path).map_err(|error|error.to_string())?;
         for _ in 0..20 {
-            match fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&path)
-            {
-                Ok(mut file) => {
-                    file.write_all(timestamp_string().as_bytes())
-                        .map_err(|err| err.to_string())?;
-                    return Ok(Self { path });
+            match file.try_lock() {
+                Ok(()) => {
+                    file.set_len(0).map_err(|error|error.to_string())?;
+                    file.write_all(format!("pid={} acquiredAt={}\n", process::id(), timestamp_string()).as_bytes())
+                        .map_err(|error| error.to_string())?;
+                    return Ok(Self { _file:file });
                 }
-                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-                    let stale = fs::metadata(&path)
-                        .and_then(|metadata| metadata.modified())
-                        .ok()
-                        .and_then(|modified| SystemTime::now().duration_since(modified).ok())
-                        .is_some_and(|age| age > Duration::from_secs(30));
-                    if stale {
-                        let _ = fs::remove_file(&path);
-                    } else {
-                        std::thread::sleep(Duration::from_millis(15));
-                    }
+                Err(std::fs::TryLockError::WouldBlock) => {
+                    std::thread::sleep(Duration::from_millis(15));
                 }
-                Err(error) => return Err(error.to_string()),
+                Err(std::fs::TryLockError::Error(error)) => return Err(error.to_string()),
             }
         }
         Err("项目状态正被另一项操作更新，请稍后重试".to_string())
-    }
-}
-
-impl Drop for RepositoryLock {
-    fn drop(&mut self) {
-        let _ = fs::remove_file(&self.path);
     }
 }
 
@@ -545,6 +606,11 @@ fn timestamp_millis() -> u128 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis()
+}
+
+fn unique_file_suffix() -> String {
+    static SEQUENCE: AtomicU64 = AtomicU64::new(0);
+    format!("{}-{}-{}",process::id(),timestamp_millis(),SEQUENCE.fetch_add(1,Ordering::Relaxed))
 }
 
 fn timestamp_string() -> String {
@@ -560,6 +626,150 @@ mod tests {
             "omnidesk-repository-{label}-{}",
             timestamp_millis()
         ))
+    }
+
+    fn seed_interrupted_journal(root: &Path) {
+        write_atomic(&root.join(".omnidesk/data/state.json"), br#"{"value":"during-commit"}"#).unwrap();
+        write_atomic(&root.join(".omnidesk/runtime/transactions/pending/held.json"),
+            serde_json::to_vec(&json!({"schemaVersion":"omnidesk.repository-transaction.v0.1",
+                "state":"prepared","mutations":[{"path":".omnidesk/data/state.json","previous":{"value":"before-commit"}}]})).unwrap().as_slice()).unwrap();
+    }
+
+    #[test]
+    fn recovery_cannot_restore_a_journal_while_its_writer_holds_the_lock() {
+        let root = test_root("active-recovery");
+        let lock = RepositoryLock::acquire(&root).unwrap();
+        seed_interrupted_journal(&root);
+        let repository = Repository::new(&root);
+        let before = fs::read(root.join(".omnidesk/runtime/transactions/pending/held.json")).unwrap();
+        assert!(repository.recover_incomplete_transactions().unwrap_err().contains("另一项操作"));
+        assert_eq!(repository.read_json(".omnidesk/data/state.json").unwrap()["value"],"during-commit");
+        assert_eq!(fs::read(root.join(".omnidesk/runtime/transactions/pending/held.json")).unwrap(),before);
+        drop(lock);
+        repository.recover_incomplete_transactions().unwrap();
+        assert_eq!(repository.read_json(".omnidesk/data/state.json").unwrap()["value"],"before-commit");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn old_file_age_does_not_steal_a_live_lock_or_replace_its_file() {
+        let root = test_root("old-live-lock");
+        let path = root.join(".omnidesk/runtime/locks/omnidesk-repository.lock");
+        let first = RepositoryLock::acquire(&root).unwrap();
+        let file = fs::OpenOptions::new().write(true).open(&path).unwrap();
+        file.set_times(fs::FileTimes::new().set_modified(SystemTime::now()-Duration::from_secs(120))).unwrap();
+        assert!(RepositoryLock::acquire(&root).is_err());
+        #[cfg(unix)] let inode = {use std::os::unix::fs::MetadataExt;fs::metadata(&path).unwrap().ino()};
+        drop(first);
+        assert!(path.is_file());
+        let second = RepositoryLock::acquire(&root).unwrap();
+        #[cfg(unix)] {use std::os::unix::fs::MetadataExt;assert_eq!(fs::metadata(&path).unwrap().ino(),inode);}
+        drop(second);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    #[ignore = "child-process helper; invoked only by the crash recovery regression"]
+    fn repository_lock_child() {
+        let root = PathBuf::from(std::env::var_os("OMNIDESK_TEST_REPOSITORY_LOCK_ROOT").unwrap());
+        let _lock = RepositoryLock::acquire(&root).unwrap();
+        seed_interrupted_journal(&root);
+        fs::write(root.join("lock-ready"),b"ready").unwrap();
+        let mut line = String::new();
+        std::io::stdin().read_line(&mut line).unwrap();
+    }
+
+    #[test]
+    fn crashed_process_releases_lock_and_recovers_before_the_next_update() {
+        use std::process::{Command,Stdio};
+        let root = test_root("process-crash");
+        let mut child = Command::new(std::env::current_exe().unwrap())
+            .args(["--exact","runtime::repository::tests::repository_lock_child","--ignored","--nocapture"])
+            .env("OMNIDESK_TEST_REPOSITORY_LOCK_ROOT",&root)
+            .stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::piped()).spawn().unwrap();
+        let deadline = std::time::Instant::now()+Duration::from_secs(5);
+        while !root.join("lock-ready").is_file() && std::time::Instant::now()<deadline {
+            assert!(child.try_wait().unwrap().is_none(),"lock child exited before acquiring the lock");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(root.join("lock-ready").is_file());
+        let repository = Repository::new(&root);
+        assert!(repository.recover_incomplete_transactions().is_err());
+        assert_eq!(repository.read_json(".omnidesk/data/state.json").unwrap()["value"],"during-commit");
+        child.kill().unwrap();child.wait().unwrap();
+        let started = std::time::Instant::now();
+        repository.transaction_with("after-crash",|repository| {
+            let mut state = repository.read_json(".omnidesk/data/state.json").unwrap();
+            assert_eq!(state["value"],"before-commit");
+            state["nextUpdate"] = json!(true);
+            Ok(((),vec![JsonMutation::upsert(".omnidesk/data/state.json",state)]))
+        }).unwrap();
+        assert!(started.elapsed()<Duration::from_secs(2),"dead process left a time-based lock delay");
+        assert_eq!(repository.read_json(".omnidesk/data/state.json").unwrap()["nextUpdate"],true);
+        let journal:Value = serde_json::from_slice(&fs::read(root.join(".omnidesk/runtime/transactions/held.json")).unwrap()).unwrap();
+        assert_eq!(journal["state"],"rolled-back");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn steady_state_updates_do_not_read_the_growing_journal_archive() {
+        let root = test_root("archive-fast-path");
+        let archive = root.join(".omnidesk/runtime/transactions");
+        fs::create_dir_all(&archive).unwrap();
+        let history = serde_json::to_vec(&json!({"state":"committed","retainedEvidence":"x".repeat(4096)})).unwrap();
+        for index in 0..1000 {fs::write(archive.join(format!("history-{index}.json")),&history).unwrap();}
+        let repository = Repository::new(&root);
+        RECOVERY_JOURNAL_READS.with(|reads|reads.set(0));
+        repository.recover_incomplete_transactions().unwrap();
+        assert_eq!(RECOVERY_JOURNAL_READS.with(|reads|reads.get()),1000);
+        assert!(archive.join("pending").is_dir());
+        RECOVERY_JOURNAL_READS.with(|reads|reads.set(0));
+        let started = std::time::Instant::now();
+        repository.transaction("hot-save",&[JsonMutation::upsert(".omnidesk/data/state.json",json!({"saved":true}))]).unwrap();
+        assert_eq!(RECOVERY_JOURNAL_READS.with(|reads|reads.get()),0,"ordinary save must not parse historical journals");
+        eprintln!("Repository hot-save with 1000 archived records: {}ms, historical journals read: 0",started.elapsed().as_millis());
+        assert_eq!(fs::read(archive.join("history-0.json")).unwrap(),history);
+        assert_eq!(fs::read(archive.join("history-999.json")).unwrap(),history);
+        assert_eq!(fs::read_dir(archive.join("pending")).unwrap().count(),0);
+        assert_eq!(fs::read_dir(&archive).unwrap().count(),1002); // history + new committed journal + pending directory
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn pending_committed_records_are_archived_without_rollback_and_corruption_blocks_writes() {
+        let root = test_root("pending-states");
+        let repository = Repository::new(&root);
+        seed_interrupted_journal(&root);
+        let pending = root.join(".omnidesk/runtime/transactions/pending");
+        let path = pending.join("held.json");
+        let mut journal:Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        journal["state"] = json!("committed");
+        fs::write(&path,serde_json::to_vec(&journal).unwrap()).unwrap();
+        repository.recover_incomplete_transactions().unwrap();
+        assert_eq!(repository.read_json(".omnidesk/data/state.json").unwrap()["value"],"during-commit");
+        assert!(!path.exists());
+        assert!(root.join(".omnidesk/runtime/transactions/held.json").is_file());
+        fs::write(pending.join("corrupt.json"),b"incomplete JSON").unwrap();
+        let before = fs::read(root.join(".omnidesk/data/state.json")).unwrap();
+        assert!(repository.transaction("must-not-write",&[JsonMutation::upsert(".omnidesk/data/state.json",json!({"lost":true}))]).unwrap_err().contains("记录损坏"));
+        assert_eq!(fs::read(root.join(".omnidesk/data/state.json")).unwrap(),before);
+        assert_eq!(fs::read(pending.join("corrupt.json")).unwrap(),b"incomplete JSON");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn explicit_import_recovery_checks_legacy_journals_after_cutover() {
+        let root = test_root("import-after-cutover");
+        let repository = Repository::new(&root);
+        repository.transaction("seed",&[JsonMutation::upsert(".omnidesk/data/state.json",json!({"value":"before-import"}))]).unwrap();
+        let imported = root.join(".omnidesk/runtime/transactions/imported.json");
+        fs::write(&imported,serde_json::to_vec(&json!({"state":"prepared","mutations":[
+            {"path":".omnidesk/data/state.json","previous":{"value":"import-recovered"}}
+        ]})).unwrap()).unwrap();
+        repository.recover_imported_transactions().unwrap();
+        assert_eq!(repository.read_json(".omnidesk/data/state.json").unwrap()["value"],"import-recovered");
+        assert_eq!(serde_json::from_slice::<Value>(&fs::read(imported).unwrap()).unwrap()["state"],"rolled-back");
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

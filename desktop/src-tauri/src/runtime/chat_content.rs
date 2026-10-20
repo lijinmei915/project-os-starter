@@ -284,9 +284,9 @@ pub fn project_evidence(root: &Path, state: Option<&Value>) -> (Value, Vec<Messa
         .collect::<Vec<_>>();
     changed_files.sort();
     changed_files.truncate(12);
-    let validation_status = read_json(root.join(GOAL_VALIDATION_REPORT_PATH))
-        .as_ref()
-        .and_then(|value| value.get("status"))
+    let validation_report = crate::runtime::goals::project_validation_report(root,
+        read_json(root.join(GOAL_VALIDATION_REPORT_PATH)).unwrap_or_else(|| json!({})));
+    let validation_status = validation_report.get("status")
         .and_then(Value::as_str)
         .unwrap_or("not-run")
         .to_string();

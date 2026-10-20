@@ -229,7 +229,12 @@ pub fn recover_and_activate_runtime_state(root: &Path) -> Result<MigrationOutcom
     repository.recover_incomplete_transactions()?;
     let outcome = ensure_active_state_namespace(root)?;
     if outcome.conflicts.is_empty() {
-        crate::runtime::repository::Repository::new(root).recover_incomplete_transactions()?;
+        let repository = crate::runtime::repository::Repository::new(root);
+        if outcome.copied > 0 {
+            repository.recover_imported_transactions()?;
+        } else {
+            repository.recover_incomplete_transactions()?;
+        }
     }
     Ok(outcome)
 }

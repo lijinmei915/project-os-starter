@@ -153,6 +153,9 @@ mod tests {
                 model: String::new(),
                 prompt: "cancel before model access".to_string(),
                 max_steps: 1,
+                previous_tool_name: String::new(),
+                previous_tool_result: None,
+                completed_check_ids: Vec::new(),
                 cancellation: Some(cancellation),
                 event_sink: None,
             })

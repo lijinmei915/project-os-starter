@@ -683,6 +683,79 @@ pub fn ordered_profile_candidates(config: &ProviderConfig) -> Vec<(String, Provi
     candidates
 }
 
+/// Groups profiles by the upstream that can fail as one unit. Different API
+/// paths, keys, or models on the same origin are not independent network
+/// failover targets.
+pub fn upstream_failure_domain(api_base: &str) -> String {
+    let trimmed = api_base.trim().trim_end_matches('/');
+    let Ok(url) = reqwest::Url::parse(trimmed) else {
+        return trimmed.to_ascii_lowercase();
+    };
+    let Some(host) = url.host_str() else {
+        return trimmed.to_ascii_lowercase();
+    };
+    let port = url
+        .port_or_known_default()
+        .map(|value| format!(":{value}"))
+        .unwrap_or_default();
+    format!(
+        "{}://{}{}",
+        url.scheme().to_ascii_lowercase(),
+        host.to_ascii_lowercase(),
+        port
+    )
+}
+
+/// Returns the profiles that must be skipped after an in-flight failure.
+/// Network failures exclude the whole upstream origin; credential, quota,
+/// model, and service failures exclude only the concrete profile.
+pub fn request_failover_exclusions(
+    config: &ProviderConfig,
+    failed: &ProviderConfig,
+    failure_status: &str,
+) -> HashSet<String> {
+    if failure_status != "network-unavailable" {
+        return HashSet::from([failed.active_profile_id.clone()]);
+    }
+    let failed_domain = upstream_failure_domain(&failed.api_base);
+    let mut excluded = config
+        .profiles
+        .iter()
+        .filter(|profile| upstream_failure_domain(&profile.api_base) == failed_domain)
+        .map(|profile| profile.id.clone())
+        .collect::<HashSet<_>>();
+    excluded.insert(failed.active_profile_id.clone());
+    excluded
+}
+
+pub fn has_independent_upstream(config: &ProviderConfig, reference: &ProviderConfig) -> bool {
+    let reference_domain = upstream_failure_domain(&reference.api_base);
+    config.profiles.iter().any(|profile| {
+        profile.id != reference.active_profile_id
+            && upstream_failure_domain(&profile.api_base) != reference_domain
+    })
+}
+
+/// Selects the next usable connection after an in-flight request failure.
+/// The returned exclusion set is the single source of truth for later
+/// attempts in the same request.
+pub async fn prepare_failover_after_request_failure(
+    root: &Path,
+    configured: &ProviderConfig,
+    failed: &ProviderConfig,
+    failure_status: &str,
+    previously_excluded: &HashSet<String>,
+) -> Result<(ProviderConfig, String, HashSet<String>), String> {
+    let mut excluded = previously_excluded.clone();
+    excluded.extend(request_failover_exclusions(
+        configured,
+        failed,
+        failure_status,
+    ));
+    let (provider, note) = prepare_for_request(root, configured, &excluded).await?;
+    Ok((provider, note, excluded))
+}
+
 pub fn health_entry<'a>(
     health: &'a ModelHealthCache,
     provider: &ProviderConfig,
@@ -733,8 +806,9 @@ pub async fn prepare_for_request(
 ) -> Result<(ProviderConfig, String), String> {
     let health = load_or_seed_health(root)?;
     let mut failures = Vec::new();
+    let mut excluded = excluded_profile_ids.clone();
     for (profile_id, candidate) in ordered_profile_candidates(configured) {
-        if excluded_profile_ids.contains(&profile_id) {
+        if excluded.contains(&profile_id) {
             continue;
         }
         let label = configured
@@ -764,6 +838,7 @@ pub async fn prepare_for_request(
                     return Ok((candidate, switch_note));
                 }
                 failures.push(format!("{}（{}）", label, entry.status));
+                excluded.extend(request_failover_exclusions(configured, &candidate, &entry.status));
                 continue;
             }
         }
@@ -793,6 +868,7 @@ pub async fn prepare_for_request(
             Err(error) => {
                 record_failure(root, &candidate, &error)?;
                 failures.push(format!("{}（{}）", label, classify_failure(&error)));
+                excluded.extend(request_failover_exclusions(configured, &candidate, classify_failure(&error)));
             }
         }
     }
@@ -1290,6 +1366,10 @@ pub fn sync_hermes_runtime_config(config: &ProviderConfig) -> Result<(), String>
         return Ok(());
     };
     let path = PathBuf::from(home).join(".hermes/config.yaml");
+    #[cfg(feature = "webdriver")]
+    let path = std::env::var_os("OMNIDESK_WEBDRIVER_WORKSPACE_ROOT")
+        .map(|root| PathBuf::from(root).join(".omnidesk/cache/hermes/config.yaml"))
+        .unwrap_or(path);
     if !path.is_file() {
         return Ok(());
     }
@@ -1433,6 +1513,12 @@ mod tests {
         );
         assert_eq!(classify_failure("request timed out"), "network-unavailable");
         assert_eq!(
+            classify_failure(
+                "error sending request for url (http://127.0.0.1:49152/v1/chat/completions)"
+            ),
+            "network-unavailable"
+        );
+        assert_eq!(
             classify_failure("模型等待首个响应超时"),
             "network-unavailable"
         );
@@ -1506,6 +1592,48 @@ mod tests {
                 .unwrap_err(),
             "请先填写 Key 保存变量名或粘贴 API Key"
         );
+    }
+
+    #[tokio::test]
+    async fn preflight_skips_sibling_profiles_after_a_network_failure() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        for cached_failure in [false, true] {
+            let root = test_directory(if cached_failure { "preflight-cached-origin" } else { "preflight-live-origin" });
+            fs::create_dir_all(&root).unwrap();
+            write_secret(&root, "PREFLIGHT_ORIGIN_KEY", "fixture-key").unwrap();
+            let unavailable = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            let failed_origin = format!("http://{}/v1", unavailable.local_addr().unwrap());
+            drop(unavailable);
+            let backup = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let backup_origin = format!("http://{}/v1", backup.local_addr().unwrap());
+            let server = tokio::spawn(async move {
+                let (mut stream, _) = backup.accept().await.unwrap();
+                let mut buffer = [0; 4096];
+                stream.read(&mut buffer).await.unwrap();
+                let body = r#"{"choices":[{"message":{"content":"OK"}}]}"#;
+                stream.write_all(format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}", body.len(), body).as_bytes()).await.unwrap();
+            });
+            let mut config = default_config();
+            config.enabled = true;
+            config.active_profile_id = "primary".to_string();
+            config.api_base = failed_origin.clone();
+            config.api_key_env = "PREFLIGHT_ORIGIN_KEY".to_string();
+            let profile = |id: &str, base: &str| ProviderProfile {
+                id: id.to_string(), name: id.to_string(), note: String::new(), website: String::new(),
+                provider: config.provider.clone(), model: config.model.clone(), api_base: base.to_string(), api_key_env: config.api_key_env.clone(),
+            };
+            config.profiles = vec![profile("primary", &failed_origin), profile("sibling", &format!("{failed_origin}/other")), profile("backup", &backup_origin)];
+            // Even a previously healthy sibling cannot rescue a failed origin.
+            let sibling = profile_config(&config, &config.profiles[1]);
+            record_health(&root, ModelHealthEntry { api_base: sibling.api_base.clone(), api_key_env: sibling.api_key_env.clone(), model: sibling.model.clone(),
+                status: "available".to_string(), message: "previously healthy".to_string(), checked_at: current_unix_timestamp() }).unwrap();
+            if cached_failure { record_failure(&root, &config, "connection refused").unwrap(); }
+            let (selected, _) = tokio::time::timeout(Duration::from_secs(2), prepare_for_request(&root, &config, &HashSet::new())).await.unwrap().unwrap();
+            assert_eq!(selected.active_profile_id, "backup");
+            assert_eq!(load_or_seed_config(&root).unwrap().active_profile_id, "backup");
+            server.await.unwrap();
+            fs::remove_dir_all(root).unwrap();
+        }
     }
 
     #[tokio::test]
@@ -1721,6 +1849,51 @@ mod tests {
             health_entry(&health, &fallback_config).unwrap(),
             161
         ));
+    }
+
+    #[test]
+    fn request_failover_distinguishes_profiles_from_independent_upstreams() {
+        let mut config = default_config();
+        config.api_base = "https://gateway.example/v1".to_string();
+        config.profiles[0].api_base = config.api_base.clone();
+        config.profiles.push(ProviderProfile {
+            id: "same-gateway".to_string(),
+            name: "Same gateway".to_string(),
+            note: String::new(),
+            website: String::new(),
+            provider: "openai-compatible".to_string(),
+            model: "other-model".to_string(),
+            api_base: "https://gateway.example/compatible/v1".to_string(),
+            api_key_env: "SAME_GATEWAY_API_KEY".to_string(),
+        });
+        config.profiles.push(ProviderProfile {
+            id: "independent".to_string(),
+            name: "Independent".to_string(),
+            note: String::new(),
+            website: String::new(),
+            provider: "openai-compatible".to_string(),
+            model: "backup-model".to_string(),
+            api_base: "https://backup.example/v1".to_string(),
+            api_key_env: "BACKUP_API_KEY".to_string(),
+        });
+
+        assert_eq!(
+            upstream_failure_domain("https://Gateway.Example/v1/chat/completions"),
+            "https://gateway.example:443"
+        );
+        let network = request_failover_exclusions(&config, &config, "network-unavailable");
+        assert!(network.contains(&config.active_profile_id));
+        assert!(network.contains("same-gateway"));
+        assert!(!network.contains("independent"));
+        assert!(has_independent_upstream(&config, &config));
+
+        let quota = request_failover_exclusions(&config, &config, "quota-exhausted");
+        assert_eq!(quota, HashSet::from([config.active_profile_id.clone()]));
+
+        config
+            .profiles
+            .retain(|profile| profile.id != "independent");
+        assert!(!has_independent_upstream(&config, &config));
     }
 
     #[test]

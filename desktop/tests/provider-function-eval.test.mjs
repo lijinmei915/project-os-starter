@@ -11,9 +11,34 @@ import {
   validateProviderFallbackRuntimeResult,
   validateProviderTimelineRuntimeResult,
   validateProviderDirectStreamRuntimeResult,
+  validateProviderReadonlyFileEvidence,
 } from "../src/agent-runtime/provider-evaluation.js";
 
 const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+test("readonly file acceptance requires a file-only marker, paired successful read and unchanged files", () => {
+  const result = {
+    readonlyFileEvidence: { fixturePath: "README.md", markerMatched: true, fixtureSourceUnchanged: true, projectEntriesUnchanged: true },
+    readonlyToolEvents: [
+      { kind: "tool-call", status: "requested", details: { name: "read_file", path: "README.md" } },
+      { kind: "tool-result", status: "succeeded", details: { name: "read_file", path: "README.md", success: true } },
+    ],
+  };
+  assert.equal(validateProviderReadonlyFileEvidence(result), result);
+  assert.throws(() => validateProviderReadonlyFileEvidence({ ...result, readonlyToolEvents: [...result.readonlyToolEvents].reverse() }), /tool evidence/);
+  for (const field of ["markerMatched", "fixtureSourceUnchanged", "projectEntriesUnchanged"]) {
+    assert.throws(() => validateProviderReadonlyFileEvidence({ ...result, readonlyFileEvidence: { ...result.readonlyFileEvidence, [field]: false } }));
+  }
+  for (const events of [[], result.readonlyToolEvents.slice(0, 1), [result.readonlyToolEvents[1]]]) {
+    assert.throws(() => validateProviderReadonlyFileEvidence({ ...result, readonlyToolEvents: events }), /tool evidence/);
+  }
+  const wrongPath = structuredClone(result);
+  wrongPath.readonlyToolEvents[1].details.path = "other.md";
+  assert.throws(() => validateProviderReadonlyFileEvidence(wrongPath), /tool evidence/);
+  const failed = structuredClone(result);
+  failed.readonlyToolEvents[1].status = "failed";
+  assert.throws(() => validateProviderReadonlyFileEvidence(failed), /tool evidence/);
+});
 
 test("direct upstream streaming requires separated visible deliveries with complete matching content", () => {
   const result = {

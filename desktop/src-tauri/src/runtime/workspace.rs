@@ -1837,12 +1837,10 @@ pub fn load_projection_state(root: &Path) -> WorkspaceProjectionState {
         goal_validation: repository
             .read_json(".omnidesk/data/goal-validation.json")
             .unwrap_or_else(|| json!({ "criteria": [] })),
-        goal_validation_report: repository
+        goal_validation_report: crate::runtime::goals::project_validation_report(root, repository
             .read_json(".omnidesk/evidence/goal-validation-report.json")
-            .unwrap_or_else(|| json!({ "status": "missing", "checks": [] })),
-        goal_signoff_history: repository
-            .read_json(".omnidesk/data/goal-signoff-history.json")
-            .unwrap_or_else(|| json!({ "entries": [] })),
+            .unwrap_or_else(|| json!({ "status": "missing", "checks": [] }))),
+        goal_signoff_history: crate::runtime::goals::signoff_history(root),
         workspace_facts: repository
             .read_json(".omnidesk/cache/workspace-facts.json")
             .unwrap_or_else(|| json!(null)),

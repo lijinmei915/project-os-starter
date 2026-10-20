@@ -54,6 +54,10 @@ impl AgentExecutorCapabilities {
         self.extensions.insert(key.into(), value);
         self
     }
+
+    pub fn extension_bool(&self, key: &str) -> bool {
+        self.extensions.get(key).and_then(Value::as_bool) == Some(true)
+    }
 }
 
 #[derive(Serialize, Clone)]
@@ -95,6 +99,9 @@ pub struct AgentExecutionRequest {
     pub model: String,
     pub prompt: String,
     pub max_steps: usize,
+    pub previous_tool_name: String,
+    pub previous_tool_result: Option<Value>,
+    pub completed_check_ids: Vec<String>,
     pub cancellation: Option<CancellationToken>,
     pub event_sink: Option<AgentEventSink>,
 }
@@ -170,6 +177,9 @@ pub trait AgentExecutor: Send + Sync {
     fn capabilities(&self) -> AgentExecutorCapabilities;
     fn status(&self) -> AgentExecutorStatus;
     fn prepare(&self, provider: &ProviderConfig) -> Result<(), String>;
+    fn requires_provider_credentials(&self) -> bool {
+        true
+    }
     fn prewarm(&self, _request: AgentExecutorWarmupRequest) -> Result<(), String> {
         Ok(())
     }
@@ -233,6 +243,26 @@ pub fn validate_governed_capabilities(executor: &dyn AgentExecutor) -> Result<()
             missing.join(", ")
         ))
     }
+}
+
+pub fn validate_task_execution_capabilities(
+    executor: &dyn AgentExecutor,
+    isolated: bool,
+) -> Result<(), String> {
+    if validate_governed_capabilities(executor).is_ok() {
+        return Ok(());
+    }
+    if isolated
+        && executor
+            .capabilities()
+            .extension_bool("isolatedPatchDraft")
+    {
+        return Ok(());
+    }
+    Err(format!(
+        "Agent Executor {} 只能在隔离工作区生成受控 Patch 草稿。",
+        executor.id()
+    ))
 }
 
 pub fn default_agent_executor() -> &'static dyn AgentExecutor {
@@ -332,6 +362,22 @@ mod tests {
     fn governed_execution_requires_the_complete_runtime_contract() {
         assert!(validate_governed_capabilities(default_agent_executor()).is_ok());
         assert!(validate_governed_capabilities(&ContractFixture).is_ok());
+    }
+
+    #[test]
+    fn isolated_draft_adapter_never_counts_as_a_governed_executor() {
+        assert!(validate_task_execution_capabilities(default_agent_executor(), false).is_ok());
+        assert!(validate_task_execution_capabilities(
+            agent_executor_by_id("codex-cli").unwrap(),
+            true
+        )
+        .is_ok());
+        assert!(validate_task_execution_capabilities(
+            agent_executor_by_id("codex-cli").unwrap(),
+            false
+        )
+        .is_err());
+        assert!(validate_governed_capabilities(agent_executor_by_id("codex-cli").unwrap()).is_err());
     }
 
     #[test]

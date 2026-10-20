@@ -30,6 +30,7 @@ pub mod tasks;
 pub mod terminal;
 pub mod theme;
 pub mod tool_registry;
+pub mod validation_revision;
 pub mod workspace;
 pub mod workspace_governance;
 pub mod workspace_watcher;

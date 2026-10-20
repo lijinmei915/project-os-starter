@@ -1,8 +1,9 @@
 #[cfg(test)]
 use crate::runtime::acp_protocol::extract_structured_envelope as extract_structured_hermes_envelope;
 use crate::runtime::agent_executor::{
-    select_agent_executor, validate_governed_capabilities, AgentExecutionMode, AgentExecutionPurpose,
-    AgentExecutionRequest, AgentExecutionResult, AgentExecutorWarmupRequest,
+    select_agent_executor, validate_governed_capabilities, validate_task_execution_capabilities,
+    AgentExecutionMode,
+    AgentExecutionPurpose, AgentExecutionRequest, AgentExecutionResult, AgentExecutorWarmupRequest,
 };
 use crate::runtime::agent_runs::PersistedAgentRun;
 use crate::runtime::chat_content::{
@@ -11,7 +12,8 @@ use crate::runtime::chat_content::{
 };
 use crate::runtime::chat_runtime::{emit_conversation_event, RuntimeRequestState};
 use crate::runtime::chat_stream::{
-    generate_provider_chat, should_retry_provider_chat, ChatStreamError,
+    continue_provider_chat, generate_provider_chat_with_tools, should_retry_provider_chat,
+    ChatStreamError,
 };
 use crate::runtime::execution::build_run_summary_markdown;
 #[cfg(test)]
@@ -26,11 +28,11 @@ use crate::runtime::planning::{
 #[cfg(test)]
 use crate::runtime::provider::ProviderProfile;
 use crate::runtime::provider::{
-    delete_profile as delete_provider_config_profile, isolate_duplicate_provider_secrets,
-    profile_from_input, save_profile as save_provider_config_profile,
-    status as provider_status_projection, status_source as provider_status_source, trim_for_trace,
-    ModelCatalog, ModelHealthCache, ModelHealthEntry, ProviderConfig, ProviderModelTestResult,
-    ProviderStatus,
+    delete_profile as delete_provider_config_profile, has_independent_upstream,
+    isolate_duplicate_provider_secrets, profile_from_input,
+    save_profile as save_provider_config_profile, status as provider_status_projection,
+    status_source as provider_status_source, trim_for_trace, ModelCatalog, ModelHealthCache,
+    ModelHealthEntry, ProviderConfig, ProviderModelTestResult, ProviderStatus,
 };
 use crate::runtime::terminal::TerminalState;
 use crate::runtime::theme::{
@@ -117,6 +119,12 @@ struct ChatWithModelInput {
     project_memory: Vec<Value>,
     #[serde(default)]
     request_id: String,
+    #[serde(default = "default_conversation_mode")]
+    conversation_mode: String,
+}
+
+fn default_conversation_mode() -> String {
+    "chat".to_string()
 }
 
 #[derive(Deserialize)]
@@ -209,6 +217,14 @@ struct DesktopConversationInput {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct ConversationHistoryInput {
+    id: String,
+    before_turn_id: Option<String>,
+    limit: Option<usize>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct ProjectMemoryInput {
     memory: Value,
 }
@@ -237,6 +253,13 @@ struct GeneratePatchDraftInput {
 #[serde(rename_all = "camelCase")]
 struct ApplyPatchDraftInput {
     task: Value,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ConfirmInterruptedPatchInput {
+    task: Value,
+    observation: Value,
 }
 
 #[derive(Deserialize)]
@@ -328,6 +351,8 @@ struct ResumeAgentRunInput {
 #[serde(rename_all = "camelCase")]
 struct ApproveAgentRunInput {
     id: String,
+    expected_revision: usize,
+    token: String,
 }
 
 #[derive(Deserialize)]
@@ -916,15 +941,36 @@ fn request_mcp_call(input: RequestMcpCallInput) -> Result<PersistedAgentRun, Str
     Ok(run)
 }
 
-fn transient_chat_failure_reply(failure_status: &str) -> Option<&'static str> {
-    if crate::runtime::provider::failure_changes_health(failure_status) {
-        return None;
+fn provider_request_failure_reply(
+    failure_status: &str,
+    has_independent_backup: bool,
+) -> &'static str {
+    match failure_status {
+        "network-unavailable" if has_independent_backup => {
+            "模型线路发生网络异常；系统已重试并尝试独立备用连接，但仍未收到正文。"
+        }
+        "network-unavailable" => {
+            "模型线路发生网络异常；系统已经重试，但当前保存的连接共用同一网关，没有可切换的独立备用线路。"
+        }
+        "authentication-failed" => {
+            "模型连接认证失败；系统已尝试其它连接。请检查对应连接的 API Key。"
+        }
+        "quota-exhausted" => {
+            "模型连接额度不足；系统已尝试其它连接，但暂时没有可用额度。"
+        }
+        "model-unavailable" => {
+            "当前线路不支持所选模型；系统已尝试其它连接。请更换模型或连接。"
+        }
+        _ => "模型服务本轮暂时不可用；系统已尝试其它连接，但没有生成新回答。",
     }
-    Some(if failure_status == "network-unavailable" {
-        "本轮请求遇到网络异常，自动重试后仍未收到正文。你可以重新发送。"
+}
+
+fn provider_failure_result_status(failure_status: &str) -> String {
+    if crate::runtime::provider::failure_changes_health(failure_status) {
+        failure_status.to_string()
     } else {
-        "模型服务本轮暂时不可用，没有生成新回答。你可以稍后重试。"
-    })
+        "request-failed".to_string()
+    }
 }
 
 #[tauri::command]
@@ -953,13 +999,21 @@ async fn chat_with_model(
         crate::runtime::workspace::project_runtime_context(&root, &current_project.name);
     let project_name = project_context.name;
     let stage = project_context.stage;
-    let state = crate::runtime::repository::Repository::new(&root).read_json(STATE_PATH);
-    let (project_evidence, all_evidence_references) = project_evidence(&root, state.as_ref());
-    let evidence_references =
-        references_for_message(&message, &input.context_state, all_evidence_references);
+    let project_mode = input.conversation_mode.trim() == "project";
+    let (project_evidence, all_evidence_references) = if project_mode {
+        let state = crate::runtime::repository::Repository::new(&root).read_json(STATE_PATH);
+        project_evidence(&root, state.as_ref())
+    } else {
+        (serde_json::json!({}), Vec::new())
+    };
+    let evidence_references = if project_mode {
+        references_for_message(&message, &input.context_state, all_evidence_references)
+    } else {
+        Vec::new()
+    };
 
     if configured_provider.enabled {
-        let (provider, provider_switch_note) =
+        let (mut provider, provider_switch_note) =
             match prepare_provider_for_request(&app_root, &configured_provider, &HashSet::new())
                 .await
             {
@@ -971,8 +1025,13 @@ async fn chat_with_model(
                         &input.context_state,
                         &project_evidence,
                     );
-                    fallback.provider_status =
-                        crate::runtime::provider::classify_failure(&err).to_string();
+                    let failure_status = crate::runtime::provider::classify_failure(&err);
+                    fallback.reply = provider_request_failure_reply(
+                        failure_status,
+                        has_independent_upstream(&configured_provider, &configured_provider),
+                    )
+                    .to_string();
+                    fallback.provider_status = provider_failure_result_status(failure_status);
                     fallback.provider_model = configured_provider.model.clone();
                     fallback.provider_error = err;
                     fallback.references = evidence_references;
@@ -996,59 +1055,246 @@ async fn chat_with_model(
         let stream_started = Instant::now();
         let provider_stream_trace = Arc::new(Mutex::new(ProviderStreamTrace::default()));
         let trace_for_request = Arc::clone(&provider_stream_trace);
+        let empty_project_evidence = serde_json::json!({});
+        let mut provider_switch_notes = Vec::new();
+        if !provider_switch_note.is_empty() {
+            provider_switch_notes.push(provider_switch_note);
+        }
         let provider_request = async {
             tokio::time::timeout(Duration::from_secs(300), async {
-                let mut attempt = 0;
+                let mut excluded_profile_ids = HashSet::new();
                 loop {
-                    let result = generate_provider_chat(
-                        &provider,
-                        &root,
-                        &project_name,
-                        &stage,
-                        &message,
-                        &attachments,
-                        &input.recent_turns,
-                        &input.context_state,
-                        input.response_contract == "recommendation-required",
-                        &input.summary,
-                        &input.project_memory,
-                        &project_evidence,
-                        |text, chars| {
-                            if let Ok(mut trace) = trace_for_request.lock() {
-                                let elapsed_ms = stream_started.elapsed().as_millis() as u64;
-                                trace.delta_count = trace.delta_count.saturating_add(1);
-                                trace.char_count = trace.char_count.saturating_add(chars as u64);
-                                trace.first_delta_ms.get_or_insert(elapsed_ms);
-                                trace.last_delta_ms = Some(elapsed_ms);
+                    let mut attempt = 0;
+                    let result = loop {
+                        let result = generate_provider_chat_with_tools(
+                            &provider,
+                            &root,
+                            &project_name,
+                            &stage,
+                            &message,
+                            &attachments,
+                            &input.recent_turns,
+                            &input.context_state,
+                            input.response_contract == "recommendation-required",
+                            &input.summary,
+                            if project_mode { &input.project_memory } else { &[] },
+                            if project_mode { &project_evidence } else { &empty_project_evidence },
+                            project_mode,
+                            |text, chars| {
+                                if let Ok(mut trace) = trace_for_request.lock() {
+                                    let elapsed_ms = stream_started.elapsed().as_millis() as u64;
+                                    trace.delta_count = trace.delta_count.saturating_add(1);
+                                    trace.char_count =
+                                        trace.char_count.saturating_add(chars as u64);
+                                    trace.first_delta_ms.get_or_insert(elapsed_ms);
+                                    trace.last_delta_ms = Some(elapsed_ms);
+                                }
+                                emit_conversation_event(
+                                    &app,
+                                    &request_id,
+                                    "model.delta",
+                                    "thinking",
+                                    "running",
+                                    json!({ "chars": chars, "text": text }),
+                                )
+                            },
+                        )
+                        .await;
+                        if !result
+                            .as_ref()
+                            .err()
+                            .is_some_and(|err| should_retry_provider_chat(err, attempt))
+                        {
+                            break result;
+                        }
+                        attempt += 1;
+                        emit_conversation_event(
+                            &app,
+                            &request_id,
+                            "request.retrying",
+                            "thinking",
+                            "running",
+                            json!({ "attempt": attempt + 1, "reason": "network-unavailable" }),
+                        );
+                        tokio::time::sleep(Duration::from_millis(400)).await;
+                    };
+                    let Err(error) = &result else {
+                        break result;
+                    };
+                    if !error.partial_reply.is_empty() {
+                        let original_partial = error.partial_reply.clone();
+                        if let Ok((next_provider, switch_note, _)) =
+                            prepare_provider_failover_for_request(
+                                &app_root,
+                                &configured_provider,
+                                &provider,
+                                "network-unavailable",
+                                &excluded_profile_ids,
+                            )
+                            .await
+                        {
+                            if next_provider.active_profile_id != provider.active_profile_id {
+                                let previous_model = provider.model.clone();
+                                let next_model = next_provider.model.clone();
+                                provider = next_provider;
+                                provider_switch_notes.push(if switch_note.is_empty() {
+                                    format!("回答中断后已切换到模型 {next_model} 继续。")
+                                } else {
+                                    switch_note
+                                });
+                                emit_conversation_event(
+                                    &app,
+                                    &request_id,
+                                    "request.failover",
+                                    "thinking",
+                                    "running",
+                                    json!({
+                                        "fromModel": previous_model,
+                                        "reason": "stream-interrupted",
+                                        "toModel": next_model,
+                                    }),
+                                );
                             }
+                        }
+                        emit_conversation_event(
+                            &app,
+                            &request_id,
+                            "request.continuing",
+                            "thinking",
+                            "running",
+                            json!({ "receivedChars": original_partial.chars().count() }),
+                        );
+                        let mut continuation_attempt = 0;
+                        let continuation = loop {
+                            let continuation = continue_provider_chat(
+                                &provider,
+                                &root,
+                                &message,
+                                &original_partial,
+                                |text, chars| {
+                                    if let Ok(mut trace) = trace_for_request.lock() {
+                                        let elapsed_ms =
+                                            stream_started.elapsed().as_millis() as u64;
+                                        trace.delta_count = trace.delta_count.saturating_add(1);
+                                        trace.char_count =
+                                            trace.char_count.saturating_add(chars as u64);
+                                        trace.first_delta_ms.get_or_insert(elapsed_ms);
+                                        trace.last_delta_ms = Some(elapsed_ms);
+                                    }
+                                    emit_conversation_event(
+                                        &app,
+                                        &request_id,
+                                        "model.delta",
+                                        "thinking",
+                                        "running",
+                                        json!({ "chars": chars, "text": text }),
+                                    )
+                                },
+                            )
+                            .await;
+                            if !continuation.as_ref().err().is_some_and(|err| {
+                                should_retry_provider_chat(err, continuation_attempt)
+                            }) {
+                                break continuation;
+                            }
+                            continuation_attempt += 1;
                             emit_conversation_event(
                                 &app,
                                 &request_id,
-                                "model.delta",
+                                "request.retrying",
                                 "thinking",
                                 "running",
-                                json!({ "chars": chars, "text": text }),
-                            )
-                        },
-                    )
-                    .await;
-                    let should_retry = result
-                        .as_ref()
-                        .err()
-                        .is_some_and(|err| should_retry_provider_chat(err, attempt));
-                    if !should_retry {
+                                json!({
+                                    "attempt": continuation_attempt + 1,
+                                    "reason": "continuation-network-unavailable",
+                                }),
+                            );
+                            tokio::time::sleep(Duration::from_millis(400)).await;
+                        };
+                        match continuation {
+                            Ok(continuation) => {
+                                let mut recovered = local_chat_result(
+                                    &message,
+                                    !attachments.is_empty(),
+                                    &input.context_state,
+                                    &project_evidence,
+                                );
+                                recovered.reply = format!("{original_partial}{continuation}");
+                                recovered.should_create_plan = false;
+                                recovered.intent = "chat".to_string();
+                                recovered.response_mode = "continued-stream".to_string();
+                                recovered.recommended_action = None;
+                                break Ok(recovered);
+                            }
+                            Err(continuation_error) => {
+                                let combined = format!(
+                                    "{}{}",
+                                    original_partial, continuation_error.partial_reply
+                                );
+                                break Err(ChatStreamError::with_partial(
+                                    format!(
+                                        "原模型流中断，自动续写也未完成：{}",
+                                        continuation_error.message
+                                    ),
+                                    &combined,
+                                ));
+                            }
+                        }
+                    }
+                    let failure_status = crate::runtime::provider::classify_failure(&error.message);
+                    if !matches!(
+                        failure_status,
+                        "network-unavailable"
+                            | "authentication-failed"
+                            | "quota-exhausted"
+                            | "model-unavailable"
+                            | "unavailable"
+                    ) {
                         break result;
                     }
-                    attempt += 1;
+                    if crate::runtime::provider::failure_changes_health(failure_status) {
+                        crate::runtime::provider::record_failure(
+                            &app_root,
+                            &provider,
+                            &error.message,
+                        )?;
+                    }
+                    let previous_model = provider.model.clone();
+                    let Ok((next_provider, switch_note, next_exclusions)) =
+                        prepare_provider_failover_for_request(
+                            &app_root,
+                            &configured_provider,
+                            &provider,
+                            failure_status,
+                            &excluded_profile_ids,
+                        )
+                        .await
+                    else {
+                        break result;
+                    };
+                    excluded_profile_ids = next_exclusions;
+                    if next_provider.active_profile_id == provider.active_profile_id {
+                        break result;
+                    }
+                    let next_model = next_provider.model.clone();
+                    provider = next_provider;
+                    provider_switch_notes.push(if switch_note.is_empty() {
+                        format!("当前连接失败，已切换到模型 {next_model}。")
+                    } else {
+                        switch_note
+                    });
                     emit_conversation_event(
                         &app,
                         &request_id,
-                        "request.retrying",
+                        "request.failover",
                         "thinking",
                         "running",
-                        json!({ "attempt": attempt + 1, "reason": "network-unavailable" }),
+                        json!({
+                            "fromModel": previous_model,
+                            "reason": failure_status,
+                            "toModel": next_model,
+                        }),
                     );
-                    tokio::time::sleep(Duration::from_millis(400)).await;
                 }
             })
             .await
@@ -1086,8 +1332,9 @@ async fn chat_with_model(
                 result.provider_model = provider.model.clone();
                 result.provider_error = String::new();
                 result.provider_stream_trace = provider_stream_trace;
-                if !provider_switch_note.is_empty() {
-                    result.reply = format!("{}\n\n{}", provider_switch_note, result.reply);
+                if !provider_switch_notes.is_empty() {
+                    result.reply =
+                        format!("{}\n\n{}", provider_switch_notes.join("\n"), result.reply);
                 }
                 result.references = evidence_references;
                 return Ok(result);
@@ -1156,28 +1403,18 @@ async fn chat_with_model(
                         provider_stream_trace,
                     });
                 }
-                if let Some(reply) = transient_chat_failure_reply(failure_status) {
-                    return Ok(ChatWithModelResult {
-                        reply: reply.to_string(),
-                        should_create_plan: false,
-                        intent: "chat".to_string(),
-                        provider_status: "request-failed".to_string(),
-                        provider_model: provider.model.clone(),
-                        provider_error: err.message,
-                        response_mode: "text".to_string(),
-                        references: evidence_references,
-                        recommended_action: None,
-                        provider_stream_trace,
-                    });
-                }
                 let mut fallback = local_chat_result(
                     &message,
                     !attachments.is_empty(),
                     &input.context_state,
                     &project_evidence,
                 );
-                fallback.provider_status =
-                    crate::runtime::provider::classify_failure(&err.message).to_string();
+                fallback.reply = provider_request_failure_reply(
+                    failure_status,
+                    has_independent_upstream(&configured_provider, &provider),
+                )
+                .to_string();
+                fallback.provider_status = provider_failure_result_status(failure_status);
                 fallback.provider_model = provider.model.clone();
                 fallback.provider_error = err.message;
                 fallback.references = evidence_references;
@@ -1395,27 +1632,29 @@ async fn generate_readonly_plan(
 }
 
 #[tauri::command]
-fn list_desktop_tasks() -> Result<Vec<Value>, String> {
+async fn list_desktop_tasks() -> Result<Vec<Value>, String> {
     let app_root = find_workspace_root()?;
     let mut registry = load_or_seed_registry(&app_root)?;
     let current_project = current_registry_project(&mut registry, &app_root)?;
     let root = PathBuf::from(&current_project.path);
-    crate::runtime::tasks::recover_storage(&crate::runtime::tasks::directory(&root))?;
-    crate::runtime::tasks::list(&root)
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::runtime::tasks::recover_storage(&crate::runtime::tasks::directory(&root))?;
+        crate::runtime::tasks::list(&root)
+    }).await.map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
-fn save_desktop_task(input: DesktopTaskInput) -> Result<Value, String> {
+async fn save_desktop_task(input: DesktopTaskInput) -> Result<Value, String> {
     let app_root = find_workspace_root()?;
     let mut registry = load_or_seed_registry(&app_root)?;
     let current_project = current_registry_project(&mut registry, &app_root)?;
     let root = PathBuf::from(&current_project.path);
-    crate::runtime::tasks::save(
+    tauri::async_runtime::spawn_blocking(move || crate::runtime::tasks::save(
         &root,
         &current_project.path,
         input.task,
         &current_timestamp_string(),
-    )
+    )).await.map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -1437,6 +1676,16 @@ fn list_desktop_conversations() -> Result<Vec<Value>, String> {
     let mut registry = load_or_seed_registry(&app_root)?;
     let current_project = current_registry_project(&mut registry, &app_root)?;
     crate::runtime::conversations::list(Path::new(&current_project.path))
+}
+
+#[tauri::command]
+fn read_desktop_conversation_history(input: ConversationHistoryInput) -> Result<Value, String> {
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let current_project = current_registry_project(&mut registry, &app_root)?;
+    crate::runtime::conversations::history(
+        Path::new(&current_project.path), &input.id, input.before_turn_id.as_deref(), input.limit.unwrap_or(60),
+    )
 }
 
 #[tauri::command]
@@ -1583,7 +1832,7 @@ async fn generate_patch_draft(
 #[tauri::command]
 fn apply_patch_draft(
     input: ApplyPatchDraftInput,
-) -> Result<crate::runtime::execution::ApplyPatchResult, String> {
+) -> Result<Value, String> {
     let app_root = find_workspace_root()?;
     let mut registry = load_or_seed_registry(&app_root)?;
     let current_project = current_registry_project(&mut registry, &app_root)?;
@@ -1593,12 +1842,29 @@ fn apply_patch_draft(
         );
     }
     let root = PathBuf::from(&current_project.path);
-    let draft = input
-        .task
-        .get("patchDraft")
-        .cloned()
-        .ok_or_else(|| "任务还没有 patch 草案".to_string())?;
-    crate::runtime::execution::apply_patch_draft(&root, &draft, &current_timestamp_string())
+    crate::runtime::tasks::apply_reviewed_patch(&root, &input.task, &current_timestamp_string())
+}
+
+#[tauri::command]
+async fn inspect_interrupted_patch(input: ApplyPatchDraftInput) -> Result<Value, String> {
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let project = current_registry_project(&mut registry, &app_root)?;
+    let root = PathBuf::from(project.path);
+    tauri::async_runtime::spawn_blocking(move || crate::runtime::tasks::inspect_interrupted_patch(
+        &root, &input.task, &current_timestamp_string()))
+        .await.map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+async fn confirm_interrupted_patch(input: ConfirmInterruptedPatchInput) -> Result<Value, String> {
+    let app_root = find_workspace_root()?;
+    let mut registry = load_or_seed_registry(&app_root)?;
+    let project = current_registry_project(&mut registry, &app_root)?;
+    let root = PathBuf::from(project.path);
+    tauri::async_runtime::spawn_blocking(move || crate::runtime::tasks::confirm_interrupted_patch(
+        &root, &input.task, &input.observation, &current_timestamp_string()))
+        .await.map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
@@ -1734,7 +2000,7 @@ fn cancel_agent_run(
 #[tauri::command]
 fn approve_agent_run(input: ApproveAgentRunInput) -> Result<PersistedAgentRun, String> {
     let app_root = find_workspace_root()?;
-    crate::runtime::agent_runs::approve(&app_root, &input.id, &current_timestamp_string())
+    crate::runtime::agent_runs::approve(&app_root, &input.id, input.expected_revision, &input.token, &current_timestamp_string())
 }
 
 #[tauri::command]
@@ -1766,7 +2032,7 @@ fn execute_approved_agent_tool(input: ExecuteApprovedAgentToolInput) -> Result<V
         &input.id,
         &input.token,
         &current_timestamp_string(),
-    )?;
+    );
     if let Ok(run) = crate::runtime::agent_runs::load(&app_root, &input.id) {
         let scheduler_status = match run.status.as_str() {
             "queued" => Some("waiting-continuation"),
@@ -1784,7 +2050,7 @@ fn execute_approved_agent_tool(input: ExecuteApprovedAgentToolInput) -> Result<V
             )?;
         }
     }
-    Ok(result)
+    result
 }
 
 fn record_background_agent_failure(root: &Path, run_id: &str, error: &str) {
@@ -1905,11 +2171,13 @@ async fn start_agent_run(
     }
     let provider = load_or_seed_provider_config(&app_root)?;
     let persisted_executor = select_agent_executor(Some(input.executor_id.as_str()), None)?;
-    validate_governed_capabilities(persisted_executor)?;
+    validate_task_execution_capabilities(persisted_executor, input.isolate)?;
     persisted_executor.prepare(&provider)?;
     let source_root = PathBuf::from(&current_project.path);
-    read_secret_from_env_or_dotenv(&source_root, &provider.api_key_env)
-        .ok_or_else(|| format!("环境变量或 .env.local 中未设置 {}", provider.api_key_env))?;
+    if persisted_executor.requires_provider_credentials() {
+        read_secret_from_env_or_dotenv(&source_root, &provider.api_key_env)
+            .ok_or_else(|| format!("环境变量或 .env.local 中未设置 {}", provider.api_key_env))?;
+    }
     let request_id = input.request_id.trim().to_string();
     let run_id = if request_id.is_empty() {
         format!(
@@ -1920,7 +2188,7 @@ async fn start_agent_run(
         format!("agent-{request_id}")
     };
     let timestamp = current_timestamp_string();
-    let queued_run = crate::runtime::agent_runs::new_agent_run_with_context(
+    let mut queued_run = crate::runtime::agent_runs::new_agent_run_with_context(
         run_id.clone(),
         request_id,
         current_project.id.clone(),
@@ -1932,8 +2200,29 @@ async fn start_agent_run(
         input.task_id.clone(),
         &timestamp,
     );
-    crate::runtime::agent_runs::persist_new_queued(&app_root, &queued_run)?;
-    crate::runtime::agent_scheduler::enqueue(&app_root, &run_id, &current_project.id, &timestamp)?;
+    if input.isolate {
+        queued_run.isolation = Some(crate::runtime::isolated_workspace::create(
+            &source_root,
+            &run_id,
+        )?);
+    }
+    if let Err(error) = crate::runtime::agent_runs::persist_new_queued(&app_root, &queued_run) {
+        if let Some(workspace) = queued_run.isolation.as_ref() {
+            let _ = crate::runtime::isolated_workspace::remove(workspace, &source_root);
+        }
+        return Err(error);
+    }
+    if let Err(error) = crate::runtime::agent_scheduler::enqueue(
+        &app_root,
+        &run_id,
+        &current_project.id,
+        &timestamp,
+    ) {
+        if let Some(workspace) = queued_run.isolation.as_ref() {
+            let _ = crate::runtime::isolated_workspace::remove(workspace, &source_root);
+        }
+        return Err(error);
+    }
     let state = runtime_requests.inner().clone();
     let background_input = RunAgentInput {
         run_id: run_id.clone(),
@@ -1963,20 +2252,24 @@ async fn run_agent_impl(
     let current_project = current_registry_project(&mut registry, &app_root)?;
     let source_root = PathBuf::from(&current_project.path);
     let provider = load_or_seed_provider_config(&app_root)?;
-    let persisted_executor_id = if input.run_id.trim().is_empty() {
-        None
+    let (persisted_executor_id, persisted_isolated) = if input.run_id.trim().is_empty() {
+        (None, false)
     } else {
         let persisted_run = crate::runtime::agent_runs::load(&app_root, input.run_id.trim())?;
-        Some(persisted_run.executor_id)
+        (Some(persisted_run.executor_id), persisted_run.isolation.is_some())
     };
     let executor = select_agent_executor(
         Some(input.executor_id.as_str()),
         persisted_executor_id.as_deref(),
     )?;
-    validate_governed_capabilities(executor)?;
+    validate_task_execution_capabilities(executor, input.isolate || persisted_isolated)?;
     executor.prepare(&provider)?;
-    let api_key = read_secret_from_env_or_dotenv(&source_root, &provider.api_key_env)
-        .ok_or_else(|| format!("环境变量或 .env.local 中未设置 {}", provider.api_key_env))?;
+    let api_key = if executor.requires_provider_credentials() {
+        read_secret_from_env_or_dotenv(&source_root, &provider.api_key_env)
+            .ok_or_else(|| format!("环境变量或 .env.local 中未设置 {}", provider.api_key_env))?
+    } else {
+        String::new()
+    };
     let request_id = input.request_id.trim().to_string();
     let purpose = agent_execution_purpose(&input.prompt);
     let max_steps = if purpose == AgentExecutionPurpose::RiskReview {
@@ -2078,6 +2371,15 @@ async fn run_agent_impl(
         None
     };
     let now = current_timestamp_string();
+    let mut checkpoint_run = crate::runtime::agent_runs::load(&app_root, &run_id)?;
+    let checkpoint_root = isolation.as_ref().or(checkpoint_run.isolation.as_ref())
+        .map(|workspace| crate::runtime::isolated_workspace::execution_root(workspace, &source_root))
+        .transpose()?.unwrap_or_else(|| source_root.clone());
+    if crate::runtime::agent_runs::revalidate_completed_checks(&mut checkpoint_run, &checkpoint_root, &now) {
+        let expected_revision = checkpoint_run.revision;
+        checkpoint_run.revision += 1;
+        crate::runtime::agent_runs::persist_if_revision(&app_root, &checkpoint_run, expected_revision)?;
+    }
     let prepared = crate::runtime::agent_runs::prepare_model_run(
         &app_root,
         crate::runtime::agent_runs::PrepareModelRunInput {
@@ -2095,7 +2397,7 @@ async fn run_agent_impl(
         &now,
     )?;
     let execution_prompt = prepared.execution_prompt;
-    let running_run = prepared.run;
+    let mut running_run = prepared.run;
     let execution_root = running_run
         .isolation
         .as_ref()
@@ -2111,6 +2413,9 @@ async fn run_agent_impl(
     } else {
         AgentExecutionMode::Resume
     };
+    let previous_tool_name = running_run.checkpoint.tool_name.clone();
+    let previous_tool_result = running_run.checkpoint.tool_result.clone();
+    let completed_check_ids = running_run.checkpoint.completed_check_ids.clone();
     let model_started_at = std::time::Instant::now();
     if running_run.executor_id != executor.id() {
         return Err(format!(
@@ -2164,6 +2469,7 @@ async fn run_agent_impl(
             }),
         );
     });
+    let checked_execution_root = execution_root.clone();
     let mut result = tauri::async_runtime::spawn_blocking(move || {
         executor.execute(AgentExecutionRequest {
             mode: execution_mode,
@@ -2175,6 +2481,9 @@ async fn run_agent_impl(
             model: provider.model,
             prompt: execution_prompt,
             max_steps,
+            previous_tool_name,
+            previous_tool_result,
+            completed_check_ids,
             cancellation,
             event_sink: Some(event_sink),
         })
@@ -2219,6 +2528,7 @@ async fn run_agent_impl(
             |error| json!({ "error": error.to_string(), "durationMs": model_duration_ms }),
         );
     if status == "succeeded" {
+        crate::runtime::agent_runs::revalidate_completed_checks(&mut running_run, &checked_execution_root, &current_timestamp_string());
         if let Some(workspace) = running_run.isolation.as_ref() {
             let diff =
                 crate::runtime::isolated_workspace::integration_diff(workspace, &source_root)?;
@@ -2229,8 +2539,8 @@ async fn run_agent_impl(
             } else if !diff.trim().is_empty() {
                 let token = format!(
                     "hermes-integration-{}-{}",
-                    running_run.step + 1,
-                    crate::runtime::provider::current_unix_timestamp()
+                    running_run.id,
+                    running_run.revision
                 );
                 status = "awaiting-approval".to_string();
                 summary = "隔离工作区的验证改动已就绪，请确认是否合并到当前工程。".to_string();
@@ -2470,6 +2780,28 @@ async fn prepare_provider_for_request(
     let result =
         crate::runtime::provider::prepare_for_request(app_root, configured, excluded_profile_ids)
             .await?;
+    #[cfg(not(test))]
+    if result.0.active_profile_id != configured.active_profile_id {
+        sync_hermes_runtime_config(&result.0)?;
+    }
+    Ok(result)
+}
+
+async fn prepare_provider_failover_for_request(
+    app_root: &Path,
+    configured: &ProviderConfig,
+    failed: &ProviderConfig,
+    failure_status: &str,
+    previously_excluded: &HashSet<String>,
+) -> Result<(ProviderConfig, String, HashSet<String>), String> {
+    let result = crate::runtime::provider::prepare_failover_after_request_failure(
+        app_root,
+        configured,
+        failed,
+        failure_status,
+        previously_excluded,
+    )
+    .await?;
     #[cfg(not(test))]
     if result.0.active_profile_id != configured.active_profile_id {
         sync_hermes_runtime_config(&result.0)?;
@@ -2769,15 +3101,24 @@ mod task_storage_tests {
     }
 
     #[test]
-    fn transient_provider_failures_do_not_generate_local_conversation_replies() {
+    fn provider_failures_explain_the_cause_and_available_recovery() {
         let service_status =
             crate::runtime::provider::classify_failure("provider HTTP 503 Service Unavailable");
         assert_eq!(service_status, "unavailable");
-        assert!(transient_chat_failure_reply(service_status)
-            .is_some_and(|reply| reply.contains("本轮暂时不可用")));
-        assert!(transient_chat_failure_reply("network-unavailable")
-            .is_some_and(|reply| reply.contains("本轮请求遇到网络异常")));
-        assert!(transient_chat_failure_reply("authentication-failed").is_none());
+        assert!(provider_request_failure_reply(service_status, false).contains("暂时不可用"));
+        assert!(provider_request_failure_reply("network-unavailable", false)
+            .contains("没有可切换的独立备用线路"));
+        assert!(provider_request_failure_reply("network-unavailable", true)
+            .contains("尝试独立备用连接"));
+        assert!(provider_request_failure_reply("authentication-failed", true).contains("API Key"));
+        assert_eq!(
+            provider_failure_result_status("network-unavailable"),
+            "request-failed"
+        );
+        assert_eq!(
+            provider_failure_result_status("quota-exhausted"),
+            "quota-exhausted"
+        );
     }
 
     #[test]
@@ -3203,12 +3544,15 @@ pub fn run() {
             generate_readonly_plan,
             generate_patch_draft,
             apply_patch_draft,
+            inspect_interrupted_patch,
+            confirm_interrupted_patch,
             write_run_summary,
             merge_run_summary_to_handoff,
             list_desktop_tasks,
             save_desktop_task,
             delete_desktop_task,
             list_desktop_conversations,
+            read_desktop_conversation_history,
             save_desktop_conversation,
             delete_desktop_conversation,
             get_project_memory,

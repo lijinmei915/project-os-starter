@@ -4,6 +4,7 @@ use notify::{
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+use std::sync::{mpsc, atomic::{AtomicU64, Ordering}};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, State};
 
@@ -11,6 +12,7 @@ use tauri::{AppHandle, Emitter, State};
 pub struct WorkspaceWatcherState {
     watcher: Mutex<Option<RecommendedWatcher>>,
     root: Mutex<String>,
+    generation: Arc<AtomicU64>,
 }
 
 #[derive(Serialize, Clone)]
@@ -115,11 +117,13 @@ pub fn start(
         }
     }
 
-    let last_emit = Arc::new(Mutex::new(Instant::now() - Duration::from_secs(10)));
+    let (sender, receiver) = mpsc::sync_channel(1);
+    let pending_path = Arc::new(Mutex::new(None::<String>));
+    let callback_path = Arc::clone(&pending_path);
     let emit_root = root.clone();
     let emit_root_text = root_text.clone();
     let emit_app = app.clone();
-    let emit_guard = Arc::clone(&last_emit);
+    let callback_root = root.clone();
     let mut watcher = RecommendedWatcher::new(
         move |result: Result<Event, notify::Error>| {
             let Ok(event) = result else {
@@ -128,34 +132,17 @@ pub fn start(
             if !event_should_refresh(&event) {
                 return;
             }
-            let Ok(mut last) = emit_guard.lock() else {
-                return;
-            };
-            if last.elapsed() < Duration::from_millis(1200) {
-                return;
-            }
-            *last = Instant::now();
             let relative = event
                 .paths
                 .iter()
                 .find(|path| !should_ignore_path(path))
-                .and_then(|path| path.strip_prefix(&emit_root).ok())
+                .and_then(|path| path.strip_prefix(&callback_root).ok())
                 .map(|path| path.to_string_lossy().replace('\\', "/"))
                 .unwrap_or_else(|| "project".to_string());
-            let external_change = crate::runtime::external_changes::record_workspace_change(
-                &emit_root,
-                &project_id,
-            )
-            .ok()
-            .flatten();
-            let _ = emit_app.emit(
-                "workspace://files-changed",
-                WorkspaceFilesChangedEvent {
-                    path: relative,
-                    root: emit_root_text.clone(),
-                    external_change,
-                },
-            );
+            if let Ok(mut path) = callback_path.lock() { *path = Some(relative); }
+            // A bounded wake-up plus a replaceable path coalesces bursts without
+            // dropping the final save or blocking notify's callback thread.
+            let _ = sender.try_send(());
         },
         NotifyConfig::default(),
     )
@@ -163,6 +150,28 @@ pub fn start(
     watcher
         .watch(&root, RecursiveMode::Recursive)
         .map_err(|err| format!("无法监听项目目录: {err}"))?;
+
+    let generation = Arc::clone(&state.generation);
+    let selected_generation = generation.fetch_add(1,Ordering::SeqCst)+1;
+    std::thread::spawn(move || {
+        while receiver.recv().is_ok() {
+            let started = Instant::now();
+            while started.elapsed() < Duration::from_secs(2) {
+                match receiver.recv_timeout(Duration::from_millis(200)) {
+                    Ok(()) => {},
+                    Err(mpsc::RecvTimeoutError::Timeout) => break,
+                    Err(mpsc::RecvTimeoutError::Disconnected) => return,
+                }
+            }
+            if generation.load(Ordering::SeqCst) != selected_generation { return; }
+            let path = pending_path.lock().ok().and_then(|mut path|path.take()).unwrap_or_else(||"project".into());
+            let external_change = crate::runtime::external_changes::record_workspace_change(&emit_root,&project_id).ok().flatten();
+            if generation.load(Ordering::SeqCst) != selected_generation { return; }
+            let _ = emit_app.emit("workspace://files-changed", WorkspaceFilesChangedEvent {
+                path, root:emit_root_text.clone(), external_change,
+            });
+        }
+    });
 
     {
         let mut watcher_slot = state.watcher.lock().map_err(|err| err.to_string())?;

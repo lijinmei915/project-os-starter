@@ -1,5 +1,6 @@
 use crate::runtime::repository::{JsonMutation, Repository};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -46,7 +47,61 @@ pub fn list(root: &Path) -> Result<Vec<Value>, String> {
             .unwrap_or("");
         b_time.cmp(a_time)
     });
-    Ok(tasks)
+    Ok(project_check_results(root, tasks))
+}
+
+/// Only the latest check batch can prove the current task version. This is a
+/// read projection: original runs and historical results remain untouched.
+fn project_check_results(root: &Path, mut tasks: Vec<Value>) -> Vec<Value> {
+    let has_checks = tasks.iter().any(|task| task["executionEvidence"].as_array()
+        .is_some_and(|items| items.iter().any(|item| item["kind"] == "check")));
+    let current = has_checks.then(|| crate::runtime::validation_revision::capture(root)).and_then(Result::ok);
+    for task in &mut tasks {
+        if task.pointer("/manualPatchApply/status").and_then(Value::as_str) == Some("applying")
+            && task.pointer("/manualPatchApply/processId").and_then(Value::as_u64) != Some(u64::from(std::process::id())) {
+            task["status"] = Value::String("interrupted".to_string());
+            task["verificationSummary"] = Value::String("上次手动改动执行中断，结果尚待核对；请先查看文件，不能自动重放。".to_string());
+        }
+        if task.pointer("/manualPatchApply/status").and_then(Value::as_str) == Some("applying") {
+            task["verificationFreshness"] = serde_json::json!({"status":"pending","reason":"改动执行结果尚待核对，旧检查不能证明本次改动。"});
+            continue;
+        }
+        let evidence = task["executionEvidence"].as_array();
+        let last_apply = evidence.and_then(|items| items.iter().rposition(|item| item["kind"] == "apply" && item["status"] == "succeeded"));
+        let last_check = evidence.and_then(|items| items.iter().rposition(|item| item["kind"] == "check"));
+        if last_apply.is_some_and(|applied| last_check.is_none_or(|checked| checked < applied)) {
+            task["verificationFreshness"] = serde_json::json!({"status":"pending","reason":"最近一次改动后尚未检查，请单独确认运行检查。"});
+            continue;
+        }
+        let latest = task["executionEvidence"].as_array().and_then(|items|
+            items.iter().rev().find(|item| item["kind"] == "check"));
+        let Some(latest) = latest else {
+            if let Some(object) = task.as_object_mut() { object.remove("verificationFreshness"); }
+            continue;
+        };
+        let (status, reason) = if latest["status"] != "succeeded" {
+            ("failed", "最近一次检查未通过。")
+        } else if let Some(runs) = latest.pointer("/details/runs").and_then(Value::as_array)
+            .filter(|runs| !runs.is_empty()) {
+            if runs.iter().any(|run| run.get("inputBinding").is_none_or(Value::is_null)) {
+                ("unbound", "历史检查未记录代码版本，请重新检查。")
+            } else if let Some(current) = current.as_ref() {
+                if runs.iter().all(|run| run["success"] == true
+                    && run.pointer("/freshness/status").and_then(Value::as_str) == Some("fresh")
+                    && run.get("inputBinding") == Some(current)) {
+                    ("fresh", "检查结果对应当前源码与验收标准。")
+                } else {
+                    ("stale", "源码、验收标准或检查批次版本已变化，请重新检查。")
+                }
+            } else {
+                ("unavailable", "无法核对当前代码版本，请重新检查。")
+            }
+        } else {
+            ("unbound", "历史检查未记录代码版本，请重新检查。")
+        };
+        task["verificationFreshness"] = serde_json::json!({"status":status,"reason":reason});
+    }
+    tasks
 }
 
 fn project_confirmation_title(mut task: Value) -> Value {
@@ -192,7 +247,8 @@ pub fn save(
     let task_dir = directory(root);
     fs::create_dir_all(&task_dir).map_err(|err| err.to_string())?;
     recover_storage(&task_dir)?;
-    Repository::new(root).transaction_with("save-desktop-task", |repository| {
+    if let Some(object) = task.as_object_mut() { object.remove("verificationFreshness"); }
+    let saved = Repository::new(root).transaction_with("save-desktop-task", |repository| {
         let id = task
             .get("id")
             .and_then(Value::as_str)
@@ -201,7 +257,23 @@ pub fn save(
             .ok_or_else(|| "任务缺少 id".to_string())?
             .to_string();
         let task_relative = format!("{TASK_DIRECTORY}/{}.json", safe_file_stem(&id));
-        let is_new = repository.read_json(&task_relative).is_none();
+        let existing = repository.read_json(&task_relative);
+        if let Some(existing) = existing.as_ref() {
+            if existing.pointer("/manualPatchApply/status").and_then(Value::as_str) == Some("applying") {
+                return Err("手动改动正在执行或结果尚待核对，不能覆盖任务或重复应用。".to_string());
+            }
+            if let Some(operation) = existing.get("manualPatchApply") {
+                if task.get("manualPatchApply") != Some(operation) {
+                    return Err("手动改动执行记录已更新，请重新打开任务后再保存。".to_string());
+                }
+                task["manualPatchApply"] = operation.clone();
+            } else if let Some(object) = task.as_object_mut() {
+                object.remove("manualPatchApply");
+            }
+        } else if let Some(object) = task.as_object_mut() {
+            object.remove("manualPatchApply");
+        }
+        let is_new = existing.is_none();
         if is_new {
             let title = normalized_title(&task);
             let goal_id = task.get("goalId").and_then(Value::as_str).unwrap_or("");
@@ -262,7 +334,204 @@ pub fn save(
             mutations.push(JsonMutation::upsert(GOALS_PATH, goals));
         }
         Ok((task, mutations))
+    })?;
+    Ok(project_check_results(root, vec![saved]).remove(0))
+}
+
+/// Reserve exactly the persisted snapshot the user reviewed. The claim is
+/// committed before touching source, so a crash never permits implicit replay.
+fn claim_reviewed_patch(root: &Path, reviewed: &Value, timestamp: &str) -> Result<Value, String> {
+    let id = reviewed.get("id").and_then(Value::as_str).filter(|id| !id.trim().is_empty())
+        .ok_or_else(|| "缺少已审阅的任务编号。".to_string())?;
+    let relative = format!("{TASK_DIRECTORY}/{}.json", safe_file_stem(id));
+    let canonical_root = fs::canonicalize(root).map_err(|error| error.to_string())?;
+    Repository::new(root).transaction_with("claim-reviewed-manual-patch", |repository| {
+        let mut task = repository.read_json(&relative).ok_or_else(|| "任务尚未保存，请重新打开并审阅草稿。".to_string())?;
+        if task.get("id").and_then(Value::as_str) != Some(id) {
+            return Err("任务编号与已保存记录不一致。".to_string());
+        }
+        for snapshot in [&task, reviewed] {
+            let path = snapshot.get("projectPath").and_then(Value::as_str)
+                .ok_or_else(|| "草稿缺少工程绑定，请重新保存并审阅。".to_string())?;
+            if fs::canonicalize(path).ok().as_ref() != Some(&canonical_root) {
+                return Err("工程已切换，不能应用另一工程的草稿。".to_string());
+            }
+        }
+        if task.pointer("/manualPatchApply/status").and_then(Value::as_str) == Some("applying") {
+            return Err("手动改动正在执行或上次结果尚待核对，不能重复应用。".to_string());
+        }
+        for field in ["patchDraft", "updatedAt", "status", "executionEvidence", "manualPatchApply"] {
+            if task.get(field) != reviewed.get(field) {
+                return Err("草稿或任务已更新，请重新查看改动后再确认。".to_string());
+            }
+        }
+        if !matches!(task.get("status").and_then(Value::as_str), Some("waiting approval" | "waiting repair approval")) {
+            return Err("当前任务不在手动改动待确认阶段。".to_string());
+        }
+        let draft = task.get("patchDraft").filter(|draft| draft.is_object())
+            .ok_or_else(|| "任务没有已保存的改动草稿。".to_string())?;
+        if task.get("executionEvidence").is_some_and(|evidence| !evidence.is_array()) {
+            return Err("任务证据格式无效，请先核对记录。".to_string());
+        }
+        let fingerprint = format!("{:x}", Sha256::digest(serde_json::to_vec(draft).map_err(|error|error.to_string())?));
+        if task.pointer("/manualPatchApply/status").and_then(Value::as_str) == Some("applied")
+            && task.pointer("/manualPatchApply/fingerprint").and_then(Value::as_str) == Some(&fingerprint) {
+            return Err("这份草稿已经应用，不能重复执行。".to_string());
+        }
+        let nonce = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos();
+        task["manualPatchApply"] = serde_json::json!({"status":"applying","fingerprint":fingerprint,
+            "token":format!("manual-patch-{}-{nonce}", std::process::id()),"startedAt":timestamp,"processId":std::process::id()});
+        task["status"] = Value::String("applying manual patch".to_string());
+        task["updatedAt"] = Value::String(timestamp.to_string());
+        Ok((task.clone(), vec![JsonMutation::upsert(relative.clone(), task)]))
     })
+}
+
+pub fn apply_reviewed_patch(root: &Path, reviewed: &Value, timestamp: &str) -> Result<Value, String> {
+    let _lease = manual_patch_lease(root, reviewed)?;
+    let claimed = claim_reviewed_patch(root, reviewed, timestamp)?;
+    // Source execution and audit own their transactions; never nest them
+    // inside the task Repository lock.
+    let applied = crate::runtime::execution::apply_patch_draft(root, &claimed["patchDraft"], timestamp);
+    let result = match &applied {
+        Ok(result) => serde_json::to_value(result).map_err(|error|error.to_string())?,
+        Err(error) => serde_json::json!({"success":false,"message":error}),
+    };
+    let id = claimed["id"].as_str().unwrap();
+    let relative = format!("{TASK_DIRECTORY}/{}.json", safe_file_stem(id));
+    let finalized = Repository::new(root).transaction_with("finish-reviewed-manual-patch", |repository| {
+        let mut task = repository.read_json(&relative).ok_or_else(||"执行记录已丢失。".to_string())?;
+        if task["manualPatchApply"] != claimed["manualPatchApply"] {
+            return Err("执行记录已变化，禁止覆盖。".to_string());
+        }
+        task["manualPatchApply"]["status"] = Value::String(if applied.is_ok() {"applied"} else {"failed"}.to_string());
+        task["manualPatchApply"]["finishedAt"] = Value::String(timestamp.to_string());
+        task["applyResult"] = result.clone();
+        task["applyResult"]["finishedAt"] = Value::String(timestamp.to_string());
+        task["updatedAt"] = Value::String(timestamp.to_string());
+        task["status"] = Value::String(if applied.is_ok() {"waiting verification"} else {"failed"}.to_string());
+        task["verificationSummary"] = Value::String(if applied.is_ok() {"改动已应用，等待单独确认运行检查。"} else {"改动未能应用，请核对失败证据。"}.to_string());
+        if task.get("executionEvidence").is_none() { task["executionEvidence"] = serde_json::json!([]); }
+        task["executionEvidence"].as_array_mut().ok_or_else(||"任务证据格式无效。".to_string())?.push(serde_json::json!({
+            "at":timestamp,"kind":"apply","status":if applied.is_ok(){"succeeded"}else{"failed"},
+            "summary":if applied.is_ok(){"已应用审阅版本，等待独立检查。"}else{"已审阅改动未能应用。"},"details":result
+        }));
+        Ok((task.clone(),vec![JsonMutation::upsert(relative.clone(),task)]))
+    });
+    match finalized {
+        Ok(task) => {
+            let mut response = result;
+            response["task"] = project_check_results(root,vec![task]).remove(0);
+            Ok(response)
+        }
+        Err(error) => Ok(serde_json::json!({"success":applied.is_ok(),"recordPending":true,
+            "message":format!("改动执行结果未能保存，请核对文件；禁止重复应用：{error}"),"output":""})),
+    }
+}
+
+fn manual_patch_lease(root: &Path, task: &Value) -> Result<crate::runtime::repository::RepositoryLock, String> {
+    let id = task["id"].as_str().filter(|id| !id.is_empty()).ok_or("缺少任务编号。")?;
+    let name = format!("manual-patch-{:x}.lock", Sha256::digest(id.as_bytes()));
+    crate::runtime::repository::RepositoryLock::acquire_named(root, &name)
+        .map_err(|error| format!("改动仍在处理，暂不能核对或再次应用：{error}"))
+}
+
+fn unresolved_manual_task(root: &Path, repository: &Repository, reviewed: &Value) -> Result<(String, Value), String> {
+    let id = reviewed["id"].as_str().filter(|id| !id.is_empty()).ok_or("缺少任务编号。")?;
+    let relative = format!("{TASK_DIRECTORY}/{}.json", safe_file_stem(id));
+    let task = repository.read_json(&relative).ok_or("找不到中断记录，请刷新任务。")?;
+    let canonical = fs::canonicalize(root).map_err(|error|error.to_string())?;
+    for snapshot in [&task, reviewed] {
+        if snapshot["id"] != id || snapshot["projectPath"].as_str()
+            .and_then(|path|fs::canonicalize(path).ok()).as_ref() != Some(&canonical) {
+            return Err("工程已切换，请重新打开当前工程的任务。".to_string());
+        }
+    }
+    for field in ["patchDraft", "updatedAt", "executionEvidence", "manualPatchApply"] {
+        if task.get(field) != reviewed.get(field) {
+            return Err("执行记录已更新，请重新核对文件。".to_string());
+        }
+    }
+    if task.pointer("/manualPatchApply/status").and_then(Value::as_str) != Some("applying") {
+        return Err("当前没有待核对的中断改动。".to_string());
+    }
+    let fingerprint = format!("{:x}", Sha256::digest(serde_json::to_vec(&task["patchDraft"]).map_err(|error|error.to_string())?));
+    if task.pointer("/manualPatchApply/fingerprint").and_then(Value::as_str) != Some(&fingerprint)
+        || task.pointer("/manualPatchApply/token").and_then(Value::as_str).is_none_or(str::is_empty)
+        || task.get("executionEvidence").is_some_and(|items| !items.is_array()) {
+        return Err("中断记录与草稿不一致，已保留记录，请人工检查文件。".to_string());
+    }
+    Ok((relative, task))
+}
+
+/// A persisted observation is reviewed separately from confirming recovery.
+/// The source-operation lease excludes a still-running apply, even in another process.
+pub fn inspect_interrupted_patch(root: &Path, reviewed: &Value, timestamp: &str) -> Result<Value, String> {
+    let _lease = manual_patch_lease(root, reviewed)?;
+    let repository = Repository::new(root);
+    let (_, task) = unresolved_manual_task(root, &repository, reviewed)?;
+    let binding = crate::runtime::validation_revision::capture(root)?;
+    let inspection = crate::runtime::execution::inspect_patch_draft(root, &task["patchDraft"])?;
+    if crate::runtime::validation_revision::capture(root)? != binding {
+        return Err("核对期间文件发生变化，请重新核对。".to_string());
+    }
+    let nonce = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos();
+    let observation = serde_json::json!({"reviewToken":format!("reconcile-{}-{nonce}",std::process::id()),
+        "operationToken":task["manualPatchApply"]["token"],"inputBinding":binding,
+        "state":inspection["state"],"forwardCheck":inspection["forwardCheck"],
+        "reverseCheck":inspection["reverseCheck"],"checkedAt":timestamp});
+    let saved = repository.transaction_with("inspect-interrupted-manual-patch", |repository| {
+        let (relative, mut current) = unresolved_manual_task(root, repository, reviewed)?;
+        if crate::runtime::validation_revision::capture(root)? != binding {
+            return Err("文件已变化，请重新核对。".to_string());
+        }
+        current["manualPatchApply"]["reconciliation"] = observation.clone();
+        Ok((current.clone(),vec![JsonMutation::upsert(relative,current)]))
+    })?;
+    Ok(serde_json::json!({"observation":observation,"task":project_check_results(root,vec![saved]).remove(0)}))
+}
+
+/// Only closes the persisted claim. Never reapplies a Patch or runs checks.
+pub fn confirm_interrupted_patch(root: &Path, reviewed: &Value, observation: &Value, timestamp: &str) -> Result<Value, String> {
+    let _lease = manual_patch_lease(root, reviewed)?;
+    let repository = Repository::new(root);
+    let (_, task) = unresolved_manual_task(root, &repository, reviewed)?;
+    if task.pointer("/manualPatchApply/reconciliation") != Some(observation)
+        || observation["operationToken"] != task["manualPatchApply"]["token"] {
+        return Err("核对记录已更新，请重新核对后确认。".to_string());
+    }
+    let state = observation["state"].as_str().unwrap_or("");
+    if !matches!(state,"applied"|"not-applied") {
+        return Err("文件状态无法确定，已保留中断记录；请人工检查差异后再核对。".to_string());
+    }
+    if crate::runtime::validation_revision::capture(root)? != observation["inputBinding"] {
+        return Err("核对后文件已变化，请重新核对。".to_string());
+    }
+    let inspection = crate::runtime::execution::inspect_patch_draft(root, &task["patchDraft"])?;
+    let saved = repository.transaction_with("confirm-interrupted-manual-patch", |repository| {
+        let (relative, mut current) = unresolved_manual_task(root,repository,reviewed)?;
+        if inspection["state"] != state || inspection["forwardCheck"] != observation["forwardCheck"]
+            || inspection["reverseCheck"] != observation["reverseCheck"]
+            || crate::runtime::validation_revision::capture(root)? != observation["inputBinding"] {
+            return Err("文件状态已变化，请重新核对。".to_string());
+        }
+        let applied = state == "applied";
+        current["manualPatchApply"]["status"] = Value::String(state.to_string());
+        current["manualPatchApply"]["finishedAt"] = Value::String(timestamp.to_string());
+        current["manualPatchApply"]["reconciliation"]["confirmedAt"] = Value::String(timestamp.to_string());
+        current["status"] = Value::String(if applied {"waiting verification"}else{"waiting approval"}.to_string());
+        let message = if applied {"文件与草稿已应用状态一致；已记录人工确认，尚未检查。"}
+            else {"文件与草稿未应用状态一致；已解除中断，重新应用仍需审阅确认。"};
+        current["verificationSummary"] = Value::String(message.to_string());
+        current["applyResult"] = serde_json::json!({"success":applied,"reconciled":true,"message":message,"finishedAt":timestamp});
+        current["updatedAt"] = Value::String(timestamp.to_string());
+        if current.get("executionEvidence").is_none() { current["executionEvidence"] = serde_json::json!([]); }
+        current["executionEvidence"].as_array_mut().ok_or("任务证据格式无效。")?.push(serde_json::json!({
+            "at":timestamp,"kind":if applied{"apply"}else{"recovery"},"status":"succeeded",
+            "summary":message,"details":{"reconciled":true,"observation":observation,"sourceWritten":false,"checksRun":false}}));
+        Ok((current.clone(),vec![JsonMutation::upsert(relative,current)]))
+    })?;
+    Ok(project_check_results(root,vec![saved]).remove(0))
 }
 
 fn safe_file_stem(id: &str) -> String {
@@ -379,6 +648,9 @@ pub fn delete(root: &Path, id: &str, timestamp: &str) -> Result<(), String> {
     Repository::new(root).transaction_with("delete-desktop-task", |repository| {
         let task_relative = format!("{TASK_DIRECTORY}/{}.json", safe_file_stem(id));
         let task = repository.read_json(&task_relative);
+        if task.as_ref().and_then(|task|task.pointer("/manualPatchApply/status")).and_then(Value::as_str) == Some("applying") {
+            return Err("手动改动正在执行或结果尚待核对，不能删除执行记录。".to_string());
+        }
         let task_conversation_id = task.as_ref().and_then(|task| {
             task.get("conversationId")
                 .and_then(Value::as_str)
@@ -431,6 +703,206 @@ pub fn delete(root: &Path, id: &str, timestamp: &str) -> Result<(), String> {
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn manual_patch_fixture() -> (std::path::PathBuf, Value) {
+        let root = std::env::temp_dir().join(format!("omnidesk-manual-reviewed-{}-{}",
+            std::process::id(), SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("example.js"), "before\n").unwrap();
+        assert!(std::process::Command::new("git").args(["init","--quiet"]).current_dir(&root).status().unwrap().success());
+        let task = save(&root,root.to_str().unwrap(),serde_json::json!({
+            "id":"manual-reviewed","title":"manual reviewed","status":"waiting approval","executionEvidence":[],
+            "patchDraft":{"allowedFiles":["example.js"],"diff":"diff --git a/example.js b/example.js\n--- a/example.js\n+++ b/example.js\n@@ -1 +1 @@\n-before\n+after\n"}
+        }),"reviewed").unwrap();
+        (root, task)
+    }
+
+    #[test]
+    fn interrupted_manual_apply_reconciles_existing_changes_without_writing_or_checking() {
+        let (root, reviewed) = manual_patch_fixture();
+        let claimed = claim_reviewed_patch(&root,&reviewed,"claim").unwrap();
+        fs::write(root.join("example.js"),"after\n").unwrap();
+        let inspected = inspect_interrupted_patch(&root,&claimed,"inspect").unwrap();
+        assert_eq!(inspected["observation"]["state"],"applied");
+        assert_eq!(inspected["task"]["manualPatchApply"]["status"],"applying");
+        assert_eq!(inspected["task"]["executionEvidence"],serde_json::json!([]));
+        assert!(confirm_interrupted_patch(&root,&claimed,&inspected["observation"],"stale").is_err());
+        let mut forged = inspected["observation"].clone(); forged["state"] = Value::String("not-applied".into());
+        assert!(confirm_interrupted_patch(&root,&inspected["task"],&forged,"forged").is_err());
+        let confirmed = confirm_interrupted_patch(&root,&inspected["task"],&inspected["observation"],"confirmed").unwrap();
+        assert_eq!(confirmed["status"],"waiting verification");
+        assert_eq!(confirmed["verificationFreshness"]["status"],"pending");
+        assert_eq!(confirmed["executionEvidence"][0]["details"]["sourceWritten"],false);
+        assert_eq!(confirmed["executionEvidence"][0]["details"]["checksRun"],false);
+        assert_eq!(fs::read(root.join("example.js")).unwrap(),b"after\n");
+        assert!(confirm_interrupted_patch(&root,&inspected["task"],&inspected["observation"],"duplicate").is_err());
+        assert!(apply_reviewed_patch(&root,&confirmed,"replay").is_err());
+        assert_eq!(list(&root).unwrap()[0]["manualPatchApply"]["status"],"applied");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn interrupted_manual_apply_not_applied_requires_a_new_explicit_apply() {
+        let (root, reviewed) = manual_patch_fixture();
+        let claimed = claim_reviewed_patch(&root,&reviewed,"claim").unwrap();
+        let inspected = inspect_interrupted_patch(&root,&claimed,"inspect").unwrap();
+        assert_eq!(inspected["observation"]["state"],"not-applied");
+        let confirmed = confirm_interrupted_patch(&root,&inspected["task"],&inspected["observation"],"confirmed").unwrap();
+        assert_eq!(confirmed["status"],"waiting approval");
+        assert_eq!(confirmed["manualPatchApply"]["status"],"not-applied");
+        assert_eq!(fs::read(root.join("example.js")).unwrap(),b"before\n");
+        assert_eq!(confirmed["executionEvidence"][0]["kind"],"recovery");
+        let saved = save(&root,root.to_str().unwrap(),confirmed,"review-again").unwrap();
+        let applied = apply_reviewed_patch(&root,&saved,"explicit-new-apply").unwrap();
+        assert_eq!(applied["success"],true);
+        assert_eq!(applied["task"]["executionEvidence"].as_array().unwrap().len(),2);
+        assert_eq!(fs::read(root.join("example.js")).unwrap(),b"after\n");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn interrupted_manual_apply_refuses_active_stale_ambiguous_and_foreign_recovery() {
+        let (root, reviewed) = manual_patch_fixture();
+        let claimed = claim_reviewed_patch(&root,&reviewed,"claim").unwrap();
+        let before = fs::read(directory(&root).join("manual-reviewed.json")).unwrap();
+        let lease = manual_patch_lease(&root,&claimed).unwrap();
+        assert!(inspect_interrupted_patch(&root,&claimed,"active").unwrap_err().contains("仍在处理"));
+        assert_eq!(fs::read(directory(&root).join("manual-reviewed.json")).unwrap(),before);
+        drop(lease);
+        let inspected = inspect_interrupted_patch(&root,&claimed,"inspect").unwrap();
+        let mut foreign = inspected["task"].clone(); foreign["projectPath"] = serde_json::json!(root.join("other"));
+        assert!(confirm_interrupted_patch(&root,&foreign,&inspected["observation"],"foreign").is_err());
+        fs::write(root.join("example.js"),"other!\n").unwrap();
+        assert!(confirm_interrupted_patch(&root,&inspected["task"],&inspected["observation"],"changed").unwrap_err().contains("文件已变化"));
+        let ambiguous = inspect_interrupted_patch(&root,&inspected["task"],"ambiguous").unwrap();
+        assert_eq!(ambiguous["observation"]["state"],"ambiguous");
+        assert!(confirm_interrupted_patch(&root,&ambiguous["task"],&ambiguous["observation"],"unknown").unwrap_err().contains("无法确定"));
+        fs::write(root.join("example.js"),"before\n").unwrap();
+        assert!(confirm_interrupted_patch(&root,&inspected["task"],&inspected["observation"],"old-observation").is_err());
+        assert_eq!(list(&root).unwrap()[0]["manualPatchApply"]["status"],"applying");
+        assert_eq!(list(&root).unwrap()[0]["executionEvidence"],serde_json::json!([]));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn manual_apply_rejects_replaced_or_foreign_snapshots_without_writing() {
+        let (root, reviewed) = manual_patch_fixture();
+        let mut newer = reviewed.clone();
+        newer["patchDraft"]["diff"] = Value::String(reviewed["patchDraft"]["diff"].as_str().unwrap().replace("+after", "+newer"));
+        let newer = save(&root,root.to_str().unwrap(),newer,"reviewed").unwrap(); // Same timestamp must still reject.
+        let before = fs::read(directory(&root).join("manual-reviewed.json")).unwrap();
+        assert!(apply_reviewed_patch(&root,&reviewed,"apply").unwrap_err().contains("重新查看"));
+        let mut foreign = newer.clone(); foreign["projectPath"] = Value::String(root.join("elsewhere").to_string_lossy().into_owned());
+        assert!(apply_reviewed_patch(&root,&foreign,"apply").unwrap_err().contains("工程已切换"));
+        assert_eq!(fs::read(root.join("example.js")).unwrap(),b"before\n");
+        assert_eq!(fs::read(directory(&root).join("manual-reviewed.json")).unwrap(),before);
+        let result = apply_reviewed_patch(&root,&newer,"apply").unwrap();
+        assert_eq!(result["success"],true,"{result}");
+        assert_eq!(result["task"]["status"],"waiting verification");
+        assert_eq!(result["task"]["manualPatchApply"]["status"],"applied");
+        assert_eq!(result["task"]["executionEvidence"].as_array().unwrap().len(),1);
+        assert_eq!(fs::read(root.join("example.js")).unwrap(),b"newer\n");
+        assert!(apply_reviewed_patch(&root,&newer,"replay").is_err());
+        assert!(save(&root,root.to_str().unwrap(),newer,"stale-save").is_err());
+        assert_eq!(list(&root).unwrap()[0]["manualPatchApply"]["status"],"applied");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn manual_apply_claim_is_exclusive_and_survives_reopening() {
+        let (root,reviewed) = manual_patch_fixture();
+        let first_root = root.clone(); let first_review = reviewed.clone();
+        let first = std::thread::spawn(move ||claim_reviewed_patch(&first_root,&first_review,"claim"));
+        let second_root = root.clone(); let second_review = reviewed.clone();
+        let second = std::thread::spawn(move ||claim_reviewed_patch(&second_root,&second_review,"claim"));
+        let results = [first.join().unwrap(),second.join().unwrap()];
+        assert_eq!(results.iter().filter(|result|result.is_ok()).count(),1);
+        let reopened = list(&root).unwrap().remove(0);
+        assert_eq!(reopened["manualPatchApply"]["status"],"applying");
+        assert!(apply_reviewed_patch(&root,&reopened,"restart").is_err());
+        assert!(save(&root,root.to_str().unwrap(),reopened,"overwrite").is_err());
+        assert!(delete(&root,"manual-reviewed","delete").is_err());
+        Repository::new(&root).transaction_with("test-simulated-restart", |repository| {
+            let relative = format!("{TASK_DIRECTORY}/manual-reviewed.json");
+            let mut task = repository.read_json(&relative).unwrap();
+            task["manualPatchApply"]["processId"] = serde_json::json!(0);
+            Ok(((),vec![JsonMutation::upsert(relative,task)]))
+        }).unwrap();
+        let interrupted = list(&root).unwrap().remove(0);
+        assert_eq!(interrupted["status"],"interrupted");
+        assert!(interrupted["verificationSummary"].as_str().unwrap().contains("不能自动重放"));
+        assert!(apply_reviewed_patch(&root,&interrupted,"restart-replay").is_err());
+        assert_eq!(fs::read(root.join("example.js")).unwrap(),b"before\n");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn manual_apply_failure_is_durable_and_does_not_accept_client_operation_fields() {
+        let (root,mut reviewed) = manual_patch_fixture();
+        reviewed["patchDraft"]["diff"] = Value::String("invalid patch".to_string());
+        reviewed["manualPatchApply"] = serde_json::json!({"status":"applied","token":"forged"});
+        reviewed = save(&root,root.to_str().unwrap(),reviewed,"invalid").unwrap();
+        assert!(reviewed.get("manualPatchApply").is_none());
+        let result = apply_reviewed_patch(&root,&reviewed,"failed").unwrap();
+        assert_eq!(result["success"],false);
+        let reopened = list(&root).unwrap().remove(0);
+        assert_eq!(reopened["status"],"failed");
+        assert_eq!(reopened["manualPatchApply"]["status"],"failed");
+        assert_eq!(reopened["executionEvidence"][0]["status"],"failed");
+        assert_eq!(fs::read(root.join("example.js")).unwrap(),b"before\n");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn task_checks_are_revalidated_without_rewriting_historical_evidence() {
+        let root = std::env::temp_dir().join(format!("omnidesk-task-freshness-{}-{}",
+            std::process::id(), SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("source.txt"), "before").unwrap();
+        let binding = crate::runtime::validation_revision::capture(&root).unwrap();
+        let run = serde_json::json!({"id":"runtime","success":true,"inputBinding":binding,"freshness":{"status":"fresh"}});
+        let check = serde_json::json!({"kind":"check","status":"succeeded","details":{"runs":[run]}});
+        let original = serde_json::json!({"id":"checked","title":"checked","status":"done",
+            "executionEvidence":[check],"verificationFreshness":{"status":"forged"}});
+        let saved = save(&root, root.to_str().unwrap(), original, "checked").unwrap();
+        assert_eq!(saved["verificationFreshness"]["status"], "fresh");
+        let path = root.join(TASK_DIRECTORY).join("checked.json");
+        let original_bytes = fs::read(&path).unwrap();
+        let stored: Value = serde_json::from_slice(&original_bytes).unwrap();
+        assert!(stored.get("verificationFreshness").is_none());
+        fs::write(root.join("source.txt"), "after!").unwrap();
+        for _restart in 0..2 {
+            let tasks = list(&root).unwrap();
+            assert_eq!(tasks[0]["verificationFreshness"]["status"], "stale");
+            assert_eq!(tasks[0]["executionEvidence"], stored["executionEvidence"]);
+            assert_eq!(fs::read(&path).unwrap(), original_bytes);
+        }
+        fs::write(root.join("source.txt"), "before").unwrap();
+        assert_eq!(list(&root).unwrap()[0]["verificationFreshness"]["status"], "fresh");
+        // A mixed-version batch cannot be presented as verified even when the
+        // final check happens to match the current source.
+        let mut mixed = stored.clone();
+        mixed["executionEvidence"][0]["details"]["runs"].as_array_mut().unwrap()
+            .push(serde_json::json!({"success":true,"inputBinding":{"sourceDigest":"other"},"freshness":{"status":"fresh"}}));
+        assert_eq!(project_check_results(&root,vec![mixed])[0]["verificationFreshness"]["status"],"stale");
+        let legacy = serde_json::json!({"executionEvidence":[{"kind":"check","status":"succeeded"}]});
+        assert_eq!(project_check_results(&root,vec![legacy])[0]["verificationFreshness"]["status"],"unbound");
+        let mut failed = stored.clone();
+        failed["executionEvidence"].as_array_mut().unwrap().push(serde_json::json!({"kind":"check","status":"failed"}));
+        assert_eq!(project_check_results(&root,vec![failed])[0]["verificationFreshness"]["status"],"failed");
+        let mut reapplied = stored.clone();
+        reapplied["executionEvidence"].as_array_mut().unwrap().push(serde_json::json!({"kind":"apply","status":"succeeded"}));
+        let projected = project_check_results(&root,vec![reapplied.clone()]).remove(0);
+        assert_eq!(projected["verificationFreshness"]["status"],"pending");
+        assert_eq!(projected["executionEvidence"],reapplied["executionEvidence"]);
+        reapplied["executionEvidence"].as_array_mut().unwrap().push(stored["executionEvidence"][0].clone());
+        assert_eq!(project_check_results(&root,vec![reapplied])[0]["verificationFreshness"]["status"],"fresh");
+        #[cfg(unix)] {
+            std::os::unix::fs::symlink("source.txt",root.join("source-link")).unwrap();
+            assert_eq!(list(&root).unwrap()[0]["verificationFreshness"]["status"],"unavailable");
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn lists_newest_task_first_and_ignores_manifest() {

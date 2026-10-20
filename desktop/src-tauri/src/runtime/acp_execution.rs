@@ -1141,15 +1141,20 @@ mod tests {
     #[cfg(unix)]
     fn acp_fixture() -> (PathBuf, PathBuf) {
         use std::os::unix::fs::PermissionsExt;
+        use std::sync::atomic::{AtomicU64, Ordering};
+        // macOS clock readings can coincide across parallel test threads.
+        // A process-local sequence prevents one test deleting another's fixture.
+        static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
         let root = std::env::temp_dir().join(format!(
-            "omnidesk-acp-executor-{}-{}",
+            "omnidesk-acp-executor-{}-{}-{}",
             std::process::id(),
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap_or_default()
-                .as_nanos()
+                .as_nanos(),
+            NEXT_FIXTURE.fetch_add(1, Ordering::Relaxed)
         ));
-        std::fs::create_dir_all(&root).unwrap();
+        std::fs::create_dir(&root).unwrap();
         std::fs::write(root.join("README.md"), "fixture\n").unwrap();
         let program = root.join("fixture-acp.sh");
         std::fs::write(

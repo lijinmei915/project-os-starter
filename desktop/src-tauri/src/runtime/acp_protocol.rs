@@ -158,6 +158,7 @@ where
     let overall_deadline = started_at + timeouts.overall;
     let mut activity_deadline = started_at + timeouts.first_response;
     let mut received_response = false;
+    let mut last_control_progress = None;
     loop {
         if cancellation.is_some_and(CancellationToken::is_cancelled) {
             return Err("请求已取消".to_string());
@@ -208,17 +209,51 @@ where
             }
         }
         if message.get("method").and_then(Value::as_str) == Some("session/update") {
-            received_response = true;
-            activity_deadline = Instant::now() + timeouts.stream_idle;
             on_update(&message)?;
-            if let Some(text) = message
-                .pointer("/params/update/content/text")
-                .and_then(Value::as_str)
-            {
-                agent_text.push_str(text);
+            if let Some(update) = message.pointer("/params/update") {
+                if update_is_progress(update, &mut last_control_progress) {
+                    received_response = true;
+                    activity_deadline = Instant::now() + timeouts.stream_idle;
+                }
+                // Reasoning chunks indicate model activity but are private and
+                // must never contaminate the public structured result.
+                if matches!(update.get("sessionUpdate").and_then(Value::as_str), None | Some("agent_message_chunk")) {
+                    if let Some(text) = update.pointer("/content/text").and_then(Value::as_str) {
+                        agent_text.push_str(text);
+                    }
+                }
             }
             continue;
         }
+    }
+}
+
+fn update_is_progress(update: &Value, last_control: &mut Option<Value>) -> bool {
+    match update.get("sessionUpdate").and_then(Value::as_str) {
+        None | Some("agent_message_chunk" | "agent_thought_chunk") => update
+            .pointer("/content/text")
+            .and_then(Value::as_str)
+            .is_some_and(|text| !text.trim().is_empty()),
+        Some("tool_call" | "tool_call_update") => {
+            let Some(id) = update.get("toolCallId").and_then(Value::as_str).filter(|id| !id.trim().is_empty()) else {
+                return false;
+            };
+            // Repeated pending/in_progress notifications are not new work.
+            // Retain only the last bounded control update, never the text stream.
+            let progress = json!({ "id": id, "status": update.get("status"), "content": update.get("content") });
+            if last_control.as_ref() == Some(&progress) { return false; }
+            *last_control = Some(progress);
+            true
+        }
+        Some("plan") if update.get("entries").and_then(Value::as_array).is_some_and(|entries| !entries.is_empty()) => {
+            let progress = json!({ "plan": update["entries"] });
+            if last_control.as_ref() == Some(&progress) { return false; }
+            *last_control = Some(progress);
+            true
+        }
+        // Session metadata, usage, modes and unknown heartbeat messages do not
+        // prove that a model has started or that project work is progressing.
+        _ => false,
     }
 }
 
@@ -348,6 +383,68 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(error, "Agent 未在规定时间开始响应");
+    }
+
+    #[test]
+    fn metadata_and_empty_chunks_do_not_count_as_a_first_response() {
+        let (sender, receiver) = mpsc::channel();
+        for update in [
+            json!({ "sessionUpdate": "current_mode_update", "currentModeId": "working" }),
+            json!({ "sessionUpdate": "usage_update", "used": 12 }),
+            json!({ "sessionUpdate": "available_commands_update", "availableCommands": [] }),
+            json!({ "sessionUpdate": "agent_thought_chunk", "content": { "text": " " } }),
+            json!({ "sessionUpdate": "user_message_chunk", "content": { "text": "not an answer" } }),
+        ] {
+            sender.send(Ok(json!({ "method": "session/update", "params": { "update": update } }).to_string())).unwrap();
+        }
+        let mut text = String::new();
+        let error = wait_for_response(&receiver, &mut Vec::new(), 7,
+            AcpResponseTimeouts::new(Duration::from_millis(20), Duration::from_millis(60), Duration::from_secs(1)),
+            &mut text, None).unwrap_err();
+        assert_eq!(error, "Agent 未在规定时间开始响应");
+        assert!(text.is_empty());
+    }
+
+    #[test]
+    fn repeated_tool_status_and_metadata_cannot_keep_an_idle_prompt_alive() {
+        let (sender, receiver) = mpsc::channel();
+        let notification = json!({ "method": "session/update", "params": { "update": {
+            "sessionUpdate": "tool_call_update", "toolCallId": "read-1", "status": "in_progress"
+        } } }).to_string();
+        sender.send(Ok(notification.clone())).unwrap();
+        let worker = std::thread::spawn(move || {
+            for _ in 0..40 {
+                std::thread::sleep(Duration::from_millis(5));
+                if sender.send(Ok(notification.clone())).is_err() { break; }
+                let _ = sender.send(Ok(json!({ "method": "session/update", "params": { "update": {
+                    "sessionUpdate": "usage_update", "used": 1
+                } } }).to_string()));
+            }
+        });
+        let error = wait_for_response(&receiver, &mut Vec::new(), 7,
+            AcpResponseTimeouts::new(Duration::from_secs(1), Duration::from_millis(30), Duration::from_millis(150)),
+            &mut String::new(), None).unwrap_err();
+        drop(receiver);
+        worker.join().unwrap();
+        assert_eq!(error, "Agent 响应中断");
+    }
+
+    #[test]
+    fn reasoning_activity_is_not_included_in_the_structured_result() {
+        let (sender, receiver) = mpsc::channel();
+        for update in [
+            json!({ "sessionUpdate": "agent_thought_chunk", "content": { "text": "private {reasoning}" } }),
+            json!({ "sessionUpdate": "agent_message_chunk", "content": { "text": "{\"type\":\"final\"}" } }),
+        ] {
+            sender.send(Ok(json!({ "method": "session/update", "params": { "update": update } }).to_string())).unwrap();
+        }
+        sender.send(Ok(json!({ "id": 7, "result": {} }).to_string())).unwrap();
+        let mut text = String::new();
+        wait_for_response(&receiver, &mut Vec::new(), 7,
+            AcpResponseTimeouts::new(Duration::from_secs(1), Duration::from_secs(1), Duration::from_secs(1)),
+            &mut text, None).unwrap();
+        assert_eq!(text, "{\"type\":\"final\"}");
+        assert_eq!(extract_structured_envelope(&text).unwrap()["type"], "final");
     }
 
     #[test]

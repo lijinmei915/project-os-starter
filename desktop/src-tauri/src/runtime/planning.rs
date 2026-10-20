@@ -3,7 +3,7 @@ use crate::runtime::provider::sync_hermes_runtime_config;
 use crate::runtime::provider::{prepare_for_request, read_secret, ProviderConfig};
 use crate::runtime::provider::{chat_completion_content, post_streaming_chat_completion, require_success};
 use crate::runtime::agent_executor::{
-    agent_executor_by_id, default_agent_executor, AgentEvent, AgentEventSink, AgentExecutionMode,
+    default_agent_executor, AgentEvent, AgentEventSink, AgentExecutionMode,
     AgentExecutionPurpose, AgentExecutionRequest,
 };
 use base64::Engine;
@@ -221,6 +221,20 @@ pub struct PlanStreamUpdate {
     pub agent_event: Option<AgentEvent>,
 }
 
+async fn bounded_plan_execution<T>(
+    token: CancellationToken,
+    timeout: Duration,
+    work: impl std::future::Future<Output = Result<T, String>>,
+) -> Result<T, String> {
+    let _cancel_on_exit = token.clone().drop_guard();
+    tokio::select! {
+        biased;
+        _ = token.cancelled() => Err("请求已取消".to_string()),
+        result = tokio::time::timeout(timeout, work) =>
+            result.map_err(|_| "计划生成超过整体时间上限".to_string())?,
+    }
+}
+
 pub async fn generate_plan<F>(
     input: GeneratePlanInput<'_>,
     on_stream: F,
@@ -228,33 +242,41 @@ pub async fn generate_plan<F>(
 where
     F: Fn(PlanStreamUpdate) + Send + Sync + 'static,
 {
+    // Provider selection and preflight are part of the user's wait, too.
+    // Canceling here drops an in-flight HTTP probe as well as ACP execution.
+    let token = input.cancellation.as_ref().map(CancellationToken::child_token).unwrap_or_default();
+    let input = GeneratePlanInput { cancellation: Some(token.clone()), ..input };
+    bounded_plan_execution(token, PLAN_TOTAL_TIMEOUT, generate_plan_inner(input, on_stream)).await
+}
+
+async fn generate_plan_inner<F>(
+    input: GeneratePlanInput<'_>,
+    on_stream: F,
+) -> Result<ReadonlyPlan, String>
+where
+    F: Fn(PlanStreamUpdate) + Send + Sync + 'static,
+{
     let mut context = input.context;
-    let codex_executor = agent_executor_by_id("codex-cli").expect("Codex CLI executor is registered");
-    let use_codex_cli = context.attachments.is_empty() && codex_executor.status().status == "ready";
-    if !context.provider.enabled && !use_codex_cli {
+    // Installation is not evidence that the selected Provider supports a
+    // different executor's wire protocol. Use the governed default here;
+    // explicitly selected task executors remain available in Agent Runs.
+    if !context.provider.enabled {
         if !context.attachments.is_empty() {
             return Err("当前模型不可用，无法读取图片内容。请恢复模型连接后重试。".to_string());
         }
         return Ok(build_local_readonly_plan(context));
     }
     let configured_provider = context.provider.clone();
-    let (provider, provider_switch_note) = if use_codex_cli {
-        (configured_provider.clone(), String::new())
-    } else {
-        prepare_for_request(input.app_root, &configured_provider, &HashSet::new()).await?
-    };
+    let (provider, provider_switch_note) =
+        prepare_for_request(input.app_root, &configured_provider, &HashSet::new()).await?;
     #[cfg(not(test))]
-    if !use_codex_cli && provider.active_profile_id != configured_provider.active_profile_id {
+    if provider.active_profile_id != configured_provider.active_profile_id {
         sync_hermes_runtime_config(&provider)?;
     }
     context.provider = provider;
-    let api_key = if use_codex_cli {
-        String::new()
-    } else {
-        read_secret(&context.root, &context.provider.api_key_env).ok_or_else(|| {
-            format!("环境变量或 .env.local 中未设置 {}", context.provider.api_key_env)
-        })?
-    };
+    let api_key = read_secret(&context.root, &context.provider.api_key_env).ok_or_else(|| {
+        format!("环境变量或 .env.local 中未设置 {}", context.provider.api_key_env)
+    })?;
     let planning_started = tokio::time::Instant::now();
     let on_stream = Arc::new(on_stream);
     let mut visual_events = Vec::new();
@@ -298,24 +320,26 @@ where
         Some(summary)
     };
     let event_offset = visual_events.len();
-    // Codex CLI has its own authenticated session and a native JSONL stream. It
-    // is only admitted here for no-attachment planning; image understanding
-    // remains on the configured provider path until the adapter has an
-    // equivalent governed image contract.
-    let executor = if use_codex_cli {
-        codex_executor
-    } else {
-        default_agent_executor()
-    };
+    let executor = default_agent_executor();
     executor.prepare(&context.provider)?;
     let root = context.root.clone();
     let api_base = context.provider.api_base.clone();
     let api_key_env = context.provider.api_key_env.clone();
     let model = context.provider.model.clone();
     let prompt = agent_plan_prompt(&context, visual_context.as_deref());
-    let cancellation = input.cancellation.clone();
+    let execution_token = input.cancellation.as_ref()
+        .map(CancellationToken::child_token)
+        .unwrap_or_default();
+    // Dropping a spawn_blocking handle does not stop its worker. Always
+    // cancel its child token when this scope returns or is dropped.
+    let _cancel_execution = execution_token.clone().drop_guard();
+    let cancellation = Some(execution_token.clone());
     let stream_sink = Arc::clone(&on_stream);
+    let stream_token = execution_token.clone();
     let event_sink: AgentEventSink = Arc::new(move |event| {
+        if stream_token.is_cancelled() {
+            return;
+        }
         let mut event = event.clone();
         event.sequence += event_offset;
         stream_sink(PlanStreamUpdate {
@@ -328,7 +352,7 @@ where
     if remaining_timeout.is_zero() {
         return Err("计划生成超过整体时间上限".to_string());
     }
-    let provider_request = tokio::time::timeout(remaining_timeout, tauri::async_runtime::spawn_blocking(move || {
+    let worker = tauri::async_runtime::spawn_blocking(move || {
         executor.execute(AgentExecutionRequest {
             mode: AgentExecutionMode::Start,
             purpose: AgentExecutionPurpose::ReadonlyPlan,
@@ -339,21 +363,16 @@ where
             model,
             prompt,
             max_steps: 20,
+            previous_tool_name: String::new(),
+            previous_tool_result: None,
+            completed_check_ids: Vec::new(),
             cancellation,
             event_sink: Some(event_sink),
         })
-    }));
-    let provider_result = if let Some(token) = input.cancellation {
-        tokio::select! {
-            _ = token.cancelled() => Err("请求已取消".to_string()),
-            result = provider_request => result.map_err(|_| "计划生成超过整体时间上限".to_string())?.map_err(|error| format!("Agent 规划 worker 中断：{error}"))?,
-        }
-    } else {
-        provider_request
-            .await
-            .map_err(|_| "计划生成超过整体时间上限".to_string())?
-            .map_err(|error| format!("Agent 规划 worker 中断：{error}"))?
-    };
+    });
+    let provider_result = bounded_plan_execution(execution_token, remaining_timeout, async {
+        worker.await.map_err(|error| format!("Agent 规划 worker 中断：{error}"))?
+    }).await;
     match provider_result.and_then(|result| {
         if result.status != "succeeded" {
             return Err(result.summary);
@@ -896,6 +915,72 @@ fn is_next_step_request(task: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn canceling_a_plan_interrupts_provider_preflight_and_closes_its_socket() {
+        use tokio::io::AsyncReadExt;
+        let root = std::env::temp_dir().join(format!("omnidesk-plan-preflight-cancel-{}-{}", std::process::id(),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        fs::create_dir_all(&root).unwrap();
+        crate::runtime::provider::write_secret(&root, "PLAN_PREFLIGHT_CANCEL_KEY", "fixture-key").unwrap();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let parent = CancellationToken::new();
+        let cancel = parent.clone();
+        let server = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut buffer = [0; 4096];
+            assert!(stream.read(&mut buffer).await.unwrap() > 0);
+            cancel.cancel();
+            tokio::time::timeout(Duration::from_secs(1), async {
+                while stream.read(&mut buffer).await.unwrap() > 0 {}
+            }).await.expect("canceling preflight must close HTTP transport");
+        });
+        let mut provider = crate::runtime::provider::default_config();
+        provider.enabled = true;
+        provider.api_base = format!("http://{address}/v1");
+        provider.api_key_env = "PLAN_PREFLIGHT_CANCEL_KEY".to_string();
+        provider.active_profile_id = "cancel-fixture".to_string();
+        provider.profiles.clear();
+        let context = PlanContext { task: "read only".to_string(), attachments: vec![], project_name: "fixture".to_string(),
+            stage: String::new(), root: root.clone(), provider, next_step_candidates: vec![], file_index: vec![] };
+        let result = tokio::time::timeout(Duration::from_secs(2), generate_plan(GeneratePlanInput {
+            app_root: &root, context, cancellation: Some(parent),
+        }, |_| {})).await.expect("plan cancellation must not wait for provider timeout");
+        assert_eq!(result.err().unwrap(), "请求已取消");
+        server.await.unwrap();
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[tokio::test]
+    async fn planning_timeout_cancels_blocking_work_without_cancelling_parent() {
+        let parent = CancellationToken::new();
+        let child = parent.child_token();
+        let worker_token = child.clone();
+        let worker = tauri::async_runtime::spawn_blocking(move || {
+            while !worker_token.is_cancelled() {
+                std::thread::sleep(Duration::from_millis(1));
+            }
+            true
+        });
+        let result: Result<(), String> = bounded_plan_execution(child, Duration::from_millis(10),
+            std::future::pending()).await;
+        assert!(result.unwrap_err().contains("整体时间上限"));
+        assert!(!parent.is_cancelled());
+        assert!(tokio::time::timeout(Duration::from_secs(1), worker).await.unwrap().unwrap());
+    }
+
+    #[tokio::test]
+    async fn planning_cancellation_and_success_close_the_child_scope() {
+        let token = CancellationToken::new();
+        token.cancel();
+        let result: Result<(), String> = bounded_plan_execution(token, Duration::from_secs(1),
+            std::future::pending()).await;
+        assert_eq!(result.unwrap_err(), "请求已取消");
+        let token = CancellationToken::new();
+        assert_eq!(bounded_plan_execution(token.clone(), Duration::from_secs(1), async { Ok(7) }).await.unwrap(), 7);
+        assert!(token.is_cancelled());
+    }
 
     #[test]
     fn local_plan_keeps_planning_read_only() {

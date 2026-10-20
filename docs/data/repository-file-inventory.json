@@ -1,6 +1,6 @@
 {
   "schemaVersion": "omnidesk.repository-file-inventory.v1",
-  "generatedAt": "2026-10-19T17:43:16.765Z",
+  "generatedAt": "2026-10-20T02:27:30.033Z",
   "sourceOfTruth": "git ls-files --cached --others --exclude-standard",
   "scope": "受版本控制文件及准备纳入版本控制的非忽略工作树文件；忽略的本地运行数据和构建输出不在本账本内。",
   "reviewContract": {
@@ -24,7 +24,7 @@
     "rule": "没有消费者证据的文件不自动删除；必须由对应 Owner 审核并通过验证后才能退役。"
   },
   "totals": {
-    "files": 594,
+    "files": 595,
     "byKind": {
       "repository": 2,
       "ci": 2,
@@ -32,7 +32,7 @@
       "desktop-support": 15,
       "eval": 11,
       "native": 68,
-      "runtime": 39,
+      "runtime": 40,
       "eval-support": 10,
       "frontend": 267,
       "test": 130,
@@ -44,7 +44,7 @@
     "classified": 7,
     "candidates": 0,
     "inProgress": 2,
-    "reviewed": 585
+    "reviewed": 586
   },
   "files": [
     {
@@ -66,7 +66,7 @@
       "path": ".github/workflows/agent-eval.yml",
       "kind": "ci",
       "owner": "Release Engineering",
-      "bytes": 10094,
+      "bytes": 10238,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -214,6 +214,7 @@
       "owner": "Documentation Governance",
       "bytes": 3839,
       "pathMentions": [
+        "desktop/scripts/run-provider-timeline-eval.mjs",
         "desktop/src-tauri/src/runtime/app.rs",
         "desktop/src-tauri/src/runtime/execution.rs",
         "desktop/src-tauri/src/runtime/external_changes.rs",
@@ -560,7 +561,7 @@
       "path": "desktop/scripts/run-provider-timeline-eval.mjs",
       "kind": "desktop-support",
       "owner": "Desktop Platform",
-      "bytes": 3871,
+      "bytes": 4961,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -605,7 +606,7 @@
       "path": "desktop/src-tauri/Cargo.lock",
       "kind": "native",
       "owner": "Desktop Shell",
-      "bytes": 134859,
+      "bytes": 134868,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -620,7 +621,7 @@
       "path": "desktop/src-tauri/Cargo.toml",
       "kind": "native",
       "owner": "Desktop Shell",
-      "bytes": 1266,
+      "bytes": 1304,
       "pathMentions": [
         ".github/workflows/ci.yml",
         "AGENTS.md",
@@ -1549,7 +1550,7 @@
       "path": "desktop/src-tauri/src/bin/provider_fallback_eval.rs",
       "kind": "native",
       "owner": "Desktop Shell",
-      "bytes": 7830,
+      "bytes": 7856,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -1564,7 +1565,7 @@
       "path": "desktop/src-tauri/src/bin/provider_timeline_eval.rs",
       "kind": "native",
       "owner": "Desktop Shell",
-      "bytes": 7999,
+      "bytes": 9304,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -1600,7 +1601,7 @@
       "path": "desktop/src-tauri/src/runtime/acp_execution.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 65290,
+      "bytes": 65618,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/gemini_executor.rs",
@@ -1620,7 +1621,7 @@
       "path": "desktop/src-tauri/src/runtime/acp_protocol.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 12526,
+      "bytes": 17824,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/acp_execution.rs",
@@ -1641,9 +1642,10 @@
       "path": "desktop/src-tauri/src/runtime/agent_executor.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 11759,
+      "bytes": 13181,
       "pathMentions": [],
       "moduleConsumers": [
+        "desktop/src-tauri/src/bin/provider_timeline_eval.rs",
         "desktop/src-tauri/src/runtime/acp_execution.rs",
         "desktop/src-tauri/src/runtime/agent_runs.rs",
         "desktop/src-tauri/src/runtime/app.rs",
@@ -1668,7 +1670,7 @@
       "path": "desktop/src-tauri/src/runtime/agent_runs.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 93331,
+      "bytes": 105336,
       "pathMentions": [
         "desktop/src/lib/agent-topic-agent-config.js",
         "desktop/src/workspace-outline.js"
@@ -1719,6 +1721,7 @@
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/acp_execution.rs",
         "desktop/src-tauri/src/runtime/app.rs",
+        "desktop/src-tauri/src/runtime/codex_executor.rs",
         "desktop/src-tauri/src/runtime/mod.rs"
       ],
       "consumerEvidence": "static-module-consumer",
@@ -1733,7 +1736,7 @@
       "path": "desktop/src-tauri/src/runtime/app.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 120147,
+      "bytes": 136277,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/main.rs",
@@ -1751,7 +1754,7 @@
       "path": "desktop/src-tauri/src/runtime/chat_content.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 18130,
+      "bytes": 18219,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/bin/provider_fallback_eval.rs",
@@ -1808,7 +1811,7 @@
       "path": "desktop/src-tauri/src/runtime/chat_stream.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 38508,
+      "bytes": 67487,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/bin/provider_fallback_eval.rs",
@@ -1828,7 +1831,7 @@
       "path": "desktop/src-tauri/src/runtime/codex_executor.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 13723,
+      "bytes": 41968,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/agent_executor.rs",
@@ -1846,7 +1849,7 @@
       "path": "desktop/src-tauri/src/runtime/conversations.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 7254,
+      "bytes": 13526,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/app.rs",
@@ -1865,15 +1868,17 @@
       "path": "desktop/src-tauri/src/runtime/execution.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 39609,
+      "bytes": 47339,
       "pathMentions": [
         "desktop/src/components/workbench/agent-config-surface-panel.jsx"
       ],
       "moduleConsumers": [
         "desktop/src-tauri/src/bin/mcp_eval.rs",
         "desktop/src-tauri/src/runtime/app.rs",
+        "desktop/src-tauri/src/runtime/codex_executor.rs",
         "desktop/src-tauri/src/runtime/goals.rs",
-        "desktop/src-tauri/src/runtime/mod.rs"
+        "desktop/src-tauri/src/runtime/mod.rs",
+        "desktop/src-tauri/src/runtime/tasks.rs"
       ],
       "consumerEvidence": "static-module-consumer",
       "consumerReview": "静态 import/mod 关系已记录。",
@@ -1887,7 +1892,7 @@
       "path": "desktop/src-tauri/src/runtime/external_changes.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 11889,
+      "bytes": 21146,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/mod.rs",
@@ -1906,7 +1911,7 @@
       "path": "desktop/src-tauri/src/runtime/gemini_executor.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 5632,
+      "bytes": 5776,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/agent_executor.rs",
@@ -1924,12 +1929,14 @@
       "path": "desktop/src-tauri/src/runtime/goals.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 49824,
+      "bytes": 58693,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/app.rs",
+        "desktop/src-tauri/src/runtime/chat_content.rs",
         "desktop/src-tauri/src/runtime/mod.rs",
-        "desktop/src-tauri/src/runtime/tasks.rs"
+        "desktop/src-tauri/src/runtime/tasks.rs",
+        "desktop/src-tauri/src/runtime/workspace.rs"
       ],
       "consumerEvidence": "static-module-consumer",
       "consumerReview": "静态 import/mod 关系已记录。",
@@ -1980,7 +1987,7 @@
       "path": "desktop/src-tauri/src/runtime/hermes_protocol.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 5474,
+      "bytes": 5788,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/acp_execution.rs",
@@ -2041,7 +2048,7 @@
       "path": "desktop/src-tauri/src/runtime/mod.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 832,
+      "bytes": 861,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -2062,6 +2069,7 @@
         "desktop/src-tauri/src/bin/patch_normalizer.rs",
         "desktop/src-tauri/src/runtime/acp_execution.rs",
         "desktop/src-tauri/src/runtime/app.rs",
+        "desktop/src-tauri/src/runtime/codex_executor.rs",
         "desktop/src-tauri/src/runtime/execution.rs",
         "desktop/src-tauri/src/runtime/isolated_workspace.rs",
         "desktop/src-tauri/src/runtime/mod.rs",
@@ -2079,7 +2087,7 @@
       "path": "desktop/src-tauri/src/runtime/patch_draft.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 15859,
+      "bytes": 20246,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/app.rs",
@@ -2097,7 +2105,7 @@
       "path": "desktop/src-tauri/src/runtime/planning.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 43507,
+      "bytes": 47780,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/app.rs",
@@ -2117,7 +2125,7 @@
       "path": "desktop/src-tauri/src/runtime/provider.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 64300,
+      "bytes": 72660,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/bin/provider_fallback_eval.rs",
@@ -2146,7 +2154,7 @@
       "path": "desktop/src-tauri/src/runtime/provider_core.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 6557,
+      "bytes": 9540,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/chat_stream.rs",
@@ -2183,7 +2191,7 @@
       "path": "desktop/src-tauri/src/runtime/repository.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 29213,
+      "bytes": 42030,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/bin/provider_fallback_eval.rs",
@@ -2201,6 +2209,7 @@
         "desktop/src-tauri/src/runtime/state_namespace.rs",
         "desktop/src-tauri/src/runtime/tasks.rs",
         "desktop/src-tauri/src/runtime/theme.rs",
+        "desktop/src-tauri/src/runtime/validation_revision.rs",
         "desktop/src-tauri/src/runtime/workspace.rs"
       ],
       "consumerEvidence": "static-module-consumer",
@@ -2215,7 +2224,7 @@
       "path": "desktop/src-tauri/src/runtime/state_namespace.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 30775,
+      "bytes": 30932,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/bin/mcp_eval.rs",
@@ -2262,7 +2271,7 @@
       "path": "desktop/src-tauri/src/runtime/tasks.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 24246,
+      "bytes": 56774,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/app.rs",
@@ -2339,15 +2348,37 @@
       "decisionEvidence": "manual-review-rule:tauri-core-entrypoints"
     },
     {
+      "path": "desktop/src-tauri/src/runtime/validation_revision.rs",
+      "kind": "runtime",
+      "owner": "Local Agent Runtime",
+      "bytes": 10867,
+      "pathMentions": [],
+      "moduleConsumers": [
+        "desktop/src-tauri/src/runtime/agent_runs.rs",
+        "desktop/src-tauri/src/runtime/execution.rs",
+        "desktop/src-tauri/src/runtime/external_changes.rs",
+        "desktop/src-tauri/src/runtime/goals.rs",
+        "desktop/src-tauri/src/runtime/mod.rs",
+        "desktop/src-tauri/src/runtime/tasks.rs"
+      ],
+      "consumerEvidence": "static-module-consumer",
+      "consumerReview": "静态 import/mod 关系已记录。",
+      "decision": "keep",
+      "rationale": "Tauri Native Shell、Runtime 模块注册和离线 Patch normalizer 入口；具体领域规则归 runtime 子模块，app.rs 单独持续拆分。",
+      "reviewStatus": "reviewed",
+      "verification": "cargo check --manifest-path desktop/src-tauri/Cargo.toml && bash tests/run-tests.sh",
+      "decisionEvidence": "manual-review-rule:tauri-core-entrypoints"
+    },
+    {
       "path": "desktop/src-tauri/src/runtime/workspace.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 99914,
+      "bytes": 99880,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/app.rs",
         "desktop/src-tauri/src/runtime/chat_content.rs",
-        "desktop/src-tauri/src/runtime/external_changes.rs",
+        "desktop/src-tauri/src/runtime/goals.rs",
         "desktop/src-tauri/src/runtime/mod.rs",
         "desktop/src-tauri/src/runtime/workspace_governance.rs"
       ],
@@ -2367,7 +2398,6 @@
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/chat_content.rs",
-        "desktop/src-tauri/src/runtime/external_changes.rs",
         "desktop/src-tauri/src/runtime/mod.rs",
         "desktop/src-tauri/src/runtime/workspace.rs"
       ],
@@ -2383,7 +2413,7 @@
       "path": "desktop/src-tauri/src/runtime/workspace_watcher.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 6000,
+      "bytes": 6922,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/app.rs",
@@ -2563,7 +2593,7 @@
       "path": "desktop/src/agent-runtime/provider-evaluation.js",
       "kind": "eval-support",
       "owner": "Agent Reliability",
-      "bytes": 7507,
+      "bytes": 8558,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/scripts/run-provider-fallback-eval.mjs",
@@ -8809,7 +8839,7 @@
       "path": "desktop/tests/provider-function-eval.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 11280,
+      "bytes": 12931,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -9709,7 +9739,7 @@
       "path": "docs/LESSONS.md",
       "kind": "documentation",
       "owner": "Documentation Governance",
-      "bytes": 139786,
+      "bytes": 169728,
       "pathMentions": [
         "desktop/src/components/workbench/project-memory-panel.jsx",
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
@@ -9811,7 +9841,7 @@
       "path": "docs/TESTING.md",
       "kind": "documentation",
       "owner": "Documentation Governance",
-      "bytes": 16418,
+      "bytes": 28110,
       "pathMentions": [
         "desktop/scripts/run-native-webdriver-smoke.mjs",
         "desktop/src-tauri/src/runtime/workspace.rs",

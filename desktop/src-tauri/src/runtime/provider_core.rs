@@ -11,6 +11,7 @@ pub struct ToolCallFragment {
 pub struct StreamDelta {
     pub content: Vec<String>,
     pub tool_call_fragments: Vec<ToolCallFragment>,
+    pub done: bool,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -38,6 +39,37 @@ impl ProviderCoreError {
 impl From<String> for ProviderCoreError {
     fn from(message: String) -> Self {
         Self::new(message)
+    }
+}
+
+/// A transport chunk can end inside a Unicode scalar. Keep only that unfinished
+/// suffix instead of replacing its bytes before the next chunk arrives.
+#[derive(Default)]
+pub struct Utf8StreamDecoder {
+    pending: Vec<u8>,
+}
+
+impl Utf8StreamDecoder {
+    pub fn push(&mut self, chunk: &[u8]) -> Result<String, &'static str> {
+        self.pending.extend_from_slice(chunk);
+        let valid_len = match std::str::from_utf8(&self.pending) {
+            Ok(_) => self.pending.len(),
+            Err(error) if error.error_len().is_none() => error.valid_up_to(),
+            Err(_) => return Err("模型流式响应包含无效的 UTF-8 字符"),
+        };
+        let decoded = std::str::from_utf8(&self.pending[..valid_len])
+            .expect("UTF-8 validated prefix")
+            .to_string();
+        self.pending.drain(..valid_len);
+        Ok(decoded)
+    }
+
+    pub fn finish(self) -> Result<(), &'static str> {
+        if self.pending.is_empty() {
+            Ok(())
+        } else {
+            Err("模型流式响应在 UTF-8 字符中间中断")
+        }
     }
 }
 
@@ -89,6 +121,8 @@ pub fn classify_failure(message: &str) -> &'static str {
         || text.contains("timeout")
         || text.contains("超时")
         || text.contains("connection")
+        || text.contains("error sending request")
+        || text.contains("tcp connect error")
         || text.contains("dns")
         || text.contains("网络")
         || text.contains("连接")
@@ -118,12 +152,20 @@ pub fn consume_openai_sse(pending: &mut String, chunk: &str) -> StreamDelta {
         };
         let data = data.trim();
         if data == "[DONE]" {
+            output.done = true;
             continue;
         }
         let event: Value = match serde_json::from_str(data) {
             Ok(event) => event,
             Err(_) => continue,
         };
+        if event
+            .pointer("/choices/0/finish_reason")
+            .and_then(Value::as_str)
+            .is_some()
+        {
+            output.done = true;
+        }
         if let Some(delta) = event
             .pointer("/choices/0/delta/content")
             .and_then(Value::as_str)
@@ -164,6 +206,38 @@ mod tests {
     use super::*;
 
     #[test]
+    fn utf8_decoder_preserves_every_split_and_single_byte_delivery() {
+        let text = "data: 中文🙂\"é\"\r\n\n�";
+        let bytes = text.as_bytes();
+        for split in 0..=bytes.len() {
+            let mut decoder = Utf8StreamDecoder::default();
+            let mut decoded = decoder.push(&bytes[..split]).unwrap();
+            assert!(decoder.pending.len() <= 3);
+            decoded.push_str(&decoder.push(&bytes[split..]).unwrap());
+            decoder.finish().unwrap();
+            assert_eq!(decoded, text, "byte split {split}");
+        }
+        let mut decoder = Utf8StreamDecoder::default();
+        let mut decoded = String::new();
+        for byte in bytes {
+            decoded.push_str(&decoder.push(&[*byte]).unwrap());
+            assert!(decoder.pending.len() <= 3);
+        }
+        decoder.finish().unwrap();
+        assert_eq!(decoded, text);
+    }
+
+    #[test]
+    fn utf8_decoder_rejects_invalid_and_unfinished_characters() {
+        for invalid in [&[0xff][..], &[0xc0, 0xaf], &[0xed, 0xa0, 0x80]] {
+            assert!(Utf8StreamDecoder::default().push(invalid).is_err());
+        }
+        let mut decoder = Utf8StreamDecoder::default();
+        assert_eq!(decoder.push(&"中".as_bytes()[..1]).unwrap(), "");
+        assert!(decoder.finish().is_err());
+    }
+
+    #[test]
     fn normalizes_endpoints_without_product_state() {
         assert_eq!(
             chat_completions_endpoint("https://api.example.test/v1"),
@@ -191,19 +265,29 @@ mod tests {
         assert_eq!(output.content, vec!["hello"]);
         assert_eq!(output.tool_call_fragments[0].name, "lookup");
         assert_eq!(output.tool_call_fragments[0].arguments, "{}");
+        assert!(output.done);
         assert!(pending.is_empty());
     }
 
     #[test]
     fn retries_only_first_network_failure_without_partial_output() {
         assert!(should_retry(&ProviderCoreError::new("connection reset"), 0));
-        assert!(!should_retry(&ProviderCoreError::new("connection reset"), 1));
+        assert!(!should_retry(
+            &ProviderCoreError::new("connection reset"),
+            1
+        ));
         assert!(!should_retry(
             &ProviderCoreError::with_partial("connection reset", "partial"),
             0
         ));
         assert!(!should_retry(
             &ProviderCoreError::new("provider HTTP 401: invalid token"),
+            0
+        ));
+        assert!(should_retry(
+            &ProviderCoreError::new(
+                "error sending request for url (http://127.0.0.1:49152/v1/chat/completions)"
+            ),
             0
         ));
     }

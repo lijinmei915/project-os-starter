@@ -163,7 +163,7 @@ async fn run_direct_stream(
     let mut first_delta_ms = None;
     let mut last_delta_ms = None;
     let mut streamed = String::new();
-    let result = runtime::chat_stream::generate_provider_chat(
+    let result = runtime::chat_stream::generate_provider_chat_with_tools(
         provider,
         project_root,
         "Provider Direct Stream Eval",
@@ -176,6 +176,7 @@ async fn run_direct_stream(
         &json!({}),
         &[],
         &json!({}),
+        false,
         |delta, chars| {
             if delta.is_empty() {
                 return;

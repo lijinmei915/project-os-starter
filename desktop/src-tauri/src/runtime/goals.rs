@@ -7,10 +7,49 @@ const GOALS_PATH: &str = ".omnidesk/data/goals.json";
 const PROJECT_GOALS_PATH: &str = ".omnidesk/data/project-goals.json";
 const GOAL_VALIDATION_PATH: &str = ".omnidesk/data/goal-validation.json";
 const GOAL_VALIDATION_REPORT_PATH: &str = ".omnidesk/evidence/goal-validation-report.json";
-const GOAL_SIGNOFF_HISTORY_PATH: &str = ".omnidesk/evidence/goal-signoff-history.json";
+const GOAL_SIGNOFF_HISTORY_PATH: &str = ".omnidesk/data/goal-signoff-history.json";
+const MISPLACED_SIGNOFF_HISTORY_PATH: &str = ".omnidesk/evidence/goal-signoff-history.json";
 const GOALS_SCHEMA_VERSION: &str = "omnidesk.goals.v0.1";
 const LEGACY_GOALS_SCHEMA_VERSION: &str = "project-os.goals.v0.1";
 const GOAL_SIGNOFF_HISTORY_SCHEMA_VERSION: &str = "omnidesk.goal-signoff-history.v0.1";
+
+/// Preserve entries written to the wrong active partition by earlier builds.
+/// Reads never migrate or delete either file; the next signoff writes data only.
+pub fn signoff_history(root: &Path) -> Value {
+    let repository = Repository::new(root);
+    let primary = repository.read_json(GOAL_SIGNOFF_HISTORY_PATH);
+    let misplaced = repository.read_json(MISPLACED_SIGNOFF_HISTORY_PATH);
+    let mut result = primary.clone().or_else(|| misplaced.clone())
+        .filter(Value::is_object).unwrap_or_else(|| json!({ "schemaVersion": GOAL_SIGNOFF_HISTORY_SCHEMA_VERSION }));
+    let mut entries = Vec::new();
+    for history in [primary, misplaced].into_iter().flatten() {
+        for entry in history["entries"].as_array().into_iter().flatten() {
+            if !entries.contains(entry) { entries.push(entry.clone()); }
+        }
+    }
+    result["entries"] = json!(entries);
+    result
+}
+
+/// Reads old evidence without upgrading it into proof for the current source.
+pub fn project_validation_report(root: &Path, mut report: Value) -> Value {
+    if report["status"].as_str() != Some("passed") { return report; }
+    let (status, reason) = match report.get("inputBinding") {
+        None => ("unbound", "这份历史报告未记录代码版本，请重新运行验收。"),
+        Some(binding) => match crate::runtime::validation_revision::capture(root) {
+            Ok(current) if binding == &current => ("fresh", "验收结果对应当前源码与验收标准。"),
+            Ok(_) => ("stale", "源码或验收标准已变化，请重新运行验收。"),
+            Err(_) => ("unavailable", "无法核对当前源码版本，请重新运行验收。"),
+        },
+    };
+    report["freshness"] = json!({ "status": status, "reason": reason });
+    if status != "fresh" {
+        report["recordedStatus"] = json!("passed");
+        report["status"] = json!("stale");
+        report["summary"] = json!(reason);
+    }
+    report
+}
 
 fn load_or_seed(repository: &Repository, project_name: &str) -> Value {
     let mut goals = project_goals_schema(repository.read_json(GOALS_PATH).unwrap_or_else(|| {
@@ -678,8 +717,9 @@ pub fn sign_off_validation(root: &Path, goal_id: &str, timestamp: &str) -> Resul
     Repository::new(root).transaction_with("sign-off-goal-validation", |repository| {
         let mut validation = repository.read_json(GOAL_VALIDATION_PATH)
             .ok_or_else(|| "未找到目标验收标准文件".to_string())?;
-        let report = repository.read_json(GOAL_VALIDATION_REPORT_PATH).unwrap_or_else(|| json!({}));
+        let report = project_validation_report(root, repository.read_json(GOAL_VALIDATION_REPORT_PATH).unwrap_or_else(|| json!({})));
         let report_status = report.get("status").and_then(Value::as_str).unwrap_or("missing");
+        if report_status == "stale" { return Err(report["summary"].as_str().unwrap_or("验收结果已过期，请重新运行验收。").to_string()); }
         if report_status != "passed" { return Err("目标还没有通过验收，不能签收。".to_string()); }
         if report.get("goalId").and_then(Value::as_str) != Some(goal_id) {
             return Err("验收报告与当前目标不一致，请先为当前目标重新运行验收。".to_string());
@@ -697,13 +737,13 @@ pub fn sign_off_validation(root: &Path, goal_id: &str, timestamp: &str) -> Resul
                 goal.insert("status".to_string(), Value::String("signed-off".to_string()));
             }
         }
-        let mut history = repository.read_json(GOAL_SIGNOFF_HISTORY_PATH).unwrap_or_else(|| json!({ "schemaVersion": GOAL_SIGNOFF_HISTORY_SCHEMA_VERSION, "entries": [] }));
+        let mut history = signoff_history(root);
         if let Some(object) = history.as_object_mut() {
             object.insert("schemaVersion".to_string(), Value::String(GOAL_SIGNOFF_HISTORY_SCHEMA_VERSION.to_string()));
             object.insert("updatedAt".to_string(), Value::String(timestamp.to_string()));
             let entries = object.entry("entries".to_string()).or_insert_with(|| Value::Array(Vec::new()));
             if let Some(entries) = entries.as_array_mut() {
-                entries.insert(0, json!({ "goalId": goal_id, "goalTitle": goal_title, "signedOffAt": timestamp, "reportStatus": report_status, "source": "OmniDesk" }));
+                entries.insert(0, json!({ "goalId": goal_id, "goalTitle": goal_title, "signedOffAt": timestamp, "reportStatus": report_status, "source": "OmniDesk", "reportGeneratedAt": report["generatedAt"], "inputBinding": report["inputBinding"] }));
             }
         }
         update_status(&mut goals, goal_id, "done", report_status, timestamp);
@@ -726,6 +766,9 @@ pub fn record_validation(
     timestamp: &str,
 ) -> Result<(), String> {
     Repository::new(root).transaction_with("run-goal-validation", |repository| {
+        let report = project_validation_report(root, report);
+        let stale = report["status"].as_str() == Some("stale");
+        let passed = passed && report["status"].as_str() == Some("passed");
         let mut goals = repository
             .read_json(GOALS_PATH)
             .ok_or_else(|| "未找到目标列表".to_string())?;
@@ -755,6 +798,8 @@ pub fn record_validation(
                         Value::String(
                             if passed {
                                 "verified"
+                            } else if stale {
+                                "validation-stale"
                             } else {
                                 "validation-failed"
                             }
@@ -768,8 +813,8 @@ pub fn record_validation(
         update_status(
             &mut goals,
             goal_id,
-            if passed { "pending-confirm" } else { "failed" },
-            if passed { "passed" } else { "failed" },
+            if passed { "pending-confirm" } else if stale { "active" } else { "failed" },
+            if passed { "passed" } else if stale { "stale" } else { "failed" },
             timestamp,
         );
         mutations.push(JsonMutation::upsert(GOALS_PATH, goals));
@@ -807,6 +852,7 @@ pub fn run_validation(root: &Path, goal_id: &str, timestamp: &str) -> Result<(),
         .or_else(|| goal.get("shortTitle").and_then(Value::as_str))
         .unwrap_or("当前目标");
 
+    let input_binding = crate::runtime::validation_revision::capture(root)?;
     let mut checks = Vec::new();
     for check_id in ["web-build", "cargo-check", "runtime"] {
         let check = execute_guarded_check(root, check_id)?;
@@ -825,6 +871,7 @@ pub fn run_validation(root: &Path, goal_id: &str, timestamp: &str) -> Result<(),
         "goalTitle": goal_title,
         "status": if passed { "passed" } else { "failed" },
         "checks": checks,
+        "inputBinding": input_binding,
     });
     record_validation(root, goal_id, goal_title, passed, report, timestamp)
 }
@@ -1149,7 +1196,7 @@ mod tests {
         .unwrap();
         fs::write(
             root.join(GOAL_VALIDATION_REPORT_PATH),
-            r#"{"goalId":"goal-1","status":"passed"}"#,
+            serde_json::to_vec(&json!({"goalId":"goal-1","status":"passed", "generatedAt":"checked", "inputBinding":crate::runtime::validation_revision::capture(&root).unwrap()})).unwrap(),
         )
         .unwrap();
         sign_off_validation(&root, "goal-1", "now").unwrap();
@@ -1166,6 +1213,8 @@ mod tests {
             repository.read_json(GOAL_SIGNOFF_HISTORY_PATH).unwrap()["entries"][0]["goalId"],
             "goal-1"
         );
+        assert_eq!(repository.read_json(GOAL_SIGNOFF_HISTORY_PATH).unwrap()["entries"][0]["reportGeneratedAt"], "checked");
+        assert_eq!(repository.read_json(GOAL_SIGNOFF_HISTORY_PATH).unwrap()["entries"][0]["inputBinding"], crate::runtime::validation_revision::capture(&root).unwrap());
         assert_eq!(
             fs::read_dir(root.join(".omnidesk/runtime/events"))
                 .unwrap()
@@ -1190,7 +1239,7 @@ mod tests {
         )
         .unwrap();
         fs::write(root.join(GOAL_VALIDATION_PATH), r#"{"goal":{}}"#).unwrap();
-        let report = json!({ "goalId": "goal-1", "status": "passed", "checks": [] });
+        let report = json!({ "goalId": "goal-1", "status": "passed", "checks": [], "inputBinding":crate::runtime::validation_revision::capture(&root).unwrap() });
         record_validation(&root, "goal-1", "Runtime", true, report, "now").unwrap();
         let repository = Repository::new(&root);
         assert_eq!(
@@ -1211,6 +1260,79 @@ mod tests {
                 .count(),
             1
         );
+    }
+
+    #[test]
+    fn signoff_preserves_misplaced_history_and_projects_the_canonical_write() {
+        let root = std::env::temp_dir().join(format!("omnidesk-signoff-path-{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));
+        fs::create_dir_all(root.join(".omnidesk/data")).unwrap();
+        fs::create_dir_all(root.join(".omnidesk/evidence")).unwrap();
+        let old = json!({"goalId":"old","signedOffAt":"earlier","reportStatus":"passed"});
+        let misplaced = json!({"entries":[old.clone()]});
+        fs::write(root.join(MISPLACED_SIGNOFF_HISTORY_PATH), serde_json::to_vec(&misplaced).unwrap()).unwrap();
+        fs::write(root.join(GOAL_SIGNOFF_HISTORY_PATH), serde_json::to_vec(&json!({"entries":[old]})).unwrap()).unwrap();
+        fs::write(root.join(GOALS_PATH), r#"{"goals":[{"id":"g","title":"Goal","status":"pending-confirm"}]}"#).unwrap();
+        fs::write(root.join(GOAL_VALIDATION_PATH), r#"{"goal":{"id":"g"}}"#).unwrap();
+        let report = json!({"goalId":"g","status":"passed","inputBinding":crate::runtime::validation_revision::capture(&root).unwrap()});
+        fs::write(root.join(GOAL_VALIDATION_REPORT_PATH), serde_json::to_vec(&report).unwrap()).unwrap();
+        sign_off_validation(&root, "g", "now").unwrap();
+        let projection = crate::runtime::workspace::load_projection_state(&root);
+        assert_eq!(projection.goal_signoff_history["entries"].as_array().unwrap().len(), 2);
+        assert_eq!(projection.goal_signoff_history["entries"][0]["goalId"], "g");
+        assert_eq!(projection.goal_signoff_history["entries"][1]["goalId"], "old");
+        assert_eq!(Repository::new(&root).read_json(MISPLACED_SIGNOFF_HISTORY_PATH).unwrap(), misplaced);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn source_or_criteria_changes_and_legacy_reports_cannot_be_signed_off() {
+        for change in ["source", "criteria", "legacy"] {
+            let root = std::env::temp_dir().join(format!("omnidesk-stale-signoff-{change}-{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));
+            fs::create_dir_all(root.join(".omnidesk/data")).unwrap();
+            fs::create_dir_all(root.join(".omnidesk/evidence")).unwrap();
+            fs::write(root.join(GOALS_PATH), r#"{"goals":[{"id":"g","status":"pending-confirm"}]}"#).unwrap();
+            fs::write(root.join(GOAL_VALIDATION_PATH), r#"{"goal":{"id":"g","status":"verified"},"criteria":[{"id":"one"}]}"#).unwrap();
+            fs::write(root.join("source.txt"), "before").unwrap();
+            let mut report = json!({"goalId":"g","status":"passed","inputBinding":crate::runtime::validation_revision::capture(&root).unwrap()});
+            if change == "legacy" { report.as_object_mut().unwrap().remove("inputBinding"); }
+            fs::write(root.join(GOAL_VALIDATION_REPORT_PATH), serde_json::to_vec(&report).unwrap()).unwrap();
+            let validation_before = fs::read(root.join(GOAL_VALIDATION_PATH)).unwrap();
+            if change == "source" { fs::write(root.join("source.txt"), "after!").unwrap(); }
+            if change == "criteria" { fs::write(root.join(GOAL_VALIDATION_PATH), r#"{"goal":{"id":"g","status":"verified"},"criteria":[{"id":"two"}]}"#).unwrap(); }
+            let before_signoff = fs::read(root.join(GOAL_VALIDATION_PATH)).unwrap();
+            assert!(sign_off_validation(&root, "g", "now").unwrap_err().contains("重新运行验收"));
+            assert_eq!(fs::read(root.join(GOAL_VALIDATION_PATH)).unwrap(), before_signoff);
+            let repository = Repository::new(&root);
+            assert_eq!(repository.read_json(GOALS_PATH).unwrap()["goals"][0]["status"], "pending-confirm");
+            assert!(repository.read_json(GOAL_SIGNOFF_HISTORY_PATH).is_none());
+            assert!(!root.join(".omnidesk/runtime/events").exists());
+            assert_eq!(repository.read_json(GOAL_VALIDATION_REPORT_PATH).unwrap(), report);
+            let projection = crate::runtime::workspace::load_projection_state(&root);
+            assert_eq!(projection.goal_validation_report["status"], "stale");
+            if change != "criteria" { assert_eq!(before_signoff, validation_before); }
+            fs::remove_dir_all(root).unwrap();
+        }
+    }
+
+    #[test]
+    fn changes_during_checks_preserve_evidence_without_advancing_goal() {
+        let root = std::env::temp_dir().join(format!("omnidesk-changing-check-{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));
+        fs::create_dir_all(root.join(".omnidesk/data")).unwrap();
+        fs::write(root.join(GOALS_PATH), r#"{"goals":[{"id":"g","status":"active"}]}"#).unwrap();
+        fs::write(root.join(GOAL_VALIDATION_PATH), r#"{"goal":{"id":"g"}}"#).unwrap();
+        fs::write(root.join("source.txt"), "before").unwrap();
+        let report = json!({"goalId":"g","status":"passed","checks":[{"id":"runtime","success":true}],"inputBinding":crate::runtime::validation_revision::capture(&root).unwrap()});
+        fs::write(root.join("source.txt"), "after!").unwrap();
+        record_validation(&root, "g", "Goal", true, report, "now").unwrap();
+        let repository = Repository::new(&root);
+        let saved = repository.read_json(GOAL_VALIDATION_REPORT_PATH).unwrap();
+        assert_eq!(saved["status"], "stale");
+        assert_eq!(saved["recordedStatus"], "passed");
+        assert_eq!(saved["checks"][0]["success"], true);
+        assert_eq!(repository.read_json(GOALS_PATH).unwrap()["goals"][0]["status"], "active");
+        assert_eq!(repository.read_json(GOAL_VALIDATION_PATH).unwrap()["goal"]["status"], "validation-stale");
+        assert!(sign_off_validation(&root, "g", "later").is_err());
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

@@ -62,6 +62,17 @@ export function validateProviderTimelineRuntimeResult(result) {
   return result;
 }
 
+export function validateProviderReadonlyFileEvidence(result) {
+  const evidence = result?.readonlyFileEvidence;
+  if (evidence?.fixturePath !== "README.md" || evidence.markerMatched !== true) throw new Error("Readonly Agent did not recover the file-only marker");
+  if (evidence.fixtureSourceUnchanged !== true || evidence.projectEntriesUnchanged !== true) throw new Error("Readonly Agent changed fixture files");
+  const events = result?.readonlyToolEvents || [];
+  const requested = events.findIndex((event) => event.kind === "tool-call" && event.status === "requested" && event.details?.name === "read_file" && event.details?.path === evidence.fixturePath);
+  const succeeded = events.findIndex((event, index) => index > requested && event.kind === "tool-result" && event.status === "succeeded" && event.details?.name === "read_file" && event.details?.path === evidence.fixturePath && event.details?.success === true);
+  if (requested < 0 || succeeded < 0) throw new Error("Readonly Agent lacks successful file tool evidence");
+  return result;
+}
+
 export function validateProviderFallbackRuntimeResult(result) {
   if (result?.schemaVersion !== "omnidesk.provider-fallback-runtime-result.v0.1") throw new Error("Provider Fallback result schema invalid");
   const fallback = result?.fallback || {};

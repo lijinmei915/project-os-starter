@@ -27,6 +27,9 @@ pub struct GuardedCheckResult {
     label: String,
     command: String,
     success: bool,
+    process_success: bool,
+    input_binding: Value,
+    freshness: Value,
     code: Option<i32>,
     output: String,
 }
@@ -98,12 +101,22 @@ pub fn run_guarded_check(
     check_id: &str,
     timestamp: &str,
 ) -> Result<GuardedCheckResult, String> {
+    run_guarded_check_with_audit(root, root, check_id, timestamp)
+}
+
+fn run_guarded_check_with_audit(
+    root: &Path,
+    audit_root: &Path,
+    check_id: &str,
+    timestamp: &str,
+) -> Result<GuardedCheckResult, String> {
     let result = execute_guarded_check(root, check_id)?;
     let _ = append_audit(
-        root,
+        audit_root,
         "guarded-check",
         result.success,
-        json!({ "checkId": result.id }),
+        json!({ "checkId": result.id, "processSuccess": result.process_success,
+            "inputBinding": result.input_binding, "freshness": result.freshness }),
         timestamp,
     );
     Ok(result)
@@ -127,22 +140,37 @@ pub(crate) fn execute_guarded_check(
         }
     }
 
+    // Capture before starting the approved command. If identity cannot be
+    // established, do not execute a check that could later look verified.
+    let input_binding = crate::runtime::validation_revision::capture(root)?;
     let output = Command::new(&spec.program)
         .args(&spec.args)
         .current_dir(root)
         .output()
         .map_err(|err| err.to_string())?;
+    let (fresh, reason) = match crate::runtime::validation_revision::capture(root) {
+        Ok(current) if current == input_binding => (true, "检查对应当前源码与验收标准。"),
+        Ok(_) => (false, "检查期间源码或验收标准发生变化，请重新检查。"),
+        Err(_) => (false, "检查后无法核对源码版本，请重新检查。"),
+    };
+    let process_success = output.status.success();
+    let mut combined_output = format!(
+        "{}{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr)
+    );
+    if !fresh {
+        // Put the reason first so bounded output cannot hide invalidation.
+        combined_output = format!("{reason}\n{combined_output}");
+    }
     Ok(GuardedCheckResult {
         id: spec.id.to_string(),
         label: spec.label.to_string(),
         command: spec.command.to_string(),
-        success: output.status.success(),
+        success: process_success && fresh,
+        process_success,
+        input_binding,
+        freshness: json!({"status": if fresh { "fresh" } else { "stale" }, "reason": reason}),
         code: output.status.code(),
-        output: trim_runner_output(&format!(
-            "{}{}",
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        )),
+        output: trim_runner_output(&combined_output),
     })
 }
 
@@ -151,10 +179,15 @@ pub fn run_git_apply(
     diff: &str,
     check_only: bool,
 ) -> Result<std::process::Output, String> {
+    run_git_apply_direction(root, diff, check_only, false)
+}
+
+fn run_git_apply_direction(root: &Path, diff: &str, check_only: bool, reverse: bool) -> Result<std::process::Output, String> {
     let mut args = vec!["apply"];
     if check_only {
         args.push("--check");
     }
+    if reverse { args.push("--reverse"); }
 
     let mut child = Command::new("git")
         .args(args)
@@ -174,11 +207,38 @@ pub fn run_git_apply(
     child.wait_with_output().map_err(|err| err.to_string())
 }
 
+/// Inspect the persisted draft without writing the worktree or Git index.
+/// A match describes compatibility, not proof of who changed the files.
+pub fn inspect_patch_draft(root: &Path, draft: &Value) -> Result<Value, String> {
+    let diff = draft_diff(draft)?;
+    if draft["notApplicable"] == true || diff.contains("PATCH_DRAFT_PENDING") {
+        return Err("没有可核对的真实改动草稿。".to_string());
+    }
+    crate::runtime::patch::validate_apply_diff_paths(diff)?;
+    let allowed = draft["allowedFiles"].as_array().map(|items| items.iter()
+        .filter_map(Value::as_str).map(str::to_string).collect::<Vec<_>>()).unwrap_or_default();
+    crate::runtime::patch::validate_unified_diff_authorized(diff, &allowed)?;
+    let forward = run_git_apply_direction(root, diff, true, false)?.status.success();
+    let reverse = run_git_apply_direction(root, diff, true, true)?.status.success();
+    Ok(json!({"state":match (forward,reverse) {
+        (true,false) => "not-applied", (false,true) => "applied", _ => "ambiguous"
+    },"forwardCheck":forward,"reverseCheck":reverse}))
+}
+
 /// Validates and applies an already-approved Patch Draft. The caller owns the
 /// project access decision; this boundary owns diff semantics, Git execution,
 /// bounded output and audit evidence.
 pub fn apply_patch_draft(
     root: &Path,
+    draft: &Value,
+    timestamp: &str,
+) -> Result<ApplyPatchResult, String> {
+    apply_patch_draft_with_audit(root, root, draft, timestamp)
+}
+
+fn apply_patch_draft_with_audit(
+    root: &Path,
+    audit_root: &Path,
     draft: &Value,
     timestamp: &str,
 ) -> Result<ApplyPatchResult, String> {
@@ -216,7 +276,7 @@ pub fn apply_patch_draft(
     let check = run_git_apply(root, diff, true)?;
     if !check.status.success() {
         let _ = append_audit(
-            root,
+            audit_root,
             "patch-apply",
             false,
             json!({ "stage": "validate" }),
@@ -240,7 +300,7 @@ pub fn apply_patch_draft(
     ));
     if !applied.status.success() {
         let _ = append_audit(
-            root,
+            audit_root,
             "patch-apply",
             false,
             json!({ "stage": "apply" }),
@@ -249,7 +309,7 @@ pub fn apply_patch_draft(
         return Err(format!("patch 应用失败：{}", output));
     }
     let _ = append_audit(
-        root,
+        audit_root,
         "patch-apply",
         true,
         json!({ "stage": "apply" }),
@@ -278,6 +338,33 @@ pub fn execute_approved_agent_tool(
         .map_err(|_| "没有找到待执行的 Agent Run。".to_string())?;
     if run.project_id != project_id {
         return Err("当前项目与该 Agent Run 的授权项目不一致，已拒绝执行。".to_string());
+    }
+    if run.approval.as_ref().and_then(|approval| approval.get("name")).and_then(Value::as_str) == Some("integrate_worktree") {
+        // Validate authorization before changing even the checkpoint projection.
+        let mut authorized = run.clone();
+        crate::runtime::agent_runs::begin_approved_tool(&mut authorized, approval_token, timestamp)?;
+        let workspace = run.isolation.as_ref().ok_or("Agent Run 没有隔离工作区。")?;
+        let checked_root = crate::runtime::isolated_workspace::execution_root(workspace, project_root)?;
+        crate::runtime::agent_runs::revalidate_completed_checks(&mut run, &checked_root, timestamp);
+        if run.checkpoint.completed_check_ids.is_empty() {
+            let expected_revision = run.revision;
+            run.checkpoint.last_confirmation = run.approval.clone();
+            run.approval = None;
+            run.approval_token.clear();
+            run.status = "queued".to_string();
+            run.checkpoint.phase = "queued".to_string();
+            run.checkpoint.next_action = "resume-model".to_string();
+            run.checkpoint.tool_name = "run_check".to_string();
+            run.checkpoint.tool_result = Some(json!({"success":false,"freshness":{"status":"stale"},"message":"合并所需检查已过期；需要新的独立检查审批。"}));
+            run.summary = "合并审批已失效，请继续任务并重新申请检查；未写入源工程。".to_string();
+            run.checkpoint.context_summary = run.summary.clone();
+            run.revision += 1;
+            run.updated_at = timestamp.to_string();
+            crate::runtime::agent_runs::append_evidence(&mut run, "approval-invalidated",
+                "检查版本已失效，原合并审批不能执行。", json!({"name":"integrate_worktree"}), timestamp);
+            crate::runtime::agent_runs::persist_if_revision(app_root, &run, expected_revision)?;
+            return Err("合并检查缺少有效版本证据；请继续该任务，重新申请独立检查。".to_string());
+        }
     }
     let (name, arguments) =
         crate::runtime::agent_runs::begin_approved_tool(&mut run, approval_token, timestamp)?;
@@ -351,6 +438,7 @@ pub fn execute_approved_agent_tool(
         execution_root.and_then(|execution_root| {
             execute_approved_tool(
                 execution_root.as_deref().unwrap_or(project_root),
+                app_root,
                 project_access_mode,
                 &name,
                 &arguments,
@@ -426,6 +514,7 @@ fn integrate_isolated_workspace(
 
 fn execute_approved_tool(
     project_root: &Path,
+    audit_root: &Path,
     project_access_mode: &str,
     name: &str,
     arguments: &Value,
@@ -452,7 +541,12 @@ fn execute_approved_tool(
                 })
                 .unwrap_or_default();
             let draft = json!({ "diff": diff, "allowedFiles": allowed_files });
-            serde_json::to_value(apply_patch_draft(project_root, &draft, timestamp)?)
+            serde_json::to_value(apply_patch_draft_with_audit(
+                project_root,
+                audit_root,
+                &draft,
+                timestamp,
+            )?)
                 .map_err(|err| err.to_string())
         }
         "run_check" => {
@@ -463,7 +557,12 @@ fn execute_approved_tool(
                 .get("checkId")
                 .and_then(Value::as_str)
                 .ok_or_else(|| "审批检查缺少 checkId。".to_string())?;
-            serde_json::to_value(run_guarded_check(project_root, check_id, timestamp)?)
+            serde_json::to_value(run_guarded_check_with_audit(
+                project_root,
+                audit_root,
+                check_id,
+                timestamp,
+            )?)
                 .map_err(|err| err.to_string())
         }
         "integrate_worktree" => Err("隔离合并只能通过绑定 Agent Run 的执行入口。".to_string()),
@@ -696,6 +795,50 @@ mod tests {
         ));
         std::fs::create_dir_all(&root).unwrap();
         assert!(run_guarded_check(&root, "arbitrary-shell-command", "now").is_err());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn approved_check_binds_actual_command_to_source_and_audit() {
+        for (label, script, expected) in [
+            ("stable", "console.log('passed')", true),
+            ("changed", "require('fs').writeFileSync('../source.txt','after!')", false),
+            ("failed", "process.exit(3)", false),
+        ] {
+            let root = test_directory(label);
+            std::fs::create_dir_all(root.join("desktop")).unwrap();
+            std::fs::write(root.join("source.txt"), "before").unwrap();
+            std::fs::write(root.join("desktop/check.cjs"), script).unwrap();
+            std::fs::write(root.join("desktop/package.json"),
+                serde_json::to_vec(&json!({"scripts":{"test":"node check.cjs"}})).unwrap()).unwrap();
+            let before = crate::runtime::validation_revision::capture(&root).unwrap();
+            let result = run_guarded_check(&root, "runtime", "checked").unwrap();
+            assert_eq!(result.success, expected, "{label}");
+            assert_eq!(result.input_binding, before);
+            assert_eq!(result.process_success, label != "failed");
+            assert_eq!(result.freshness["status"], if label == "changed" { "stale" } else { "fresh" });
+            if label == "changed" {
+                assert_eq!(result.code, Some(0));
+                assert!(result.output.starts_with("检查期间源码"));
+            }
+            let audit = Repository::new(&root).read_json(AUDIT_PATH).unwrap();
+            assert_eq!(audit["events"][0]["success"], expected);
+            assert_eq!(audit["events"][0]["details"]["inputBinding"], before);
+            std::fs::remove_dir_all(root).unwrap();
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unbindable_source_rejects_check_before_command_execution() {
+        let root = test_directory("unbindable-check");
+        std::fs::create_dir_all(root.join("desktop")).unwrap();
+        std::fs::write(root.join("desktop/package.json"),
+            r#"{"scripts":{"test":"node -e \"require('fs').writeFileSync('../executed','yes')\""}}"#).unwrap();
+        std::os::unix::fs::symlink("desktop/package.json", root.join("linked-source")).unwrap();
+        assert!(run_guarded_check(&root, "runtime", "checked").err().unwrap().contains("符号链接"));
+        assert!(!root.join("executed").exists());
+        assert!(!root.join(AUDIT_PATH).exists());
         std::fs::remove_dir_all(root).unwrap();
     }
 
@@ -960,7 +1103,7 @@ mod tests {
         assert_eq!(pending.status, "awaiting-approval");
         assert!(!marker.exists());
         let approved =
-            crate::runtime::agent_runs::approve(&root, "run-mcp-discovery", "approved").unwrap();
+            crate::runtime::agent_runs::approve(&root, "run-mcp-discovery", pending.revision, "approval-mcp", "approved").unwrap();
         let result = execute_approved_agent_tool(
             &root,
             &root,

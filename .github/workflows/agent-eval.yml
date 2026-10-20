@@ -103,6 +103,7 @@ jobs:
         run: |
           export eval_root=".omnidesk/evidence/agent-eval/${{ github.run_id }}/p3"
           npm --prefix desktop run eval:provider:timeline -- --trace "../$eval_root/traces/provider-runtime-timeline.trace.json"
+          npm --prefix desktop run eval:provider:timeline -- --readonly-files --trace "../$eval_root/traces/provider-readonly-files.trace.json"
       - name: Run P4 third-party MCP evaluation
         if: matrix.target == 'p4'
         env:

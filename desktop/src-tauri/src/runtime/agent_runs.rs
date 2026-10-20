@@ -281,6 +281,18 @@ pub fn persist(root: &Path, run: &PersistedAgentRun) -> Result<(), String> {
     Ok(())
 }
 
+/// Source capture happens outside the state lock. Never let its later result
+/// overwrite a cancellation or another approval transition in the meantime.
+pub fn persist_if_revision(root: &Path, run: &PersistedAgentRun, expected_revision: usize) -> Result<(), String> {
+    Repository::new(root).transaction_with("persist-agent-checkpoint-revision", |repository| {
+        let current = load_from_repository(repository, &run.id)?;
+        if current.revision != expected_revision {
+            return Err("Agent Run 已变化，拒绝写入迟到的版本核对结果。".to_string());
+        }
+        Ok(((), vec![mutation(run)?]))
+    })
+}
+
 pub fn persist_new_queued(root: &Path, run: &PersistedAgentRun) -> Result<(), String> {
     if run.status != "queued" {
         return Err("只有完整的 queued Agent Run 可以首次入队。".to_string());
@@ -659,7 +671,7 @@ pub fn cancel(root: &Path, id: &str, timestamp: &str) -> Result<PersistedAgentRu
     })
 }
 
-pub fn approve(root: &Path, id: &str, timestamp: &str) -> Result<PersistedAgentRun, String> {
+pub fn approve(root: &Path, id: &str, expected_revision: usize, expected_token: &str, timestamp: &str) -> Result<PersistedAgentRun, String> {
     Repository::new(root).transaction_with("approve-agent-run", |repository| {
         let mut run = load_from_repository(repository, id)
             .map_err(|_| "没有找到待审批的 Agent Run。".to_string())?;
@@ -675,6 +687,9 @@ pub fn approve(root: &Path, id: &str, timestamp: &str) -> Result<PersistedAgentR
             .to_string();
         if token.is_empty() {
             return Err("该 Agent Run 没有待审批请求。".to_string());
+        }
+        if run.revision != expected_revision || expected_token.is_empty() || token != expected_token {
+            return Err("审批内容已变化，请刷新并重新审阅，未执行任何工具。".to_string());
         }
         // The run remains in its approval phase until the controlled tool has
         // actually consumed the approval. The tool executor guards this state.
@@ -915,8 +930,13 @@ pub fn prepare_model_run(
         .tool_result
         .as_ref()
         .map(|result| {
+            let instruction = if result.pointer("/freshness/status").and_then(Value::as_str) == Some("stale") {
+                "旧检查已失效，不能据此返回验证完成。请重新请求独立检查审批，不要重新应用已完成的 Patch。"
+            } else {
+                "不要重复这个操作；用户回答不代表写入或检查授权。若仍需写入或检查，先请求新的独立审批。"
+            };
             format!(
-                "\n\nOmniDesk 已记录上一操作或用户回答，结果如下。不要重复这个操作；用户回答不代表写入或检查授权。若仍需写入或检查，先请求新的独立审批。\n{}",
+                "\n\nOmniDesk 已记录上一操作或用户回答，结果如下。{instruction}\n{}",
                 serde_json::to_string(result).unwrap_or_else(|_| "null".to_string())
             )
         })
@@ -1116,17 +1136,19 @@ pub fn begin_approved_tool(
     run.checkpoint.tool_name = name.clone();
     run.checkpoint.tool_arguments = arguments.clone();
     run.checkpoint.tool_result = None;
-    run.checkpoint.allowed_files = arguments
-        .get("allowedFiles")
-        .and_then(Value::as_array)
-        .map(|items| {
-            items
-                .iter()
-                .filter_map(Value::as_str)
-                .map(ToString::to_string)
-                .collect()
-        })
-        .unwrap_or_default();
+    if matches!(name.as_str(), "apply_patch" | "integrate_worktree") {
+        run.checkpoint.allowed_files = arguments
+            .get("allowedFiles")
+            .and_then(Value::as_array)
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(ToString::to_string)
+                    .collect()
+            })
+            .unwrap_or_default();
+    }
     let phase = run.status.clone();
     append_evidence(
         run,
@@ -1149,21 +1171,24 @@ pub fn settle_approved_tool(
         && result.get("success").and_then(Value::as_bool) == Some(true);
     let standalone_tool_succeeded =
         run.executor_id == "tool-gateway" && matches!(name, "mcp_discover" | "mcp_call");
-    let check_failed =
-        name == "run_check" && result.get("success").and_then(Value::as_bool) == Some(false);
+    let check_invalidated = name == "run_check"
+        && result.pointer("/freshness/status").and_then(Value::as_str) == Some("stale");
+    let check_failed = name == "run_check" && !check_invalidated
+        && result.get("success").and_then(Value::as_bool) == Some(false);
     if name == "run_check" {
+        if result["success"] != true { run.checkpoint.completed_check_ids.clear(); }
         if let Some(check_id) = arguments.get("checkId").and_then(Value::as_str) {
-            if !run
-                .checkpoint
-                .completed_check_ids
-                .iter()
-                .any(|id| id == check_id)
-            {
+            run.checkpoint.completed_check_ids.retain(|id| id != check_id);
+            if result["success"] == true && result.get("inputBinding").is_some_and(Value::is_object)
+                && result.pointer("/freshness/status").and_then(Value::as_str) == Some("fresh") {
                 run.checkpoint
                     .completed_check_ids
                     .push(check_id.to_string());
             }
         }
+    }
+    if name == "apply_patch" && result["success"] == true {
+        run.checkpoint.completed_check_ids.clear();
     }
     if integration_succeeded {
         run.status = "succeeded".to_string();
@@ -1191,6 +1216,9 @@ pub fn settle_approved_tool(
                 "检查未通过，剩余 {} 轮受控修复。",
                 run.checkpoint.remaining_repair_budget
             );
+        } else if check_invalidated {
+            run.checkpoint.next_action = "resume-model".to_string();
+            run.summary = "检查期间代码版本发生变化；需要重新请求独立检查审批，不消耗修复次数。".to_string();
         } else {
             run.checkpoint.next_action = "resume-model".to_string();
             run.summary = format!("已执行审批工具：{name}；等待模型根据结果继续。");
@@ -1208,11 +1236,47 @@ pub fn settle_approved_tool(
     let summary = run.summary.clone();
     append_evidence(
         run,
-        if check_failed { "check" } else { "tool-result" },
+        if name == "run_check" { "check" } else { "tool-result" },
         summary,
-        json!({ "name": name, "result": result }),
+        json!({ "name": name, "checkId": arguments.get("checkId"), "result": result }),
         timestamp,
     );
+}
+
+/// Reuses only checks whose original evidence still matches the actual
+/// execution directory. Checkpoint projections may change; evidence never does.
+pub fn revalidate_completed_checks(run: &mut PersistedAgentRun, root: &Path, timestamp: &str) -> bool {
+    if run.checkpoint.completed_check_ids.is_empty() { return false; }
+    let current = crate::runtime::validation_revision::capture(root).ok();
+    let latest_succeeded = run.evidence.iter().rev().find(|event|
+        event.pointer("/details/name").and_then(Value::as_str) == Some("run_check"))
+        .and_then(|event| event.pointer("/details/result"))
+        .is_some_and(|result| result["success"] == true);
+    let mut invalidated = Vec::new();
+    for id in &run.checkpoint.completed_check_ids {
+        let result = run.evidence.iter().rev().find(|event| {
+            event.pointer("/details/name").and_then(Value::as_str) == Some("run_check")
+                && event.pointer("/details/checkId").filter(|value| value.is_string()).or_else(|| event.pointer("/details/result/id"))
+                    .and_then(Value::as_str) == Some(id.as_str())
+        }).and_then(|event| event.pointer("/details/result"));
+        let valid = latest_succeeded && result.is_some_and(|result| result["success"] == true
+            && result.pointer("/freshness/status").and_then(Value::as_str) == Some("fresh")
+            && current.as_ref().is_some_and(|current| result.get("inputBinding") == Some(current)));
+        if !valid { invalidated.push(id.clone()); }
+    }
+    if invalidated.is_empty() { return false; }
+    run.checkpoint.completed_check_ids.retain(|id| !invalidated.contains(id));
+    if run.checkpoint.tool_name == "run_check" {
+        if let Some(result) = run.checkpoint.tool_result.as_mut().filter(|value| value.is_object()) {
+            result["recordedSuccess"] = result.get("success").cloned().unwrap_or(Value::Null);
+            result["success"] = json!(false);
+            result["freshness"] = json!({"status":"stale","reason":"旧检查不再对应当前代码，需要新的独立检查审批。"});
+        }
+    }
+    run.updated_at = timestamp.to_string();
+    append_evidence(run, "check-invalidated", "旧检查版本已失效，需要重新审批检查。",
+        json!({"checkIds":invalidated}), timestamp);
+    true
 }
 
 pub fn fail_approved_tool(run: &mut PersistedAgentRun, name: &str, error: &str, timestamp: &str) {
@@ -1842,10 +1906,22 @@ mod tests {
         run.status = "awaiting-approval".to_string();
         run.approval = Some(json!({"token":"token-1","name":"run_check"}));
         persist(&root, &run).unwrap();
-        let approved = approve(&root, "run-1", "later").unwrap();
+        assert!(approve(&root, "run-1", run.revision + 1, "token-1", "stale-version").is_err());
+        assert!(approve(&root, "run-1", run.revision, "old-token", "stale-token").is_err());
+        assert!(approve(&root, "run-1", run.revision, "", "missing-token").is_err());
+        assert_eq!(load(&root, "run-1").unwrap().revision, run.revision);
+        let approved = approve(&root, "run-1", run.revision, "token-1", "later").unwrap();
+        assert!(approve(&root, "run-1", run.revision, "token-1", "double-click").is_err());
+        assert_eq!(load(&root, "run-1").unwrap().revision, approved.revision);
         assert_eq!(approved.status, "awaiting-approval");
         assert_eq!(approved.approval_token, "token-1");
         assert_eq!(approved.approval.unwrap()["status"], "approved");
+        let mut replacement = load(&root, "run-1").unwrap();
+        replacement.revision += 1;
+        replacement.approval = Some(json!({"token":"token-2","name":"apply_patch","arguments":{"diff":"new diff"}}));
+        persist(&root, &replacement).unwrap();
+        assert!(approve(&root, "run-1", approved.revision, "token-1", "old-review").is_err());
+        assert_eq!(load(&root, "run-1").unwrap().approval, replacement.approval);
     }
 
     #[test]
@@ -2123,6 +2199,31 @@ mod tests {
     }
 
     #[test]
+    fn check_approval_preserves_the_patch_file_authorization() {
+        let mut run = new_hermes_run(
+            "run-check-keeps-files".to_string(),
+            "request-1".to_string(),
+            "project-1".to_string(),
+            "test".to_string(),
+            20,
+            String::new(),
+            "now",
+        );
+        run.checkpoint.allowed_files = vec!["src/lib.rs".to_string()];
+        run.status = "awaiting-approval".to_string();
+        run.approval = Some(json!({
+            "token": "check-token",
+            "status": "approved",
+            "name": "run_check",
+            "arguments": { "checkId": "runtime" }
+        }));
+
+        begin_approved_tool(&mut run, "check-token", "later").unwrap();
+
+        assert_eq!(run.checkpoint.allowed_files, vec!["src/lib.rs"]);
+    }
+
+    #[test]
     fn mcp_discovery_is_persisted_as_an_unexecuted_independent_approval() {
         let root = std::env::temp_dir().join(format!(
             "omnidesk-agent-mcp-discovery-{}",
@@ -2247,8 +2348,117 @@ mod tests {
         assert_eq!(run.checkpoint.next_action, "resume-repair-draft");
         assert_eq!(run.checkpoint.remaining_repair_budget, 1);
         assert_eq!(run.repair_attempt, 1);
-        assert_eq!(run.checkpoint.completed_check_ids, vec!["desktop-node"]);
+        assert!(run.checkpoint.completed_check_ids.is_empty());
         assert_eq!(run.evidence.last().unwrap()["phase"], "check");
+    }
+
+    #[test]
+    fn completed_checks_require_current_source_and_preserve_original_results() {
+        let root = std::env::temp_dir().join(format!("omnidesk-agent-check-recovery-{}-{}",std::process::id(),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("source.txt"),"before").unwrap();
+        let binding = crate::runtime::validation_revision::capture(&root).unwrap();
+        let mut run = new_hermes_run("check-recovery".into(),"request".into(),"project".into(),"test".into(),20,String::new(),"created");
+        run.checkpoint.tool_name = "run_check".into();
+        let result = json!({"id":"runtime","success":true,"inputBinding":binding,"freshness":{"status":"fresh"}});
+        settle_approved_tool(&mut run,"run_check",&json!({"checkId":"runtime"}),result.clone(),"checked");
+        assert_eq!(run.checkpoint.completed_check_ids,vec!["runtime"]);
+        assert!(!revalidate_completed_checks(&mut run,&root,"unchanged"));
+        persist(&root,&run).unwrap();
+        let mut late = run.clone();
+        late.revision += 1;
+        let cancelled = cancel(&root,&run.id,"cancelled").unwrap();
+        assert!(persist_if_revision(&root,&late,run.revision).is_err());
+        assert_eq!(load(&root,&run.id).unwrap().status,"cancelled");
+        // Restore the independent test case through its owner before checking
+        // source freshness; the cancellation conflict above has been asserted.
+        run.revision = cancelled.revision + 1;
+        persist(&root,&run).unwrap();
+        let historical = run.evidence.clone();
+        std::fs::write(root.join("source.txt"),"after!").unwrap();
+        let mut reopened = load(&root,&run.id).unwrap();
+        assert!(revalidate_completed_checks(&mut reopened,&root,"changed"));
+        assert!(reopened.checkpoint.completed_check_ids.is_empty());
+        assert_eq!(&reopened.evidence[..historical.len()],historical.as_slice());
+        assert_eq!(reopened.checkpoint.tool_result.as_ref().unwrap()["freshness"]["status"],"stale");
+        assert_eq!(reopened.checkpoint.remaining_repair_budget,2);
+        assert_eq!(reopened.repair_attempt,0);
+        // A successful source-changing Patch invalidates every earlier check.
+        settle_approved_tool(&mut run,"apply_patch",&json!({}),json!({"success":true}),"patched");
+        assert!(run.checkpoint.completed_check_ids.is_empty());
+        // Legacy success without a binding can never restore completed IDs.
+        settle_approved_tool(&mut run,"run_check",&json!({"checkId":"runtime"}),json!({"success":true}),"legacy");
+        assert!(run.checkpoint.completed_check_ids.is_empty());
+        // Old checkpoint IDs without supporting evidence are also rejected.
+        run.checkpoint.completed_check_ids = vec!["legacy".into()];
+        assert!(revalidate_completed_checks(&mut run,&root,"legacy-recovery"));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn invalidated_check_does_not_consume_repair_budget_even_when_exhausted() {
+        let mut run = new_hermes_run("stale-check".into(),"request".into(),"project".into(),"test".into(),20,String::new(),"created");
+        run.checkpoint.remaining_repair_budget = 0;
+        run.repair_attempt = 2;
+        run.checkpoint.completed_check_ids = vec!["runtime".into()];
+        settle_approved_tool(&mut run,"run_check",&json!({"checkId":"runtime"}),
+            json!({"success":false,"processSuccess":true,"freshness":{"status":"stale"}}),"stale");
+        assert_eq!(run.status,"queued");
+        assert_eq!(run.checkpoint.next_action,"resume-model");
+        assert_eq!(run.checkpoint.remaining_repair_budget,0);
+        assert_eq!(run.repair_attempt,2);
+        assert!(run.checkpoint.completed_check_ids.is_empty());
+        assert!(run.summary.contains("不消耗修复次数"));
+        run.checkpoint.completed_check_ids = vec!["web-build".into()];
+        settle_approved_tool(&mut run,"run_check",&json!({"checkId":"runtime"}),json!({"success":false}),"failed");
+        assert!(run.checkpoint.completed_check_ids.is_empty());
+    }
+
+    #[test]
+    fn two_failed_repair_rounds_exhaust_the_budget_without_a_third_repair() {
+        let mut run = new_hermes_run(
+            "run-check-repair-limit".to_string(),
+            "request-1".to_string(),
+            "project-1".to_string(),
+            "test".to_string(),
+            20,
+            String::new(),
+            "now",
+        );
+        run.checkpoint.allowed_files = vec!["src/lib.rs".to_string()];
+
+        settle_approved_tool(
+            &mut run,
+            "run_check",
+            &json!({ "checkId": "runtime" }),
+            json!({ "success": false, "output": "first failure" }),
+            "first",
+        );
+        settle_approved_tool(
+            &mut run,
+            "run_check",
+            &json!({ "checkId": "runtime" }),
+            json!({ "success": false, "output": "second failure" }),
+            "second",
+        );
+        assert_eq!(run.status, "queued");
+        assert_eq!(run.checkpoint.remaining_repair_budget, 0);
+        assert_eq!(run.repair_attempt, 2);
+        settle_approved_tool(
+            &mut run,
+            "run_check",
+            &json!({ "checkId": "runtime" }),
+            json!({ "success": false, "output": "third failure" }),
+            "third",
+        );
+
+        assert_eq!(run.status, "failed");
+        assert_eq!(run.checkpoint.next_action, "none");
+        assert_eq!(run.checkpoint.remaining_repair_budget, 0);
+        assert_eq!(run.repair_attempt, 2);
+        assert_eq!(run.checkpoint.allowed_files, vec!["src/lib.rs"]);
+        assert!(run.checkpoint.completed_check_ids.is_empty());
     }
 
     #[test]

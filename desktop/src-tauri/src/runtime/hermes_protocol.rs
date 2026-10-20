@@ -78,6 +78,13 @@ fn acp_capabilities(usage: bool) -> AgentExecutorCapabilities {
 
 fn candidate_programs(program: &str) -> Vec<PathBuf> {
     let mut paths = Vec::new();
+    #[cfg(feature = "webdriver")]
+    if program == "hermes-acp" {
+        if let Some(root) = std::env::var_os("OMNIDESK_WEBDRIVER_WORKSPACE_ROOT") {
+            let fixture = PathBuf::from(root).join(".omnidesk/cache/native-hermes-acp");
+            if fixture.is_file() { paths.push(fixture); }
+        }
+    }
     if let Ok(home) = std::env::var("HOME") {
         paths.push(PathBuf::from(home).join(".local/bin").join(program));
     }

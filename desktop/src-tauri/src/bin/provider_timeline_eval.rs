@@ -23,6 +23,8 @@ struct EvalRequest {
     project_id: String,
     prompt: String,
     max_steps: usize,
+    #[serde(default)]
+    readonly_files: bool,
 }
 
 fn main() {
@@ -99,7 +101,7 @@ fn run(request: EvalRequest) -> Result<Value, String> {
     )?;
 
     let model_started = Instant::now();
-    let model_result = runtime::hermes_execution::run_structured_loop(
+    let model_result = runtime::hermes_execution::run_structured_loop_with_mode(
         &project_root,
         &api_key,
         &api_base,
@@ -108,8 +110,32 @@ fn run(request: EvalRequest) -> Result<Value, String> {
         &prepared.execution_prompt,
         request.max_steps,
         None,
+        runtime::agent_executor::AgentExecutionMode::Start,
+        if request.readonly_files {
+            runtime::agent_executor::AgentExecutionPurpose::ReadonlyPlan
+        } else {
+            runtime::agent_executor::AgentExecutionPurpose::GovernedTask
+        },
+        None,
     );
     let duration_ms = model_started.elapsed().as_millis() as u64;
+    // The general timeline intentionally omits paths. Preserve only the fixed
+    // non-sensitive fixture path for this explicit file-read acceptance slice.
+    let readonly_tool_events = if request.readonly_files {
+        model_result.as_ref().ok().map(|result| {
+            result.events.iter().filter(|event| {
+                matches!(event.kind.as_str(), "tool-call" | "tool-result")
+                    && event.details.get("name").and_then(Value::as_str) == Some("read_file")
+                    && event.details.get("path").and_then(Value::as_str) == Some("README.md")
+            }).map(|event| json!({
+                "kind": event.kind,
+                "status": event.status,
+                "details": { "name": "read_file", "path": "README.md", "success": event.details.get("success") }
+            })).collect::<Vec<_>>()
+        }).unwrap_or_default()
+    } else {
+        Vec::new()
+    };
     let (status, summary, step, approval, interaction, evidence_details, usage) = match model_result
     {
         Ok(result) => {
@@ -179,6 +205,7 @@ fn run(request: EvalRequest) -> Result<Value, String> {
         "summary": summary,
         "durationMs": duration_ms,
         "usage": usage,
+        "readonlyToolEvents": readonly_tool_events,
         "scheduler": {
             "statusDuringExecution": scheduler_during,
             "activeCountAfter": scheduler_after.active_count,
