@@ -1573,8 +1573,11 @@ test("keeps Provider chat transport and SSE result normalization outside Tauri c
   assert.doesNotMatch(app, /async fn generate_provider_chat\(/);
   assert.doesNotMatch(app, /consume_openai_sse_deltas/);
   assert.doesNotMatch(app, /streaming_reply_prefix/);
-  assert.match(app, /generate_provider_chat, should_retry_provider_chat, ChatStreamError/);
+  assert.match(app, /generate_provider_chat_with_tools, should_retry_provider_chat/);
+  assert.match(app, /project_mode,\s*\|text, chars\|/);
   assert.match(stream, /pub async fn generate_provider_chat/);
+  assert.match(stream, /pub async fn generate_provider_chat_with_tools/);
+  assert.match(stream, /require_recommendation \|\| !allow_engineering_tools/);
   assert.match(stream, /post_streaming_chat_completion/);
   assert.match(stream, /use crate::runtime::provider_core/);
   assert.match(core, /pub fn consume_openai_sse/);
@@ -1694,10 +1697,10 @@ test("keeps Provider credential policy and Hermes config persistence outside Tau
 test("keeps read-only planning outside the Tauri command assembly", () => {
   const app = source("src-tauri/src/runtime/app.rs");
   const planning = source("src-tauri/src/runtime/planning.rs");
-  const planCommand = app.slice(
-    app.indexOf("async fn generate_readonly_plan("),
-    app.indexOf("#[tauri::command]\nfn list_desktop_tasks"),
-  );
+  const planStart = app.indexOf("async fn generate_readonly_plan(");
+  const planEnd = app.indexOf("#[tauri::command]", planStart);
+  assert.ok(planStart >= 0 && planEnd > planStart, "readonly plan command has an explicit boundary");
+  const planCommand = app.slice(planStart, planEnd);
   assert.match(app, /use crate::runtime::planning/);
   assert.match(app, /planning::generate_plan\(/);
   assert.doesNotMatch(app, /struct PlanContext/);
@@ -2020,11 +2023,14 @@ test("keeps guarded check execution and audit evidence in the Execution domain",
 test("keeps approved Patch Apply validation, Git execution, and evidence in the Execution domain", () => {
   const app = source("src-tauri/src/runtime/app.rs");
   const execution = source("src-tauri/src/runtime/execution.rs");
+  const tasks = source("src-tauri/src/runtime/tasks.rs");
   const applyCommand = app.slice(
     app.indexOf("fn apply_patch_draft("),
     app.indexOf("fn write_run_summary("),
   );
-  assert.match(applyCommand, /execution::apply_patch_draft\(&root, &draft/);
+  assert.match(applyCommand, /tasks::apply_reviewed_patch\(&root, &input.task/);
+  assert.doesNotMatch(applyCommand, /execution::apply_patch_draft/);
+  assert.match(tasks, /execution::apply_patch_draft\(root, &claimed\["patchDraft"\]/);
   assert.doesNotMatch(applyCommand, /validate_apply_diff_paths\(diff\)/);
   assert.doesNotMatch(applyCommand, /validate_unified_diff_authorized\(diff/);
   assert.doesNotMatch(applyCommand, /run_git_apply\(root, diff/);
@@ -2033,7 +2039,7 @@ test("keeps approved Patch Apply validation, Git execution, and evidence in the 
   assert.match(execution, /validate_apply_diff_paths\(diff\)/);
   assert.match(execution, /validate_unified_diff_authorized\(diff, &allowed_files\)/);
   assert.match(execution, /run_git_apply\(root, diff, true\)/);
-  assert.match(execution, /append_audit\(\s*root,\s*"patch-apply"/);
+  assert.match(execution, /append_audit\(\s*(?:root|audit_root),\s*"patch-apply"/);
 });
 
 test("keeps goal-validation suite composition in the Goals domain", () => {

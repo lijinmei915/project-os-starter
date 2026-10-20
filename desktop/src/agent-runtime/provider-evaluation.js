@@ -108,3 +108,25 @@ export function validateProviderDirectStreamRuntimeResult(result) {
     || (result.deltaEvents <= 256 && samples.at(-1).elapsedMs !== lastDeltaMs)) throw new Error("Visible stream timing evidence is incomplete");
   return result;
 }
+
+// Protocol diagnostics only: never return response bodies, text, or error messages.
+export function summarizeProviderStreamProbe(body) {
+  const records = String(body).split(/\r?\n/).filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trim());
+  const result = { dataRecords: records.length, doneRecords: 0, jsonRecords: 0, malformedRecords: 0, errorRecords: 0, contentRecords: 0, contentChars: 0, toolRecords: 0, finishRecords: 0, nonSseJson: false };
+  for (const record of records) {
+    if (record === "[DONE]") { result.doneRecords += 1; continue; }
+    let value;
+    try { value = JSON.parse(record); result.jsonRecords += 1; } catch { result.malformedRecords += 1; continue; }
+    if (value.error != null) result.errorRecords += 1;
+    for (const choice of Array.isArray(value.choices) ? value.choices : []) {
+      const content = choice?.delta?.content;
+      if (typeof content === "string" && content.length) { result.contentRecords += 1; result.contentChars += [...content].length; }
+      if (Array.isArray(choice?.delta?.tool_calls) && choice.delta.tool_calls.length) result.toolRecords += 1;
+      if (choice?.finish_reason != null) result.finishRecords += 1;
+    }
+  }
+  if (!records.length) {
+    try { const value = JSON.parse(body); result.nonSseJson = true; if (value.error != null) result.errorRecords += 1; } catch {}
+  }
+  return result;
+}

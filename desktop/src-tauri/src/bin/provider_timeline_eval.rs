@@ -9,7 +9,10 @@ use serde_json::{json, Value};
 use std::fs;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::sync::{mpsc, Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use tokio_util::sync::CancellationToken;
 
 const REQUEST_SCHEMA: &str = "omnidesk.provider-timeline-eval-request.v0.1";
 const RESULT_SCHEMA: &str = "omnidesk.provider-timeline-runtime-result.v0.1";
@@ -101,6 +104,24 @@ fn run(request: EvalRequest) -> Result<Value, String> {
     )?;
 
     let model_started = Instant::now();
+    let cancellation = CancellationToken::new();
+    let deadline_exceeded = Arc::new(AtomicBool::new(false));
+    let deadline_flag = deadline_exceeded.clone();
+    let deadline_token = cancellation.clone();
+    let (finished_tx, finished_rx) = mpsc::channel::<()>();
+    let deadline_worker = std::thread::spawn(move || {
+        if matches!(finished_rx.recv_timeout(Duration::from_secs(100)), Err(mpsc::RecvTimeoutError::Timeout)) {
+            deadline_flag.store(true, Ordering::SeqCst);
+            deadline_token.cancel();
+        }
+    });
+    let live_events = Arc::new(Mutex::new(Vec::new()));
+    let captured_events = live_events.clone();
+    let event_sink: runtime::agent_executor::AgentEventSink = Arc::new(move |event| {
+        if let Ok(mut events) = captured_events.lock() {
+            events.push(event.clone());
+        }
+    });
     let model_result = runtime::hermes_execution::run_structured_loop_with_mode(
         &project_root,
         &api_key,
@@ -109,21 +130,24 @@ fn run(request: EvalRequest) -> Result<Value, String> {
         &model,
         &prepared.execution_prompt,
         request.max_steps,
-        None,
+        Some(&cancellation),
         runtime::agent_executor::AgentExecutionMode::Start,
         if request.readonly_files {
             runtime::agent_executor::AgentExecutionPurpose::ReadonlyPlan
         } else {
             runtime::agent_executor::AgentExecutionPurpose::GovernedTask
         },
-        None,
+        Some(event_sink),
     );
+    drop(finished_tx);
+    let _ = deadline_worker.join();
+    let model_deadline_exceeded = deadline_exceeded.load(Ordering::SeqCst);
+    let captured_events = live_events.lock().map(|events| events.clone()).unwrap_or_default();
     let duration_ms = model_started.elapsed().as_millis() as u64;
     // The general timeline intentionally omits paths. Preserve only the fixed
     // non-sensitive fixture path for this explicit file-read acceptance slice.
     let readonly_tool_events = if request.readonly_files {
-        model_result.as_ref().ok().map(|result| {
-            result.events.iter().filter(|event| {
+            captured_events.iter().filter(|event| {
                 matches!(event.kind.as_str(), "tool-call" | "tool-result")
                     && event.details.get("name").and_then(Value::as_str) == Some("read_file")
                     && event.details.get("path").and_then(Value::as_str) == Some("README.md")
@@ -132,7 +156,6 @@ fn run(request: EvalRequest) -> Result<Value, String> {
                 "status": event.status,
                 "details": { "name": "read_file", "path": "README.md", "success": event.details.get("success") }
             })).collect::<Vec<_>>()
-        }).unwrap_or_default()
     } else {
         Vec::new()
     };
@@ -164,14 +187,18 @@ fn run(request: EvalRequest) -> Result<Value, String> {
             (status, summary, step, None, None, details, usage)
         }
         Err(error) => {
-            let summary = bounded_error(&error);
+            let summary = if model_deadline_exceeded {
+                "Provider Timeline Eval exceeded the 100-second model deadline; execution cancelled".to_string()
+            } else {
+                bounded_error(&error)
+            };
             (
                 "failed".to_string(),
                 summary.clone(),
                 None,
                 None,
                 None,
-                json!({ "error": summary, "durationMs": duration_ms }),
+                json!({ "error": summary, "durationMs": duration_ms, "agentEvents": captured_events, "modelDeadlineExceeded": model_deadline_exceeded }),
                 Value::Null,
             )
         }
@@ -204,6 +231,7 @@ fn run(request: EvalRequest) -> Result<Value, String> {
         "runStatus": settled.status,
         "summary": summary,
         "durationMs": duration_ms,
+        "modelDeadlineExceeded": model_deadline_exceeded,
         "usage": usage,
         "readonlyToolEvents": readonly_tool_events,
         "scheduler": {

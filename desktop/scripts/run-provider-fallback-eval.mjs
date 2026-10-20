@@ -8,6 +8,7 @@ import {
   normalizeProviderUsage,
   validateProviderFallbackRuntimeResult,
   validateProviderDirectStreamRuntimeResult,
+  summarizeProviderStreamProbe,
 } from "../src/agent-runtime/provider-evaluation.js";
 
 const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -78,6 +79,7 @@ try {
 }
 
 if (!directStream) await new Promise((resolve) => relay.close(resolve));
+const protocolProbe = directStream && failure ? await probeDirectStream() : null;
 const trace = {
   schemaVersion: directStream ? "omnidesk.provider-direct-stream-eval.v0.1" : "omnidesk.provider-fallback-eval.v0.1",
   startedAt,
@@ -89,12 +91,39 @@ const trace = {
   relay: directStream ? null : relayEvidence,
   runtime: runtimeResult,
   error: failure,
+  protocolProbe,
 };
 fs.mkdirSync(path.dirname(tracePath), { recursive: true });
 fs.writeFileSync(tracePath, `${JSON.stringify(trace, null, 2)}\n`);
 fs.rmSync(fixtureRoot, { recursive: true, force: true });
 if (failure) throw new Error(`Provider Fallback Eval failed; trace: ${tracePath}`);
 process.stdout.write(`${JSON.stringify({ status: "passed", tracePath, model, durationMs: trace.durationMs })}\n`);
+
+async function probeDirectStream() {
+  const started = Date.now();
+  const result = { separateDiagnosticRequest: true, httpStatus: null, eventStreamContentType: false, chunks: 0, bytes: 0, firstChunkMs: null, durationMs: 0, completed: false, truncated: false, errorType: null };
+  let body = "";
+  const decoder = new TextDecoder();
+  try {
+    const response = await fetch(chatCompletionsEndpoint(apiBase), {
+      method: "POST", headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
+      body: JSON.stringify({ model, messages: [{ role: "user", content: "请用中文写十二条关于如何整理书桌的小建议，每条约二十字。直接回答。" }], stream: true }),
+      signal: AbortSignal.timeout(45_000),
+    });
+    result.httpStatus = response.status;
+    result.eventStreamContentType = (response.headers.get("content-type") || "").includes("text/event-stream");
+    for await (const chunk of response.body) {
+      result.chunks += 1; result.bytes += chunk.length;
+      result.firstChunkMs ??= Date.now() - started;
+      if (result.bytes > 512_000) { result.truncated = true; break; }
+      body += decoder.decode(chunk, { stream: true });
+    }
+    body += decoder.decode();
+    result.completed = !result.truncated;
+  } catch (error) { result.errorType = error?.name || "Error"; }
+  result.durationMs = Date.now() - started;
+  return { ...result, protocol: summarizeProviderStreamProbe(body) };
+}
 
 async function handleRelayRequest(request, response) {
   let rawBody = "";

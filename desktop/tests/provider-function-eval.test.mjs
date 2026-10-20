@@ -12,9 +12,27 @@ import {
   validateProviderTimelineRuntimeResult,
   validateProviderDirectStreamRuntimeResult,
   validateProviderReadonlyFileEvidence,
+  summarizeProviderStreamProbe,
 } from "../src/agent-runtime/provider-evaluation.js";
 
 const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+test("stream probe distinguishes protocol failure without exporting private response content", () => {
+  const secret = "private-body-key-value";
+  const normal = summarizeProviderStreamProbe(`data: {"choices":[{"delta":{"content":"中文🙂"}}]}\r\n\r\ndata: [DONE]\r\n`);
+  assert.equal(normal.contentRecords, 1);
+  assert.equal(normal.contentChars, 3);
+  assert.equal(normal.doneRecords, 1);
+  const error = summarizeProviderStreamProbe(`data: {"error":{"message":"${secret}"}}\n\n`);
+  assert.equal(error.errorRecords, 1);
+  assert.equal(JSON.stringify(error).includes(secret), false);
+  const plain = summarizeProviderStreamProbe(JSON.stringify({ error: { message: secret } }));
+  assert.equal(plain.nonSseJson, true);
+  assert.equal(plain.errorRecords, 1);
+  assert.equal(JSON.stringify(plain).includes(secret), false);
+  assert.equal(summarizeProviderStreamProbe("data: invalid\n").malformedRecords, 1);
+  assert.equal(summarizeProviderStreamProbe("data: [DONE]").doneRecords, 1);
+});
 
 test("readonly file acceptance requires a file-only marker, paired successful read and unchanged files", () => {
   const result = {

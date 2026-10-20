@@ -8,6 +8,10 @@ import { validateProviderTimelineRuntimeResult, validateProviderReadonlyFileEvid
 
 const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = path.resolve(desktopRoot, "..");
+const cargoTargetRoot = process.env.CARGO_TARGET_DIR
+  ? path.resolve(repositoryRoot, process.env.CARGO_TARGET_DIR)
+  : path.join(desktopRoot, "src-tauri", "target");
+const runtimeBinaryPath = path.join(cargoTargetRoot, "debug", `omnidesk-provider-timeline-eval${process.platform === "win32" ? ".exe" : ""}`);
 const argument = (name) => {
   const index = process.argv.indexOf(name);
   return index >= 0 ? process.argv[index + 1] : "";
@@ -35,6 +39,7 @@ fs.writeFileSync(path.join(projectRoot, "README.md"), fixtureSource);
 let runtimeResult = null;
 let failure = null;
 try {
+  await buildRuntime();
   const execution = await runRuntime({
     schemaVersion: "omnidesk.provider-timeline-eval-request.v0.1",
     appRoot,
@@ -46,6 +51,7 @@ try {
     maxSteps: 3,
     readonlyFiles,
   });
+  if (execution.timedOut) throw new Error("Provider Timeline Runtime exceeded the 120-second process deadline; process group terminated");
   if (execution.code !== 0) throw new Error(execution.stderr || `Provider Timeline Runtime exited ${execution.code}`);
   runtimeResult = JSON.parse(execution.stdout.trim());
   if (readonlyFiles) {
@@ -82,24 +88,46 @@ process.stdout.write(`${JSON.stringify({ status: "passed", tracePath, model, dur
 
 function runRuntime(request) {
   return new Promise((resolve) => {
-    const child = spawn("cargo", [
-      "run",
-      "--quiet",
-      "--manifest-path",
-      path.join(desktopRoot, "src-tauri", "Cargo.toml"),
-      "--bin",
-      "omnidesk-provider-timeline-eval",
-    ], { cwd: repositoryRoot, stdio: ["pipe", "pipe", "pipe"] });
+    const child = spawn(runtimeBinaryPath, [], { cwd: repositoryRoot, detached: process.platform !== "win32", stdio: ["pipe", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
-    const timeout = setTimeout(() => child.kill("SIGKILL"), 120_000);
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      if (process.platform !== "win32" && child.pid) {
+        try { process.kill(-child.pid, "SIGKILL"); } catch { child.kill("SIGKILL"); }
+      } else child.kill("SIGKILL");
+    }, 120_000);
+    child.on("error", (error) => {
+      clearTimeout(timeout);
+      resolve({ code: -1, timedOut, stderr: redact(error.message, fixtureRoot), stdout });
+    });
     child.stdout.on("data", (chunk) => { stdout = `${stdout}${chunk}`.slice(-2_000_000); });
     child.stderr.on("data", (chunk) => { stderr = `${stderr}${chunk}`.slice(-20_000); });
     child.on("close", (code) => {
       clearTimeout(timeout);
-      resolve({ code, stderr: redact(stderr, fixtureRoot), stdout });
+      resolve({ code, timedOut, stderr: redact(stderr, fixtureRoot), stdout });
     });
     child.stdin.end(JSON.stringify(request));
+  });
+}
+
+function buildRuntime() {
+  return new Promise((resolve, reject) => {
+    const child = spawn("cargo", ["build", "--quiet", "--manifest-path", path.join(desktopRoot, "src-tauri", "Cargo.toml"), "--bin", "omnidesk-provider-timeline-eval"], {
+      cwd: repositoryRoot, stdio: ["ignore", "ignore", "pipe"],
+    });
+    let stderr = "";
+    let timedOut = false;
+    const timeout = setTimeout(() => { timedOut = true; child.kill("SIGKILL"); }, 600_000);
+    child.stderr.on("data", (chunk) => { stderr = `${stderr}${chunk}`.slice(-20_000); });
+    child.on("error", (error) => { clearTimeout(timeout); reject(error); });
+    child.on("close", (code) => {
+      clearTimeout(timeout);
+      if (timedOut) reject(new Error("Provider Timeline Runtime build exceeded 600 seconds"));
+      else if (code !== 0) reject(new Error(redact(stderr, fixtureRoot) || `Provider Timeline Runtime build exited ${code}`));
+      else resolve();
+    });
   });
 }
 
