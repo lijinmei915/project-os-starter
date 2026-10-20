@@ -175,6 +175,8 @@ impl TemporaryHermesHome {
         );
         fs::write(path.join("config.yaml"), config)
             .map_err(|error| format!("写入 Hermes 只读隔离配置失败：{error}"))?;
+        fs::write(path.join("sitecustomize.py"), include_str!("hermes_readonly_compat.py"))
+            .map_err(|error| format!("写入 Hermes 只读协议兼容模块失败：{error}"))?;
         Ok(Self { path })
     }
 }
@@ -201,8 +203,17 @@ fn spawn_acp_transport(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     if let Some(home) = readonly_home {
+        // Scope the version-specific callback fix to this isolated process;
+        // never modify the user's installed Hermes or general Python setup.
+        let mut python_paths = vec![home.path.clone()];
+        if let Some(existing) = std::env::var_os("PYTHONPATH") {
+            python_paths.extend(std::env::split_paths(&existing));
+        }
+        let python_path = std::env::join_paths(python_paths)
+            .map_err(|error| format!("Hermes 只读协议兼容路径无效：{error}"))?;
         command
             .env("HERMES_HOME", &home.path)
+            .env("PYTHONPATH", python_path)
             .env("HERMES_EXEC_ASK", "1");
     }
     if config.forward_provider_env {
@@ -1275,6 +1286,7 @@ done
         assert!(config.contains("providers:\n  omnidesk-gateway:"));
         assert!(config.contains("key_env: \"TEST_API_KEY\""));
         assert!(!config.contains("secret"));
+        assert_eq!(std::fs::read_to_string(path.join("sitecustomize.py")).unwrap(), include_str!("hermes_readonly_compat.py"));
         drop(home);
         assert!(!path.exists());
     }

@@ -1,6 +1,6 @@
 {
   "schemaVersion": "omnidesk.repository-file-inventory.v1",
-  "generatedAt": "2026-10-20T10:21:57.478Z",
+  "generatedAt": "2026-10-20T10:38:24.030Z",
   "sourceOfTruth": "git ls-files --cached --others --exclude-standard",
   "scope": "受版本控制文件及准备纳入版本控制的非忽略工作树文件；忽略的本地运行数据和构建输出不在本账本内。",
   "reviewContract": {
@@ -24,7 +24,7 @@
     "rule": "没有消费者证据的文件不自动删除；必须由对应 Owner 审核并通过验证后才能退役。"
   },
   "totals": {
-    "files": 595,
+    "files": 597,
     "byKind": {
       "repository": 2,
       "ci": 2,
@@ -32,10 +32,10 @@
       "desktop-support": 15,
       "eval": 11,
       "native": 68,
-      "runtime": 40,
+      "runtime": 41,
       "eval-support": 10,
       "frontend": 267,
-      "test": 130,
+      "test": 131,
       "documentation": 19,
       "documentation-data": 5,
       "schema": 15,
@@ -44,7 +44,7 @@
     "classified": 7,
     "candidates": 0,
     "inProgress": 2,
-    "reviewed": 586
+    "reviewed": 588
   },
   "files": [
     {
@@ -66,7 +66,7 @@
       "path": ".github/workflows/agent-eval.yml",
       "kind": "ci",
       "owner": "Release Engineering",
-      "bytes": 10431,
+      "bytes": 10494,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -561,7 +561,7 @@
       "path": "desktop/scripts/run-provider-timeline-eval.mjs",
       "kind": "desktop-support",
       "owner": "Desktop Platform",
-      "bytes": 6731,
+      "bytes": 6902,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -1601,7 +1601,7 @@
       "path": "desktop/src-tauri/src/runtime/acp_execution.rs",
       "kind": "runtime",
       "owner": "Local Agent Runtime",
-      "bytes": 65990,
+      "bytes": 66856,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/src-tauri/src/runtime/gemini_executor.rs",
@@ -2003,6 +2003,21 @@
       "reviewStatus": "reviewed",
       "verification": "bash tests/run-tests.sh",
       "decisionEvidence": "manual-review-registry"
+    },
+    {
+      "path": "desktop/src-tauri/src/runtime/hermes_readonly_compat.py",
+      "kind": "runtime",
+      "owner": "Local Agent Runtime",
+      "bytes": 1360,
+      "pathMentions": [],
+      "moduleConsumers": [],
+      "consumerEvidence": "no-static-module-consumer",
+      "consumerReview": "没有静态 import/mod 关系；路径提及、Owner 和领域回归构成保留证据，删除前必须补运行时或发布消费者复核。",
+      "decision": "keep",
+      "rationale": "Tauri Native Shell、Runtime 模块注册和离线 Patch normalizer 入口；具体领域规则归 runtime 子模块，app.rs 单独持续拆分。",
+      "reviewStatus": "reviewed",
+      "verification": "cargo check --manifest-path desktop/src-tauri/Cargo.toml && bash tests/run-tests.sh",
+      "decisionEvidence": "manual-review-rule:tauri-core-entrypoints"
     },
     {
       "path": "desktop/src-tauri/src/runtime/isolated_workspace.rs",
@@ -2594,7 +2609,7 @@
       "path": "desktop/src/agent-runtime/provider-evaluation.js",
       "kind": "eval-support",
       "owner": "Agent Reliability",
-      "bytes": 11319,
+      "bytes": 11431,
       "pathMentions": [],
       "moduleConsumers": [
         "desktop/scripts/run-provider-fallback-eval.mjs",
@@ -8552,6 +8567,23 @@
       "decisionEvidence": "manual-review-rule:desktop-test-suites"
     },
     {
+      "path": "desktop/tests/hermes-readonly-compat.test.py",
+      "kind": "test",
+      "owner": "Desktop Quality",
+      "bytes": 2180,
+      "pathMentions": [
+        ".github/workflows/agent-eval.yml"
+      ],
+      "moduleConsumers": [],
+      "consumerEvidence": "no-static-module-consumer",
+      "consumerReview": "没有静态 import/mod 关系；路径提及、Owner 和领域回归构成保留证据，删除前必须补运行时或发布消费者复核。",
+      "decision": "keep",
+      "rationale": "Desktop Runtime、Workbench、Preview 与 Agent 闭环回归套件；Node 测试覆盖 tests/*.test.mjs，E2E smoke 由 Playwright 独立运行。",
+      "reviewStatus": "reviewed",
+      "verification": "npm --prefix desktop test && npm --prefix desktop run test:smoke；原生窗口行为另运行 npm --prefix desktop run test:native。",
+      "decisionEvidence": "manual-review-rule:desktop-test-suites"
+    },
+    {
       "path": "desktop/tests/mcp-evaluation.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
@@ -8840,7 +8872,7 @@
       "path": "desktop/tests/provider-function-eval.test.mjs",
       "kind": "test",
       "owner": "Desktop Quality",
-      "bytes": 15114,
+      "bytes": 15301,
       "pathMentions": [],
       "moduleConsumers": [],
       "consumerEvidence": "no-static-module-consumer",
@@ -9740,7 +9772,7 @@
       "path": "docs/LESSONS.md",
       "kind": "documentation",
       "owner": "Documentation Governance",
-      "bytes": 171772,
+      "bytes": 172510,
       "pathMentions": [
         "desktop/src/components/workbench/project-memory-panel.jsx",
         "desktop/src/components/workbench/workspace-static-surfaces.jsx",
@@ -9842,7 +9874,7 @@
       "path": "docs/TESTING.md",
       "kind": "documentation",
       "owner": "Documentation Governance",
-      "bytes": 29609,
+      "bytes": 30135,
       "pathMentions": [
         "desktop/scripts/run-native-webdriver-smoke.mjs",
         "desktop/src-tauri/src/runtime/workspace.rs",

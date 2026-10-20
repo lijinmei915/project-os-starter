@@ -56,6 +56,7 @@ jobs:
           python3 -m pip install --user "hermes-agent[acp]==$HERMES_VERSION"
           test "$("$HOME/.local/bin/hermes-acp" --version)" = "$HERMES_VERSION"
           "$HOME/.local/bin/hermes-acp" --check
+          python3 desktop/tests/hermes-readonly-compat.test.py
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Verify Patch Normalizer
         if: matrix.target == 'p3' || matrix.target == 'p4' || matrix.target == 'suite'

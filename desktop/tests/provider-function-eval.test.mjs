@@ -64,13 +64,14 @@ test("stream probe distinguishes protocol failure without exporting private resp
 
 test("readonly file acceptance requires a file-only marker, paired successful read and unchanged files", () => {
   const result = {
-    readonlyFileEvidence: { fixturePath: "README.md", markerMatched: true, fixtureSourceUnchanged: true, projectEntriesUnchanged: true },
+    readonlyFileEvidence: { fixturePath: "README.md", outerSteps: 1, markerMatched: true, fixtureSourceUnchanged: true, projectEntriesUnchanged: true },
     readonlyToolEvents: [
       { kind: "tool-call", status: "requested", details: { name: "read_file", path: "README.md" } },
       { kind: "tool-result", status: "succeeded", details: { name: "read_file", path: "README.md", success: true } },
     ],
   };
   assert.equal(validateProviderReadonlyFileEvidence(result), result);
+  assert.throws(() => validateProviderReadonlyFileEvidence({ ...result, readonlyFileEvidence: { ...result.readonlyFileEvidence, outerSteps: 2 } }), /another outer round/);
   assert.throws(() => validateProviderReadonlyFileEvidence({ ...result, readonlyToolEvents: [...result.readonlyToolEvents].reverse() }), /tool evidence/);
   for (const field of ["markerMatched", "fixtureSourceUnchanged", "projectEntriesUnchanged"]) {
     assert.throws(() => validateProviderReadonlyFileEvidence({ ...result, readonlyFileEvidence: { ...result.readonlyFileEvidence, [field]: false } }));

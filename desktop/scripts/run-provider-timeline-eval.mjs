@@ -58,6 +58,8 @@ try {
     runtimeResult.readonlyFileEvidence = {
       fixturePath: "README.md",
       markerMatched: String(runtimeResult.modelAnswerSummary || "").includes(marker),
+      outerSteps: runtimeResult.timeline?.events?.flatMap((event) => event.details?.agentEvents || [])
+        .find((event) => event.kind === "terminal")?.details?.step,
       fixtureSourceUnchanged: fs.readFileSync(path.join(projectRoot, "README.md"), "utf8") === fixtureSource,
       projectEntriesUnchanged: JSON.stringify(fs.readdirSync(projectRoot).sort()) === JSON.stringify(["README.md"]),
     };

@@ -89,6 +89,7 @@ export function validateProviderActivityTiming(result) {
 
 export function validateProviderReadonlyFileEvidence(result) {
   const evidence = result?.readonlyFileEvidence;
+  if (evidence?.outerSteps !== 1) throw new Error("Readonly single-file fixture required another outer round");
   if (evidence?.fixturePath !== "README.md" || evidence.markerMatched !== true) throw new Error("Readonly Agent did not recover the file-only marker");
   if (evidence.fixtureSourceUnchanged !== true || evidence.projectEntriesUnchanged !== true) throw new Error("Readonly Agent changed fixture files");
   const events = result?.readonlyToolEvents || [];

@@ -1,6 +1,6 @@
 {
   "schemaVersion": "omnidesk.schema-contract-inventory.v1",
-  "generatedAt": "2026-10-20T10:21:58.218Z",
+  "generatedAt": "2026-10-20T10:38:25.051Z",
   "sourceOfTruth": "schemas/*.json plus git grep consumer evidence",
   "totals": {
     "contracts": 16,
