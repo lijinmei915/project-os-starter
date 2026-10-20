@@ -91,9 +91,11 @@ jobs:
           OMNIDESK_AGENT_EVAL_MODEL: ${{ vars.OMNIDESK_AGENT_EVAL_MODEL }}
         run: |
           export eval_root=".omnidesk/evidence/agent-eval/${{ github.run_id }}/p1"
-          npm --prefix desktop run eval:provider:function -- --trace "../$eval_root/traces/provider-function-calling.trace.json"
-          npm --prefix desktop run eval:provider:fallback -- --trace "../$eval_root/traces/provider-fallback-slow-stream.trace.json"
-          npm --prefix desktop run eval:provider:fallback -- --direct-stream --trace "../$eval_root/traces/provider-direct-stream.trace.json"
+          eval_status=0
+          npm --prefix desktop run eval:provider:function -- --trace "../$eval_root/traces/provider-function-calling.trace.json" || eval_status=1
+          npm --prefix desktop run eval:provider:fallback -- --trace "../$eval_root/traces/provider-fallback-slow-stream.trace.json" || eval_status=1
+          npm --prefix desktop run eval:provider:fallback -- --direct-stream --trace "../$eval_root/traces/provider-direct-stream.trace.json" || eval_status=1
+          exit "$eval_status"
       - name: Run P3 Runtime Timeline evaluation
         if: matrix.target == 'p3'
         env:
@@ -102,8 +104,10 @@ jobs:
           OMNIDESK_AGENT_EVAL_MODEL: ${{ vars.OMNIDESK_AGENT_EVAL_MODEL }}
         run: |
           export eval_root=".omnidesk/evidence/agent-eval/${{ github.run_id }}/p3"
-          npm --prefix desktop run eval:provider:timeline -- --trace "../$eval_root/traces/provider-runtime-timeline.trace.json"
-          npm --prefix desktop run eval:provider:timeline -- --readonly-files --trace "../$eval_root/traces/provider-readonly-files.trace.json"
+          eval_status=0
+          npm --prefix desktop run eval:provider:timeline -- --trace "../$eval_root/traces/provider-runtime-timeline.trace.json" || eval_status=1
+          npm --prefix desktop run eval:provider:timeline -- --readonly-files --trace "../$eval_root/traces/provider-readonly-files.trace.json" || eval_status=1
+          exit "$eval_status"
       - name: Run P4 third-party MCP evaluation
         if: matrix.target == 'p4'
         env:
